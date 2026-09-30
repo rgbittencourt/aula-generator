@@ -2,6 +2,9 @@ const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
 const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
+const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
+const DRAFT_MAX_AGE_DAYS = 30;
+let saveTimer = null;
 
 function splitLines(value) { return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : String(value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
 function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char])); }
@@ -11,6 +14,168 @@ function paragraphsMarkup(value) { return String(value ?? "").split(/\n\s*\n|\r?
 function slugify(value) { return String(value || "curso").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "curso"; }
 function downloadBlob(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
 function addDays(dateString, days) { const date = new Date(`${dateString}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); }
+
+function formatSavedAt(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function setSaveStatus(title, detail, tone = "") {
+  const bar = $("#recovery-bar");
+  if (!bar) return;
+  $("#save-status-title").textContent = title;
+  $("#save-status").textContent = detail;
+  bar.classList.toggle("is-warning", tone === "warning");
+  bar.classList.toggle("is-success", tone === "success");
+}
+
+function safeStorageGet() {
+  try { return localStorage.getItem(DRAFT_STORAGE_KEY); } catch { return null; }
+}
+
+function safeStorageSet(value) {
+  try { localStorage.setItem(DRAFT_STORAGE_KEY, value); return true; } catch { return false; }
+}
+
+function safeStorageRemove() {
+  try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch { /* armazenamento pode estar bloqueado */ }
+}
+
+function persistedInput() {
+  const input = formInput();
+  const { accessCode, ...safeInput } = input;
+  return safeInput;
+}
+
+function currentSnapshot() {
+  const input = persistedInput();
+  const hasWork = Boolean(input.title.trim() || state.weeks.length);
+  if (!hasWork) return null;
+  return {
+    version: 2,
+    app: "aula-generator",
+    savedAt: new Date().toISOString(),
+    form: input,
+    results: state.weeks.length ? {
+      ok: true,
+      provider: state.provider,
+      input: state.input || input,
+      workload: state.workload,
+      generalPlan: state.generalPlan,
+      teacherGuides: state.teacherGuides,
+      validation: state.validation,
+      weeks: state.weeks
+    } : null
+  };
+}
+
+function saveDraft(reason = "") {
+  try {
+    const snapshot = currentSnapshot();
+    if (!snapshot) return;
+    if (!safeStorageSet(JSON.stringify(snapshot))) {
+      setSaveStatus("Salvamento automático limitado", "O navegador não tem espaço disponível. Baixe um backup manual.", "warning");
+      return;
+    }
+    const resultText = snapshot.results ? ` · ${snapshot.results.weeks.length} semana(s) preservada(s)` : "";
+    setSaveStatus("Salvamento local ativo", `Último salvamento: ${formatSavedAt(snapshot.savedAt)}${resultText}`, "success");
+  } catch {
+    setSaveStatus("Backup manual recomendado", "Não foi possível salvar automaticamente neste navegador. Use Baixar backup.", "warning");
+  }
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveDraft("alteração"), 500);
+}
+
+function readDraft() {
+  const raw = safeStorageGet();
+  if (!raw) return null;
+  try {
+    const draft = JSON.parse(raw);
+    const age = draft?.savedAt ? Date.now() - new Date(draft.savedAt).getTime() : Infinity;
+    if (draft?.version !== 2 || draft?.app !== "aula-generator" || !draft.form || age > DRAFT_MAX_AGE_DAYS * 86400000) {
+      safeStorageRemove();
+      return null;
+    }
+    return draft;
+  } catch {
+    safeStorageRemove();
+    return null;
+  }
+}
+
+function hideDraftRecovery() { $("#draft-recovery")?.classList.add("hidden"); }
+
+function offerDraftRecovery() {
+  const draft = readDraft();
+  if (!draft) return;
+  const hasResults = Boolean(draft.results?.weeks?.length);
+  $("#draft-recovery-details").textContent = `Salvo em ${formatSavedAt(draft.savedAt)}${hasResults ? ` · ${draft.results.weeks.length} semana(s) gerada(s)` : " · briefing em andamento"}.`;
+  $("#draft-recovery").classList.remove("hidden");
+  setSaveStatus("Planejamento recuperável encontrado", "Escolha Retomar planejamento ou descarte este rascunho.", "success");
+}
+
+function applyInputToForm(input = {}) {
+  const fields = { "course-title": "title", audience: "audience", level: "level", author: "author", institution: "institution", weeks: "weeks", hours: "hoursPerWeek", "calendar-mode": "calendarMode", "start-date": "startDate", objectives: "objectives", content: "content", "didactic-mode": "didacticMode", references: "references", videos: "videoLinks", "video-search-suggestions": "videoSearchSuggestions", "image-links": "imageLinks", "image-search-suggestions": "imageSearchSuggestions" };
+  Object.entries(fields).forEach(([elementId, key]) => {
+    const element = $("#" + elementId);
+    if (!element) return;
+    const value = input[key];
+    element.value = Array.isArray(value) ? value.join("\n") : (value ?? "");
+  });
+  $("#practice-enabled").checked = Boolean(input.webPracticeEnabled || input.webPractice?.enabled);
+  $("#practice-list").innerHTML = "";
+  practiceSequence = 0;
+  const practices = Array.isArray(input.webPractices) && input.webPractices.length ? input.webPractices : [{}];
+  practices.forEach((practice) => addPractice(practice));
+  $("#materials-list").innerHTML = "";
+  materialSequence = 0;
+  const materials = Array.isArray(input.materials) && input.materials.length ? input.materials : [{}];
+  materials.forEach((material) => addMaterial(material));
+  if ($("#access-code")) $("#access-code").value = "";
+  toggleCalendar();
+  togglePractice();
+  updateSummary();
+  updateProgress();
+}
+
+function restoreSnapshot(snapshot) {
+  if (!snapshot?.form) return;
+  applyInputToForm(snapshot.form);
+  hideDraftRecovery();
+  if (snapshot.results?.weeks?.length) {
+    renderWeeks({ ...snapshot.results, input: snapshot.results.input || snapshot.form });
+    setSaveStatus("Planejamento retomado", `${snapshot.results.weeks.length} semana(s) recuperada(s).`, "success");
+  } else {
+    setSaveStatus("Briefing retomado", "Continue preenchendo; o salvamento automático está ativo.", "success");
+  }
+  showAssistantMessage("Planejamento recuperado. Confira o briefing e continue de onde parou.");
+}
+
+function downloadBackup() {
+  const snapshot = currentSnapshot();
+  if (!snapshot) { showAssistantMessage("Preencha ao menos o título do curso antes de salvar um backup.", true); return; }
+  downloadBlob(new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" }), `${slugify(snapshot.form.title || "planejamento")}-backup.json`);
+  setSaveStatus("Backup baixado", "Guarde este arquivo fora do navegador para uma recuperação adicional.", "success");
+}
+
+function restoreBackupFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const snapshot = JSON.parse(String(reader.result || ""));
+      if (snapshot?.version !== 2 || snapshot?.app !== "aula-generator" || !snapshot.form) throw new Error("Este arquivo não é um backup válido do Gerador de Aulas.");
+      safeStorageSet(JSON.stringify(snapshot));
+      restoreSnapshot(snapshot);
+    } catch (error) { showAssistantMessage(error.message || "Não foi possível restaurar o backup.", true); }
+  };
+  reader.readAsText(file);
+}
 
 let practiceSequence = 0;
 let materialSequence = 0;
@@ -152,6 +317,12 @@ function updateSummary() {
   $("#workload-preview strong").textContent = `${hours * weeks} horas totais`;
 }
 
+function updateProgress() {
+  const fields = [...document.querySelectorAll("#course-form input, #course-form textarea, #course-form select")].filter((item) => !item.disabled && item.type !== "hidden");
+  const filled = fields.filter((item) => item.type === "checkbox" ? item.checked : String(item.value || "").trim()).length;
+  $("#briefing-progress").style.width = `${Math.round(filled / Math.max(1, fields.length) * 100)}%`;
+}
+
 function toggleCalendar() {
   const calendar = $("#calendar-mode").value === "calendar";
   document.querySelectorAll(".calendar-only").forEach((item) => item.classList.toggle("hidden", !calendar));
@@ -242,6 +413,8 @@ async function assistBriefing() {
     if (!$("#video-search-suggestions").value.trim() && Array.isArray(briefing.videoSearchSuggestions) && briefing.videoSearchSuggestions.length) { $("#video-search-suggestions").value = briefing.videoSearchSuggestions.join("\n"); filled.push("buscas de vídeos"); }
     if (!$("#image-search-suggestions").value.trim() && Array.isArray(briefing.imageSearchSuggestions) && briefing.imageSearchSuggestions.length) { $("#image-search-suggestions").value = briefing.imageSearchSuggestions.join("\n"); filled.push("buscas de imagens"); }
     updateSummary();
+    updateProgress();
+    scheduleSave();
     const note = briefing.notes?.length ? ` Observações: ${briefing.notes.join(" ")}` : "";
     showAssistantMessage(filled.length ? `Campos preenchidos: ${filled.join(", ")}. Revise as sugestões antes de gerar as aulas.${note}` : "A IA não encontrou campos vazios que pudesse completar com segurança.");
   } catch (error) { showAssistantMessage(error.message, true); }
@@ -447,6 +620,7 @@ function renderWeeks(data) {
   $("#week-grid").querySelectorAll(".week-download").forEach((button) => button.addEventListener("click", () => downloadWeek(Number(button.dataset.index))));
   renderGeneralPlan(data.generalPlan);
   renderWorkload(data.workload);
+  saveDraft("resultado");
   $("#results-section").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -540,21 +714,21 @@ async function loadHealth() {
   } catch { status.innerHTML = '<span class="status-dot offline"></span>servidor indisponível'; }
 }
 
-$("#add-practice").addEventListener("click", () => addPractice());
-$("#add-material").addEventListener("click", () => addMaterial());
+$("#add-practice").addEventListener("click", () => { addPractice(); scheduleSave(); });
+$("#add-material").addEventListener("click", () => { addMaterial(); scheduleSave(); });
 $("#practice-list").addEventListener("click", (event) => {
   const button = event.target.closest("[data-remove-practice]");
   if (!button) return;
   button.closest(".practice-card").remove();
   if (!document.querySelector("#practice-list .practice-card")) addPractice();
-  refreshItemButtons(); togglePractice(); updateSummary();
+  refreshItemButtons(); togglePractice(); updateSummary(); scheduleSave();
 });
 $("#materials-list").addEventListener("click", (event) => {
   const button = event.target.closest("[data-remove-material]");
   if (!button) return;
   button.closest(".material-card").remove();
   if (!document.querySelector("#materials-list .material-card")) addMaterial();
-  refreshItemButtons(); updateSummary();
+  refreshItemButtons(); updateSummary(); scheduleSave();
 });
 addPractice();
 addMaterial();
@@ -568,15 +742,16 @@ $("#close-lesson-modal-secondary").addEventListener("click", closeLessonPreview)
 $("#regenerate-week-button").addEventListener("click", regenerateSelectedWeek);
 $("#lesson-modal").addEventListener("click", (event) => { if (event.target.id === "lesson-modal") closeLessonPreview(); });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.previewIndex != null) closeLessonPreview(); });
-$("#calendar-mode").addEventListener("change", toggleCalendar);
-$("#practice-enabled").addEventListener("change", togglePractice);
-document.querySelectorAll("#course-form input, #course-form textarea, #course-form select").forEach((field) => field.addEventListener("input", updateSummary));
-document.querySelectorAll("#course-form input, #course-form textarea, #course-form select").forEach((field) => field.addEventListener("input", () => {
-  const fields = [...document.querySelectorAll("#course-form input, #course-form textarea, #course-form select")].filter((item) => !item.disabled && item.type !== "hidden");
-  const filled = fields.filter((item) => item.type === "checkbox" ? item.checked : String(item.value || "").trim()).length;
-  $("#briefing-progress").style.width = `${Math.round(filled / Math.max(1, fields.length) * 100)}%`;
-}));
+$("#calendar-mode").addEventListener("change", () => { toggleCalendar(); scheduleSave(); });
+$("#practice-enabled").addEventListener("change", () => { togglePractice(); scheduleSave(); });
+$("#course-form").addEventListener("input", () => { updateSummary(); updateProgress(); scheduleSave(); });
+$("#save-backup-button").addEventListener("click", downloadBackup);
+$("#restore-backup-button").addEventListener("click", () => $("#backup-file-input").click());
+$("#backup-file-input").addEventListener("change", (event) => { restoreBackupFile(event.target.files?.[0]); event.target.value = ""; });
+$("#restore-draft-button").addEventListener("click", () => restoreSnapshot(readDraft()));
+$("#discard-draft-button").addEventListener("click", () => { safeStorageRemove(); hideDraftRecovery(); setSaveStatus("Salvamento local ativo", "O próximo briefing será salvo automaticamente neste navegador."); });
+window.addEventListener("beforeunload", () => saveDraft("fechamento"));
 $("#generate-button").dataset.label = "Gerar com IA";
 $("#fallback-button").dataset.label = "Gerar exemplo local";
 $("#assist-button").dataset.label = "Preencher vazios com IA";
-toggleCalendar(); togglePractice(); updateSummary(); loadHealth();
+toggleCalendar(); togglePractice(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();

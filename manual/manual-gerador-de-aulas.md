@@ -161,6 +161,20 @@ Na implantação atual, a IA está configurada e a aplicação pública exige um
 
 Digite o código no campo **Código de acesso da IA publicada**. Se o código estiver errado ou ausente, a geração protegida retornará erro de autorização.
 
+### 4.2 Salvamento automático e recuperação
+
+O Gerador salva automaticamente o briefing e, depois da geração, também salva as semanas, o Planejamento Geral, os guias do professor e o estado de revisão no navegador. Se houver queda de energia, atualização acidental ou fechamento inesperado, abra novamente a mesma URL no mesmo navegador e dispositivo.
+
+Se existir um planejamento salvo, aparecerá a faixa:
+
+> Encontramos um planejamento salvo neste navegador.
+
+Clique em **Retomar planejamento** para restaurar o briefing e, quando disponível, as semanas já geradas. O campo do código de acesso não é salvo; informe-o novamente quando precisar gerar ou refazer uma semana.
+
+Para maior segurança, clique em **Baixar backup** depois de uma geração importante. Guarde o arquivo `.json` em outro local. Em caso de perda do armazenamento do navegador, clique em **Restaurar backup** e selecione esse arquivo.
+
+O autosave é local: ele não sincroniza entre computadores, perfis de navegador ou dispositivos. Para um planejamento importante, use os dois mecanismos: autosave e backup baixado.
+
 ### 4.1 Como interpretar o indicador do cabeçalho
 
 O cabeçalho mostra o estado dos serviços. Exemplos:

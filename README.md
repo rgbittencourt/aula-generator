@@ -8,6 +8,14 @@ Aplicação para transformar um briefing de curso em uma trilha semanal de aulas
 - **Vercel:** implantação recomendada para ativar IA, pesquisa de recursos, PDF do professor e ZIP completo. O mesmo repositório executa o frontend e as funções serverless.
 - **Segurança:** as chaves da OpenAI e do YouTube devem ser cadastradas somente como variáveis secretas da Vercel. Elas nunca devem entrar no GitHub, no arquivo `.env` versionado ou nesta conversa.
 
+## Salvamento e recuperação contra queda de energia
+
+O navegador salva automaticamente o briefing e, depois da geração, as semanas, o Planejamento Geral, o guia do professor e o estado de validação em `localStorage`. Ao reabrir a aplicação no mesmo navegador e dispositivo, aparecerá a opção **Retomar planejamento**.
+
+Para uma proteção adicional, use **Baixar backup** antes de fechar o navegador ou depois de uma geração importante. O arquivo JSON baixado pode ser recuperado com **Restaurar backup**. Por segurança, o código de acesso da IA nunca é salvo no autosave nem no backup.
+
+O autosave local protege contra atualização da página, fechamento acidental, queda de energia e reinício do navegador, desde que os dados do site não sejam apagados. Ele não substitui o backup manual quando o planejamento for importante, nem sincroniza automaticamente entre dispositivos ou navegadores diferentes.
+
 ## Passo a passo: criar a chave da API OpenAI
 
 A assinatura do ChatGPT e o uso da API são gerenciados em áreas diferentes da OpenAI. Para o gerador, é necessária uma **API key** da plataforma de desenvolvedores.
