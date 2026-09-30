@@ -11,6 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "..", "public");
 const app = express();
 const port = Number(process.env.PORT || 4310);
+const host = process.env.HOST || "127.0.0.1";
 
 app.use(express.json({ limit: "4mb" }));
 app.use(express.static(publicDir, { etag: true }));
@@ -62,6 +63,6 @@ app.post("/api/zip", async (req, res) => {
   }
 });
 
-app.listen(port, "127.0.0.1", () => {
-  console.log(`Aula Generator em http://127.0.0.1:${port}`);
+app.listen(port, host, () => {
+  console.log(`Aula Generator em http://${host}:${port}`);
 });

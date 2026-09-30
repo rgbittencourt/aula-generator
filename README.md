@@ -1,20 +1,26 @@
 # Gerador de Aulas
 
-Aplicação local para transformar um briefing de curso em uma trilha semanal de aulas compatível com o **Aula Studio**.
+Aplicação para transformar um briefing de curso em uma trilha semanal de aulas compatível com o **Aula Studio**.
 
-## O que já faz
+## Abrir diretamente pelo navegador
 
-O formulário aceita tema geral, público, nível, número de semanas, horas de estudo por semana, calendário por numeração ou data de início, webpráticas, objetivos, conteúdos, referências e links de vídeos. O resultado pode ser gerado por IA ou por um exemplo local sem API. Cada semana é baixável como `.aula.json` e todas podem ser empacotadas em um ZIP.
+O frontend público é publicado pelo GitHub Pages em:
+
+<https://rgbittencourt.github.io/aula-generator/>
+
+Na versão GitHub Pages, use **Gerar exemplo local**. Ela funciona sem terminal, backend ou chave de API e gera os arquivos `.aula.json` e o ZIP diretamente no navegador.
+
+A geração por IA fica desativada nessa URL de propósito: GitHub Pages é hospedagem estática e não pode guardar uma `OPENAI_API_KEY` com segurança. Para ativar IA, será necessário publicar o backend em uma hospedagem com variáveis secretas protegidas.
+
+## O que o gerador prepara
+
+O formulário aceita tema geral, público, nível, número de semanas, horas de estudo por semana, calendário por numeração ou data de início, webpráticas, objetivos, conteúdos, referências e links de vídeos. Cada semana pode ser baixada como `.aula.json` e todas podem ser empacotadas em um ZIP.
 
 A distribuição detalhada de horas está preparada para receber as fórmulas da planilha. Até lá, o sistema registra a carga semanal e informa que a alocação interna está pendente.
 
-## Requisitos
+## Uso local com IA
 
-- Node.js 22 ou superior;
-- uma chave de API de um provedor OpenAI-compatible para geração com IA;
-- acesso local ao repositório privado do Aula Studio apenas para abrir os arquivos gerados no editor.
-
-## Executar
+Para usar a IA por um backend local protegido:
 
 ```bash
 cp .env.example .env
@@ -25,14 +31,13 @@ npm run dev
 
 Abra <http://127.0.0.1:4310>.
 
-Para validar o fluxo sem configurar uma chave, clique em **Gerar exemplo local**. O endpoint `GET /api/health` informa se a IA está configurada.
-
 ### Variáveis de ambiente
 
 ```text
 OPENAI_API_KEY=chave-local-nunca-commitada
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
+HOST=127.0.0.1
 PORT=4310
 ```
 
