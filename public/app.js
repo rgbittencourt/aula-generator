@@ -50,6 +50,11 @@ function materialCard(data = {}) {
       <label class="field"><span>Momento de uso</span><input class="material-moment" value="${escapeHtml(data.moment || "")}" placeholder="Ex.: antes da semana 1; revisão da semana 3" /></label>
       <label class="field"><span>Link real (opcional)</span><input class="material-link" type="url" value="${escapeHtml(data.link || "")}" placeholder="Cole somente um link conferido" /></label>
     </div>
+    <div class="field-grid three">
+      <label class="field"><span>Páginas</span><input class="material-pages" type="number" min="0" step="1" value="${escapeHtml(data.pages || "")}" placeholder="Ex.: 12" /></label>
+      <label class="field"><span>Duração (min)</span><input class="material-duration" type="number" min="0" step="1" value="${Number(data.durationMinutes) || ""}" placeholder="Para vídeo/áudio" /></label>
+      <label class="field checkbox-field"><span>Leitura obrigatória</span><input class="material-required" type="checkbox" ${data.required ? "checked" : ""} /></label>
+    </div>
     <label class="field"><span>Objetivo do material</span><input class="material-objective" value="${escapeHtml(data.objective || "")}" placeholder="Por que o estudante precisa deste material?" /></label>
     <label class="field"><span>Alinhamento com o conteúdo</span><textarea class="material-alignment" rows="2" placeholder="Que conceito, objetivo ou webprática ele sustenta?">${escapeHtml(data.alignment || "")}</textarea></label>
     <label class="field"><span>Como o estudante vai usar</span><textarea class="material-use" rows="2" placeholder="Ler, comparar, assistir com roteiro, extrair dados…">${escapeHtml(data.use || "")}</textarea></label>
@@ -87,6 +92,9 @@ function collectMaterials() {
     title: card.querySelector(".material-title").value.trim(),
     link: card.querySelector(".material-link").value.trim(),
     moment: card.querySelector(".material-moment").value.trim(),
+    pages: card.querySelector(".material-pages").value.trim(),
+    durationMinutes: Number(card.querySelector(".material-duration").value) || 0,
+    required: card.querySelector(".material-required").checked,
     objective: card.querySelector(".material-objective").value.trim(),
     alignment: card.querySelector(".material-alignment").value.trim(),
     use: card.querySelector(".material-use").value.trim(),
