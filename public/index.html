@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#14213D" />
+  <title>Gerador de Aulas</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Gerador de Aulas">
+      <img src="/logo.svg" alt="" width="38" height="38" />
+      <span><strong>Gerador</strong><small>de aulas</small></span>
+    </a>
+    <div class="header-status" id="api-status"><span class="status-dot"></span> verificando ambiente…</div>
+  </header>
+
+  <main class="page-shell">
+    <section class="intro">
+      <p class="eyebrow">PLANEJAMENTO PEDAGÓGICO</p>
+      <h1>Do tema geral a uma trilha de aulas semanais.</h1>
+      <p class="intro-copy">Descreva o curso, defina o tempo de estudo e escolha como o calendário deve funcionar. O gerador prepara uma aula editável por semana para revisão no Aula Studio.</p>
+    </section>
+
+    <form id="course-form" novalidate>
+      <div class="workspace-grid">
+        <div class="form-column">
+          <section class="panel panel-main">
+            <div class="panel-heading">
+              <div><span class="step">01</span><div><h2>Identidade do curso</h2><p>O contexto que orienta todas as semanas.</p></div></div>
+            </div>
+            <div class="field-grid two">
+              <label class="field span-2"><span>Tema geral ou título do curso <b>*</b></span><input id="course-title" name="title" required placeholder="Ex.: Fundamentos de sustentabilidade urbana" /></label>
+              <label class="field"><span>Público</span><input id="audience" name="audience" placeholder="Ex.: estudantes de graduação" /></label>
+              <label class="field"><span>Nível</span><select id="level" name="level"><option>Iniciante</option><option selected>Intermediário</option><option>Avançado</option></select></label>
+              <label class="field"><span>Autor(a)</span><input id="author" name="author" placeholder="Nome para os arquivos" /></label>
+              <label class="field"><span>Instituição</span><input id="institution" name="institution" placeholder="Opcional" /></label>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading"><div><span class="step">02</span><div><h2>Tempo e calendário</h2><p>A carga semanal ficará registrada em cada JSON.</p></div></div></div>
+            <div class="field-grid three">
+              <label class="field"><span>Número de semanas <b>*</b></span><input id="weeks" name="weeks" type="number" min="1" max="52" value="4" required /></label>
+              <label class="field"><span>Horas por semana <b>*</b></span><input id="hours" name="hoursPerWeek" type="number" min="0" max="80" step="0.25" value="4" required /></label>
+              <label class="field"><span>Modo do calendário</span><select id="calendar-mode" name="calendarMode"><option value="week-number" selected>Semana 1, Semana 2…</option><option value="calendar">Data de início real</option></select></label>
+              <label class="field calendar-only span-2 hidden"><span>Início do curso</span><input id="start-date" name="startDate" type="date" /></label>
+              <div class="calendar-note calendar-only hidden">As semanas serão calculadas em blocos de 7 dias a partir da data escolhida.</div>
+            </div>
+            <div class="workload-preview" id="workload-preview"><span class="workload-icon">Σ</span><span><strong>16 horas totais</strong><small>Distribuição interna aguardando as fórmulas da planilha.</small></span></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading"><div><span class="step">03</span><div><h2>Intenção pedagógica</h2><p>Objetivos e conteúdo-base para a geração.</p></div></div></div>
+            <label class="field"><span>Objetivos de aprendizagem <b>*</b></span><textarea id="objectives" name="objectives" rows="4" placeholder="Um objetivo por linha. Ex.: Identificar os principais desafios de mobilidade urbana."></textarea><small class="hint">Escreva verbos observáveis: analisar, comparar, aplicar, criar, avaliar.</small></label>
+            <label class="field"><span>Conteúdos, recortes e orientações</span><textarea id="content" name="content" rows="5" placeholder="Conceitos obrigatórios, recorte regional, abordagem desejada, exemplos que devem aparecer…"></textarea></label>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading"><div><span class="step">04</span><div><h2>Webpráticas</h2><p>Atividades de pesquisa, produção ou aplicação na web.</p></div></div><label class="switch"><input id="practice-enabled" type="checkbox" /><span></span></label></div>
+            <div id="practice-fields" class="practice-fields disabled">
+              <label class="field"><span>Em que momentos devem aparecer?</span><input id="practice-moments" placeholder="Ex.: semanas 2 e 4; depois do módulo de conceitos" /></label>
+              <div class="field-grid two">
+                <label class="field"><span>Duração estimada (minutos)</span><input id="practice-duration" type="number" min="0" step="5" value="45" /></label>
+                <label class="field"><span>Tipo de prática</span><select id="practice-type"><option>Pesquisa orientada</option><option>Produção colaborativa</option><option>Estudo de caso</option><option>Curadoria de referências</option></select></label>
+              </div>
+              <label class="field"><span>Instruções gerais</span><textarea id="practice-instructions" rows="3" placeholder="O que o aluno deve fazer, observar, produzir ou entregar?"></textarea></label>
+            </div>
+            <p class="disabled-note" id="practice-note">Ative para incluir webpráticas no briefing da IA.</p>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading"><div><span class="step">05</span><div><h2>Materiais de apoio</h2><p>Referências e links entram como insumos, não como fontes inventadas.</p></div></div></div>
+            <label class="field"><span>Referências, livros e documentos</span><textarea id="references" rows="4" placeholder="Uma referência ou URL por linha"></textarea></label>
+            <label class="field"><span>Links de vídeos</span><textarea id="videos" rows="3" placeholder="Um link do YouTube ou outra URL por linha"></textarea></label>
+          </section>
+
+          <div class="form-actions">
+            <button class="button button-secondary" type="button" id="fallback-button"><span>Gerar exemplo local</span></button>
+            <button class="button button-primary" type="submit" id="generate-button"><span>Gerar com IA</span><span class="button-arrow">→</span></button>
+          </div>
+          <p class="action-note">O exemplo local não usa API. Use-o para validar o fluxo e o formato dos arquivos antes de configurar a chave.</p>
+        </div>
+
+        <aside class="summary-column">
+          <section class="summary-card sticky-card">
+            <p class="eyebrow">RESUMO DO PROJETO</p>
+            <h2 id="summary-title">Seu curso ainda não foi definido</h2>
+            <div class="summary-rule"></div>
+            <dl class="summary-list">
+              <div><dt>Semanas</dt><dd id="summary-weeks">4</dd></div>
+              <div><dt>Estudo semanal</dt><dd id="summary-hours">4 h</dd></div>
+              <div><dt>Carga total</dt><dd id="summary-total">16 h</dd></div>
+              <div><dt>Calendário</dt><dd id="summary-calendar">Por numeração</dd></div>
+              <div><dt>Webpráticas</dt><dd id="summary-practice">Não</dd></div>
+            </dl>
+            <div class="formula-note"><span>ƒx</span><p><strong>Cálculos em evolução</strong> A distribuição de conteúdo, prática e avaliação será ligada à planilha de fórmulas na próxima etapa.</p></div>
+          </section>
+          <section class="future-card"><span class="future-icon">✦</span><h3>Extensões previstas</h3><p>O adaptador de IA foi separado do gerador. Depois podemos conectar imagens, diagramas, busca de vídeos, referências e outros provedores sem mudar o contrato semanal.</p></section>
+        </aside>
+      </div>
+    </form>
+
+    <section class="results-section hidden" id="results-section">
+      <div class="results-header"><div><p class="eyebrow">RESULTADO</p><h2 id="results-title">Semanas geradas</h2><p id="results-subtitle"></p></div><button class="button button-primary" type="button" id="zip-button">Baixar ZIP <span class="button-arrow">↓</span></button></div>
+      <div class="result-alert hidden" id="result-alert"></div>
+      <div class="week-grid" id="week-grid"></div>
+    </section>
+
+    <section class="empty-state" id="empty-state"><span class="empty-mark">01</span><p>Preencha o briefing para montar a primeira trilha semanal.</p></section>
+  </main>
+  <footer class="site-footer"><span>Gerador de Aulas</span><span>Saída compatível com Aula Studio · revisão humana antes da publicação</span></footer>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

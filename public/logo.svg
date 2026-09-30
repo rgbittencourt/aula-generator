@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title>Gerador de Aulas</title>
+  <desc>Três cartões de planejamento semanal empilhados.</desc>
+  <rect width="128" height="128" rx="0" fill="#14213D"/>
+  <rect x="27" y="24" width="64" height="42" rx="8" fill="#F6F0E6"/>
+  <rect x="37" y="34" width="28" height="5" rx="2.5" fill="#E76F51"/>
+  <rect x="37" y="45" width="43" height="5" rx="2.5" fill="#B8C5D6"/>
+  <rect x="37" y="55" width="33" height="5" rx="2.5" fill="#B8C5D6"/>
+  <rect x="37" y="48" width="64" height="42" rx="8" fill="#E76F51" opacity=".95"/>
+  <rect x="47" y="58" width="28" height="5" rx="2.5" fill="#FFF8ED"/>
+  <rect x="47" y="69" width="43" height="5" rx="2.5" fill="#F7B5A2"/>
+  <rect x="47" y="79" width="33" height="5" rx="2.5" fill="#F7B5A2"/>
+  <rect x="27" y="72" width="64" height="42" rx="8" fill="#2A9D8F"/>
+  <rect x="37" y="82" width="28" height="5" rx="2.5" fill="#FFF8ED"/>
+  <rect x="37" y="93" width="43" height="5" rx="2.5" fill="#BCE5DE"/>
+  <rect x="37" y="103" width="33" height="5" rx="2.5" fill="#BCE5DE"/>
+</svg>

@@ -1,0 +1,159 @@
+const $ = (selector) => document.querySelector(selector);
+const state = { input: null, weeks: [], workload: null, provider: null };
+const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
+
+function splitLines(value) { return String(value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
+function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char])); }
+function formatDate(value) { if (!value) return ""; return value.split("-").reverse().join("/"); }
+function slugify(value) { return String(value || "curso").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "curso"; }
+function downloadBlob(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
+
+function formInput() {
+  const calendarMode = $("#calendar-mode").value;
+  return {
+    title: $("#course-title").value,
+    audience: $("#audience").value,
+    level: $("#level").value,
+    author: $("#author").value,
+    institution: $("#institution").value,
+    weeks: Number($("#weeks").value),
+    hoursPerWeek: Number($("#hours").value),
+    calendarMode,
+    startDate: calendarMode === "calendar" ? $("#start-date").value : null,
+    objectives: splitLines($("#objectives").value),
+    content: $("#content").value,
+    references: splitLines($("#references").value),
+    videoLinks: splitLines($("#videos").value),
+    webPracticeEnabled: $("#practice-enabled").checked,
+    webPractice: {
+      enabled: $("#practice-enabled").checked,
+      moments: splitLines($("#practice-moments").value),
+      instructions: `${$("#practice-type").value}. ${$("#practice-instructions").value}`.trim(),
+      durationMinutes: Number($("#practice-duration").value) || 0
+    }
+  };
+}
+
+function updateSummary() {
+  const weeks = Math.max(1, Number($("#weeks").value) || 1);
+  const hours = Math.max(0, Number($("#hours").value) || 0);
+  const calendar = $("#calendar-mode").value;
+  $("#summary-title").textContent = $("#course-title").value.trim() || "Seu curso ainda não foi definido";
+  $("#summary-weeks").textContent = weeks;
+  $("#summary-hours").textContent = `${hours} h`;
+  $("#summary-total").textContent = `${hours * weeks} h`;
+  $("#summary-calendar").textContent = calendar === "calendar" ? (formatDate($("#start-date").value) || "Data pendente") : "Por numeração";
+  $("#summary-practice").textContent = $("#practice-enabled").checked ? "Sim" : "Não";
+  $("#workload-preview strong").textContent = `${hours * weeks} horas totais`;
+}
+
+function toggleCalendar() {
+  const calendar = $("#calendar-mode").value === "calendar";
+  document.querySelectorAll(".calendar-only").forEach((item) => item.classList.toggle("hidden", !calendar));
+  $("#start-date").required = calendar;
+  updateSummary();
+}
+
+function togglePractice() {
+  const enabled = $("#practice-enabled").checked;
+  $("#practice-fields").classList.toggle("disabled", !enabled);
+  $("#practice-note").classList.toggle("hidden", enabled);
+  document.querySelectorAll("#practice-fields input, #practice-fields textarea, #practice-fields select").forEach((item) => { item.disabled = !enabled; });
+  updateSummary();
+}
+
+function setBusy(button, busy, label) {
+  button.disabled = busy;
+  button.classList.toggle("is-loading", busy);
+  button.querySelector("span:first-child").textContent = busy ? label : button.dataset.label;
+}
+
+function showError(message) {
+  const alert = $("#result-alert");
+  alert.textContent = message;
+  alert.classList.remove("hidden");
+  alert.classList.add("error-alert");
+  $("#results-section").classList.remove("hidden");
+}
+
+function renderWorkload(workload) {
+  if (!workload) return;
+  const suffix = workload.formulaStatus === "configured" ? "fórmula configurada" : "fórmulas da planilha pendentes";
+  $("#workload-preview small").textContent = `${suffix} · ${workload.totalMinutes} minutos totais`;
+}
+
+function renderWeeks(data) {
+  state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.provider = data.provider;
+  $("#results-title").textContent = `${data.weeks.length} semanas prontas para revisão`;
+  $("#results-subtitle").textContent = data.provider === "fallback" ? "Exemplo local gerado sem API; use-o para validar o fluxo." : `Gerado por IA com ${data.model || "o provedor configurado"}. Revise antes de publicar.`;
+  $("#results-section").classList.remove("hidden");
+  $("#empty-state").classList.add("hidden");
+  const alert = $("#result-alert");
+  alert.className = "result-alert";
+  alert.textContent = data.provider === "fallback" ? "Este é um exemplo estrutural. A geração por IA será ativada quando OPENAI_API_KEY estiver configurada." : "A geração terminou. Baixe cada semana ou o ZIP para abrir e revisar no Aula Studio.";
+  const cards = data.weeks.map((lesson, index) => {
+    const meta = lesson.meta || {};
+    const workload = data.workload?.weeks?.[index];
+    const types = [...new Set((lesson.blocks || []).map((block) => blockLabels[block.type] || block.type))].slice(0, 5);
+    const date = meta.calendarStartDate ? `${formatDate(meta.calendarStartDate)}–${formatDate(meta.calendarEndDate)}` : meta.weekLabel;
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><h3>${escapeHtml(meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span>${workload?.totalHours ?? meta.studyHours ?? "—"} h</span><span>${lesson.blocks?.length || 0} blocos</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div><button class="week-download" data-index="${index}" type="button">Baixar .aula.json <span>↓</span></button></article>`;
+  }).join("");
+  $("#week-grid").innerHTML = cards;
+  $("#week-grid").querySelectorAll(".week-download").forEach((button) => button.addEventListener("click", () => downloadWeek(Number(button.dataset.index))));
+  renderWorkload(data.workload);
+  $("#results-section").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function downloadWeek(index) {
+  const lesson = state.weeks[index];
+  if (!lesson) return;
+  const number = String(index + 1).padStart(2, "0");
+  downloadBlob(new Blob([JSON.stringify(lesson, null, 2)], { type: "application/json" }), `semana-${number}-${slugify(lesson.meta?.title)}.aula.json`);
+}
+
+async function generate(fallback = false) {
+  const input = formInput();
+  if (!input.title.trim()) { showError("Informe o tema geral ou título do curso."); $("#course-title").focus(); return; }
+  if (!input.objectives.length && !input.content.trim()) { showError("Informe ao menos um objetivo ou conteúdo-base para orientar a geração."); $("#objectives").focus(); return; }
+  const button = fallback ? $("#fallback-button") : $("#generate-button");
+  button.dataset.label = fallback ? "Gerar exemplo local" : "Gerar com IA";
+  setBusy(button, true, fallback ? "Montando exemplo…" : "Gerando material…");
+  $("#result-alert").classList.add("hidden");
+  try {
+    const response = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input, fallback }) });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Não foi possível gerar o curso.");
+    renderWeeks(data);
+  } catch (error) { showError(error.message); }
+  finally { setBusy(button, false, ""); }
+}
+
+async function downloadZip() {
+  if (!state.weeks.length) return;
+  const button = $("#zip-button");
+  button.disabled = true; button.classList.add("is-loading");
+  try {
+    const response = await fetch("/api/zip", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: state.input, weeks: state.weeks }) });
+    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível montar o ZIP."); }
+    downloadBlob(await response.blob(), `${slugify(state.input.title)}-semanas.zip`);
+  } catch (error) { showError(error.message); }
+  finally { button.disabled = false; button.classList.remove("is-loading"); }
+}
+
+async function loadHealth() {
+  try {
+    const data = await (await fetch("/api/health")).json();
+    const status = $("#api-status");
+    status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? "IA configurada" : "modo exemplo · chave pendente"}`;
+  } catch { $("#api-status").innerHTML = '<span class="status-dot offline"></span>servidor indisponível'; }
+}
+
+$("#course-form").addEventListener("submit", (event) => { event.preventDefault(); generate(false); });
+$("#fallback-button").addEventListener("click", () => generate(true));
+$("#zip-button").addEventListener("click", downloadZip);
+$("#calendar-mode").addEventListener("change", toggleCalendar);
+$("#practice-enabled").addEventListener("change", togglePractice);
+document.querySelectorAll("#course-form input, #course-form textarea, #course-form select").forEach((field) => field.addEventListener("input", updateSummary));
+$("#generate-button").dataset.label = "Gerar com IA";
+$("#fallback-button").dataset.label = "Gerar exemplo local";
+toggleCalendar(); togglePractice(); updateSummary(); loadHealth();
