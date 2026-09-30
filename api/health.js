@@ -10,6 +10,8 @@ export default function handler(_request, response) {
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
     model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
     autoRepair: process.env.AULA_AUTO_REPAIR !== "false",
+    academicPipeline: process.env.AULA_ACADEMIC_PIPELINE !== "false",
+    academicReview: process.env.AULA_ACADEMIC_REVIEW !== "false",
     reviewBeforeExport: true,
     output: ".aula.json por semana + ZIP + revisão/regeneração individual"
   });

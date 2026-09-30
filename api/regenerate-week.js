@@ -21,9 +21,11 @@ export default async function handler(request, response) {
     const weeks = currentWeeks.map((week, weekIndex) => weekIndex === index ? researched : week);
     const workload = calculateCourseWorkload(input, input.formulaConfig, weeks);
     const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
-    const teacherGuides = buildTeacherGuides(input, enrichedWeeks, request.body?.teacherGuides || []);
+    const providedGuides = Array.isArray(request.body?.teacherGuides) ? [...request.body.teacherGuides] : [];
+    providedGuides[index] = raw.teacherGuide || providedGuides[index] || {};
+    const teacherGuides = buildTeacherGuides(input, enrichedWeeks, providedGuides);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
-    const validation = validateCourse(input, enrichedWeeks, workload);
+    const validation = validateCourse(input, enrichedWeeks, workload, teacherGuides);
     response.setHeader("Cache-Control", "no-store");
     return response.status(200).json({ ok: true, provider: "ai-regenerate", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", weekIndex: index, instruction, input, workload, generalPlan: { ...generalPlan, validation }, validation, week: enrichedWeeks[index], weeks: enrichedWeeks, teacherGuides });
   } catch (error) {

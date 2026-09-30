@@ -19,7 +19,7 @@ export default async function handler(request, response) {
     const enrichedWeeks = attachWorkloadToLessons(researchedWeeks, workload);
     const teacherGuides = buildTeacherGuides(input, enrichedWeeks, generated.teacherGuides);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
-    const validation = validateCourse(input, enrichedWeeks, workload);
+    const validation = validateCourse(input, enrichedWeeks, workload, teacherGuides);
     response.setHeader("Cache-Control", "no-store");
     return response.status(200).json({ ok: true, provider: useFallback ? "fallback" : "ai", model: useFallback ? null : (process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini"), input, workload, generalPlan: { ...generalPlan, validation }, validation, weeks: enrichedWeeks, teacherGuides, filePrefix: slugify(input.title, "curso") });
   } catch (error) {

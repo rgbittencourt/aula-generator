@@ -1,5 +1,6 @@
 import { normalizeDidacticArc, fallbackDidacticArc, buildAlignmentMatrix, buildProgression, pedagogicalReview } from "./pedagogy.js";
 import { measureLessonQuality } from "./content-quality.js";
+import { normalizeAcademicProfile } from "./academic.js";
 
 export const DEFAULT_LICENSE = "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br";
 
@@ -271,6 +272,7 @@ function normalizeSection(value = {}, index = 0) {
     caseStudy: Object.keys(caseStudy).length ? { title: text(caseStudy.title), context: text(caseStudy.context || caseStudy.body), data: text(caseStudy.data), questions: splitLines(caseStudy.questions) } : null,
     reflection: reflection ? (typeof reflection === "string" ? { question: text(reflection), body: "" } : { question: text(reflection.question || reflection.title), body: text(reflection.body || reflection.context) }) : null,
     keyTerms: splitLines(section.keyTerms || section.terms),
+    counterpoint: text(section.counterpoint || section.limit || section.alternativeInterpretation),
     didacticRole: text(section.didacticRole || section.role),
     resources: normalizeResources(section.resources, "section-resource")
   };
@@ -279,6 +281,48 @@ function normalizeSection(value = {}, index = 0) {
 function normalizeGlossary(value) {
   if (!Array.isArray(value)) return [];
   return value.map((item) => typeof item === "string" ? { term: text(item), definition: "" } : { term: text(item?.term || item?.word), definition: text(item?.definition || item?.body) }).filter((item) => item.term || item.definition);
+}
+
+function normalizeReference(value, index = 0) {
+  if (typeof value === "string") return { id: `ref-${String(index + 1).padStart(2, "0")}`, citation: text(value), type: "fonte-a-conferir", authors: [], year: "", publisher: "", doi: "", href: "", verified: false, verificationStatus: "needs-human-review", usedInSections: [], supportsClaims: [] };
+  const item = object(value);
+  return {
+    id: text(item.id, `ref-${String(index + 1).padStart(2, "0")}`),
+    citation: text(item.citation || item.title || item.reference),
+    type: text(item.type, "fonte-a-conferir"),
+    authors: splitLines(item.authors || item.author),
+    year: text(item.year),
+    publisher: text(item.publisher || item.journal || item.institution),
+    doi: text(item.doi),
+    href: text(item.href || item.url || item.link),
+    verified: bool(item.verified, false),
+    verificationStatus: text(item.verificationStatus, item.verified ? "verified" : "needs-human-review"),
+    usedInSections: splitLines(item.usedInSections || item.sections),
+    supportsClaims: splitLines(item.supportsClaims || item.claimIds),
+    notes: text(item.notes)
+  };
+}
+
+function normalizeReferences(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(normalizeReference).filter((item) => item.citation || item.href || item.doi);
+}
+
+function normalizeClaimEvidence(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry, index) => {
+    const item = object(entry);
+    return {
+      id: text(item.id, `claim-${String(index + 1).padStart(2, "0")}`),
+      claim: text(item.claim),
+      sectionNumber: text(item.sectionNumber || item.section),
+      sourceIds: splitLines(item.sourceIds || item.sources),
+      sourceType: text(item.sourceType),
+      supportLevel: text(item.supportLevel, "insufficient"),
+      verificationStatus: text(item.verificationStatus, "needs-human-review"),
+      note: text(item.note)
+    };
+  }).filter((item) => item.claim);
 }
 
 function normalizeAssessment(value = {}) {
@@ -409,13 +453,16 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
     synthesis: text(plan.synthesis),
     nextWeekConnection: text(plan.nextWeekConnection || plan.whatsNext),
     glossary: normalizeGlossary(plan.glossary),
-    references: splitLines(plan.references || input.references),
+    references: normalizeReferences(plan.references || input.references),
+    claimEvidence: normalizeClaimEvidence(plan.claimEvidence || plan.evidenceMap),
     assessment: normalizeAssessment(plan.assessment),
     resourceResearch: object(plan.resourceResearch),
     alignmentMatrix: Array.isArray(plan.alignmentMatrix) ? plan.alignmentMatrix : [],
     spiralReview: object(plan.spiralReview),
     timePlan: normalizeTimePlan(plan.timePlan),
     humanReview: bool(plan.humanReview ?? plan.requiresHumanReview, true),
+    academicProfile: normalizeAcademicProfile(input.academicProfile, input),
+    academicPlan: object(plan.academicPlan),
     notes: splitLines(plan.notes)
   };
   normalized.alignmentMatrix = buildAlignmentMatrix(normalized);
@@ -454,7 +501,8 @@ export function normalizeCourseInput(raw = {}) {
     webPractice: { enabled, moments: legacyMoments.length ? legacyMoments : splitLines(practice.moments || raw.practiceMoments), instructions: legacyInstructions || text(practice.instructions || raw.practiceInstructions), durationMinutes: webPractices.reduce((sum, item) => sum + item.durationMinutes, 0) },
     author: text(raw.author), role: text(raw.role), institution: text(raw.institution), year: text(raw.year, String(new Date().getFullYear())), language: text(raw.language, "pt-BR"),
     license: text(raw.license, DEFAULT_LICENSE),
-    formulaConfig: raw.formulaConfig && typeof raw.formulaConfig === "object" ? raw.formulaConfig : null
+    formulaConfig: raw.formulaConfig && typeof raw.formulaConfig === "object" ? raw.formulaConfig : null,
+    academicProfile: normalizeAcademicProfile(raw.academicProfile, raw)
   };
 }
 
@@ -571,7 +619,7 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
   blocks.push({ id: newId("b-topic-", week, 1), type: "topic", bg: "neutral-default", pad: "normal", props: { children } });
   plan.webPractices.forEach((practice, practiceIndex) => blocks.push({ id: newId("b-practice-", week, practiceIndex), type: "destaque", bg: "neutral-default", pad: "tight", props: { title: practice.title, body: `<p>${html([practice.objective, practice.instructions, practice.product].filter(Boolean).join(" "))}</p>`, tone: "ocean", icon: "" } }));
   if (plan.synthesis) blocks.push({ id: newId("b-synthesis-", week, 0), type: "sintese", bg: "sage-deep", pad: "airy", props: { eyebrow: "Síntese", title: "A ideia que fecha a semana", body: richHtml(plan.synthesis) } });
-  if (plan.references.length) blocks.push({ id: newId("b-references-", week, 0), type: "referencias", bg: "neutral-default", pad: "normal", props: { title: "Referências", items: plan.references.map((item) => ({ html: html(item) })) } });
+  if (plan.references.length) blocks.push({ id: newId("b-references-", week, 0), type: "referencias", bg: "neutral-default", pad: "normal", props: { title: "Referências", items: plan.references.map((item) => ({ html: html(item.citation || item.title || item.href), href: item.href || "", credit: item.publisher || item.authors?.join(", ") || "" })) } });
   if (plan.assessment.questions.length) blocks.push({ id: newId("b-quiz-", week, 0), type: "quiz", bg: "neutral-subtle", pad: "normal", props: { title: plan.assessment.title, intro: plan.assessment.format, avaliativo: true, passMark: plan.assessment.passMark, questions: plan.assessment.questions } });
   return blocks;
 }

@@ -127,6 +127,10 @@ function applyInputToForm(input = {}) {
     const value = input[key];
     element.value = Array.isArray(value) ? value.join("\n") : (value ?? "");
   });
+  const profile = input.academicProfile || {};
+  const profileFields = { "academic-discipline": "discipline", "academic-level": "level", "academic-depth": "depth", "academic-target-words": "targetWords", "academic-min-sections": "minimumSections", "academic-min-references": "minimumReferences", "academic-primary-sources": "primarySourcesRequired", "citation-style": "citationStyle", "academic-scope": "historicalScope", "academic-authors": "requiredAuthors", "academic-frameworks": "requiredFrameworks", "academic-avoid": "avoidTopics", "academic-source-policy": "sourcePolicy" };
+  Object.entries(profileFields).forEach(([elementId, key]) => { const element = $("#" + elementId); if (element) element.value = Array.isArray(profile[key]) ? profile[key].join("\n") : (profile[key] ?? element.value); });
+  [["#require-counterpoints", "requireCounterarguments"], ["#require-comparisons", "requireConceptComparison"], ["#require-case-study", "requireCaseStudy"]].forEach(([selector, key]) => { if (profile[key] !== undefined) $(selector).checked = Boolean(profile[key]); });
   $("#practice-enabled").checked = Boolean(input.webPracticeEnabled || input.webPractice?.enabled);
   $("#practice-list").innerHTML = "";
   practiceSequence = 0;
@@ -285,6 +289,24 @@ function formInput() {
     objectives: splitLines($("#objectives").value),
     content: $("#content").value,
     didacticMode: $("#didactic-mode").value,
+    academicProfile: {
+      discipline: $("#academic-discipline").value.trim(),
+      level: $("#academic-level").value,
+      depth: $("#academic-depth").value,
+      targetWords: Number($("#academic-target-words").value) || 2800,
+      minimumSections: Number($("#academic-min-sections").value) || 6,
+      minimumReferences: Number($("#academic-min-references").value) || 0,
+      primarySourcesRequired: Number($("#academic-primary-sources").value) || 0,
+      citationStyle: $("#citation-style").value,
+      historicalScope: $("#academic-scope").value.trim(),
+      requiredAuthors: splitLines($("#academic-authors").value),
+      requiredFrameworks: splitLines($("#academic-frameworks").value),
+      avoidTopics: splitLines($("#academic-avoid").value),
+      sourcePolicy: $("#academic-source-policy").value.trim(),
+      requireCounterarguments: $("#require-counterpoints").checked,
+      requireConceptComparison: $("#require-comparisons").checked,
+      requireCaseStudy: $("#require-case-study").checked
+    },
     references: splitLines($("#references").value),
     videoLinks: splitLines($("#videos").value),
     videoSearchSuggestions: splitLines($("#video-search-suggestions").value),
@@ -434,10 +456,15 @@ function renderLessonPreview(lesson, index) {
   const sections = Array.isArray(plan.contentSections) ? plan.contentSections : [];
   const objectives = Array.isArray(plan.learningObjectives) ? plan.learningObjectives : [];
   const allResources = plan.resources || {};
+  const guide = state.teacherGuides[index] || {};
+  const academicReview = guide.academicReview || {};
+  const claimEvidence = Array.isArray(guide.claimEvidence || plan.claimEvidence) ? (guide.claimEvidence || plan.claimEvidence) : [];
+  const academicLabel = { approved: "revisão acadêmica aprovada", "approved-with-review": "revisão acadêmica com pendências", "needs-revision": "revisão acadêmica exige reescrita" }[academicReview.status] || "revisão acadêmica pendente";
   const statusLabel = { complete: "conteúdo completo", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[quality.status] || "qualidade não medida";
   const strip = document.querySelector("#lesson-quality-strip");
-  strip.innerHTML = `<span class="quality-badge ${escapeHtml(quality.status || "needs-review")}">${escapeHtml(statusLabel)}</span><span>${Number(quality.wordCount || 0).toLocaleString("pt-BR")} palavras</span><span>${sections.length} seções</span><span>${objectives.length} objetivos</span><span>nota estrutural ${Number(quality.score || 0)}/100</span>`;
+  strip.innerHTML = `<span class="quality-badge ${escapeHtml(quality.status || "needs-review")}">${escapeHtml(statusLabel)}</span><span>${Number(quality.wordCount || 0).toLocaleString("pt-BR")} palavras</span><span>${sections.length} seções</span><span>${objectives.length} objetivos</span><span>nota estrutural ${Number(quality.score || 0)}/100</span><span class="academic-review-badge">${escapeHtml(academicLabel)}</span><span>${claimEvidence.length} evidências mapeadas</span>`;
   const issue = Array.isArray(quality.issues) && quality.issues.length ? `<div class="reader-warning"><strong>Antes de exportar:</strong> ${escapeHtml(quality.issues.join(" · "))}</div>` : "";
+  const academicIssue = Array.isArray(academicReview.issues) && academicReview.issues.length ? `<div class="reader-warning"><strong>Revisão acadêmica:</strong><ul>${academicReview.issues.slice(0, 8).map((item) => `<li><strong>${escapeHtml(item.severity || "revisão")}</strong> ${escapeHtml(item.description || "Pendência")}${item.suggestedRepair ? ` — ${escapeHtml(item.suggestedRepair)}` : ""}</li>`).join("")}</ul></div>` : "";
   const sectionsMarkup = sections.map((section) => {
     const subs = (section.subsections || []).map((sub) => `<h4>${escapeHtml(`${sub.number || ""} ${sub.title || ""}`.trim())}</h4>${paragraphsMarkup(sub.body)}`).join("");
     const caseMarkup = section.caseStudy ? `<div class="reader-callout"><strong>${escapeHtml(section.caseStudy.title || "Estudo de caso")}</strong>${paragraphsMarkup(section.caseStudy.context || section.caseStudy.data || "")}${(section.caseStudy.questions || []).length ? `<ul>${section.caseStudy.questions.map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul>` : ""}</div>` : "";
@@ -448,7 +475,6 @@ function renderLessonPreview(lesson, index) {
   const globalResources = Object.values(allResources).flat().filter((resource) => resource && !sections.some((section) => (section.resources || []).some((item) => item.id && item.id === resource.id))).slice(0, 12).map(resourcePreview).join("");
   const glossary = (plan.glossary || []).length ? `<section><h3>Glossário</h3><ul>${plan.glossary.map((item) => `<li><strong>${escapeHtml(item.term || "Termo")}</strong>: ${escapeHtml(item.definition || "")}</li>`).join("")}</ul></section>` : "";
   const assessment = (plan.assessment?.questions || []).length ? `<section><h3>${escapeHtml(plan.assessment.title || "Atividade avaliativa")}</h3><p>${escapeHtml(plan.assessment.format || "Questões alinhadas aos objetivos")}</p><ol>${plan.assessment.questions.map((q) => `<li>${escapeHtml(q.q || q.question || "")}${q.explanation ? `<small>${escapeHtml(q.explanation)}</small>` : ""}</li>`).join("")}</ol></section>` : "";
-  const guide = state.teacherGuides[index] || {};
   const arc = plan.didacticArc || guide.didacticArc || {};
   const phaseSummary = arc.phasePlan ? Object.entries(arc.phasePlan).filter(([key, value]) => key !== "labels" && key !== "omitted" && value === true).map(([key]) => arc.phasePlan.labels?.[key] || key).join(" · ") : (arc.sequence || []).join(" · ");
   const diagnostic = plan.diagnostic?.prompt ? `<section class="reader-callout"><h3>Antes de começar</h3>${paragraphsMarkup(plan.diagnostic.prompt)}${plan.diagnostic.expectedEvidence ? `<small>O que será observado: ${escapeHtml(plan.diagnostic.expectedEvidence)}</small>` : ""}</section>` : "";
@@ -461,7 +487,7 @@ function renderLessonPreview(lesson, index) {
   const alignment = (plan.alignmentMatrix || []).length ? `<section><h3>Alinhamento pedagógico</h3><ul>${plan.alignmentMatrix.map((row) => `<li><strong>${escapeHtml(row.objective || "Objetivo")}</strong>: ${escapeHtml(row.evidence || "evidência a definir")} · avaliação: ${escapeHtml((row.assessmentQuestions || []).join(", ") || "a definir")}</li>`).join("")}</ul></section>` : "";
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
-  $("#lesson-reader").innerHTML = `${issue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${practiceProjects}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${assessment}${alignment}${workload}`;
+  $("#lesson-reader").innerHTML = `${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${practiceProjects}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${assessment}${alignment}${workload}`;
 }
 
 function openLessonPreview(index) {

@@ -140,3 +140,24 @@ test("ZIP contém um JSON rico por semana em semanas/", async () => {
   const first = JSON.parse(await zip.files[names[0]].async("string"));
   assert.ok(first.lessonPlan.contentSections.length);
 });
+
+
+test("normaliza perfil acadêmico configurável", () => {
+  const input = normalizeCourseInput({ title: "Políticas públicas", weeks: 1, hoursPerWeek: 4, academicProfile: { level: "pós-graduação", depth: "avançado", targetWords: 4200, minimumSections: 8, minimumReferences: 6, primarySourcesRequired: 2, discipline: "Administração pública", requiredAuthors: "Autor A\nAutor B", requireCounterarguments: true } });
+  assert.equal(input.academicProfile.level, "pós-graduação");
+  assert.equal(input.academicProfile.targetWords, 4200);
+  assert.equal(input.academicProfile.minimumSections, 8);
+  assert.equal(input.academicProfile.minimumReferences, 6);
+  assert.equal(input.academicProfile.primarySourcesRequired, 2);
+  assert.deepEqual(input.academicProfile.requiredAuthors, ["Autor A", "Autor B"]);
+});
+
+test("prompt acadêmico exige planejamento, evidência, fontes e revisão crítica", () => {
+  const input = normalizeCourseInput({ title: "Gestão educacional", weeks: 1, hoursPerWeek: 4, academicProfile: { level: "pós-graduação", targetWords: 3800, minimumReferences: 5, primarySourcesRequired: 2 } });
+  const prompt = buildWeekGenerationPrompt(input, 0, { theme: "Estado e políticas educacionais", claimsRequiringEvidence: [{ claim: "afirmação" }] });
+  assert.match(prompt, /Perfil acadêmico desta trilha/i);
+  assert.match(prompt, /mapa de evidências/i);
+  assert.match(prompt, /fontes acadêmicas\/oficiais/i);
+  assert.match(prompt, /contraponto/i);
+  assert.match(prompt, /não inventar dados bibliográficos/i);
+});

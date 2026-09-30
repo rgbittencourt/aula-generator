@@ -46,6 +46,8 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 | `OPENAI_MODEL` | `gpt-4o-mini` | Production, Preview e Development |
 | `OPENAI_CONTENT_MODEL` | opcional; modelo mais capaz para texto longo | Production, Preview e Development |
 | `OPENAI_MAX_TOKENS` | `16000` | Production, Preview e Development |
+| `AULA_ACADEMIC_PIPELINE` | `true` | Production, Preview e Development |
+| `AULA_ACADEMIC_REVIEW` | `true` | Production, Preview e Development |
 | `AULA_AUTO_REPAIR` | `true` | Production, Preview e Development |
 | `AULA_ACCESS_CODE` | uma frase/código privado seu | Production, Preview e Development |
 | `YOUTUBE_API_KEY` | chave opcional do YouTube Data API | Production e, se desejar, Preview |
@@ -72,6 +74,18 @@ O botão de assistência completa somente campos vazios do briefing. A geração
 Antes de considerar uma semana pronta, o gerador verifica título específico, abertura, pelo menos quatro objetivos, cinco ou mais seções desenvolvidas, síntese, avaliação, blocos compatíveis com o Aula Studio e alinhamento entre objetivo, atividade, evidência e avaliação. A IA recebe uma exigência de texto longo e, se a primeira resposta ficar curta, executa uma segunda etapa de reparo editorial. A tela mostra palavras, seções, objetivos, nota estrutural e pendências.
 
 O resultado também traz um checklist pedagógico: diagnóstico, checagens formativas, avaliação somativa com feedback, webprática completa quando houver, diferenciação, acessibilidade, recursos contextualizados e autoavaliação. Uma semana bloqueada deve ser refeita antes do uso no Aula Studio.
+
+### Perfil acadêmico e pipeline de texto
+
+O briefing possui um **Perfil acadêmico do conteúdo** com nível, profundidade, meta de palavras, mínimo de seções, referências, fontes acadêmicas/oficiais, escopo histórico, autores, quadros teóricos, tópicos a evitar e regras de contraponto, comparação e estudo de caso. Esses dados entram nos prompts e no checklist; não são apenas campos decorativos.
+
+Para evitar a geração superficial, a IA trabalha em três fases:
+
+1. **Planejamento acadêmico:** define conceitos, pergunta central, sequência argumentativa, afirmações que exigem evidência, exemplos, controvérsias e plano de avaliação.
+2. **Redação:** escreve a semana completa para o aluno e o guia separado do professor, incluindo `claimEvidence` e referências estruturadas.
+3. **Revisão crítica:** procura superficialidade, desalinhamento, repetição, fonte inventada, afirmação sem suporte, falta de contraponto e problemas de acessibilidade. Se necessário, executa um reparo e revisa novamente.
+
+O manual contém os prompts efetivos e o contrato JSON de cada fase. As variáveis `AULA_ACADEMIC_PIPELINE`, `AULA_ACADEMIC_REVIEW` e `AULA_AUTO_REPAIR` controlam esse comportamento; o padrão das três é ativado.
 
 ### Como a ordem funciona
 
@@ -147,6 +161,8 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_CONTENT_MODEL=
 OPENAI_MAX_TOKENS=16000
+AULA_ACADEMIC_PIPELINE=true
+AULA_ACADEMIC_REVIEW=true
 AULA_AUTO_REPAIR=true
 AULA_ACCESS_CODE=um-codigo-privado-opcional
 YOUTUBE_API_KEY=chave-do-youtube-opcional

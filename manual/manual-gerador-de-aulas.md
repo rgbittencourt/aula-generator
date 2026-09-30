@@ -2,7 +2,7 @@
 
 ## Da ideia inicial ao JSON semanal, guia do professor e publicação no Moodle
 
-**Versão do manual:** 1.1  
+**Versão do manual:** 1.2  
 **Data:** 30 de setembro de 2026  
 **Aplicação:** Gerador de Aulas  
 **URL pública:** <https://aula-generator.vercel.app/>  
@@ -22,6 +22,7 @@
 8. [Usando a IA para completar campos vazios](#8-usando-a-ia-para-completar-campos-vazios)
 9. [Gerando as semanas com IA](#9-gerando-as-semanas-com-ia)
 10. [Como a IA organiza cada semana](#10-como-a-ia-organiza-cada-semana)
+10.1. [Perfil acadêmico e prompts do sistema](#101-perfil-acadêmico-e-prompts-do-sistema)
 11. [Webpráticas](#11-webpráticas)
 12. [Materiais de apoio e recursos multimídia](#12-materiais-de-apoio-e-recursos-multimídia)
 13. [Cálculo da carga de estudo](#13-cálculo-da-carga-de-estudo)
@@ -359,6 +360,26 @@ Também é possível escolher uma preferência:
 
 A preferência não é uma receita fixa. Mesmo que se escolha um arco, a IA pode adaptar a sequência quando outro percurso for pedagogicamente mais adequado.
 
+### 7.6 Perfil acadêmico e metas de profundidade
+
+O bloco **Perfil acadêmico do conteúdo** controla a exigência textual da geração. Ele não é apenas informativo: seus valores entram no planejamento da semana, no prompt de redação, na revisão crítica e no checklist antes da exportação.
+
+| Campo | Como orientar o gerador |
+|---|---|
+| Disciplina/área | Define vocabulário, exemplos e fontes procuradas. |
+| Nível acadêmico | Graduação, pós-graduação, formação profissional ou educação básica. |
+| Profundidade | Ajusta densidade argumentativa, quantidade de exemplos e contrapontos. |
+| Meta de palavras | Alvo aproximado de texto útil por semana; não é preenchimento artificial. |
+| Mínimo de seções | Garante progressão em partes legíveis, com títulos específicos. |
+| Mínimo de referências | Piso de referências estruturadas que deverão ser conferidas. |
+| Fontes acadêmicas/oficiais | Quantidade mínima de fontes institucionais, acadêmicas ou oficiais. |
+| Escopo histórico/geográfico | Impede que a IA use exemplos fora do recorte desejado. |
+| Autores e quadros teóricos | Orienta a abordagem, sem permitir citações inventadas. |
+| Tópicos a evitar | Restringe abordagens ou conteúdos indesejados. |
+| Política de fontes | Define que toda pendência deve ser sinalizada para revisão humana. |
+
+As três opções finais controlam regras de rigor: **exigir contrapontos e limites**, **comparar conceitos próximos** e **exigir exemplo ou estudo de caso**. Se o curso não comportar uma dessas exigências, desmarque-a conscientemente e registre a decisão no planejamento.
+
 ---
 
 ## 8. Usando a IA para completar campos vazios
@@ -445,6 +466,159 @@ Cada semana pode seguir um arco diferente, mas normalmente contém as seguintes 
 A ordem interessa. Um vídeo ou artigo não deveria aparecer apenas porque foi solicitado; ele deve estar relacionado a um conceito, pergunta ou atividade. Por isso, os recursos são associados à seção ou ao tópico que justificou seu uso.
 
 A IA não deve impor vídeo, leitura, quiz ou webprática em todas as semanas. Uma semana conceitual pode precisar de leitura e síntese; outra pode exigir estudo de caso; uma terceira pode ser uma oficina aplicada.
+
+### 10.1 Perfil acadêmico e prompts do sistema
+
+**Sim. A versão atual do manual registra os prompts efetivos usados pelo sistema.** Eles ficam documentados aqui para que o professor entenda o processo e para que uma futura alteração possa ser comparada com o comportamento publicado. A implementação correspondente está em `src/academic.js` e `src/ai.js`.
+
+#### Prompt-base de rigor acadêmico
+
+Este é o prompt de sistema compartilhado pelo planejamento, redação, revisão e reparo:
+
+```text
+Você é um designer instrucional, autor acadêmico e revisor científico especializado em materiais educacionais de nível superior.
+
+Prioridades, nesta ordem:
+1. Correção conceitual e factual.
+2. Coerência com o nível acadêmico e o público.
+3. Profundidade explicativa.
+4. Alinhamento entre objetivos, conteúdo, atividades, evidências e avaliação.
+5. Clareza, progressão didática e legibilidade.
+6. Rastreabilidade das fontes e transparência sobre incertezas.
+
+Defina conceitos antes de aplicá-los. Diferencie conceitos próximos, correntes teóricas e interpretações divergentes. Explique relações de causa, consequência, condição e limite. Diferencie fato, interpretação, inferência, exemplo e recomendação. Inclua limites, controvérsias e contrapontos quando pertinentes.
+
+Não invente autores, livros, artigos, DOI, URLs, números, instituições, resultados ou dados estatísticos. Use somente fontes fornecidas pelo usuário ou candidatos reais retornados pelos provedores. Quando algo não puder ser confirmado, marque verificationStatus como needs-human-review.
+
+Recursos audiovisuais são complementares e devem aparecer no ponto de uso. Toda atividade deve produzir uma evidência. Toda avaliação deve verificar objetivos realmente trabalhados. Não force vídeo, leitura, quiz ou webprática sem função didática.
+
+Responda somente JSON válido conforme o contrato solicitado. Nunca mostre sua verificação interna.
+```
+
+#### Etapa 1 — Planejamento acadêmico da semana
+
+Antes de escrever o texto, o sistema chama o modelo com um prompt que pede somente o plano argumentativo. O retorno precisa conter:
+
+```json
+{
+  "weekNumber": 1,
+  "theme": "título específico",
+  "centralQuestion": "pergunta orientadora",
+  "centralConcepts": ["conceitos que serão definidos"],
+  "relatedConcepts": ["conceitos próximos"],
+  "objectives": ["objetivos observáveis"],
+  "sectionSequence": [
+    {
+      "number": "1",
+      "title": "...",
+      "purpose": "...",
+      "keyClaims": ["afirmação a sustentar"],
+      "example": "...",
+      "counterpoint": "..."
+    }
+  ],
+  "requiredSources": [{"topic": "...", "sourceType": "...", "reason": "..."}],
+  "claimsRequiringEvidence": [{"id": "claim-01", "claim": "...", "sectionNumber": "1", "sourceType": "..."}],
+  "examples": ["exemplo contextualizado"],
+  "controversies": ["limite ou interpretação alternativa"],
+  "assessmentPlan": [{"objective": "...", "evidence": "...", "questionType": "..."}],
+  "omissions": [{"phase": "...", "reason": "..."}]
+}
+```
+
+O objetivo dessa etapa é impedir que o modelo comece por um resumo genérico. Ele precisa decidir quais conceitos serão definidos, quais afirmações exigem suporte, que exemplo será usado, onde entra a avaliação e que fases serão omitidas com justificativa.
+
+#### Etapa 2 — Redação da aula do aluno e do guia do professor
+
+O prompt de redação recebe o briefing, o perfil acadêmico e o plano da etapa anterior. Ele exige:
+
+- título específico e informativo;
+- abertura contextualizada;
+- quatro a oito objetivos observáveis;
+- pelo menos o número configurado de seções substanciais;
+- explicação conceitual, exemplos, aplicação e crítica;
+- recursos dentro da seção em que serão usados;
+- referências estruturadas, sem bibliografia inventada;
+- `claimEvidence` para rastrear afirmações centrais;
+- avaliação com questões alinhadas;
+- `teacherGuide` separado do JSON do estudante.
+
+O trecho de contrato mais importante do prompt é:
+
+```text
+O texto é o produto principal. Não entregue resumo, tópicos telegráficos, frases soltas, uma lista de links ou apenas instruções para o professor. Escreva para o estudante ler e aprender.
+
+Produza aproximadamente {targetWords} palavras e pelo menos {minimumSections} seções substanciais. Inclua pelo menos {minimumReferences} referências, sendo {primarySourcesRequired} acadêmica(s) ou oficial(is), sem inventar dados bibliográficos.
+
+Cada afirmação central deve aparecer em claimEvidence com id, claim, sectionNumber, sourceIds, sourceType, supportLevel, verificationStatus e note. Afirmações sem fonte usam supportLevel "insufficient" e verificationStatus "needs-human-review".
+
+{counterpointRule}; {comparisonRule}; {caseStudyRule}.
+
+Não invente URLs, DOI, durações, autores, números ou referências verificadas. Para recurso ainda não conferido, use searchQuery e verificationStatus "suggested-no-url".
+```
+
+O JSON de saída desta etapa é reduzido pelo normalizador: os `blocks` do Aula Studio são montados no servidor e o conteúdo reservado ao professor é mantido no `teacherGuide`/PDF.
+
+#### Pesquisa e curadoria de recursos
+
+Depois da redação, a pesquisa consulta os provedores configurados. O prompt de curadoria instrui:
+
+```text
+Escolha somente entre os candidatos reais recebidos. Nunca invente URL, título, autor, duração, licença ou DOI. Avalie alinhamento a objetivo, confiabilidade, atualidade, acessibilidade, duração, licença/crédito, idioma e momento didático. Um vídeo sem legenda/transcrição deve ter alternativa textual. Uma imagem/diagrama deve ter altText ou alternativa descritiva. Escolha no máximo 2 vídeos, 3 imagens/diagramas e 3 leituras. O professor fará a aprovação final: marque selected-by-ai, nunca approved.
+```
+
+Cada candidato preserva provedor, fonte, licença, estado de seleção, justificativa e pendência humana. Isso permite trocar ou retirar mídia no Aula Studio sem reescrever a aula inteira.
+
+#### Etapa 3 — Revisão crítica acadêmica
+
+O revisor recebe a aula inteira e o planejamento. Ele não deve reescrever imediatamente; primeiro retorna um diagnóstico:
+
+```json
+{
+  "status": "approved | approved-with-review | needs-revision",
+  "strengths": ["..."],
+  "issues": [
+    {
+      "severity": "high | medium | low",
+      "type": "unsupported-claim | superficiality | misalignment | invented-source | repetition | weak-example | missing-counterpoint | accessibility | other",
+      "sectionNumber": "...",
+      "description": "...",
+      "suggestedRepair": "..."
+    }
+  ],
+  "unsupportedClaims": ["..."],
+  "rewriteRequired": false
+}
+```
+
+O revisor verifica definição de conceitos, sustentação de afirmações, distinção entre fato e interpretação, exemplos, contrapontos, alinhamento objetivo–evidência–avaliação, função dos recursos, repetição, síntese e continuidade curricular.
+
+#### Reparo condicional
+
+Se a qualidade estrutural ficar abaixo do piso ou o revisor indicar `rewriteRequired: true`, o sistema chama o prompt de reparo. Ele recebe os problemas encontrados e ordena:
+
+```text
+Reescreva a unidade inteira, não faça um resumo e não remova conteúdo que já esteja bom. Corrija os problemas estruturais e acadêmicos apontados. Não faça alongamento artificial. Preserve o mapa de evidências, marque pendências como needs-human-review e não invente fontes. Entregue novamente lessonPlan e teacherGuide, sem blocks.
+```
+
+Depois do reparo, uma nova revisão é executada. Uma semana com falha crítica permanece bloqueada e aparece na prévia para conferência humana.
+
+#### Regeneração solicitada pelo professor
+
+Quando o professor abre uma semana e escreve uma solicitação, o prompt recebe a instrução livre, a semana atual e um novo planejamento acadêmico. Ele deve preservar o que está bom e alterar somente o que foi pedido, mantendo título, objetivos, seções, evidências, fontes e avaliação. A revisão crítica também é executada após a regeneração.
+
+#### Variáveis que controlam os prompts
+
+| Variável | Padrão | Efeito |
+|---|---:|---|
+| `OPENAI_CONTENT_MODEL` | usa `OPENAI_MODEL` | Modelo usado para texto longo. |
+| `OPENAI_MAX_TOKENS` | `16000` | Limite de saída por chamada; aumente apenas se o modelo/projeto aceitar. |
+| `AULA_ACADEMIC_PIPELINE` | `true` | Liga planejamento, redação e revisão acadêmica. |
+| `AULA_ACADEMIC_REVIEW` | `true` | Executa a revisão crítica e o relatório de pendências. |
+| `AULA_AUTO_REPAIR` | `true` | Permite uma reescrita automática quando houver falha. |
+| `AULA_RESOURCE_RESEARCH` | `true` | Pesquisa candidatos de vídeos, imagens e leituras. |
+
+Essas variáveis não substituem a leitura do professor. Elas controlam o processo de geração; aprovação de fonte, adequação curricular e publicação continuam sendo decisões humanas.
 
 ---
 

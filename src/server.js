@@ -30,6 +30,8 @@ app.get("/api/health", (_req, res) => {
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
       model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
       autoRepair: process.env.AULA_AUTO_REPAIR !== "false",
+      academicPipeline: process.env.AULA_ACADEMIC_PIPELINE !== "false",
+      academicReview: process.env.AULA_ACADEMIC_REVIEW !== "false",
       reviewBeforeExport: true,
       output: ".aula.json por semana + ZIP + revisão/regeneração individual"
   });
@@ -49,7 +51,7 @@ app.post("/api/generate", async (req, res) => {
     const enrichedWeeks = attachWorkloadToLessons(researchedWeeks, workload);
     const teacherGuides = buildTeacherGuides(input, enrichedWeeks, generated.teacherGuides);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
-    const validation = validateCourse(input, enrichedWeeks, workload);
+    const validation = validateCourse(input, enrichedWeeks, workload, teacherGuides);
     res.json({
       ok: true,
       provider: useFallback ? "fallback" : "ai",
@@ -82,9 +84,11 @@ app.post("/api/regenerate-week", async (req, res) => {
     const weeks = currentWeeks.map((week, weekIndex) => weekIndex === index ? researched : week);
     const workload = calculateCourseWorkload(input, input.formulaConfig, weeks);
     const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
-    const teacherGuides = buildTeacherGuides(input, enrichedWeeks, req.body?.teacherGuides || []);
+    const providedGuides = Array.isArray(req.body?.teacherGuides) ? [...req.body.teacherGuides] : [];
+    providedGuides[index] = raw.teacherGuide || providedGuides[index] || {};
+    const teacherGuides = buildTeacherGuides(input, enrichedWeeks, providedGuides);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
-    const validation = validateCourse(input, enrichedWeeks, workload);
+    const validation = validateCourse(input, enrichedWeeks, workload, teacherGuides);
     res.json({ ok: true, provider: "ai-regenerate", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", weekIndex: index, instruction, input, workload, generalPlan: { ...generalPlan, validation }, validation, week: enrichedWeeks[index], weeks: enrichedWeeks, teacherGuides });
   } catch (error) {
     const status = error.code === "AI_KEY_MISSING" ? 503 : 400;
@@ -115,7 +119,7 @@ app.post("/api/zip", async (req, res) => {
     const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
     const teacherGuides = buildTeacherGuides(input, enrichedWeeks, req.body?.teacherGuides || []);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
-    const validation = validateCourse(input, enrichedWeeks, workload);
+    const validation = validateCourse(input, enrichedWeeks, workload, teacherGuides);
     const buffer = await createWeeksZip(input, enrichedWeeks, { ...generalPlan, validation }, teacherGuides);
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-semanas.zip"`);
