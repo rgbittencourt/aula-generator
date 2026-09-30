@@ -39,7 +39,7 @@ test("prompt semanal exige unidade didática completa antes do cálculo de tempo
   const prompt = buildWeekGenerationPrompt(input, 0);
   assert.match(prompt, /uma semana de material didático/i);
   assert.match(prompt, /lessonPlan/i);
-  assert.match(prompt, /contentSections: 4 a 10/i);
+  assert.match(prompt, /contentSections com 6–12/i);
   assert.match(prompt, /timePlan com targetMinutes 0/i);
   assert.match(prompt, /nunca invente URLs/i);
   assert.match(prompt, /teacherGuide/i);

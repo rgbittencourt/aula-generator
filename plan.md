@@ -33,6 +33,12 @@ O frontend é servido sem cache compartilhado para o HTML mutável; APIs usam `n
 
 A IA escolhe o arco didático adequado ao tema, aos objetivos, ao momento do curso e à carga disponível. Arcos possíveis incluem: descoberta conceitual, estudo de caso, oficina aplicada, análise de dados, debate orientado, revisão e síntese, ou uma combinação justificada. Não existe uma sequência obrigatória para todas as semanas.
 
+### Padrão mínimo de conteúdo textual
+
+Uma semana não é considerada pronta apenas porque contém blocos válidos ou recursos localizados. O gerador deve exigir título específico, abertura contextualizada, objetivos observáveis, pelo menos cinco seções de conteúdo com texto desenvolvido, síntese, conexão com a próxima semana e avaliação alinhada. A profundidade esperada é a de uma unidade didática completa: aproximadamente 2.200 palavras como piso ajustável pela carga, com seções substanciais e exemplos/contrapontos quando pertinentes. O resultado recebe métricas e alertas de qualidade e não deve ser enviado ao Aula Studio se permanecer estruturalmente insuficiente.
+
+O fluxo também inclui revisão antes da exportação: cada semana pode ser aberta em uma prévia de leitura, conferida pelo professor e regenerada individualmente com uma solicitação livre, sem refazer o curso inteiro. A regeneração preserva o briefing e os demais campos da semana, recalcula a carga e atualiza o Planejamento Geral.
+
 Cada semana pode conter, quando fizer sentido:
 
 - abertura e contextualização;

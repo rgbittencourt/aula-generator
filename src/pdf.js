@@ -79,13 +79,16 @@ export async function createTeacherGuidePdf(input, teacherGuides = [], generalPl
     heading("Arco didático escolhido", 2);
     paragraph(`${guide.didacticArc.label}: ${guide.didacticArc.rationale}`);
     paragraph(`Percurso: ${guide.didacticArc.sequence.join(" -> ")}. ${guide.didacticArc.webPracticeRole}`, { color: muted });
+    if (guide.didacticArc.phasePlan) { paragraph(`Fases ativas: ${Object.entries(guide.didacticArc.phasePlan).filter(([key, value]) => key !== "labels" && key !== "omitted" && value === true).map(([key]) => guide.didacticArc.phasePlan.labels?.[key] || key).join("; ")}`, { color: muted }); }
+    if (guide.didacticArc.phasePlan?.omitted?.length) { paragraph(`Fases omitidas com justificativa: ${guide.didacticArc.phasePlan.omitted.map((item) => `${item.label}: ${item.reason}`).join(" | ")}`, { color: muted }); }
     heading("Objetivos da semana", 2); bullets(guide.objectives);
     if (guide.alignmentMatrix.length) {
       heading("Matriz de alinhamento", 2);
       for (const row of guide.alignmentMatrix) paragraph(`Objetivo: ${row.objective}\nConteúdo: ${(row.contentSections || []).join(", ") || "a conferir"}\nEvidência: ${row.evidence || "a definir"}\nAvaliação: ${(row.assessmentQuestions || []).join(", ") || "a conferir"}`, { indent: 8, after: 8 });
     }
     if (guide.diagnostic && Object.keys(guide.diagnostic).length) { heading("Diagnóstico inicial", 2); paragraph(guide.diagnostic.prompt || guide.diagnostic.question || guide.diagnostic.instructions || JSON.stringify(guide.diagnostic)); }
-    if (guide.formativeChecks.length) { heading("Checagens formativas", 2); bullets(guide.formativeChecks.map((item) => typeof item === "string" ? item : item.prompt || item.question || item.title)); }
+    if (guide.formativeChecks.length) { heading("Checagens formativas", 2); bullets(guide.formativeChecks.map((item) => typeof item === "string" ? item : `${item.prompt || item.question || item.title}${item.feedback ? ` — feedback: ${item.feedback}` : ""}`)); }
+    if (guide.summativeAssessment && Object.keys(guide.summativeAssessment).length) { heading("Avaliação somativa", 2); paragraph(`${guide.summativeAssessment.title || "Avaliação final"}: ${guide.summativeAssessment.format || ""}`); }
     if (guide.mediationQuestions.length) { heading("Perguntas para mediação", 2); bullets(guide.mediationQuestions); }
     if (guide.commonMisconceptions.length) { heading("Equívocos comuns", 2); bullets(guide.commonMisconceptions); }
     if (guide.interventions.length) { heading("Intervenções do professor", 2); bullets(guide.interventions); }
@@ -93,10 +96,10 @@ export async function createTeacherGuidePdf(input, teacherGuides = [], generalPl
     paragraph("Apoio/recuperação:", { font: bold, after: 2 }); bullets(guide.differentiation.support);
     paragraph("Percurso padrão:", { font: bold, after: 2 }); bullets(guide.differentiation.standard);
     paragraph("Aprofundamento:", { font: bold, after: 2 }); bullets(guide.differentiation.extension);
-    if (guide.accessibility.length) { heading("Acessibilidade", 2); bullets(guide.accessibility); }
+    if (guide.accessibility && Object.keys(guide.accessibility).length) { heading("Acessibilidade", 2); paragraph(JSON.stringify(guide.accessibility, null, 2)); }
     if (guide.assessmentNotes.length) { heading("Notas de avaliação", 2); bullets(guide.assessmentNotes); }
     if (guide.spiralReview && Object.keys(guide.spiralReview).length) { heading("Revisão espiral", 2); paragraph(JSON.stringify(guide.spiralReview, null, 2)); }
-    if (guide.webPractices.length) { heading("Webpráticas associadas", 2); for (const practice of guide.webPractices) paragraph(`${practice.title || "Projeto"}: ${practice.objective || ""}\nProduto: ${practice.product || practice.delivery || "a definir"}\nDuração: ${practice.durationMinutes || "a definir"} minutos`, { indent: 8 }); }
+    if (guide.webPractices.length) { heading("Webpráticas associadas", 2); for (const practice of guide.webPractices) { paragraph(`${practice.title || "Projeto"}: ${practice.objective || ""}\nProblema: ${practice.problem || practice.context || "a definir"}\nPapel do estudante: ${practice.studentRole || "a definir"}\nProduto: ${practice.product || practice.delivery || "a definir"}\nDuração: ${practice.durationMinutes || "a definir"} minutos`, { indent: 8 }); if (practice.steps?.length) bullets(practice.steps.map((step) => `${step.order || ""}. ${step.title}: ${step.instructions} (${step.minutes || 0} min) — evidência: ${step.evidence || "a definir"}`)); if (practice.rubric?.length) bullets(practice.rubric.map((criterion) => `${criterion.criterion}: excelente — ${criterion.excellent}; em desenvolvimento — ${criterion.developing}`)); if (practice.fallbackPlan) paragraph(`Plano B: ${practice.fallbackPlan}`, { indent: 8 }); } }
     heading("Checklist antes da publicação", 2);
     for (const check of guide.qualityReview?.checks || []) paragraph(`${check.pass ? "OK" : "REVISAR"} - ${check.label}`, { color: check.pass ? muted : coral, indent: 8, after: 3 });
     if (guide.workloadAdvice.length) { heading("Ajustes de carga sugeridos", 2); bullets(guide.workloadAdvice); }

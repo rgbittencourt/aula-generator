@@ -36,6 +36,9 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 | `OPENAI_API_KEY` | a chave criada na etapa anterior | Production, Preview e Development |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Production, Preview e Development |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Production, Preview e Development |
+| `OPENAI_CONTENT_MODEL` | opcional; modelo mais capaz para texto longo | Production, Preview e Development |
+| `OPENAI_MAX_TOKENS` | `16000` | Production, Preview e Development |
+| `AULA_AUTO_REPAIR` | `true` | Production, Preview e Development |
 | `AULA_ACCESS_CODE` | uma frase/código privado seu | Production, Preview e Development |
 | `YOUTUBE_API_KEY` | chave opcional do YouTube Data API | Production e, se desejar, Preview |
 
@@ -43,6 +46,8 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 8. Abra a URL fornecida pela Vercel e confira o indicador no cabeçalho.
 9. Se `AULA_ACCESS_CODE` estiver configurado, informe esse código no campo de acesso da interface. Ele não é a chave da OpenAI.
 10. Preencha o briefing, use **Preencher vazios com IA** se quiser assistência e depois clique em **Gerar com IA**.
+11. Abra cada card em **Ver aula**. Leia título, objetivos, conteúdo, atividades, recursos, síntese e avaliação antes de exportar.
+12. Se uma semana estiver fraca ou precisar de outro foco, escreva a solicitação no final da prévia e clique em **Refazer esta semana com IA**. Somente a semana aberta será reescrita.
 
 Depois de alterar qualquer variável, abra **Deployments**, escolha a implantação mais recente e faça **Redeploy** para que a função receba os valores novos.
 
@@ -53,6 +58,16 @@ O fluxo começa pelo briefing, mas o resultado não é uma lista fixa de seçõe
 A semana produzida é uma unidade completa: abertura, conteúdo desenvolvido, seções e subseções, exemplos, reflexões, recursos no ponto de uso, síntese, avaliação, conexão com a semana seguinte e cálculo posterior da carga. Vídeos, imagens, diagramas e leituras ficam associados ao trecho ou conceito que motivou seu uso. A leitura do aluno não termina com uma galeria de links separada.
 
 O botão de assistência completa somente campos vazios do briefing. A geração final trabalha sobre o briefing revisado, e o backend pesquisa candidatos reais de vídeo, imagem/diagrama e leitura antes da seleção pela IA.
+
+### Controle de qualidade textual
+
+Antes de considerar uma semana pronta, o gerador verifica título específico, abertura, pelo menos quatro objetivos, cinco ou mais seções desenvolvidas, síntese, avaliação, blocos compatíveis com o Aula Studio e alinhamento entre objetivo, atividade, evidência e avaliação. A IA recebe uma exigência de texto longo e, se a primeira resposta ficar curta, executa uma segunda etapa de reparo editorial. A tela mostra palavras, seções, objetivos, nota estrutural e pendências.
+
+O resultado também traz um checklist pedagógico: diagnóstico, checagens formativas, avaliação somativa com feedback, webprática completa quando houver, diferenciação, acessibilidade, recursos contextualizados e autoavaliação. Uma semana bloqueada deve ser refeita antes do uso no Aula Studio.
+
+### Como a ordem funciona
+
+Não existe uma sequência rígida para todas as semanas. A IA escolhe um arco adequado — descoberta conceitual, caso, oficina, análise de dados, debate ou síntese — e registra quais fases estão ativas: abertura, diagnóstico, explicação, exemplo, prática guiada, prática independente, reflexão, avaliação e síntese. Quando uma fase é omitida, a omissão recebe justificativa. Vídeos, imagens e leituras entram dentro do tópico/conceito que os torna úteis; não são despejados em uma galeria final.
 
 ## Separação aluno e professor
 
@@ -79,7 +94,7 @@ O Planejamento Geral considera o total do curso, apresenta meta, carga calculada
 
 Após a geração textual, o sistema consulta **YouTube Data API v3** para vídeos, **Wikimedia Commons** para imagens e diagramas com metadados de crédito/licença e **Crossref** para referências acadêmicas. A IA recebe os candidatos retornados pelos provedores, escolhe os mais adequados e registra justificativa pedagógica, fonte, URL, duração e licença quando disponíveis. As alternativas permanecem no campo `lessonPlan.resourceResearch` para conferência.
 
-Os recursos selecionados viram blocos editáveis do Aula Studio: `video`, `imagem` ou `materiais`. Isso permite abrir a aula e **editar o texto, trocar/remover uma imagem ou vídeo, inserir outro bloco e reorganizar a leitura** sem transformar o conteúdo em HTML achatado.
+Os recursos selecionados viram blocos editáveis do Aula Studio: `video`, `imagem` ou `materiais`. Isso permite abrir a aula e **editar o texto, trocar/remover uma imagem ou vídeo, inserir outro bloco e reorganizar a leitura** sem transformar o conteúdo em HTML achatado. Cada recurso possui estado `candidate-found`, `selected-by-ai` ou `approved`, além de pendências de licença, atualidade, acessibilidade, duração e adequação ao idioma. A aprovação final continua humana.
 
 ### Configurar a pesquisa de vídeos
 
@@ -101,6 +116,7 @@ Sem `YOUTUBE_API_KEY`, o gerador continua pesquisando imagens/diagramas e leitur
 | `GET /api/health` | informa o estado das chaves e do modelo |
 | `POST /api/assist-briefing` | preenche campos vazios do briefing |
 | `POST /api/generate` | gera semanas do aluno, guias do professor e Planejamento Geral |
+| `POST /api/regenerate-week` | refaz somente uma semana com instrução do professor e recalcula o curso |
 | `POST /api/teacher-pdf` | devolve somente o PDF do guia do professor |
 | `POST /api/zip` | devolve o pacote completo, incluindo PDF e webpráticas |
 
@@ -121,6 +137,9 @@ Variáveis principais:
 OPENAI_API_KEY=chave-local-nunca-commitada
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
+OPENAI_CONTENT_MODEL=
+OPENAI_MAX_TOKENS=16000
+AULA_AUTO_REPAIR=true
 AULA_ACCESS_CODE=um-codigo-privado-opcional
 YOUTUBE_API_KEY=chave-do-youtube-opcional
 AULA_RESOURCE_RESEARCH=true

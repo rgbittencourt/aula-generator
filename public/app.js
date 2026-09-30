@@ -1,11 +1,13 @@
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
-const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null };
+const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 
 function splitLines(value) { return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : String(value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
 function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char])); }
 function formatDate(value) { return value ? value.split("-").reverse().join("/") : ""; }
+function readableText(value) { return String(value ?? "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim(); }
+function paragraphsMarkup(value) { return String(value ?? "").split(/\n\s*\n|\r?\n/).map((part) => readableText(part)).filter(Boolean).map((part) => `<p>${escapeHtml(part)}</p>`).join(""); }
 function slugify(value) { return String(value || "curso").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "curso"; }
 function downloadBlob(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
 function addDays(dateString, days) { const date = new Date(`${dateString}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); }
@@ -246,6 +248,91 @@ async function assistBriefing() {
   finally { setBusy(button, false, ""); }
 }
 
+function resourcePreview(resource) {
+  const title = resource.title || resource.kind || "Recurso";
+  const href = resource.href ? `<a href="${escapeHtml(resource.href)}" target="_blank" rel="noreferrer">${escapeHtml(resource.href)}</a>` : `<span>Busca sugerida: ${escapeHtml(resource.searchQuery || "a confirmar")}</span>`;
+  const detail = [resource.pedagogicalUse || resource.objective, resource.source, resource.license].filter(Boolean).join(" · ");
+  return `<div class="reader-resource"><div><strong>${escapeHtml(title)}</strong>${href}<small>${escapeHtml(detail || "Recurso contextualizado para esta seção.")}</small></div></div>`;
+}
+
+function renderLessonPreview(lesson, index) {
+  const plan = lesson?.lessonPlan || {};
+  const quality = lesson?.contentQuality || {};
+  const sections = Array.isArray(plan.contentSections) ? plan.contentSections : [];
+  const objectives = Array.isArray(plan.learningObjectives) ? plan.learningObjectives : [];
+  const allResources = plan.resources || {};
+  const statusLabel = { complete: "conteúdo completo", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[quality.status] || "qualidade não medida";
+  const strip = document.querySelector("#lesson-quality-strip");
+  strip.innerHTML = `<span class="quality-badge ${escapeHtml(quality.status || "needs-review")}">${escapeHtml(statusLabel)}</span><span>${Number(quality.wordCount || 0).toLocaleString("pt-BR")} palavras</span><span>${sections.length} seções</span><span>${objectives.length} objetivos</span><span>nota estrutural ${Number(quality.score || 0)}/100</span>`;
+  const issue = Array.isArray(quality.issues) && quality.issues.length ? `<div class="reader-warning"><strong>Antes de exportar:</strong> ${escapeHtml(quality.issues.join(" · "))}</div>` : "";
+  const sectionsMarkup = sections.map((section) => {
+    const subs = (section.subsections || []).map((sub) => `<h4>${escapeHtml(`${sub.number || ""} ${sub.title || ""}`.trim())}</h4>${paragraphsMarkup(sub.body)}`).join("");
+    const caseMarkup = section.caseStudy ? `<div class="reader-callout"><strong>${escapeHtml(section.caseStudy.title || "Estudo de caso")}</strong>${paragraphsMarkup(section.caseStudy.context || section.caseStudy.data || "")}${(section.caseStudy.questions || []).length ? `<ul>${section.caseStudy.questions.map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul>` : ""}</div>` : "";
+    const reflection = section.reflection?.question ? `<div class="reader-callout"><strong>Para refletir</strong><p>${escapeHtml(section.reflection.question)}</p>${paragraphsMarkup(section.reflection.body || "")}</div>` : "";
+    const resources = [...(section.resources || [])].map(resourcePreview).join("");
+    return `<section><h3>${escapeHtml(`${section.number || ""} ${section.title || "Seção"}`.trim())}</h3>${paragraphsMarkup(section.body)}${subs}${caseMarkup}${reflection}${resources}</section>`;
+  }).join("");
+  const globalResources = Object.values(allResources).flat().filter((resource) => resource && !sections.some((section) => (section.resources || []).some((item) => item.id && item.id === resource.id))).slice(0, 12).map(resourcePreview).join("");
+  const glossary = (plan.glossary || []).length ? `<section><h3>Glossário</h3><ul>${plan.glossary.map((item) => `<li><strong>${escapeHtml(item.term || "Termo")}</strong>: ${escapeHtml(item.definition || "")}</li>`).join("")}</ul></section>` : "";
+  const assessment = (plan.assessment?.questions || []).length ? `<section><h3>${escapeHtml(plan.assessment.title || "Atividade avaliativa")}</h3><p>${escapeHtml(plan.assessment.format || "Questões alinhadas aos objetivos")}</p><ol>${plan.assessment.questions.map((q) => `<li>${escapeHtml(q.q || q.question || "")}${q.explanation ? `<small>${escapeHtml(q.explanation)}</small>` : ""}</li>`).join("")}</ol></section>` : "";
+  const guide = state.teacherGuides[index] || {};
+  const arc = plan.didacticArc || guide.didacticArc || {};
+  const phaseSummary = arc.phasePlan ? Object.entries(arc.phasePlan).filter(([key, value]) => key !== "labels" && key !== "omitted" && value === true).map(([key]) => arc.phasePlan.labels?.[key] || key).join(" · ") : (arc.sequence || []).join(" · ");
+  const diagnostic = plan.diagnostic?.prompt ? `<section class="reader-callout"><h3>Antes de começar</h3>${paragraphsMarkup(plan.diagnostic.prompt)}${plan.diagnostic.expectedEvidence ? `<small>O que será observado: ${escapeHtml(plan.diagnostic.expectedEvidence)}</small>` : ""}</section>` : "";
+  const formative = (plan.formativeChecks || []).length ? `<section><h3>Paradas de aprendizagem</h3><ul>${plan.formativeChecks.map((check) => `<li><strong>${escapeHtml(check.moment || "Checagem")}</strong>: ${escapeHtml(check.prompt || "")}${check.feedback ? `<small>Feedback: ${escapeHtml(check.feedback)}</small>` : ""}</li>`).join("")}</ul></section>` : "";
+  const activities = (plan.activities || []).length ? `<section><h3>Atividades e evidências</h3><ul>${plan.activities.map((activity) => `<li><strong>${escapeHtml(activity.title || "Atividade")}</strong>: ${escapeHtml(activity.instructions || "")}${activity.evidence ? `<small>Evidência: ${escapeHtml(activity.evidence)}</small>` : ""}</li>`).join("")}</ul></section>` : "";
+  const practiceProjects = (guide.webPracticeProjects || guide.webPractices || []).length ? `<section class="reader-callout"><h3>Projeto de webprática</h3>${(guide.webPracticeProjects || guide.webPractices).map((practice) => `<h4>${escapeHtml(practice.title || "Webprática")}</h4>${paragraphsMarkup(practice.problem || practice.context)}<p><strong>Papel:</strong> ${escapeHtml(practice.studentRole || "")}</p><p><strong>Produto:</strong> ${escapeHtml(practice.product || practice.deliverable || "")}</p><ol>${(practice.steps || []).map((step) => `<li>${escapeHtml(step.title || "Etapa")}: ${escapeHtml(step.instructions || "")} (${Number(step.minutes || 0)} min)</li>`).join("")}</ol>`).join("")}</section>` : "";
+  const differentiation = plan.differentiation && (plan.differentiation.support?.length || plan.differentiation.standard?.length || plan.differentiation.extension?.length) ? `<section><h3>Trilhas de estudo</h3><h4>Essencial</h4><ul>${(plan.differentiation.support || []).map((item) => `<li>${escapeHtml(item.title || item.instructions || item)}</li>`).join("")}</ul><h4>Padrão</h4><ul>${(plan.differentiation.standard || []).map((item) => `<li>${escapeHtml(item.title || item.instructions || item)}</li>`).join("")}</ul><h4>Aprofundamento</h4><ul>${(plan.differentiation.extension || []).map((item) => `<li>${escapeHtml(item.title || item.instructions || item)}</li>`).join("")}</ul></section>` : "";
+  const selfAssessment = (plan.selfAssessment?.prompts || []).length ? `<section><h3>Autoavaliação</h3><ul>${plan.selfAssessment.prompts.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>` : "";
+  const workload = plan.timePlan?.workloadAdjustment?.suggestions?.length ? `<section class="reader-warning"><h3>Ajustes de carga sugeridos</h3><ul>${plan.timePlan.workloadAdjustment.suggestions.map((item) => `<li>${escapeHtml(item.rationale || item.action || "Ajuste")}${item.title ? ` — ${escapeHtml(item.title)}` : ""}</li>`).join("")}</ul></section>` : "";
+  const alignment = (plan.alignmentMatrix || []).length ? `<section><h3>Alinhamento pedagógico</h3><ul>${plan.alignmentMatrix.map((row) => `<li><strong>${escapeHtml(row.objective || "Objetivo")}</strong>: ${escapeHtml(row.evidence || "evidência a definir")} · avaliação: ${escapeHtml((row.assessmentQuestions || []).join(", ") || "a definir")}</li>`).join("")}</ul></section>` : "";
+  $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
+  $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
+  $("#lesson-reader").innerHTML = `${issue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${practiceProjects}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${assessment}${alignment}${workload}`;
+}
+
+function openLessonPreview(index) {
+  const lesson = state.weeks[index];
+  if (!lesson) return;
+  state.previewIndex = index;
+  renderLessonPreview(lesson, index);
+  $("#week-revision").value = "";
+  $("#lesson-modal").classList.remove("hidden");
+  $("#lesson-modal").setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+}
+
+function closeLessonPreview() {
+  $("#lesson-modal").classList.add("hidden");
+  $("#lesson-modal").setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+  state.previewIndex = null;
+}
+
+async function regenerateSelectedWeek() {
+  const index = state.previewIndex;
+  const instruction = $("#week-revision").value.trim();
+  if (index == null || !instruction) { $("#regenerate-note").textContent = "Escreva primeiro o que deseja alterar nesta semana."; return; }
+  if (isGitHubPages) { $("#regenerate-note").textContent = "A regeneração por IA fica disponível na URL Vercel com backend protegido."; return; }
+  const button = $("#regenerate-week-button");
+  button.dataset.label = "Refazer esta semana com IA";
+  setBusy(button, true, "Refazendo…");
+  $("#regenerate-note").textContent = "A IA está reescrevendo somente esta semana e preservando o restante do curso…";
+  try {
+    const input = { ...state.input };
+    const accessCode = $("#access-code")?.value || "";
+    const headers = { "Content-Type": "application/json" };
+    if (accessCode) headers["x-aula-access-code"] = accessCode;
+    const response = await fetch("/api/regenerate-week", { method: "POST", headers, body: JSON.stringify({ input, weekIndex: index, instruction, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Não foi possível refazer a semana.");
+    renderWeeks(data);
+    $("#regenerate-note").textContent = "Semana atualizada. Confira a nova versão abaixo antes de exportar.";
+    openLessonPreview(index);
+  } catch (error) { $("#regenerate-note").textContent = error.message; }
+  finally { setBusy(button, false, ""); }
+}
+
 function weekCalendar(input, index) {
   const weekNumber = index + 1;
   if (input.calendarMode !== "calendar" || !input.startDate) return { weekNumber, label: `Semana ${weekNumber}`, startDate: null, endDate: null };
@@ -281,7 +368,17 @@ function fallbackLesson(input, index) {
     ...input.references.map((href, i) => ({ type: "artigo", title: `Referência ${i + 1}`, source: "Material indicado", href }))
   ].filter((item) => item.title || item.href);
   if (materialItems.length) blocks.push({ id: id("b-materials-", 20), type: "materiais", bg: "neutral-default", pad: "normal", props: { title: "Materiais de apoio", items: materialItems } });
-  return { meta: { title: `${input.title} — ${calendar.label}`, courseTitle: input.title, weekNumber: week, weekLabel: calendar.label, calendarStartDate: calendar.startDate, calendarEndDate: calendar.endDate, studyHours: input.hoursPerWeek, author: input.author, role: "", institution: input.institution, year: new Date().getFullYear().toString(), aiTool: "", aiUse: "", license: "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br" }, blocks };
+  const theme = `${input.title} — Semana ${week}`;
+  const objectives = [...input.objectives, `Relacionar ${input.title} a uma situação concreta.`, `Analisar limites e possibilidades do tema.`, `Aplicar o conteúdo em uma produção observável.`, "Sintetizar o que foi aprendido nesta etapa."].filter((item, itemIndex, list) => item && list.indexOf(item) === itemIndex).slice(0, 5);
+  const sections = [
+    { number: "1", title: "Contexto e pergunta de partida", body: content, resources: [] },
+    { number: "2", title: "Conceitos centrais", body: `Nesta seção, organize os conceitos fundamentais de ${input.title}, diferenciando termos próximos e explicando por que eles importam para a realidade do estudante.`, resources: [] },
+    { number: "3", title: "Exemplo aplicado", body: "Observe uma situação concreta, identifique o problema, descreva as evidências disponíveis e formule uma primeira interpretação antes de consultar a solução ou o comentário do professor.", resources: [] },
+    { number: "4", title: "Análise crítica e atividade guiada", body: "Compare possibilidades, reconheça limites dos dados e registre quais decisões seriam justificáveis. Esta etapa prepara a produção do estudante.", resources: [] },
+    { number: "5", title: "Síntese e transferência", body: "Retome os conceitos, conecte-os ao seu contexto e registre uma aplicação possível para continuar o percurso nas próximas semanas.", resources: [] }
+  ];
+  const lessonPlan = { weekNumber: week, theme, welcome: `Nesta semana, você vai estudar ${input.title} a partir de uma sequência de contexto, conceitos, exemplo, aplicação e reflexão. Use esta prévia para conferir a organização antes de exportar.`, learningObjectives: objectives, didacticArc: { id: "descoberta-conceitual", label: "Descoberta conceitual", sequence: ["opening", "conceptExplanation", "workedExample", "guidedPractice", "reflection", "synthesis"], phasePlan: { opening: true, diagnostic: false, conceptExplanation: true, workedExample: true, guidedPractice: true, independentPractice: false, reflection: true, assessment: true, synthesis: true, labels: {} } }, contentSections: sections, resources: { videos: input.videoLinks.map((href, i) => ({ id: `video-${i + 1}`, title: `Vídeo fornecido ${i + 1}`, href, kind: "video", objective: "Aprofundar o conceito apresentado." })), readingsRequired: [], readingsExtra: input.references.map((href, i) => ({ id: `reading-${i + 1}`, title: `Leitura indicada ${i + 1}`, href, kind: "artigo", objective: "Relacionar a leitura ao conteúdo." })), images: [], podcasts: [], datasets: [] }, webPractices: [], activities: [{ id: "activity-1", title: "Registro de aplicação", type: "produção", instructions: "Descreva como o tema aparece no seu contexto.", evidence: "Texto curto de análise", durationMinutes: 20, required: true }], diagnostic: { prompt: "O que você já sabe sobre este tema?", expectedEvidence: "Hipótese inicial do estudante." }, formativeChecks: [{ id: "check-1", moment: "Após os conceitos", prompt: "Explique um conceito com suas próprias palavras.", feedback: "Compare sua resposta com a síntese da seção." }], differentiation: { support: [{ title: "Trilha essencial", instructions: "Retome o glossário e o exemplo resolvido." }], standard: [{ title: "Trilha padrão", instructions: "Leia todas as seções e entregue a atividade." }], extension: [{ title: "Aprofundamento", instructions: "Compare o exemplo com outro contexto." }] }, selfAssessment: { prompts: ["Consigo explicar o conceito central?", "Consigo aplicá-lo a uma situação real?"] }, synthesis: "O exemplo local e os conceitos centrais devem ser lidos juntos: compreender uma definição não basta; é preciso usá-la para interpretar uma situação e justificar uma decisão.", nextWeekConnection: "Na próxima semana, o conceito será retomado em uma situação mais complexa.", glossary: [], references: input.references, assessment: { title: "Avaliação formativa", format: "Questões de revisão", questions: [] }, alignmentMatrix: objectives.map((objective, i) => ({ objective, contentSections: [String(Math.min(i + 1, 5))], activities: ["activity-1"], evidence: "Registro de aplicação", assessmentQuestions: [] })), timePlan: { targetMinutes: input.hoursPerWeek * 60, calculatedMinutes: 0, workloadAdjustment: { suggestions: [] } } };
+  return { meta: { title: theme, courseTitle: input.title, weekNumber: week, weekLabel: calendar.label, calendarStartDate: calendar.startDate, calendarEndDate: calendar.endDate, studyHours: input.hoursPerWeek, author: input.author, role: "", institution: input.institution, year: new Date().getFullYear().toString(), aiTool: "", aiUse: "", license: "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br" }, lessonPlan, contentQuality: { status: "needs-review", score: 68, wordCount: sections.reduce((total, section) => total + section.body.split(/\s+/).length, 0), issues: ["exemplo local: substitua pela geração com IA antes da exportação"], sectionCount: sections.length, objectiveCount: objectives.length }, blocks };
 }
 
 function staticTeacherGuides(input, weeks) {
@@ -315,19 +412,23 @@ function renderGeneralPlan(plan) {
   const categoryMarkup = Object.entries(plan.categoryTotals || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<span>${escapeHtml(labels[key] || key)}: ${formatMinutes(value)}</span>`).join("");
   const unresolved = Array.isArray(plan.unresolvedResources) ? plan.unresolvedResources : [];
   const arcs = (plan.didacticArcs || []).filter((arc) => arc.label).map((arc) => `<span class="arc-chip">${escapeHtml(arc.label)}</span>`).join("");
-  container.innerHTML = `<p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o guia do professor são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div>${unresolved.length ? `<div class="general-warning">${unresolved.length} recurso(s) precisam de conferência para fechar o cálculo: ${escapeHtml(unresolved.slice(0, 4).map((item) => item.title).join(", "))}${unresolved.length > 4 ? "…" : ""}</div>` : ""}`;
+  const checklist = Array.isArray(plan.pedagogicalChecklist) ? plan.pedagogicalChecklist : [];
+  const passed = checklist.filter((item) => item.pass).length;
+  const checklistMarkup = checklist.length ? `<div class="general-warning ${passed === checklist.length ? "checklist-ok" : ""}"><strong>Checklist pedagógico: ${passed}/${checklist.length} itens atendidos</strong><ul>${checklist.filter((item) => !item.pass).slice(0, 8).map((item) => `<li>Semana ${item.weekNumber}: ${escapeHtml(item.label)}</li>`).join("") || "<li>Todos os itens essenciais foram atendidos; faça a aprovação humana dos recursos.</li>"}</ul></div>` : "";
+  const progressionMarkup = Array.isArray(plan.progression) && plan.progression.length ? `<div class="general-warning"><strong>Progressão curricular</strong><ul>${plan.progression.map((item) => `<li>Semana ${item.weekNumber}: ${escapeHtml(item.theme || "")} ${item.projectMilestone ? `— ${escapeHtml(item.projectMilestone)}` : ""}</li>`).join("")}</ul></div>` : "";
+  container.innerHTML = `<p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o guia do professor são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div>${unresolved.length ? `<div class="general-warning">${unresolved.length} recurso(s) precisam de conferência para fechar o cálculo: ${escapeHtml(unresolved.slice(0, 4).map((item) => item.title).join(", "))}${unresolved.length > 4 ? "…" : ""}</div>` : ""}${checklistMarkup}${progressionMarkup}`;
   container.classList.remove("hidden");
 }
 
 function renderWeeks(data) {
-  state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider;
+  state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider; state.validation = data.validation || data.generalPlan?.validation || null;
   $("#results-title").textContent = `${data.weeks.length} semanas prontas para revisão`;
   $("#results-subtitle").textContent = data.provider === "static-demo" ? "Modo público GitHub Pages: exemplo gerado no navegador, sem API." : data.provider === "fallback" ? "Exemplo local gerado sem API; use-o para validar o fluxo." : `Gerado por IA com ${data.model || "o provedor configurado"}. Revise antes de publicar.`;
   $("#results-section").classList.remove("hidden");
   $("#empty-state").classList.add("hidden");
   const alert = $("#result-alert");
   alert.className = "result-alert";
-  alert.textContent = data.provider === "static-demo" ? "Esta versão pública gera exemplos diretamente no navegador. A IA será conectada em uma hospedagem com backend protegido quando você escolher essa opção." : data.provider === "fallback" ? "Este é um exemplo estrutural. A geração por IA será ativada quando OPENAI_API_KEY estiver configurada." : "A geração terminou. Baixe cada semana ou o ZIP para abrir e revisar no Aula Studio.";
+  alert.textContent = data.provider === "static-demo" ? "Esta versão pública gera exemplos diretamente no navegador. A IA será conectada em uma hospedagem com backend protegido quando você escolher essa opção." : data.provider === "fallback" ? "Este é um exemplo estrutural. A geração por IA será ativada quando OPENAI_API_KEY estiver configurada." : state.validation?.readyForExport ? "A geração terminou. Faça a revisão humana de cada semana e, depois, baixe os arquivos." : `A geração terminou, mas há ${state.validation?.summary?.blockedWeeks || 0} semana(s) bloqueada(s) e ${state.validation?.summary?.reviewWeeks || 0} em revisão. Abra cada semana antes de exportar.`;
   const cards = data.weeks.map((lesson, index) => {
     const meta = lesson.meta || {};
     const workload = data.workload?.weeks?.[index];
@@ -337,9 +438,12 @@ function renderWeeks(data) {
     const target = workload?.targetMinutes != null ? formatMinutes(workload.targetMinutes) : "meta —";
     const guide = state.teacherGuides[index];
     const arc = guide?.didacticArc?.label || lesson.lessonPlan?.didacticArc?.label || "Arco variável";
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div><h3>${escapeHtml(meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${lesson.blocks?.length || 0} blocos</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div><button class="week-download" data-index="${index}" type="button">Baixar JSON do aluno <span>↓</span></button></article>`;
+    const quality = lesson.contentQuality || {};
+    const qualityLabel = { complete: "conteúdo completo", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[quality.status] || "qualidade não medida";
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div><h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div><span class="quality-badge ${escapeHtml(quality.status || "needs-review")}">${escapeHtml(qualityLabel)}</span><div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="week-download" data-index="${index}" type="button">Baixar JSON <span>↓</span></button></div></article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
+  $("#week-grid").querySelectorAll(".week-preview").forEach((button) => button.addEventListener("click", () => openLessonPreview(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-download").forEach((button) => button.addEventListener("click", () => downloadWeek(Number(button.dataset.index))));
   renderGeneralPlan(data.generalPlan);
   renderWorkload(data.workload);
@@ -459,6 +563,11 @@ $("#fallback-button").addEventListener("click", () => generate(true));
 $("#assist-button").addEventListener("click", assistBriefing);
 $("#zip-button").addEventListener("click", downloadZip);
 $("#teacher-pdf-button").addEventListener("click", downloadTeacherPdf);
+$("#close-lesson-modal").addEventListener("click", closeLessonPreview);
+$("#close-lesson-modal-secondary").addEventListener("click", closeLessonPreview);
+$("#regenerate-week-button").addEventListener("click", regenerateSelectedWeek);
+$("#lesson-modal").addEventListener("click", (event) => { if (event.target.id === "lesson-modal") closeLessonPreview(); });
+document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.previewIndex != null) closeLessonPreview(); });
 $("#calendar-mode").addEventListener("change", toggleCalendar);
 $("#practice-enabled").addEventListener("change", togglePractice);
 document.querySelectorAll("#course-form input, #course-form textarea, #course-form select").forEach((field) => field.addEventListener("input", updateSummary));

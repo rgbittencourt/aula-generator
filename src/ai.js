@@ -1,4 +1,5 @@
-import { KNOWN_BLOCK_TYPES, normalizeWeeklyOutput } from "./aula-schema.js";
+import { KNOWN_BLOCK_TYPES, normalizeLesson, normalizeWeeklyOutput } from "./aula-schema.js";
+import { measureLessonQuality, qualityPromptGuidance } from "./content-quality.js";
 import { buildTeacherGuide } from "./teacher-guide.js";
 
 const providerBase = () => (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
@@ -9,7 +10,7 @@ function parseJson(content) {
   return JSON.parse(text);
 }
 
-async function callJson(messages) {
+async function callJson(messages, options = {}) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     const error = new Error("OPENAI_API_KEY não está configurada. Cadastre a chave como segredo na Vercel.");
@@ -20,8 +21,9 @@ async function callJson(messages) {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-      temperature: 0.55,
+      model: options.model || process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
+      temperature: options.temperature ?? 0.45,
+      max_tokens: Number(process.env.OPENAI_MAX_TOKENS || 16000),
       response_format: { type: "json_object" },
       messages
     })
@@ -129,17 +131,20 @@ export async function selectResourcesWithAI(input, research) {
   };
   const prompt = `Você é o curador final de recursos educacionais. A semana já foi escrita por um designer instrucional. Agora escolha, entre os candidatos reais abaixo, os recursos que melhor aprofundam os objetivos e os conceitos da semana.
 
-Responda somente JSON válido com estas propriedades: videos, images, readings. Cada propriedade deve ser um array de objetos com candidateId, keep, reason, use, guidingQuestion, required, moment e query.
+Responda somente JSON válido com estas propriedades: videos, images, readings. Cada propriedade deve ser um array de objetos com candidateId, keep, reason, use, guidingQuestion, required, moment, query, alignment, quality, currency, accessibility, durationFit, license, language, score, hasCaptions, hasTranscript, accessibilitySummary e lowBandwidthAlternative.
 
 Regras obrigatórias:
 - só escolha candidateId que exista nos candidatos recebidos;
 - nunca invente URL, título, autor, duração, licença ou DOI;
 - prefira material em ${input.language || "pt-BR"}, fonte institucional/acadêmica e recurso acessível;
+- avalie explicitamente: alinhamento a um objetivo, confiabilidade/qualidade da fonte, atualidade, acessibilidade, duração em relação à carga, licença/crédito, idioma e momento didático;
+- um vídeo sem legenda/transcrição deve trazer uma alternativa textual; uma imagem/diagrama deve trazer altText ou uma alternativa descritiva;
 - escolha no máximo 2 vídeos, 3 imagens/diagramas e 3 leituras por semana;
 - elimine duplicatas e descarte recursos que não tenham relação clara com o conteúdo;
 - explique em reason por que o recurso foi escolhido e em use como ele será usado pedagogicamente;
 - marque required true somente quando o recurso for necessário para atingir um objetivo;
 - se nenhum candidato servir, retorne keep false para aquele pedido.
+- o professor fará a aprovação final: nunca marque o recurso como aprovado; apenas selecione-o como "selected-by-ai" e deixe a revisão humana pendente.
 
 Curso e briefing:
 ${JSON.stringify({ title: input.title, audience: input.audience, level: input.level, objectives: input.objectives, content: input.content }, null, 2)}
@@ -163,56 +168,120 @@ const BLOCK_TYPES = [...KNOWN_BLOCK_TYPES].join(", ");
 
 export function buildWeekGenerationPrompt(input, weekIndex = 0) {
   const weekNumber = weekIndex + 1;
-  return `Gere UMA semana de material didático em JSON para o curso abaixo. Esta é a semana ${weekNumber} de ${input.weeks}. O resultado precisa ter nível de detalhamento próximo a uma unidade didática completa em DOCX: abertura, texto-base desenvolvido, seções numeradas, subseções quando úteis, estudo de caso quando fizer sentido, reflexões, recursos no ponto de uso, síntese, glossário, referências, avaliação e conexão com a próxima semana. Não entregue um resumo superficial nem apenas uma lista de links.
+  const previous = weekNumber > 1 ? `A semana anterior foi a ${weekNumber - 1}; retome um conceito dela e mostre como esta semana avança.` : "Esta é a abertura do curso; construa a base conceitual e anuncie o percurso.";
+  return `Gere UMA semana de material didático: uma unidade didática semanal completa em JSON para o curso abaixo. Esta é a semana ${weekNumber} de ${input.weeks}. ${previous}
 
-Retorne um objeto com exatamente estas propriedades de alto nível: meta, lessonPlan, blocks e teacherGuide. O teacherGuide é material exclusivo do professor e nunca deve ser repetido dentro de lessonPlan ou blocks.
+${qualityPromptGuidance(input)}
 
-lessonPlan deve conter:
-- weekNumber, theme, welcome;
-- didacticArc: escolha o arco adequado entre descoberta-conceitual, estudo-de-caso, oficina-aplicada, analise-de-dados, debate-orientado e revisao-e-sintese. Retorne id, label, rationale e sequence. Não use o mesmo arco automaticamente quando outro for mais apropriado;
-- learningObjectives: 3 a 8 objetivos observáveis, coerentes com o curso e com esta semana;
+O texto é o produto principal. Não entregue resumo, tópicos telegráficos, frases soltas, uma lista de links ou apenas instruções para o professor. Escreva para o estudante ler e aprender. O padrão de referência é uma aula em DOCX com abertura, objetivos, explicação conceitual, exemplos, casos, contrapontos críticos, síntese, glossário, referências e avaliação. Varie o arco didático conforme o tema; webprática só aparece se estiver programada para esta semana.
+
+Retorne somente este objeto de alto nível: { meta, lessonPlan, teacherGuide }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. teacherGuide é exclusivo do professor e nunca deve ser repetido no conteúdo do aluno.
+
+lessonPlan obrigatório:
+- weekNumber, theme (título específico e informativo, nunca "Conteúdo da semana"), welcome (80–160 palavras, contextualizada e ligada ao percurso), didacticArc com sequence, phasePlan e omissionReasons. A phasePlan pode omitir etapas, mas deve justificar a omissão;
+- learningObjectives com 4–8 objetivos observáveis, específicos desta semana, usando verbos como explicar, comparar, analisar, aplicar, avaliar ou criar;
 - prerequisites e contentDensity;
-- contentSections: 4 a 10 seções, conforme a complexidade real da semana. Cada seção deve ter number, title, didacticRole, body, subsections, caseStudy (quando fizer sentido), reflection (quando fizer sentido), keyTerms e resources. O body deve explicar conceitos, exemplos e implicações, com texto substancial. Evite repetir a mesma introdução em todas as seções;
-- resources com arrays videos, readingsRequired, readingsExtra, images, podcasts e datasets. Cada recurso deve conter title, source, author quando conhecido, href somente se foi fornecido no briefing, required, sectionNumber ou moment, objective, guidingQuestion, pedagogicalUse, durationMinutes, altText/caption/credit para imagens, searchQuery quando o link não estiver disponível, verificationStatus e requiresVerification;
-- webPractices: preserve somente as práticas fornecidas e programadas para esta semana. Se nenhuma prática estiver programada ou for necessária, retorne []. Nunca invente webprática apenas para preencher a estrutura. Na aula do aluno, deixe apenas uma orientação curta;
-- teacherGuide: material exclusivo do professor com purpose, didacticArc, objectives, alignmentMatrix, diagnostic, formativeChecks, mediationQuestions, commonMisconceptions, interventions, differentiation (support, standard, extension), accessibility, assessmentNotes, selfAssessment, spiralReview, resourceNotes, qualityReview e workloadAdvice;
-- para cada webprática programada no curso, desenvolva o projeto independente com context, prerequisites, teacherPreparation, studentPreparation, materials, steps com minutos, product/delivery, criteria/rubric, prompts, roteiro com blocos e duração, plano B, acessibilidade, continuidade e artifacts/files quando fizer sentido;
-- activities: registre fóruns, discussões, comunicações síncronas, projetos e outras atividades com type, title, count, durationMinutes ou unitDurationMinutes, hoursPerCommunication e required;
-- synthesis, nextWeekConnection, glossary, references e assessment;
-- timePlan com targetMinutes 0, items vazio e calculationMethod "derived-after-content". O servidor calculará os tempos depois de receber o conteúdo; não invente a distribuição de horas aqui.
+- contentSections com 6–12 seções/subseções quando a complexidade pedir. Cada seção deve ter number, title, didacticRole, body com 180–450 palavras substanciais, subsections, caseStudy quando pertinente, reflection quando pertinente, keyTerms e resources. A progressão deve ir do problema/pergunta para conceitos, exemplos ou evidências, aplicação e crítica. Não repita a mesma introdução em seções diferentes;
+- resources com videos, readingsRequired, readingsExtra, images, podcasts e datasets. Cada recurso deve conter title, source, author quando conhecido, href somente se foi fornecido no briefing, required, sectionNumber ou moment, objective, guidingQuestion, pedagogicalUse, durationMinutes, altText/caption/credit para imagens, searchQuery quando o link não estiver disponível, verificationStatus e requiresVerification;
+- webPractices: preserve somente as práticas fornecidas e programadas para esta semana; se não houver prática programada, retorne []. Uma prática deve ser um projeto independente com problem, context, studentRole, challenge, deliverable, prerequisites, materials, data, steps (cada uma com minutes, instructions e evidence), criteria, rubric com níveis, examples, revision, fallbackPlan, accessibility e versões simplified/advanced. Desenvolva o projeto completo no teacherGuide; no JSON do aluno deixe somente a orientação necessária no ponto da atividade;
+- diagnostic com pergunta/problema inicial, evidência esperada e feedback; formativeChecks com perguntas durante o texto, momento, evidência, feedback e ação de intervenção;
+- activities para fóruns, discussões, produção, estudo de caso ou encontro síncrono, com type, title, instructions, durationMinutes, evidence, evidenceType, feedback, criteria e required;
+- alignmentMatrix: uma linha por objetivo, ligando contentSections, activities, evidence e assessmentQuestions. Não deixe objetivo sem atividade, evidência e avaliação;
+- differentiation com trilhas support/essential, standard e extension, cada uma com instruções e recursos;
+- accessibility com alternativas para baixa conexão, linguagem clara, uso em celular, diagramas e mídias;
+- selfAssessment com perguntas de autoavaliação, escala e feedback;
+- spiralReview com previousConceptsReviewed, newConcepts, preparationForNextWeek, cumulativeEvidence e projectMilestone;
+- synthesis com pelo menos 80 palavras, nextWeekConnection com pelo menos 40 palavras, glossary com 5–10 termos, references e assessment;
+- assessment com normalmente 6 questões: 4 múltipla escolha com 4 alternativas e 2 verdadeiro/falso, alinhadas a objetivos e texto, com resposta e explicação;
+- timePlan com targetMinutes 0, items vazio e calculationMethod "derived-after-content".
 
-A avaliação semanal deve normalmente ter 6 questões objetivas: 4 de múltipla escolha com 4 alternativas e 2 de verdadeiro/falso, sempre alinhadas aos objetivos e com gabarito, explicação e versão Moodle GIFT quando possível.
-
-blocks deve transformar o lessonPlan em uma leitura editável no Aula Studio e usar somente estes tipos: ${BLOCK_TYPES}. Respeite a anatomia exata do registro: hero com eyebrow/title/lead; topic com props.children; titulo com text/level; prose com body HTML; destaque/atencao/reflexao com suas props próprias; video com id/title/caption/credit/start; imagem com src/slotId/caption/credit/ratio; materiais com title/items[{type,title,source,href}]; quiz com title/intro/avaliativo/passMark/questions; sintese com eyebrow/title/body; referencias com title/items[{html}]. Os blocos de vídeo, imagem e materiais devem aparecer dentro de topic, imediatamente depois da seção ou conceito que justificou o recurso; não crie uma galeria final obrigatória. Na primeira etapa, use searchQuery para recursos sem URL; depois da redação o servidor pesquisará candidatos reais, a IA os selecionará e os converterá em blocos editáveis. Não coloque formatos inventados nem props de outro bloco. Um quiz deve usar props.questions com q, options, answer e explanation.
-
-Regras de conteúdo e fontes:
-- escreva em ${input.language}, com linguagem humana, clara, específica e pedagogicamente provocadora;
-- distribua progressivamente os objetivos, sem copiar o mesmo bloco em semanas diferentes;
-- respeite o público (${input.audience}) e nível (${input.level});
-- use o recorte, os conteúdos e as práticas do briefing;
-- apresente vídeos, imagens, artigos e leituras como recursos contextualizados, com a função pedagógica e o momento de uso;
-- não force diagnóstico, vídeo, leitura, webprática ou quiz em toda semana; inclua apenas o que tiver função pedagógica;
-- se didacticMode for diferente de auto, trate-o como preferência de percurso e mantenha liberdade para adaptar a sequência ao conteúdo;
-- nunca invente URLs, DOI, durações, autores, números ou referências verificadas. Para um recurso ainda não conferido, use searchQuery e verificationStatus "suggested-no-url";
-- se houver um link real no briefing, preserve-o e marque verificationStatus "provided-needs-review";
+Regras de escrita:
+- escreva em ${input.language}, com linguagem humana, clara, específica, variada e pedagogicamente provocadora;
+- conecte o tema à realidade do público (${input.audience}) e do nível (${input.level}); use os exemplos, recortes regionais e instituições fornecidos no briefing;
+- inclua pelo menos um exemplo concreto, uma situação-problema ou estudo de caso e um contraponto/limite quando forem pertinentes;
+- integre vídeos, imagens, artigos e leituras na seção em que serão usados, explicando o que o estudante deve observar ou responder; não crie uma galeria final de links;
+- não force diagnóstico, vídeo, leitura, webprática ou quiz quando não houver função pedagógica;
+- nunca invente URLs, DOI, durações, autores, números ou referências verificadas. Para recurso ainda não conferido, use searchQuery e verificationStatus "suggested-no-url";
 - não escreva markdown fora das strings do JSON e não inclua comentários.
+
+teacherGuide deve trazer purpose, didacticArc, alignmentMatrix, diagnostic, formativeChecks, mediationQuestions, commonMisconceptions, interventions, differentiation, accessibility, assessmentNotes, selfAssessment, spiralReview, resourceNotes, qualityReview e workloadAdvice. Se houver webprática programada, inclua preparação, roteiro com minutos, prompts, produto, critérios, plano B e artefatos.
 
 Briefing estruturado:
 ${JSON.stringify({ ...input, weekToGenerate: weekNumber }, null, 2)}
 
-Retorne somente JSON válido para esta semana.`;
+Retorne JSON completo, sem omitir propriedades obrigatórias.`;
 }
 
 export function buildGenerationPrompt(input) {
   return `Gere ${input.weeks} semanas, uma por objeto, seguindo o contrato de buildWeekGenerationPrompt. Varie o arco didático conforme o conteúdo; não inclua webprática em semanas não programadas; misture recursos no ponto de uso; mantenha teacherGuide separado e produza blocks exclusivamente para o aluno no Aula Studio. A carga horária será calculada depois do conteúdo.\n\n${JSON.stringify(input, null, 2)}`;
 }
 
+async function repairWeekWithAI(input, index, raw, quality) {
+  const weekNumber = index + 1;
+  const prompt = `A semana ${weekNumber} abaixo foi rejeitada por insuficiência textual. Reescreva a unidade inteira, não faça um resumo e não remova conteúdo que já esteja bom.
+
+${qualityPromptGuidance(input)}
+
+Problemas detectados: ${quality.issues.join("; ") || "conteúdo abaixo do padrão"}.
+
+Entregue somente { lessonPlan, teacherGuide }. lessonPlan precisa ter título específico, welcome, 4–8 objetivos observáveis, 6–12 contentSections com corpo de 180–450 palavras cada quando pertinente, exemplos/caso/contraponto, synthesis, nextWeekConnection, glossary, references, assessment com 6 questões e timePlan. Não gere blocks. Não invente URLs ou referências verificadas; use searchQuery para recursos sem link.
+
+Semana a revisar:
+${JSON.stringify(raw?.lessonPlan || raw, null, 2)}
+
+Briefing do curso:
+${JSON.stringify({ ...input, weekToGenerate: weekNumber }, null, 2)}
+
+Retorne JSON completo agora.`;
+  return callJson([
+    { role: "system", content: "Você é um editor pedagógico rigoroso. Reescreva conteúdo didático completo em português do Brasil e não aceite uma semana superficial." },
+    { role: "user", content: prompt }
+  ], { temperature: 0.35 });
+}
+
 async function generateOneWeek(input, index) {
-  const raw = await callJson([
+  let raw = await callJson([
     { role: "system", content: "Você é um designer instrucional rigoroso. Gere somente JSON válido, desenvolva uma semana completa e nunca invente fontes ou links." },
     { role: "user", content: buildWeekGenerationPrompt(input, index) }
   ]);
+  if (process.env.AULA_AUTO_REPAIR !== "false") {
+    const initialLesson = normalizeLesson(raw, input, index);
+    const initialQuality = measureLessonQuality(initialLesson, input);
+    if (initialQuality.status !== "complete") {
+      try {
+        const repaired = await repairWeekWithAI(input, index, raw, initialQuality);
+        const repairedLesson = normalizeLesson(repaired, input, index);
+        const repairedQuality = measureLessonQuality(repairedLesson, input);
+        if (repairedQuality.wordCount >= initialQuality.wordCount || repairedQuality.score > initialQuality.score) raw = repaired;
+      } catch {
+        // A primeira versão ainda será devolvida com o alerta de qualidade para revisão humana.
+      }
+    }
+  }
   return raw?.lessonPlan || raw?.blocks ? raw : raw?.week || raw;
+}
+
+export async function regenerateWeekWithAI(input, index, currentWeek, instruction) {
+  const weekNumber = index + 1;
+  const prompt = `Refaça somente a semana ${weekNumber} do curso abaixo. O professor pediu esta alteração:
+
+"${String(instruction || "").trim()}"
+
+Preserve o que estiver bom, mas cumpra a solicitação de forma visível. A semana deve continuar sendo uma unidade didática completa, não um resumo. ${qualityPromptGuidance(input)}
+
+Retorne apenas { lessonPlan, teacherGuide }. Não gere blocks; o servidor os monta para o Aula Studio. lessonPlan deve manter título específico, welcome, 4–8 objetivos, 6–12 contentSections com texto substancial, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências, avaliação e timePlan. Não invente URLs ou fontes verificadas.
+
+Briefing do curso:
+${JSON.stringify({ ...input, weekToGenerate: weekNumber }, null, 2)}
+
+Semana atual:
+${JSON.stringify(currentWeek?.lessonPlan || currentWeek, null, 2)}
+
+Retorne JSON completo agora.`;
+  return callJson([
+    { role: "system", content: "Você é um editor instrucional. Atenda a solicitação do professor com precisão, preserve a qualidade textual e responda somente JSON válido." },
+    { role: "user", content: prompt }
+  ], { temperature: 0.35 });
 }
 
 export async function generateWithAI(input) {

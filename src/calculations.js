@@ -152,6 +152,25 @@ function allocationFromItems(items) {
   return output;
 }
 
+function workloadAdjustment(items, targetMinutes, calculatedMinutes) {
+  const variance = calculatedMinutes - targetMinutes;
+  const suggestions = [];
+  if (variance > 0) {
+    const optional = items.filter((entry) => entry.required === false).sort((a, b) => b.minutes - a.minutes);
+    for (const entry of optional.slice(0, 4)) {
+      suggestions.push({ action: entry.category === "video" ? "make-optional" : "move-resource", resourceId: entry.id, title: entry.title, minutesSaved: entry.minutes, toWeek: null, rationale: "Reduzir a carga obrigatória sem retirar o núcleo conceitual." });
+    }
+    const video = items.find((entry) => entry.category === "video" && entry.required !== false);
+    if (video) suggestions.push({ action: "shorten-or-replace-video", resourceId: video.id, title: video.title, minutesSaved: Math.round(video.minutes * 0.5), rationale: "Substituir por vídeo mais curto ou por alternativa textual equivalente." });
+    const practice = items.find((entry) => entry.category === "practice");
+    if (practice) suggestions.push({ action: "split-practice", resourceId: practice.id, title: practice.title, minutesSaved: Math.round(practice.minutes * 0.35), toWeek: null, rationale: "Dividir a produção em duas entregas ou mover uma etapa para a semana seguinte." });
+  } else if (variance < 0) {
+    suggestions.push({ action: "deepen-content", minutesAdded: Math.abs(variance), rationale: "Acrescentar exemplo aplicado, leitura extra ou prática de interpretação sem alterar os objetivos." });
+    suggestions.push({ action: "add-formative-check", minutesAdded: Math.min(15, Math.abs(variance)), rationale: "Inserir uma checagem formativa com feedback durante o texto." });
+  }
+  return { targetMinutes, calculatedMinutes, status: variance > 0 ? "over-target" : variance < 0 ? "under-target" : "balanced", varianceMinutes: variance, suggestions };
+}
+
 function ratioAllocation(totalMinutes, ratios) {
   const keys = ["content", "practice", "assessment", "review"];
   const values = keys.map((key) => Math.max(0, Number(ratios?.[key]) || 0));
@@ -200,6 +219,7 @@ export function calculateWeekWorkload(input, formulaConfigOrIndex = input.formul
     categoryTotals: allocationFromItems(derived.items),
     items: derived.items,
     unresolved: derived.unresolved,
+    workloadAdjustment: workloadAdjustment(derived.items, targetMinutes, calculatedMinutes),
     formulaStatus: formulaConfig?.ratios ? "configured" : "internal-profile",
     formulaProfile: formulaProfileSummary(profile),
     formulaNote: "Perfil interno: o conteúdo é calculado depois que a semana é escrita; itens sem páginas, palavras ou duração ficam pendentes de conferência."
@@ -238,16 +258,21 @@ export function buildGeneralPlan(input, workload, lessons = [], teacherGuides = 
   if (!webPractices.length) input.webPractices.forEach((practice) => { if (!webPractices.some((current) => current.id === practice.id)) webPractices.push(practice); });
   const target = workload.totalTargetLearnerMinutes || workload.totalMinutes || 0;
   const calculated = workload.calculatedMinutes || workload.derivedMinutes || 0;
+  const progression = lessons.map((lesson, index) => ({ weekNumber: index + 1, theme: lesson.lessonPlan?.theme, previousConceptsReviewed: lesson.lessonPlan?.spiralReview?.previousConceptsReviewed || [], newConcepts: lesson.lessonPlan?.spiralReview?.newConcepts || [], preparationForNextWeek: lesson.lessonPlan?.spiralReview?.preparationForNextWeek || [], projectMilestone: lesson.lessonPlan?.spiralReview?.projectMilestone || "" }));
+  const checklist = lessons.flatMap((lesson, index) => (lesson.lessonPlan?.pedagogicalReview?.checks || []).map((check) => ({ ...check, weekNumber: index + 1 })));
   return {
     title: input.title,
     course: { audience: input.audience, level: input.level, weeks: input.weeks, hoursPerWeek: input.hoursPerWeek, calendarMode: input.calendarMode, startDate: input.startDate, objectives: input.objectives },
     formulaProfile: workload.formulaProfile,
     totals: { targetLearnerMinutes: target, targetInstructionalMinutes: workload.totalTargetInstructionalMinutes || 0, calculatedLearnerMinutes: calculated, requiredMinutes: workload.requiredMinutes || 0, optionalMinutes: workload.optionalMinutes || 0, instructionalMinutes: workload.instructionalMinutes || 0, varianceMinutes: calculated - target, targetHours: target / 60, calculatedHours: calculated / 60 },
     categoryTotals,
-    weeks: (workload.weeks || []).map((week) => ({ weekNumber: week.weekNumber, targetMinutes: week.targetMinutes, calculatedMinutes: week.calculatedMinutes, requiredMinutes: week.requiredMinutes, optionalMinutes: week.optionalMinutes, varianceMinutes: week.varianceMinutes, fitStatus: week.fitStatus, items: week.items, unresolved: week.unresolved })),
+    weeks: (workload.weeks || []).map((week) => ({ weekNumber: week.weekNumber, targetMinutes: week.targetMinutes, calculatedMinutes: week.calculatedMinutes, requiredMinutes: week.requiredMinutes, optionalMinutes: week.optionalMinutes, varianceMinutes: week.varianceMinutes, fitStatus: week.fitStatus, items: week.items, unresolved: week.unresolved, workloadAdjustment: week.workloadAdjustment })),
     webPractices,
     didacticArcs: (teacherGuides || []).map((guide) => ({ weekNumber: guide.weekNumber, id: guide.didacticArc?.id, label: guide.didacticArc?.label })),
     teacherGuide: { available: Boolean(teacherGuides?.length), format: "pdf" },
+    progression,
+    pedagogicalChecks: lessons.map((lesson) => ({ weekNumber: lesson.meta?.weekNumber, review: lesson.lessonPlan?.pedagogicalReview, contentQuality: lesson.contentQuality })),
+    pedagogicalChecklist: checklist,
     unresolvedResources: unresolved,
     notes: ["A carga da semana é calculada depois da redação do conteúdo.", "Links sem duração, leituras sem páginas/palavras e fontes não conferidas permanecem sinalizados para revisão humana."]
   };
@@ -272,6 +297,7 @@ export function attachWorkloadToLessons(lessons, workload) {
           instructionalMinutes: week.instructionalMinutes,
           items: week.items,
           unresolved: week.unresolved,
+          workloadAdjustment: week.workloadAdjustment,
           formulaProfile: week.formulaProfile,
           calculationMethod: "aula-generator-internal-profile",
           notes: `${week.fitStatus}; diferença de ${week.varianceMinutes} minutos em relação à meta do estudante.`

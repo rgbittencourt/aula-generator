@@ -1,4 +1,5 @@
-import { normalizeDidacticArc, fallbackDidacticArc } from "./pedagogy.js";
+import { normalizeDidacticArc, fallbackDidacticArc, buildAlignmentMatrix, buildProgression, pedagogicalReview } from "./pedagogy.js";
+import { measureLessonQuality } from "./content-quality.js";
 
 export const DEFAULT_LICENSE = "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br";
 
@@ -17,6 +18,26 @@ const integer = (value, fallback) => { const n = Number.parseInt(value, 10); ret
 const number = (value, fallback) => { const n = Number(value); return Number.isFinite(n) ? n : fallback; };
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const bool = (value, fallback = false) => value === undefined || value === null ? fallback : Boolean(value);
+
+function defaultWeeklyObjectives(input = {}, index = 0) {
+  const supplied = splitLines(input.objectives);
+  const topic = text(input.title, "o tema da semana");
+  const defaults = [
+    `Explicar os conceitos centrais de ${topic} na perspectiva desta semana.`,
+    `Relacionar ${topic} a um exemplo ou problema concreto do contexto educacional.`,
+    `Analisar criticamente implicações, limites ou decisões associadas a ${topic}.`,
+    `Aplicar o que foi estudado em uma situação de gestão, pesquisa ou produção.`,
+    "Sintetizar os aprendizados e formular uma pergunta para continuar o percurso."
+  ];
+  const rotated = supplied.length ? supplied.map((item, itemIndex) => `${item} — foco da semana ${index + 1}`) : [];
+  return [...rotated, ...defaults].filter((item, itemIndex, list) => list.indexOf(item) === itemIndex).slice(0, 8);
+}
+
+function specificTheme(value, input, index) {
+  const candidate = text(value);
+  if (candidate && !/^conteúdo da semana$|^seção \d+$|^sem título$/iu.test(candidate)) return candidate;
+  return `${text(input.title, "Curso")} — Semana ${index + 1}`;
+}
 
 export function splitLines(value) {
   if (Array.isArray(value)) return value.map((item) => text(item)).filter(Boolean);
@@ -39,6 +60,8 @@ function normalizeResource(value = {}, index = 0, defaultKind = "material") {
   const resource = object(value);
   const href = text(resource.href || resource.link || resource.url);
   const verificationStatus = text(resource.verificationStatus, href ? "provided-needs-review" : "suggested-no-url");
+  const researchStatus = text(resource.researchStatus || resource.status, href ? "candidate-found" : "suggested");
+  const accessibility = object(resource.accessibility || resource.videoAccessibility);
   return {
     id: text(resource.id, `${slugify(defaultKind)}-${index + 1}`),
     kind: text(resource.kind || resource.type, defaultKind),
@@ -68,6 +91,33 @@ function normalizeResource(value = {}, index = 0, defaultKind = "material") {
     researchRequestId: text(resource.researchRequestId),
     selectionReason: text(resource.selectionReason),
     pedagogicalUse: text(resource.pedagogicalUse),
+    researchStatus,
+    humanApproval: text(resource.humanApproval || resource.approvalStatus, "pending"),
+    curation: {
+      alignment: text(resource.curation?.alignment || resource.alignmentScore),
+      quality: text(resource.curation?.quality || resource.qualityAssessment),
+      currency: text(resource.curation?.currency || resource.currentness),
+      accessibility: text(resource.curation?.accessibility || resource.accessibilityAssessment),
+      durationFit: text(resource.curation?.durationFit),
+      license: text(resource.curation?.license || resource.licenseAssessment),
+      language: text(resource.curation?.language || resource.languageFit),
+      moment: text(resource.curation?.moment || resource.momentFit),
+      score: Math.max(0, number(resource.curation?.score || resource.curationScore, 0))
+    },
+    accessibility: {
+      hasCaptions: bool(accessibility.hasCaptions ?? resource.hasCaptions, false),
+      hasTranscript: bool(accessibility.hasTranscript ?? resource.hasTranscript, false),
+      summary: text(accessibility.summary || resource.accessibilitySummary),
+      lowBandwidthAlternative: text(accessibility.lowBandwidthAlternative || resource.lowBandwidthAlternative),
+      altText: text(accessibility.altText || resource.altText || resource.alt),
+      diagramAlternative: text(accessibility.diagramAlternative || resource.diagramAlternative)
+    },
+    videoAccessibility: ["video", "audio"].includes(text(resource.kind || resource.type, defaultKind)) ? {
+      hasCaptions: bool(accessibility.hasCaptions ?? resource.hasCaptions, false),
+      hasTranscript: bool(accessibility.hasTranscript ?? resource.hasTranscript, false),
+      summary: text(accessibility.summary || resource.accessibilitySummary),
+      lowBandwidthAlternative: text(accessibility.lowBandwidthAlternative || resource.lowBandwidthAlternative)
+    } : null,
     verificationStatus,
     requiresVerification: bool(resource.requiresVerification, !href || verificationStatus !== "verified"),
     notes: text(resource.notes)
@@ -111,7 +161,25 @@ function normalizeActivities(value) {
       hoursPerCommunication: Math.max(0, number(item.hoursPerCommunication, 0)),
       required: bool(item.required, true),
       instructions: text(item.instructions),
+      evidence: text(item.evidence || item.product || item.delivery),
+      evidenceType: text(item.evidenceType || item.learningEvidence),
+      feedback: text(item.feedback || item.formativeFeedback),
+      criteria: splitLines(item.criteria),
       notes: text(item.notes)
+    };
+  });
+}
+
+function normalizeRubric(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((criterion, index) => {
+    const item = object(criterion);
+    return {
+      id: text(item.id, `criterion-${index + 1}`),
+      criterion: text(item.criterion || item.title, `Critério ${index + 1}`),
+      excellent: text(item.excellent || item.advanced || item.meets),
+      developing: text(item.developing || item.basic || item.partial),
+      beginning: text(item.beginning || item.insufficient || item.minimum)
     };
   });
 }
@@ -121,7 +189,7 @@ function normalizePractice(value = {}, index = 0) {
   const steps = Array.isArray(practice.steps)
     ? practice.steps.map((step, stepIndex) => {
       const item = object(step);
-      return { order: stepIndex + 1, title: text(item.title, `Etapa ${stepIndex + 1}`), instructions: text(item.instructions || item.body || item.text), minutes: Math.max(0, number(item.minutes || item.durationMinutes, 0)) };
+      return { order: stepIndex + 1, title: text(item.title, `Etapa ${stepIndex + 1}`), instructions: text(item.instructions || item.body || item.text), minutes: Math.max(0, number(item.minutes || item.durationMinutes, 0)), evidence: text(item.evidence || item.product || item.delivery) };
     })
     : splitLines(practice.steps).map((step, stepIndex) => ({ order: stepIndex + 1, title: `Etapa ${stepIndex + 1}`, instructions: step, minutes: 0 }));
   return {
@@ -130,6 +198,9 @@ function normalizePractice(value = {}, index = 0) {
     type: text(practice.type, "Pesquisa orientada"),
     modality: text(practice.modality || practice.format),
     context: text(practice.context || practice.scenario || practice.problem),
+    problem: text(practice.problem || practice.context || practice.scenario),
+    studentRole: text(practice.studentRole || practice.role),
+    challenge: text(practice.challenge),
     prerequisites: splitLines(practice.prerequisites),
     moments: splitLines(practice.moments || practice.moment),
     objective: text(practice.objective),
@@ -139,15 +210,19 @@ function normalizePractice(value = {}, index = 0) {
     materials: splitLines(practice.materials),
     instructions: text(practice.instructions),
     steps,
-    product: text(practice.product),
+    product: text(practice.product || practice.deliverable || practice.delivery),
+    deliverable: text(practice.deliverable || practice.product || practice.delivery),
     assessment: text(practice.assessment),
-    criteria: splitLines(practice.criteria || practice.rubric),
-    rubric: splitLines(practice.rubric),
+    criteria: splitLines(practice.criteria),
+    rubric: normalizeRubric(practice.rubric || practice.criteria),
     prompts: splitLines(practice.prompts || practice.prompt),
     roteiro: object(practice.roteiro || practice.sessionPlan || practice.timeline),
     artifacts: normalizeArtifacts(practice.artifacts || practice.files || practice.outputs),
     continuation: text(practice.continuation),
     fallbackPlan: text(practice.fallbackPlan || practice.planB),
+    revision: text(practice.revision || practice.reviewProcess),
+    examples: normalizeArtifacts(practice.examples || practice.exampleFiles),
+    variants: { simplified: text(practice.variants?.simplified || practice.simplifiedVersion), advanced: text(practice.variants?.advanced || practice.advancedVersion) },
     resources: normalizeResources(practice.resources, "practice-resource"),
     durationMinutes: Math.max(0, number(practice.durationMinutes || practice.sessionMinutes, 45)),
     delivery: text(practice.delivery || practice.evidence)
@@ -162,7 +237,7 @@ function studentPractice(practice = {}) {
     moments: splitLines(practice.moments),
     objective: text(practice.objective),
     instructions: text(practice.instructions),
-    steps: Array.isArray(practice.steps) ? practice.steps.map((step) => ({ order: step.order, title: text(step.title), instructions: text(step.instructions), minutes: Math.max(0, number(step.minutes, 0)) })) : [],
+    steps: Array.isArray(practice.steps) ? practice.steps.map((step) => ({ order: step.order, title: text(step.title), instructions: text(step.instructions), minutes: Math.max(0, number(step.minutes, 0)), evidence: text(step.evidence) })) : [],
     product: text(practice.product || practice.delivery),
     assessment: text(practice.assessment),
     durationMinutes: Math.max(0, number(practice.durationMinutes, 0))
@@ -219,6 +294,9 @@ function normalizeAssessment(value = {}) {
       options,
       answer: Number.isFinite(Number(item.answer)) ? Number(item.answer) : (typeof item.answer === "boolean" ? (item.answer ? 1 : 0) : 0),
       explanation: text(item.explanation || item.feedback),
+      feedbackByOption: Array.isArray(item.feedbackByOption || item.optionFeedback) ? (item.feedbackByOption || item.optionFeedback).map((feedback) => text(feedback)) : [],
+      formative: bool(item.formative, false),
+      summative: bool(item.summative, true),
       points: Math.max(0, number(item.points, 1))
     };
   }).filter((item) => item.q) : [];
@@ -230,6 +308,7 @@ function normalizeAssessment(value = {}) {
     durationMinutes: Math.max(0, number(assessment.durationMinutes || assessment.timeEstimateMinutes, 0)),
     questions,
     moodleGift: text(assessment.moodleGift || assessment.gift),
+    feedback: text(assessment.feedback),
     notes: text(assessment.notes)
   };
 }
@@ -265,16 +344,44 @@ function normalizeTimePlan(value = {}) {
     items,
     unresolved: Array.isArray(plan.unresolved) ? plan.unresolved.map((entry) => object(entry)) : [],
     formulaProfile: object(plan.formulaProfile),
+    workloadAdjustment: object(plan.workloadAdjustment),
     calculationMethod: text(plan.calculationMethod, "derived-after-content"),
     notes: text(plan.notes)
   };
+}
+
+function normalizeDiagnostic(value) {
+  if (typeof value === "string") return { prompt: text(value), type: "pergunta de entrada", evidence: "resposta inicial do estudante" };
+  const source = object(value);
+  return { type: text(source.type, "pergunta de entrada"), prompt: text(source.prompt || source.question || source.instructions), expectedEvidence: text(source.expectedEvidence || source.evidence), feedback: text(source.feedback), justification: text(source.justification) };
+}
+
+function normalizeFormativeChecks(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry, index) => {
+    const item = object(entry);
+    return { id: text(item.id, `check-${index + 1}`), moment: text(item.moment || item.when, `Durante a seção ${index + 1}`), prompt: text(item.prompt || item.question || item.instructions), expectedEvidence: text(item.expectedEvidence || item.evidence), feedback: text(item.feedback), action: text(item.action || item.ifWrong) };
+  }).filter((item) => item.prompt || item.expectedEvidence);
+}
+
+function normalizeDifferentiation(value) {
+  const source = object(value);
+  const normalize = (items) => Array.isArray(items) ? items.map((item) => typeof item === "string" ? { title: item, instructions: item, resources: [] } : { title: text(item?.title || item?.label), instructions: text(item?.instructions || item?.body || item?.description), resources: normalizeResources(item?.resources, "differentiation-resource") }).filter((item) => item.title || item.instructions) : [];
+  return { support: normalize(source.support || source.essential || source.recovery), standard: normalize(source.standard || source.core), extension: normalize(source.extension || source.advanced || source.deepening), rationale: text(source.rationale) };
+}
+
+function normalizeSelfAssessment(value) {
+  const source = object(value);
+  return { title: text(source.title, "Autoavaliação"), prompts: splitLines(source.prompts || source.questions || source.items), scale: splitLines(source.scale), feedback: text(source.feedback) };
 }
 
 export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
   const plan = object(raw);
   const resources = object(plan.resources);
   const rawSections = Array.isArray(plan.contentSections) ? plan.contentSections : (Array.isArray(plan.sections) ? plan.sections : []);
-  const contentSections = rawSections.length ? rawSections.map(normalizeSection) : [{ number: "1", title: "Conteúdo da semana", body: text(input.content, `Estude os conceitos centrais de ${input.title}.`), subsections: [], caseStudy: null, reflection: null, keyTerms: [], resources: [] }];
+  const contentSections = rawSections.length
+    ? rawSections.map(normalizeSection).filter((section) => section.title || section.body || section.subsections.length)
+    : [{ number: "1", title: `${text(input.title, "Tema")} em contexto`, body: text(input.content, `Estude os conceitos centrais de ${input.title} e relacione-os a exemplos concretos da gestão educacional.`), subsections: [], caseStudy: null, reflection: null, keyTerms: [], resources: [] }];
   const videos = normalizeResources(resources.videos || plan.videos, "video");
   const requiredReadings = normalizeResources(resources.readingsRequired || plan.readingsRequired, "reading-required");
   const extraReadings = normalizeResources(resources.readingsExtra || plan.readingsExtra, "reading-extra");
@@ -283,11 +390,11 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
   const datasets = normalizeResources(resources.datasets || plan.datasets, "dataset");
   const practices = Array.isArray(plan.webPractices) ? plan.webPractices.map(normalizePractice) : (input.webPractices || []).map(normalizePractice);
   const activities = normalizeActivities(plan.activities);
-  return {
+  const normalized = {
     weekNumber: index + 1,
-    theme: text(plan.theme, contentSections[0]?.title || `${input.title} — Semana ${index + 1}`),
-    welcome: text(plan.welcome || plan.welcomeText),
-    learningObjectives: splitLines(plan.learningObjectives || plan.objectives || input.objectives),
+    theme: specificTheme(plan.theme || plan.title, input, index),
+    welcome: text(plan.welcome || plan.welcomeText, `Nesta semana, você vai compreender ${text(input.title, "o tema do curso")} a partir de conceitos, exemplos e uma aplicação orientada. A leitura retoma o percurso anterior e prepara a próxima etapa.`),
+    learningObjectives: splitLines(plan.learningObjectives || plan.objectives).length ? splitLines(plan.learningObjectives || plan.objectives) : defaultWeeklyObjectives(input, index),
     prerequisites: splitLines(plan.prerequisites),
     contentDensity: text(plan.contentDensity, "completa"),
     didacticArc: normalizeDidacticArc(plan.didacticArc, practices.length > 0, index),
@@ -295,20 +402,26 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
     resources: { videos, readingsRequired: requiredReadings, readingsExtra: extraReadings, images, podcasts, datasets },
     webPractices: practices.map(studentPractice),
     activities,
-    diagnostic: object(plan.diagnostic || plan.initialDiagnostic),
-    formativeChecks: Array.isArray(plan.formativeChecks || plan.checkpoints) ? (plan.formativeChecks || plan.checkpoints) : [],
-    differentiation: object(plan.differentiation),
-    selfAssessment: object(plan.selfAssessment || plan.studentSelfAssessment),
+    diagnostic: normalizeDiagnostic(plan.diagnostic || plan.initialDiagnostic),
+    formativeChecks: normalizeFormativeChecks(plan.formativeChecks || plan.checkpoints),
+    differentiation: normalizeDifferentiation(plan.differentiation),
+    selfAssessment: normalizeSelfAssessment(plan.selfAssessment || plan.studentSelfAssessment),
     synthesis: text(plan.synthesis),
     nextWeekConnection: text(plan.nextWeekConnection || plan.whatsNext),
     glossary: normalizeGlossary(plan.glossary),
     references: splitLines(plan.references || input.references),
     assessment: normalizeAssessment(plan.assessment),
     resourceResearch: object(plan.resourceResearch),
+    alignmentMatrix: Array.isArray(plan.alignmentMatrix) ? plan.alignmentMatrix : [],
+    spiralReview: object(plan.spiralReview),
     timePlan: normalizeTimePlan(plan.timePlan),
     humanReview: bool(plan.humanReview ?? plan.requiresHumanReview, true),
     notes: splitLines(plan.notes)
   };
+  normalized.alignmentMatrix = buildAlignmentMatrix(normalized);
+  normalized.spiralReview = buildProgression(normalized, index);
+  normalized.pedagogicalReview = pedagogicalReview(normalized);
+  return normalized;
 }
 
 export function normalizeCourseInput(raw = {}) {
@@ -400,6 +513,12 @@ export function weekMeta(input, index) {
 }
 
 function html(value) { return text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function richHtml(value) {
+  const source = text(value);
+  if (!source) return "";
+  if (/<(?:p|ul|ol|h[1-6]|strong|em|blockquote|br)\b/i.test(source)) return source.replace(/<script[\s\S]*?<\/script>/gi, "");
+  return source.split(/\n\s*\n|\r?\n/).map((paragraph) => paragraph.trim()).filter(Boolean).map((paragraph) => `<p>${html(paragraph)}</p>`).join("");
+}
 function youtubeId(value) { const match = text(value).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&#/]+)/i); return match ? match[1] : ""; }
 
 function fallbackLessonPlan(input, index) {
@@ -427,7 +546,7 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
   const week = index + 1; const calendar = weekCalendar(input, index); const objective = plan.learningObjectives[0] || `Compreender os fundamentos de ${input.title}.`;
   const blocks = [{ id: newId("b-hero-", week, 0), type: "hero", bg: "neutral-default", pad: "normal", props: { eyebrow: calendar.label.toUpperCase(), title: `${plan.theme}: ${calendar.label}`, lead: objective, author: input.author || "Autor", authorImage: "", readTime: `${input.hoursPerWeek} h de estudo`, date: input.year } }];
   const children = [];
-  if (plan.welcome) children.push({ id: newId("c-welcome-", week, children.length), type: "prose", props: { body: `<p>${html(plan.welcome)}</p>`, dropcap: false, dropcapTone: "terracotta" } });
+  if (plan.welcome) children.push({ id: newId("c-welcome-", week, children.length), type: "prose", props: { body: richHtml(plan.welcome), dropcap: false, dropcapTone: "terracotta" } });
   if (plan.learningObjectives.length) children.push({ id: newId("c-objectives-", week, children.length), type: "destaque", props: { title: "Objetivos de aprendizagem", body: `<ul>${plan.learningObjectives.map((item) => `<li>${html(item)}</li>`).join("")}</ul>`, tone: "sage", icon: "" } });
   const allResources = [...plan.resources.videos, ...plan.resources.images, ...plan.resources.readingsRequired, ...plan.resources.readingsExtra, ...plan.resources.podcasts, ...plan.resources.datasets];
   const usedResources = new Set();
@@ -444,14 +563,14 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
   };
   plan.contentSections.forEach((section, sectionIndex) => {
     children.push({ id: newId("c-title-", week, sectionIndex + 2), type: "titulo", props: { text: `${section.number} ${section.title}`, level: "h2" } });
-    if (section.body) children.push({ id: newId("c-prose-", week, sectionIndex + 20), type: "prose", props: { body: `<p>${html(section.body)}</p>`, dropcap: sectionIndex === 0, dropcapTone: "terracotta" } });
-    section.subsections.forEach((sub, subIndex) => { children.push({ id: newId("c-subtitle-", week, sectionIndex * 10 + subIndex + 1), type: "titulo", props: { text: `${sub.number} ${sub.title}`, level: "h3" } }); if (sub.body) children.push({ id: newId("c-subprose-", week, sectionIndex * 10 + subIndex + 3), type: "prose", props: { body: `<p>${html(sub.body)}</p>`, dropcap: false, dropcapTone: "terracotta" } }); });
+    if (section.body) children.push({ id: newId("c-prose-", week, sectionIndex + 20), type: "prose", props: { body: richHtml(section.body), dropcap: sectionIndex === 0, dropcapTone: "terracotta" } });
+    section.subsections.forEach((sub, subIndex) => { children.push({ id: newId("c-subtitle-", week, sectionIndex * 10 + subIndex + 1), type: "titulo", props: { text: `${sub.number} ${sub.title}`, level: "h3" } }); if (sub.body) children.push({ id: newId("c-subprose-", week, sectionIndex * 10 + subIndex + 3), type: "prose", props: { body: richHtml(sub.body), dropcap: false, dropcapTone: "terracotta" } }); });
     if (section.reflection?.question) children.push({ id: newId("c-reflection-", week, sectionIndex + 1), type: "reflexao", props: { title: "Para refletir", question: html(section.reflection.question), body: html(section.reflection.body), tone: "lavender", icon: "" } });
     children.push(...resourceChildren([...(section.resources || []), ...allResources], sectionIndex));
   });
   blocks.push({ id: newId("b-topic-", week, 1), type: "topic", bg: "neutral-default", pad: "normal", props: { children } });
   plan.webPractices.forEach((practice, practiceIndex) => blocks.push({ id: newId("b-practice-", week, practiceIndex), type: "destaque", bg: "neutral-default", pad: "tight", props: { title: practice.title, body: `<p>${html([practice.objective, practice.instructions, practice.product].filter(Boolean).join(" "))}</p>`, tone: "ocean", icon: "" } }));
-  if (plan.synthesis) blocks.push({ id: newId("b-synthesis-", week, 0), type: "sintese", bg: "sage-deep", pad: "airy", props: { eyebrow: "Síntese", title: "A ideia que fecha a semana", body: `<p>${html(plan.synthesis)}</p>` } });
+  if (plan.synthesis) blocks.push({ id: newId("b-synthesis-", week, 0), type: "sintese", bg: "sage-deep", pad: "airy", props: { eyebrow: "Síntese", title: "A ideia que fecha a semana", body: richHtml(plan.synthesis) } });
   if (plan.references.length) blocks.push({ id: newId("b-references-", week, 0), type: "referencias", bg: "neutral-default", pad: "normal", props: { title: "Referências", items: plan.references.map((item) => ({ html: html(item) })) } });
   if (plan.assessment.questions.length) blocks.push({ id: newId("b-quiz-", week, 0), type: "quiz", bg: "neutral-subtle", pad: "normal", props: { title: plan.assessment.title, intro: plan.assessment.format, avaliativo: true, passMark: plan.assessment.passMark, questions: plan.assessment.questions } });
   return blocks;
@@ -463,10 +582,21 @@ export function buildFallbackLesson(input, index) {
 }
 
 export function normalizeLesson(raw, input, index) {
-  const fallback = buildFallbackLesson(input, index); const source = raw && typeof raw === "object" ? raw : {}; const seen = new Set();
-  const blocks = integrateRootResources(Array.isArray(source.blocks) ? source.blocks.map((block, i) => sanitizeBlock(block, index + 1, `block-${i}`, seen)).filter(Boolean) : [], index + 1);
-  const lessonPlan = normalizeLessonPlan(source.lessonPlan || source.plan || fallback.lessonPlan, input, index);
-  return { meta: { ...fallback.meta, ...(source.meta && typeof source.meta === "object" ? source.meta : {}), ...weekMeta(input, index) }, lessonPlan, blocks: blocks.length ? blocks : fallback.blocks };
+  const fallback = buildFallbackLesson(input, index);
+  const source = raw && typeof raw === "object" ? raw : {};
+  const seen = new Set();
+  const sourceBlocks = integrateRootResources(Array.isArray(source.blocks) ? source.blocks.map((block, i) => sanitizeBlock(block, index + 1, `block-${i}`, seen)).filter(Boolean) : [], index + 1);
+  const lessonPlan = normalizeLessonPlan(source.lessonPlan || source.plan || {}, input, index);
+  const hasHero = sourceBlocks.some((block) => block.type === "hero" && text(block.props?.title));
+  const hasTopic = sourceBlocks.some((block) => ["topic", "topic-collapsible", "topic-slider"].includes(block.type) && Array.isArray(block.props?.children) && block.props.children.length > 0);
+  const hasObjectives = sourceBlocks.some((block) => block.type === "destaque" && text(block.props?.title).toLowerCase().includes("objetiv"));
+  const hasContent = sourceBlocks.some((block) => block.type === "prose" || block.type === "titulo");
+  const blocks = sourceBlocks.length && hasHero && hasTopic && hasObjectives && hasContent ? sourceBlocks : fallbackBlocks(input, index, lessonPlan);
+  const baseMeta = weekMeta(input, index);
+  const suppliedMeta = source.meta && typeof source.meta === "object" ? source.meta : {};
+  const meta = { ...fallback.meta, ...baseMeta, ...suppliedMeta, title: lessonPlan.theme, courseTitle: input.title, weekNumber: index + 1, weekLabel: baseMeta.weekLabel, calendarStartDate: baseMeta.calendarStartDate, calendarEndDate: baseMeta.calendarEndDate, studyHours: input.hoursPerWeek };
+  const lesson = { meta, lessonPlan, blocks };
+  return { ...lesson, contentQuality: measureLessonQuality(lesson, input) };
 }
 
 export function normalizeWeeklyOutput(raw, input) {

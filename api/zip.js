@@ -2,6 +2,7 @@ import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } fr
 import { createWeeksZip } from "../src/zip.js";
 import { normalizeCourseInput, normalizeWeeklyOutput, slugify, validateLesson } from "../src/aula-schema.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
+import { validateCourse } from "../src/validation.js";
 
 export default async function handler(request, response) {
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
@@ -13,7 +14,8 @@ export default async function handler(request, response) {
     const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
     const teacherGuides = buildTeacherGuides(input, enrichedWeeks, request.body?.teacherGuides || []);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
-    const buffer = await createWeeksZip(input, enrichedWeeks, generalPlan, teacherGuides);
+    const validation = validateCourse(input, enrichedWeeks, workload);
+    const buffer = await createWeeksZip(input, enrichedWeeks, { ...generalPlan, validation }, teacherGuides);
     response.setHeader("Content-Type", "application/zip");
     response.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-semanas.zip"`);
     response.setHeader("Cache-Control", "no-store");

@@ -212,6 +212,28 @@ function resourceFromCandidate(candidate, selection) {
     researchRequestId: candidate.requestId,
     selectionReason: selection.reason,
     pedagogicalUse: selection.use,
+    researchStatus: "selected-by-ai",
+    humanApproval: "pending",
+    curation: {
+      alignment: selection.alignment || selection.reason || "selecionado para um objetivo da semana",
+      quality: selection.quality || "revisar fonte e autoria",
+      currency: selection.currency || "revisar atualidade",
+      accessibility: selection.accessibility || "revisar legenda, transcrição ou alternativa",
+      durationFit: selection.durationFit || "comparar com a carga calculada",
+      license: selection.license || candidate.license || "revisar licença",
+      language: selection.language || "adequar ao público",
+      moment: selection.moment || "ponto de uso",
+      score: Number(selection.score || 0)
+    },
+    accessibility: {
+      hasCaptions: Boolean(selection.hasCaptions),
+      hasTranscript: Boolean(selection.hasTranscript),
+      summary: text(selection.accessibilitySummary),
+      lowBandwidthAlternative: text(selection.lowBandwidthAlternative),
+      altText: candidate.altText || candidate.caption || "",
+      diagramAlternative: text(selection.diagramAlternative)
+    },
+    videoAccessibility: type === "video" ? { hasCaptions: Boolean(selection.hasCaptions), hasTranscript: Boolean(selection.hasTranscript), summary: text(selection.accessibilitySummary), lowBandwidthAlternative: text(selection.lowBandwidthAlternative) } : null,
     verificationStatus: "ai-selected-from-provider-needs-human-review",
     requiresVerification: true,
     notes: "Recurso localizado por provedor e selecionado pela IA; confira disponibilidade, licença e adequação antes da publicação."

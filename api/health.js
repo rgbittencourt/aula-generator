@@ -8,7 +8,9 @@ export default function handler(_request, response) {
     accessRequired: accessRequired(),
     resourceResearch: process.env.AULA_RESOURCE_RESEARCH !== "false",
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-    output: ".aula.json por semana + ZIP"
+    model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
+    autoRepair: process.env.AULA_AUTO_REPAIR !== "false",
+    reviewBeforeExport: true,
+    output: ".aula.json por semana + ZIP + revisão/regeneração individual"
   });
 }
