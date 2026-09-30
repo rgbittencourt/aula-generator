@@ -2,7 +2,7 @@
 
 ## Da ideia inicial ao JSON semanal, guia do professor e publicação no Moodle
 
-**Versão do manual:** 1.0  
+**Versão do manual:** 1.1  
 **Data:** 30 de setembro de 2026  
 **Aplicação:** Gerador de Aulas  
 **URL pública:** <https://aula-generator.vercel.app/>  
@@ -656,6 +656,8 @@ Cada cartão mostra:
 - meta da semana;
 - quantidade de blocos;
 - tipos de bloco;
+- indicador de qualidade textual;
+- botão **Ver aula** para abrir a leitura completa;
 - botão de download do JSON.
 
 ![Semanas geradas](assets/04-semanas-geradas.png)
@@ -677,7 +679,34 @@ Leia cada semana como se você fosse o estudante. Pergunte:
 9. A conexão com a próxima semana faz sentido?
 10. O tempo estimado é plausível?
 
-### 15.2 Revisão pedagógica e revisão editorial
+### 15.2 Abrir a prévia completa
+
+Clique em **Ver aula** no card da semana. A janela de prévia apresenta, na ordem em que o estudante encontrará o material:
+
+- arco didático e fases ativas;
+- abertura e objetivos;
+- diagnóstico inicial, quando previsto;
+- seções e subseções de conteúdo;
+- vídeos, imagens, diagramas e leituras no ponto de uso;
+- atividades e evidências produzidas;
+- projeto de webprática separado, somente se houver prática naquela semana;
+- síntese, continuidade, trilhas de diferenciação, glossário, autoavaliação e avaliação.
+
+O topo da janela mostra palavras, seções, objetivos e nota estrutural. Leia a aula inteira antes de baixar o JSON. Se aparecer **conteúdo insuficiente**, não abra essa versão no Aula Studio ainda.
+
+### 15.3 Refazer somente uma semana
+
+No final da prévia há o campo **Quer refazer esta semana?**. Escreva uma solicitação específica, por exemplo:
+
+```text
+Amplie a seção sobre o estudo de caso com um exemplo brasileiro, acrescente uma pergunta formativa durante o texto, retire o segundo vídeo e transforme a avaliação em uma decisão aplicada.
+```
+
+Clique em **Refazer esta semana com IA**. O sistema envia o briefing, a semana atual e a solicitação, reescreve apenas a semana aberta, pesquisa novamente os recursos dessa semana, recalcula sua carga e atualiza o Planejamento Geral. As outras semanas permanecem intactas.
+
+Use pedidos que indiquem **o que mudar**, **onde mudar** e **por quê**. Depois da resposta, leia novamente a semana e compare a carga, os objetivos, a evidência e a avaliação.
+
+### 15.4 Revisão pedagógica e revisão editorial
 
 Faça duas leituras diferentes.
 
