@@ -17,7 +17,7 @@ const positive = (value) => { const number = Number(value); return Number.isFini
 const stripHtml = (value) => text(value).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 const words = (value) => stripHtml(value).split(/\s+/).filter(Boolean).length;
 
-export const PENDING_FORMULA_PROFILE = { status: "spreadsheet-profile", ...resolveFormulaProfile() };
+export const PENDING_FORMULA_PROFILE = { status: "internal-profile", ...resolveFormulaProfile() };
 
 function item({ id, title, category, minutes, basis, confidence = "medium", required = true, formulaKey = "", details = {}, instructionalMinutes = 0 }) {
   const learnerMinutes = decimal(minutes);
@@ -46,7 +46,7 @@ function estimateContentItems(lesson, profile) {
   const items = sections.map((section, index) => {
     const wordCount = countWordsInSection(section);
     const minutes = digitalContentMinutes(wordCount, profile);
-    return item({ id: `content-${index + 1}`, title: section.title || `Conteúdo didático ${index + 1}`, category: "content", minutes, basis: `${wordCount} palavras ÷ ${profile.constants.wordsPerMinute} × ${profile.constants.digitalContentFactor} minutos`, confidence: wordCount ? "high" : "low", required: true, formulaKey: "digitalContent", details: { wordCount, source: "Material!N:O" } });
+    return item({ id: `content-${index + 1}`, title: section.title || `Conteúdo didático ${index + 1}`, category: "content", minutes, basis: `${wordCount} palavras ÷ ${profile.constants.wordsPerMinute} × ${profile.constants.digitalContentFactor} minutos`, confidence: wordCount ? "high" : "low", required: true, formulaKey: "digitalContent", details: { wordCount, source: "perfil interno · conteúdo digital" } });
   }).filter((entry) => entry.minutes > 0);
   return items;
 }
@@ -200,9 +200,9 @@ export function calculateWeekWorkload(input, formulaConfigOrIndex = input.formul
     categoryTotals: allocationFromItems(derived.items),
     items: derived.items,
     unresolved: derived.unresolved,
-    formulaStatus: formulaConfig?.ratios ? "configured" : "spreadsheet-profile",
+    formulaStatus: formulaConfig?.ratios ? "configured" : "internal-profile",
     formulaProfile: formulaProfileSummary(profile),
-    formulaNote: "Aplicativo + Material: o conteúdo é calculado depois que a semana é escrita; itens sem páginas, palavras ou duração ficam pendentes de conferência."
+    formulaNote: "Perfil interno: o conteúdo é calculado depois que a semana é escrita; itens sem páginas, palavras ou duração ficam pendentes de conferência."
   };
 }
 
@@ -219,7 +219,7 @@ export function calculateCourseWorkload(input, formulaConfig = input.formulaConf
     requiredMinutes: weeks.reduce((sum, week) => sum + week.requiredMinutes, 0),
     optionalMinutes: weeks.reduce((sum, week) => sum + week.optionalMinutes, 0),
     instructionalMinutes: weeks.reduce((sum, week) => sum + week.instructionalMinutes, 0),
-    formulaStatus: formulaConfig?.ratios ? "configured" : "spreadsheet-profile",
+    formulaStatus: formulaConfig?.ratios ? "configured" : "internal-profile",
     formulaProfile: formulaProfileSummary(resolveFormulaProfile(formulaConfig)),
     weeks
   };
@@ -270,7 +270,7 @@ export function attachWorkloadToLessons(lessons, workload) {
           items: week.items,
           unresolved: week.unresolved,
           formulaProfile: week.formulaProfile,
-          calculationMethod: "sala-evolucao-aplicativo-material",
+          calculationMethod: "aula-generator-internal-profile",
           notes: `${week.fitStatus}; diferença de ${week.varianceMinutes} minutos em relação à meta do estudante.`
         }
       }

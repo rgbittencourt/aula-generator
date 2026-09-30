@@ -73,7 +73,13 @@ Webpráticas são cadastradas como uma lista independente. Quando ativadas, o br
 
 Materiais de apoio também são itens independentes. Cada material pode indicar tipo, título, momento de uso, link real, objetivo, alinhamento com o conteúdo e como o estudante deverá utilizá-lo. O formulário aceita links reais de vídeos e imagens, além de termos de busca para recursos que ainda serão escolhidos. A IA deve relacionar os materiais aos objetivos, textos, conceitos e webpráticas, mas não deve inventar links, DOI ou fontes verificadas. Todo material sugerido precisa ser conferido pelo professor antes da publicação.
 
-A distribuição detalhada de horas usa o perfil importado das abas **Aplicativo** e **Material** da planilha compartilhada. O cálculo acontece depois que a semana é escrita: conteúdo digital usa palavras, leituras usam páginas/palavras e o tipo científico/popular, vídeos usam duração conferida, fóruns usam a regra de 2 horas por post e avaliações/práticas entram como itens próprios. Recursos sem dados suficientes ficam sinalizados para revisão.
+A distribuição detalhada de horas usa um **perfil interno versionado no código da aplicação**. O cálculo acontece depois que a semana é escrita: conteúdo digital usa palavras, leituras usam páginas/palavras e o tipo científico/popular, vídeos usam duração conferida, fóruns usam a regra de 2 horas por post e avaliações/práticas entram como itens próprios. Recursos sem dados suficientes ficam sinalizados para revisão.
+
+## Cálculos isolados da aplicação
+
+Os cálculos são independentes e não fazem leitura de nenhuma fonte externa. A aplicação guarda as regras em `src/formula-profile.js` e executa tudo em `src/calculations.js`. O perfil interno é versionado junto com o código e cada JSON registra o identificador e a versão utilizados naquela geração.
+
+Se as regras mudarem no futuro, a alteração será feita diretamente no código, acompanhada por testes e publicada como uma nova versão do perfil. A planilha original não é necessária para instalar, executar ou gerar aulas.
 
 ## Pesquisa automática de recursos
 
@@ -101,7 +107,7 @@ Para usar o backend localmente:
 
 ```bash
 cp .env.example .env
-# edite .env e preencha OPENAI_API_KEY e AULA_ACCESS_CODE, se desejar proteção
+# edite .env e preencha OPENAI_API_KEY, YOUTUBE_API_KEY e AULA_ACCESS_CODE, se desejar proteção
 npm install
 npm run dev
 ```
@@ -115,6 +121,8 @@ OPENAI_API_KEY=chave-local-nunca-commitada
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
 AULA_ACCESS_CODE=um-codigo-privado-opcional
+YOUTUBE_API_KEY=chave-do-youtube-opcional
+AULA_RESOURCE_RESEARCH=true
 HOST=127.0.0.1
 PORT=4310
 ```
@@ -135,4 +143,4 @@ O ZIP contém os arquivos em `semanas/`. Depois da revisão no Aula Studio, use 
 
 ## Planejamento Geral e pacotes auxiliares
 
-O resultado também inclui `planejamento-geral.json`, com metas e totais de todas as semanas, carga obrigatória/opcional, atividade instrucional equivalente, categorias, pendências e o perfil de fórmulas usado. O ZIP ainda contém `webpraticas/`, com guia/roteiro, pacote JSON e arquivos-exemplo produzidos para cada prática.
+O resultado também inclui `planejamento-geral.json`, com metas e totais de todas as semanas, carga obrigatória/opcional, atividade instrucional equivalente, categorias, pendências e o perfil interno de fórmulas usado. O ZIP ainda contém `webpraticas/`, com guia/roteiro, pacote JSON e arquivos-exemplo produzidos para cada prática.

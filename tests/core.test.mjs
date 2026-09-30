@@ -71,12 +71,12 @@ test("fallback gera uma aula válida para cada semana", () => {
   assert.ok(weeks[0].blocks.some((block) => block.type === "video"));
 });
 
-test("cálculo deriva itens do conteúdo e mantém perfil futuro da planilha", () => {
+test("cálculo deriva itens do conteúdo usando perfil interno versionado", () => {
   const input = normalizeCourseInput({ title: "Curso", weeks: 2, hoursPerWeek: 5, content: "Este é um texto-base substancial para a leitura da semana.", objectives: ["Conhecer"] });
   const lessons = [buildFallbackLesson(input, 0), buildFallbackLesson(input, 1)];
   const pending = calculateCourseWorkload(input, input.formulaConfig, lessons);
   assert.equal(pending.totalMinutes, 600);
-  assert.equal(pending.formulaStatus, "spreadsheet-profile");
+  assert.equal(pending.formulaStatus, "internal-profile");
   assert.ok(pending.derivedMinutes > 0);
   assert.ok(pending.weeks[0].items.length > 0);
   const configured = calculateWeekWorkload(input, 0, { ratios: { content: 0.5, practice: 0.25, assessment: 0.15, review: 0.1 } }, lessons[0]);
@@ -89,7 +89,7 @@ test("cálculo deriva itens do conteúdo e mantém perfil futuro da planilha", (
   assert.ok(general.categoryTotals.contentMinutes > 0);
 });
 
-test("perfil Aplicativo + Material calcula leitura digital, artigo científico e texto popular", () => {
+test("perfil interno calcula leitura digital, artigo científico e texto popular", () => {
   assert.equal(Math.round(digitalContentMinutes(273)), 5);
   assert.equal(Math.round(readingMinutes({ type: "Artigo científico", pages: 10 })), 50);
   assert.equal(Math.round(readingMinutes({ type: "Texto popular", pages: 10 })), 30);

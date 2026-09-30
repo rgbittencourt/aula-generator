@@ -285,12 +285,12 @@ function fallbackLesson(input, index) {
 
 function staticDemo(input) {
   const weeks = Array.from({ length: input.weeks }, (_, index) => fallbackLesson(input, index));
-  return { ok: true, provider: "static-demo", model: null, input, workload: { totalHours: input.hoursPerWeek * input.weeks, totalMinutes: Math.round(input.hoursPerWeek * input.weeks * 60), formulaStatus: "pending-spreadsheet", weeks: weeks.map((_, index) => ({ weekNumber: index + 1, totalHours: input.hoursPerWeek, totalMinutes: Math.round(input.hoursPerWeek * 60), formulaStatus: "pending-spreadsheet" })) }, weeks, filePrefix: slugify(input.title) };
+  return { ok: true, provider: "static-demo", model: null, input, workload: { totalHours: input.hoursPerWeek * input.weeks, totalMinutes: Math.round(input.hoursPerWeek * input.weeks * 60), formulaStatus: "internal-profile", weeks: weeks.map((_, index) => ({ weekNumber: index + 1, totalHours: input.hoursPerWeek, totalMinutes: Math.round(input.hoursPerWeek * 60), formulaStatus: "internal-profile" })) }, weeks, filePrefix: slugify(input.title) };
 }
 
 function renderWorkload(workload) {
   if (!workload) return;
-  const suffix = workload.formulaStatus === "configured" ? "configuração personalizada" : "perfil Aplicativo + Material";
+  const suffix = workload.formulaStatus === "configured" ? "configuração personalizada" : "perfil interno de dimensionamento";
   const calculated = workload.calculatedMinutes ?? workload.derivedMinutes ?? workload.totalMinutes ?? 0;
   const target = workload.totalTargetLearnerMinutes ?? workload.totalMinutes ?? 0;
   $("#workload-preview small").textContent = `${suffix} · ${calculated.toFixed ? calculated.toFixed(1) : calculated} min calculados de ${target} min de meta`;

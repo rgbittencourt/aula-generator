@@ -1,10 +1,10 @@
-export const SALA_EVOLUCAO_FORMULA_PROFILE = Object.freeze({
-  id: "sala-evolucao-aplicativo-material",
+export const INTERNAL_FORMULA_PROFILE = Object.freeze({
+  id: "aula-generator-internal-v1",
   version: "2026-09-30",
   source: {
-    spreadsheetId: "12kzs-xcGGGz7_nv9nr3cf8Hgpmr_Z6p09ihmspXZnoA",
-    sheets: ["Aplicativo", "Material"],
-    description: "Regras transcritas das fórmulas de dimensionamento de atividade instrucional e atividade de aprendizagem equivalente."
+    type: "internal",
+    name: "Perfil interno de dimensionamento",
+    description: "Regras consolidadas no código da aplicação; execução independente e autocontida."
   },
   constants: {
     wordsPerMinute: 273,
@@ -41,14 +41,15 @@ function positive(value) {
 export function resolveFormulaProfile(overrides = null) {
   const raw = overrides && typeof overrides === "object" ? overrides : {};
   return {
-    ...SALA_EVOLUCAO_FORMULA_PROFILE,
+    ...INTERNAL_FORMULA_PROFILE,
     ...raw,
-    constants: { ...SALA_EVOLUCAO_FORMULA_PROFILE.constants, ...(raw.constants || {}) },
-    categories: { ...SALA_EVOLUCAO_FORMULA_PROFILE.categories, ...(raw.categories || {}) }
+    source: { ...INTERNAL_FORMULA_PROFILE.source, ...(raw.source || {}) },
+    constants: { ...INTERNAL_FORMULA_PROFILE.constants, ...(raw.constants || {}) },
+    categories: { ...INTERNAL_FORMULA_PROFILE.categories, ...(raw.categories || {}) }
   };
 }
 
-export function digitalContentMinutes(wordCount, profile = SALA_EVOLUCAO_FORMULA_PROFILE) {
+export function digitalContentMinutes(wordCount, profile = INTERNAL_FORMULA_PROFILE) {
   const words = positive(wordCount);
   return words ? words / profile.constants.wordsPerMinute * profile.constants.digitalContentFactor : 0;
 }
@@ -58,7 +59,7 @@ export function classifyReading(resource = {}) {
   return /popular|site|blog|not[ií]cia|divulga[cç][aã]o|texto livre/.test(value) ? "popular" : "scientific";
 }
 
-export function readingMinutes(resource = {}, profile = SALA_EVOLUCAO_FORMULA_PROFILE) {
+export function readingMinutes(resource = {}, profile = INTERNAL_FORMULA_PROFILE) {
   const kind = classifyReading(resource);
   const pages = positive(resource.pages);
   const words = positive(resource.wordCount || resource.words || resource.numberOfWords);
@@ -69,19 +70,19 @@ export function readingMinutes(resource = {}, profile = SALA_EVOLUCAO_FORMULA_PR
   return 0;
 }
 
-export function forumMinutes(posts, profile = SALA_EVOLUCAO_FORMULA_PROFILE) {
+export function forumMinutes(posts, profile = INTERNAL_FORMULA_PROFILE) {
   return positive(posts) * profile.constants.forumMinutesPerPost;
 }
 
-export function imageMinutes(count, profile = SALA_EVOLUCAO_FORMULA_PROFILE) {
+export function imageMinutes(count, profile = INTERNAL_FORMULA_PROFILE) {
   return positive(count) * profile.constants.imageMinutes;
 }
 
-export function datasetMinutes(count, profile = SALA_EVOLUCAO_FORMULA_PROFILE) {
+export function datasetMinutes(count, profile = INTERNAL_FORMULA_PROFILE) {
   return positive(count) * profile.constants.datasetMinutes;
 }
 
-export function assessmentMinutes({ count = 1, durationMinutes = 0 } = {}, profile = SALA_EVOLUCAO_FORMULA_PROFILE) {
+export function assessmentMinutes({ count = 1, durationMinutes = 0 } = {}, profile = INTERNAL_FORMULA_PROFILE) {
   const units = Math.max(1, positive(count));
   const duration = positive(durationMinutes) || profile.constants.quizMinutesPerQuestion;
   return units * duration;
@@ -92,7 +93,7 @@ export function synchronousCommunicationMinutes({ count = 1, hoursPerCommunicati
   return positive(durationMinutes) ? units * positive(durationMinutes) : units * positive(hoursPerCommunication) * 60;
 }
 
-export function formulaProfileSummary(profile = SALA_EVOLUCAO_FORMULA_PROFILE) {
+export function formulaProfileSummary(profile = INTERNAL_FORMULA_PROFILE) {
   return {
     id: profile.id,
     version: profile.version,
