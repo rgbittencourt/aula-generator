@@ -73,7 +73,7 @@ Webpráticas são cadastradas como uma lista independente. Quando ativadas, o br
 
 Materiais de apoio também são itens independentes. Cada material pode indicar tipo, título, momento de uso, link real, objetivo, alinhamento com o conteúdo e como o estudante deverá utilizá-lo. A IA deve relacionar os materiais aos objetivos, textos, conceitos e webpráticas, mas não deve inventar links, DOI ou fontes verificadas. Todo material sugerido precisa ser conferido pelo professor antes da publicação.
 
-A distribuição detalhada de horas está preparada para receber as fórmulas da planilha. Até lá, o sistema registra a carga semanal e informa que a alocação interna está pendente.
+A distribuição detalhada de horas usa o perfil importado das abas **Aplicativo** e **Material** da planilha compartilhada. O cálculo acontece depois que a semana é escrita: conteúdo digital usa palavras, leituras usam páginas/palavras e o tipo científico/popular, vídeos usam duração conferida, fóruns usam a regra de 2 horas por post e avaliações/práticas entram como itens próprios. Recursos sem dados suficientes ficam sinalizados para revisão.
 
 ## Uso local com IA
 
@@ -113,6 +113,6 @@ semana-02-titulo.aula.json
 
 O ZIP contém os arquivos em `semanas/`. Depois da revisão no Aula Studio, use **Exportar → Pacote SCORM (.zip)** para enviar a aula ao Moodle.
 
-## Próxima etapa
+## Planejamento Geral e pacotes auxiliares
 
-Ao receber a planilha, substitua o perfil provisório em `src/calculations.js` pelas fórmulas reais, incluindo conversões, arredondamentos e regras de webpráticas. O contrato da interface e dos JSONs não precisa mudar.
+O resultado também inclui `planejamento-geral.json`, com metas e totais de todas as semanas, carga obrigatória/opcional, atividade instrucional equivalente, categorias, pendências e o perfil de fórmulas usado. O ZIP ainda contém `webpraticas/`, com guia/roteiro, pacote JSON e arquivos-exemplo produzidos para cada prática.

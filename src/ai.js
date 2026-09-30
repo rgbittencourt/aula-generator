@@ -38,7 +38,7 @@ async function callJson(messages) {
 }
 
 export function buildBriefingPrompt(input, missingFields = []) {
-  return `Atue como designer instrucional e assistente de planejamento de curso. Complete somente os campos que estão vazios no briefing abaixo. Responda somente JSON válido com estas propriedades: audience (string), objectives (array de strings), content (string), webPractices (array de objetos), materials (array de objetos), references (array de strings), videoSearchSuggestions (array de strings), notes (array de strings).
+  return `Atue como designer instrucional e assistente de planejamento de curso. Complete somente os campos que estão vazios no briefing abaixo. Responda somente JSON válido com estas propriedades: audience (string), objectives (array de strings), content (string), webPractices (array de objetos), materials (array de objetos), references (array de strings), videoSearchSuggestions (array de strings), imageSearchSuggestions (array de strings), notes (array de strings).
 
 Campos que precisam de preenchimento: ${missingFields.length ? missingFields.join(", ") : "nenhum; apenas revise e sugira melhorias"}.
 
@@ -47,11 +47,11 @@ Regras:
 - escreva em português do Brasil, com linguagem humana, clara e pedagogicamente útil;
 - produza objetivos observáveis, progressivos e adequados ao público e ao nível;
 - organize o conteúdo em uma sequência didática coerente com o número de semanas e a carga horária;
-- se webpráticas estiverem ativadas, gere no mínimo uma e, quando pedagogicamente justificável, várias práticas distintas. Cada objeto deve conter title, type, moments, objective, instructions, product, assessment e durationMinutes. Não repita a mesma atividade com nomes diferentes;
+- se webpráticas estiverem ativadas, gere no mínimo uma e, quando pedagogicamente justificável, várias práticas distintas. Cada objeto deve conter title, type, moments, objective, preparation, materials, instructions, steps, product, criteria, assessment, continuation, fallbackPlan, resources e durationMinutes;
 - alinhe cada webprática a objetivos e conteúdos específicos, distribuindo-as em momentos coerentes do calendário;
-- gere materiais de apoio como objetos com type, title, link, moment, objective, alignment, use e notes. Eles devem servir aos objetivos e conteúdos, indicar por que serão usados, em que momento entram e como o estudante trabalhará com eles;
-- para referências, sugira obras, autores, documentos ou fontes que o professor deve conferir; não invente URLs, DOI ou dados bibliográficos específicos;
-- para vídeos, gere termos de busca e tipos de material, não links inventados;
+- gere materiais de apoio como objetos com type, title, link, moment, required, objective, alignment, use, pages, durationMinutes e notes. Eles devem servir aos objetivos e conteúdos, indicar por que serão usados, em que momento entram e como o estudante trabalhará com eles;
+- para referências e artigos, sugira obras, autores, documentos ou fontes que o professor deve conferir; não invente URLs, DOI, páginas ou dados bibliográficos específicos;
+- para vídeos e imagens, gere termos de busca e intenção pedagógica; use links somente quando já tiverem sido fornecidos pelo usuário;
 - não preencha nome de autor ou instituição, pois esses dados devem vir do usuário;
 - não escreva markdown fora das strings do JSON.
 
@@ -63,6 +63,49 @@ Retorne JSON válido agora.`;
 
 function text(value) { return typeof value === "string" ? value.trim() : ""; }
 function stringList(value) { return Array.isArray(value) ? value.map(text).filter(Boolean) : []; }
+function safeNumber(value, fallback = 0) { const n = Number(value); return Number.isFinite(n) ? n : fallback; }
+
+function normalizeBriefingPractice(practice, index) {
+  return {
+    id: text(practice?.id) || `webpractice-${index + 1}`,
+    title: text(practice?.title) || `Webprática ${index + 1}`,
+    type: text(practice?.type) || "Pesquisa orientada",
+    modality: text(practice?.modality || practice?.format),
+    moments: stringList(practice?.moments || practice?.moment),
+    objective: text(practice?.objective),
+    preparation: text(practice?.preparation),
+    materials: stringList(practice?.materials),
+    instructions: text(practice?.instructions),
+    steps: Array.isArray(practice?.steps) ? practice.steps : stringList(practice?.steps),
+    product: text(practice?.product),
+    assessment: text(practice?.assessment),
+    criteria: stringList(practice?.criteria || practice?.rubric),
+    continuation: text(practice?.continuation),
+    fallbackPlan: text(practice?.fallbackPlan || practice?.planB),
+    resources: Array.isArray(practice?.resources) ? practice.resources : [],
+    durationMinutes: Math.max(5, safeNumber(practice?.durationMinutes, 45))
+  };
+}
+
+function normalizeBriefingMaterial(material, index) {
+  return {
+    id: text(material?.id) || `material-${index + 1}`,
+    type: text(material?.type) || "Texto-base",
+    title: text(material?.title),
+    link: text(material?.link || material?.href),
+    source: text(material?.source || material?.publisher || material?.institution),
+    author: text(material?.author),
+    required: Boolean(material?.required ?? material?.mandatory),
+    moment: text(material?.moment),
+    objective: text(material?.objective),
+    alignment: text(material?.alignment || material?.contentAlignment),
+    use: text(material?.use || material?.howToUse),
+    pages: text(material?.pages),
+    durationMinutes: Math.max(0, safeNumber(material?.durationMinutes, 0)),
+    verificationStatus: text(material?.verificationStatus) || (material?.link ? "provided-needs-review" : "suggested-no-url"),
+    notes: text(material?.notes)
+  };
+}
 
 export async function assistBriefing(input, missingFields = []) {
   const raw = await callJson([
@@ -70,64 +113,72 @@ export async function assistBriefing(input, missingFields = []) {
     { role: "user", content: buildBriefingPrompt(input, missingFields) }
   ]);
   return {
-    audience: text(raw.audience),
-    objectives: stringList(raw.objectives),
-    content: text(raw.content),
-    webPractices: Array.isArray(raw.webPractices) ? raw.webPractices.map((practice, index) => ({
-      id: text(practice?.id, `webpractice-${index + 1}`),
-      title: text(practice?.title, `Webprática ${index + 1}`),
-      type: text(practice?.type, "Pesquisa orientada"),
-      moments: stringList(practice?.moments || practice?.moment),
-      objective: text(practice?.objective),
-      instructions: text(practice?.instructions),
-      product: text(practice?.product),
-      assessment: text(practice?.assessment),
-      durationMinutes: Number(practice?.durationMinutes) || 45
-    })) : [],
-    materials: Array.isArray(raw.materials) ? raw.materials.map((material, index) => ({
-      id: text(material?.id, `material-${index + 1}`),
-      type: text(material?.type, "Texto-base"),
-      title: text(material?.title),
-      link: text(material?.link || material?.href),
-      moment: text(material?.moment),
-      objective: text(material?.objective),
-      alignment: text(material?.alignment || material?.contentAlignment),
-      use: text(material?.use || material?.howToUse),
-      notes: text(material?.notes)
-    })) : [],
-    references: stringList(raw.references),
-    videoSearchSuggestions: stringList(raw.videoSearchSuggestions),
-    notes: stringList(raw.notes)
+    audience: text(raw.audience), objectives: stringList(raw.objectives), content: text(raw.content),
+    webPractices: Array.isArray(raw.webPractices) ? raw.webPractices.map(normalizeBriefingPractice) : [],
+    materials: Array.isArray(raw.materials) ? raw.materials.map(normalizeBriefingMaterial) : [],
+    references: stringList(raw.references), videoSearchSuggestions: stringList(raw.videoSearchSuggestions), imageSearchSuggestions: stringList(raw.imageSearchSuggestions), notes: stringList(raw.notes)
   };
 }
 
-export function buildGenerationPrompt(input) {
-  return `Gere um planejamento pedagógico semanal em JSON para o curso abaixo. A resposta deve conter exatamente uma propriedade "weeks" com ${input.weeks} itens. Cada item deve conter "meta" e "blocks". Os blocos precisam ser compatíveis com o Aula Studio e usar somente estes tipos: ${[...KNOWN_BLOCK_TYPES].join(", ")}.
+const BLOCK_TYPES = [...KNOWN_BLOCK_TYPES].join(", ");
 
-Regras pedagógicas:
-- distribua progressivamente os objetivos e conteúdos ao longo das semanas;
-- respeite ${input.hoursPerWeek} horas de estudo por semana;
-- escreva em ${input.language};
-- produza texto claro, humanizado, específico e sem frases genéricas;
-- use webpráticas ${input.webPractice.enabled ? "quando fizer sentido, especialmente nos momentos indicados" : "não inclua"};
-- quando houver várias webpráticas em input.webPractices, trate cada uma como atividade distinta e preserve seu objetivo, momento, produto e avaliação;
-- use input.materials para inserir materiais de apoio nos momentos adequados, explicando no conteúdo semanal como cada material sustenta o objetivo ou conceito;
-- mantenha referências e vídeos como materiais complementares, sem inventar URLs;
-- para vídeos do YouTube, use o ID em props.id somente quando um link real foi fornecido;
-- use HTML simples dentro de props.body quando necessário, sem scripts;
-- um tópico deve colocar seus blocos internos em props.children;
-- um quiz deve usar props.questions, cada questão com q, options, answer e explanation.
+export function buildWeekGenerationPrompt(input, weekIndex = 0) {
+  const weekNumber = weekIndex + 1;
+  return `Gere UMA semana de material didático em JSON para o curso abaixo. Esta é a semana ${weekNumber} de ${input.weeks}. O resultado precisa ter nível de detalhamento próximo a uma unidade didática completa em DOCX: abertura, texto-base desenvolvido, seções numeradas, subseções quando úteis, estudo de caso, reflexões, recursos no ponto de uso, síntese, glossário, referências, avaliação e conexão com a próxima semana. Não entregue um resumo superficial nem apenas uma lista de links.
+
+Retorne um objeto com exatamente estas propriedades de alto nível: meta, lessonPlan e blocks.
+
+lessonPlan deve conter:
+- weekNumber, theme, welcome;
+- learningObjectives: 6 a 8 objetivos observáveis, coerentes com o curso e com esta semana;
+- prerequisites;
+- contentDensity: "completa";
+- contentSections: 6 a 12 seções. Cada seção deve ter number, title, body, subsections, caseStudy (quando fizer sentido), reflection (quando fizer sentido), keyTerms e resources. O body deve explicar conceitos, exemplos e implicações, com texto substancial. Evite repetir a mesma introdução em todas as seções;
+- resources com arrays videos, readingsRequired, readingsExtra, images, podcasts e datasets. Cada recurso deve conter title, source, author quando conhecido, href somente se foi fornecido no briefing, required, moment, objective, guidingQuestion, durationMinutes, altText/caption/credit para imagens, searchQuery quando o link não estiver disponível, verificationStatus e requiresVerification;
+- webPractices: preserve as práticas fornecidas e desenvolva cada prática de modo independente, com context, prerequisites, teacherPreparation, studentPreparation, materials, steps com minutos, product/delivery, criteria/rubric, prompts, roteiro com blocos e duração, plano B e continuidade;
+- para cada webprática, gere artifacts/files quando fizer sentido: cada artefato deve ter filename, title, format, purpose e content/template. Inclua arquivos-exemplo, guia do professor, roteiro do estudante, checklist, modelo de entrega, dados de apoio ou prompts prontos quando o tipo da prática exigir;
+- activities: registre fóruns, discussões, comunicações síncronas, projetos e outras atividades com type, title, count, durationMinutes ou unitDurationMinutes, hoursPerCommunication e required;
+- synthesis, nextWeekConnection, glossary, references e assessment;
+- timePlan com targetMinutes 0, items vazio e calculationMethod "derived-after-content". O servidor calculará os tempos depois de receber o conteúdo; não invente a distribuição de horas aqui.
+
+A avaliação semanal deve normalmente ter 6 questões objetivas: 4 de múltipla escolha com 4 alternativas e 2 de verdadeiro/falso, sempre alinhadas aos objetivos e com gabarito, explicação e versão Moodle GIFT quando possível.
+
+blocks deve transformar o lessonPlan em uma leitura editável no Aula Studio e usar somente estes tipos: ${BLOCK_TYPES}. Use hero para a abertura; topic com titulo/prose para seções; destaque, atencao e reflexao para caixas; video apenas com IDs reais do YouTube fornecidos; imagem apenas com src real fornecido ou sem src acompanhado de legenda, altText e crédito; materiais para links e leituras; quiz para a avaliação; sintese, referencias e outros blocos estruturais quando fizer sentido. Um topic deve colocar os blocos internos em props.children. Um quiz deve usar props.questions com q, options, answer e explanation.
+
+Regras de conteúdo e fontes:
+- escreva em ${input.language}, com linguagem humana, clara, específica e pedagogicamente provocadora;
+- distribua progressivamente os objetivos, sem copiar o mesmo bloco em semanas diferentes;
+- respeite o público (${input.audience}) e nível (${input.level});
+- use o recorte, os conteúdos e as práticas do briefing;
+- apresente vídeos, imagens, artigos e leituras como recursos contextualizados, com a função pedagógica e o momento de uso;
+- nunca invente URLs, DOI, durações, autores, números ou referências verificadas. Para um recurso ainda não conferido, use searchQuery e verificationStatus "suggested-no-url";
+- se houver um link real no briefing, preserve-o e marque verificationStatus "provided-needs-review";
+- não escreva markdown fora das strings do JSON e não inclua comentários.
 
 Briefing estruturado:
-${JSON.stringify(input, null, 2)}
+${JSON.stringify({ ...input, weekToGenerate: weekNumber }, null, 2)}
 
-Retorne somente JSON válido, sem markdown, comentários ou texto fora do objeto.`;
+Retorne somente JSON válido para esta semana.`;
+}
+
+export function buildGenerationPrompt(input) {
+  return `Gere ${input.weeks} semanas, uma por objeto, seguindo este contrato: cada semana deve ser produzida pelo mesmo padrão editorial completo exigido em buildWeekGenerationPrompt, com lessonPlan rico, recursos contextualizados, webpráticas e blocos Aula Studio. A carga horária será calculada depois do conteúdo.\n\n${JSON.stringify(input, null, 2)}`;
+}
+
+async function generateOneWeek(input, index) {
+  const raw = await callJson([
+    { role: "system", content: "Você é um designer instrucional rigoroso. Gere somente JSON válido, desenvolva uma semana completa e nunca invente fontes ou links." },
+    { role: "user", content: buildWeekGenerationPrompt(input, index) }
+  ]);
+  return raw?.lessonPlan || raw?.blocks ? raw : raw?.week || raw;
 }
 
 export async function generateWithAI(input) {
-  const raw = await callJson([
-    { role: "system", content: "Você é um designer instrucional rigoroso. Gere somente JSON válido e nunca invente fontes ou links." },
-    { role: "user", content: buildGenerationPrompt(input) }
-  ]);
-  return normalizeWeeklyOutput(raw, input);
+  const weeks = [];
+  const batchSize = Math.min(3, Math.max(1, Number(process.env.AULA_AI_BATCH_SIZE) || 3));
+  for (let start = 0; start < input.weeks; start += batchSize) {
+    const batch = await Promise.all(Array.from({ length: Math.min(batchSize, input.weeks - start) }, (_, offset) => generateOneWeek(input, start + offset)));
+    weeks.push(...batch);
+  }
+  return normalizeWeeklyOutput({ weeks }, input);
 }

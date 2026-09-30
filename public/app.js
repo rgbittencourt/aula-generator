@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
-const state = { input: null, weeks: [], workload: null, provider: null };
+const state = { input: null, weeks: [], workload: null, generalPlan: null, provider: null };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 
 function splitLines(value) { return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : String(value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
@@ -112,6 +112,7 @@ function formInput() {
     references: splitLines($("#references").value),
     videoLinks: splitLines($("#videos").value),
     videoSearchSuggestions: splitLines($("#video-search-suggestions").value),
+    imageSearchSuggestions: splitLines($("#image-search-suggestions").value),
     materials: collectMaterials(),
     accessCode: $("#access-code")?.value || "",
     webPracticeEnabled: $("#practice-enabled").checked,
@@ -186,6 +187,7 @@ function briefingMissingFields(input) {
   if (!input.references.length) missing.push("references");
   if (!meaningfulMaterials.length) missing.push("materials");
   if (!input.videoSearchSuggestions.length) missing.push("videoSearchSuggestions");
+  if (!input.imageSearchSuggestions.length) missing.push("imageSearchSuggestions");
   return missing;
 }
 
@@ -226,6 +228,7 @@ async function assistBriefing() {
     }
     if (!$("#references").value.trim() && Array.isArray(briefing.references) && briefing.references.length) { $("#references").value = briefing.references.map((item) => `[Sugestão para conferir] ${item}`).join("\n"); filled.push("referências sugeridas"); }
     if (!$("#video-search-suggestions").value.trim() && Array.isArray(briefing.videoSearchSuggestions) && briefing.videoSearchSuggestions.length) { $("#video-search-suggestions").value = briefing.videoSearchSuggestions.join("\n"); filled.push("buscas de vídeos"); }
+    if (!$("#image-search-suggestions").value.trim() && Array.isArray(briefing.imageSearchSuggestions) && briefing.imageSearchSuggestions.length) { $("#image-search-suggestions").value = briefing.imageSearchSuggestions.join("\n"); filled.push("buscas de imagens"); }
     updateSummary();
     const note = briefing.notes?.length ? ` Observações: ${briefing.notes.join(" ")}` : "";
     showAssistantMessage(filled.length ? `Campos preenchidos: ${filled.join(", ")}. Revise as sugestões antes de gerar as aulas.${note}` : "A IA não encontrou campos vazios que pudesse completar com segurança.");
@@ -278,12 +281,31 @@ function staticDemo(input) {
 
 function renderWorkload(workload) {
   if (!workload) return;
-  const suffix = workload.formulaStatus === "configured" ? "fórmula configurada" : "fórmulas da planilha pendentes";
-  $("#workload-preview small").textContent = `${suffix} · ${workload.totalMinutes} minutos totais`;
+  const suffix = workload.formulaStatus === "configured" ? "configuração personalizada" : "perfil Aplicativo + Material";
+  const calculated = workload.calculatedMinutes ?? workload.derivedMinutes ?? workload.totalMinutes ?? 0;
+  const target = workload.totalTargetLearnerMinutes ?? workload.totalMinutes ?? 0;
+  $("#workload-preview small").textContent = `${suffix} · ${calculated.toFixed ? calculated.toFixed(1) : calculated} min calculados de ${target} min de meta`;
+}
+
+function formatMinutes(value) {
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes)) return "—";
+  return `${(minutes / 60).toFixed(1)} h`;
+}
+
+function renderGeneralPlan(plan) {
+  const container = $("#general-plan");
+  if (!container || !plan?.totals) { container?.classList.add("hidden"); return; }
+  const totals = plan.totals;
+  const labels = { contentMinutes: "Conteúdo", resourcesMinutes: "Materiais e mídia", practiceMinutes: "Webpráticas", assessmentMinutes: "Avaliação", reviewMinutes: "Revisão", communicationMinutes: "Comunicação", projectMinutes: "Projetos", otherMinutes: "Outros" };
+  const categoryMarkup = Object.entries(plan.categoryTotals || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<span>${escapeHtml(labels[key] || key)}: ${formatMinutes(value)}</span>`).join("");
+  const unresolved = Array.isArray(plan.unresolvedResources) ? plan.unresolvedResources : [];
+  container.innerHTML = `<p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div>${unresolved.length ? `<div class="general-warning">${unresolved.length} recurso(s) precisam de conferência para fechar o cálculo: ${escapeHtml(unresolved.slice(0, 4).map((item) => item.title).join(", "))}${unresolved.length > 4 ? "…" : ""}</div>` : ""}`;
+  container.classList.remove("hidden");
 }
 
 function renderWeeks(data) {
-  state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.provider = data.provider;
+  state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.provider = data.provider;
   $("#results-title").textContent = `${data.weeks.length} semanas prontas para revisão`;
   $("#results-subtitle").textContent = data.provider === "static-demo" ? "Modo público GitHub Pages: exemplo gerado no navegador, sem API." : data.provider === "fallback" ? "Exemplo local gerado sem API; use-o para validar o fluxo." : `Gerado por IA com ${data.model || "o provedor configurado"}. Revise antes de publicar.`;
   $("#results-section").classList.remove("hidden");
@@ -296,10 +318,13 @@ function renderWeeks(data) {
     const workload = data.workload?.weeks?.[index];
     const types = [...new Set((lesson.blocks || []).map((block) => blockLabels[block.type] || block.type))].slice(0, 5);
     const date = meta.calendarStartDate ? `${formatDate(meta.calendarStartDate)}–${formatDate(meta.calendarEndDate)}` : meta.weekLabel;
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><h3>${escapeHtml(meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span>${workload?.totalHours ?? meta.studyHours ?? "—"} h</span><span>${lesson.blocks?.length || 0} blocos</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div><button class="week-download" data-index="${index}" type="button">Baixar .aula.json <span>↓</span></button></article>`;
+    const calculated = workload?.calculatedMinutes != null ? formatMinutes(workload.calculatedMinutes) : `${workload?.totalHours ?? meta.studyHours ?? "—"} h`;
+    const target = workload?.targetMinutes != null ? formatMinutes(workload.targetMinutes) : "meta —";
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><h3>${escapeHtml(meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${lesson.blocks?.length || 0} blocos</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div><button class="week-download" data-index="${index}" type="button">Baixar .aula.json <span>↓</span></button></article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
   $("#week-grid").querySelectorAll(".week-download").forEach((button) => button.addEventListener("click", () => downloadWeek(Number(button.dataset.index))));
+  renderGeneralPlan(data.generalPlan);
   renderWorkload(data.workload);
   $("#results-section").scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -346,6 +371,7 @@ async function downloadZip() {
       if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
       const zip = new window.JSZip();
       state.weeks.forEach((lesson, index) => { const number = String(index + 1).padStart(2, "0"); zip.file(`semanas/semana-${number}-${slugify(lesson.meta?.title)}.aula.json`, JSON.stringify(lesson, null, 2)); });
+      if (state.generalPlan) zip.file("planejamento-geral.json", JSON.stringify(state.generalPlan, null, 2));
       downloadBlob(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), `${slugify(state.input.title)}-semanas.zip`);
       return;
     }

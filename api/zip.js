@@ -1,3 +1,4 @@
+import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "../src/calculations.js";
 import { createWeeksZip } from "../src/zip.js";
 import { normalizeCourseInput, normalizeWeeklyOutput, slugify, validateLesson } from "../src/aula-schema.js";
 
@@ -7,7 +8,10 @@ export default async function handler(request, response) {
     const input = normalizeCourseInput(request.body?.input || {});
     const weeks = normalizeWeeklyOutput({ weeks: request.body?.weeks || [] }, input);
     if (!weeks.every(validateLesson)) return response.status(400).json({ ok: false, error: "O conjunto de semanas contém uma aula inválida." });
-    const buffer = await createWeeksZip(input, weeks);
+    const workload = calculateCourseWorkload(input, input.formulaConfig, weeks);
+    const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
+    const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks);
+    const buffer = await createWeeksZip(input, enrichedWeeks, generalPlan);
     response.setHeader("Content-Type", "application/zip");
     response.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-semanas.zip"`);
     response.setHeader("Cache-Control", "no-store");

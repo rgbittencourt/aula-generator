@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="./styles.css" />
   <style>
     .ai-assist-button{height:36px;padding:0 11px;font-size:11px;white-space:nowrap}.item-card{background:#fbfcfd;border:1px solid #dfe4ea;border-radius:11px;padding:15px;margin-bottom:12px}.item-card-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px;color:#14213d;font-size:12px}.remove-item{border:0;background:#fbe5df;color:#bf4c34;border-radius:50%;width:25px;height:25px;font-size:18px;line-height:1}.remove-item:disabled{opacity:.3;cursor:not-allowed}.add-item-button{height:38px;font-size:12px;margin-bottom:10px}.material-mark{font-size:21px;color:#e76f51}.assistant-note{margin:14px 0 0}.assistant-note.error-note{color:#8e3724;background:#fbe5df;border-radius:8px;padding:9px}.stacked-list{display:flex;flex-direction:column;gap:2px}
+    .general-plan{margin:18px 0 24px;padding:20px;border:1px solid #dfe4ea;border-radius:14px;background:#fffdf8}.general-plan h3{margin:0 0 6px;color:#14213d}.general-plan p{margin:4px 0;color:#5e6875;font-size:13px}.general-plan-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:15px 0}.general-metric{padding:12px;border-radius:10px;background:#f4f0e8}.general-metric strong{display:block;color:#14213d;font-size:18px}.general-metric small{color:#687381}.general-category-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.general-category-list span{padding:6px 9px;border-radius:999px;background:#edf2ed;color:#43584b;font-size:11px}.general-warning{margin-top:12px;padding:10px;border-radius:9px;background:#fff3dc;color:#76530d;font-size:12px}.week-metrics span strong{color:#14213d}.formula-note p{font-size:12px}@media (max-width:680px){.general-plan-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
   </style>
 </head>
 <body>
@@ -53,7 +54,7 @@
               <label class="field calendar-only span-2 hidden"><span>Início do curso</span><input id="start-date" name="startDate" type="date" /></label>
               <div class="calendar-note calendar-only hidden">As semanas serão calculadas em blocos de 7 dias a partir da data escolhida.</div>
             </div>
-            <div class="workload-preview" id="workload-preview"><span class="workload-icon">Σ</span><span><strong>16 horas totais</strong><small>Distribuição interna aguardando as fórmulas da planilha.</small></span></div>
+            <div class="workload-preview" id="workload-preview"><span class="workload-icon">Σ</span><span><strong>16 horas totais</strong><small>O cálculo será refinado depois que o conteúdo e os materiais forem gerados.</small></span></div>
           </section>
 
           <section class="panel">
@@ -80,6 +81,7 @@
             <label class="field"><span>Referências, livros e documentos</span><textarea id="references" rows="4" placeholder="Uma referência ou URL por linha"></textarea></label>
             <label class="field"><span>Links de vídeos</span><textarea id="videos" rows="3" placeholder="Um link do YouTube ou outra URL por linha"></textarea></label>
             <label class="field"><span>Termos de busca para vídeos</span><textarea id="video-search-suggestions" rows="3" placeholder="A IA pode sugerir buscas sem inventar links"></textarea><small class="hint">São termos para você pesquisar e escolher vídeos reais; a IA não inventa URLs.</small></label>
+            <label class="field"><span>Termos de busca para imagens e diagramas</span><textarea id="image-search-suggestions" rows="3" placeholder="Ex.: mapa de indicadores educacionais, diagrama de fluxo"></textarea><small class="hint">Use os termos para localizar imagens com licença e crédito adequados.</small></label>
           </section>
 
           <div class="form-actions">
@@ -101,7 +103,7 @@
               <div><dt>Calendário</dt><dd id="summary-calendar">Por numeração</dd></div>
               <div><dt>Webpráticas</dt><dd id="summary-practice">Não</dd></div>
             </dl>
-            <div class="formula-note"><span>ƒx</span><p><strong>Cálculos em evolução</strong> A distribuição de conteúdo, prática e avaliação será ligada à planilha de fórmulas na próxima etapa.</p></div>
+            <div class="formula-note"><span>ƒx</span><p><strong>Perfil Aplicativo + Material</strong> Leitura, artigos, vídeos, fóruns, práticas e avaliações são dimensionados depois que a semana é escrita.</p></div>
           </section>
           <section class="future-card"><span class="future-icon">✦</span><h3>Extensões previstas</h3><p>O adaptador de IA foi separado do gerador. Depois podemos conectar imagens, diagramas, busca de vídeos, referências e outros provedores sem mudar o contrato semanal.</p></section>
         </aside>
@@ -111,6 +113,7 @@
     <section class="results-section hidden" id="results-section">
       <div class="results-header"><div><p class="eyebrow">RESULTADO</p><h2 id="results-title">Semanas geradas</h2><p id="results-subtitle"></p></div><button class="button button-primary" type="button" id="zip-button">Baixar ZIP <span class="button-arrow">↓</span></button></div>
       <div class="result-alert hidden" id="result-alert"></div>
+      <div class="general-plan hidden" id="general-plan"></div>
       <div class="week-grid" id="week-grid"></div>
     </section>
 

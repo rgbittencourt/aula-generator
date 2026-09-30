@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { calculateCourseWorkload } from "./calculations.js";
+import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "./calculations.js";
 import { buildFallbackLesson, normalizeCourseInput, normalizeWeeklyOutput, slugify, validateLesson } from "./aula-schema.js";
 import { assistBriefing, generateWithAI } from "./ai.js";
 import { createWeeksZip } from "./zip.js";
@@ -31,19 +31,22 @@ app.post("/api/generate", async (req, res) => {
   if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
     const input = normalizeCourseInput(req.body?.input || req.body || {});
-    const workload = calculateCourseWorkload(input);
     const useFallback = Boolean(req.body?.fallback);
     const weeks = useFallback
       ? Array.from({ length: input.weeks }, (_, index) => buildFallbackLesson(input, index))
       : await generateWithAI(input);
     const normalizedWeeks = normalizeWeeklyOutput({ weeks }, input);
+    const workload = calculateCourseWorkload(input, input.formulaConfig, normalizedWeeks);
+    const enrichedWeeks = attachWorkloadToLessons(normalizedWeeks, workload);
+    const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks);
     res.json({
       ok: true,
       provider: useFallback ? "fallback" : "ai",
       model: useFallback ? null : (process.env.OPENAI_MODEL || "gpt-4o-mini"),
       input,
       workload,
-      weeks: normalizedWeeks,
+      generalPlan,
+      weeks: enrichedWeeks,
       filePrefix: slugify(input.title, "curso")
     });
   } catch (error) {
@@ -71,7 +74,10 @@ app.post("/api/zip", async (req, res) => {
     const input = normalizeCourseInput(req.body?.input || {});
     const weeks = normalizeWeeklyOutput({ weeks: req.body?.weeks || [] }, input);
     if (!weeks.every(validateLesson)) return res.status(400).json({ ok: false, error: "O conjunto de semanas contém uma aula inválida." });
-    const buffer = await createWeeksZip(input, weeks);
+    const workload = calculateCourseWorkload(input, input.formulaConfig, weeks);
+    const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
+    const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks);
+    const buffer = await createWeeksZip(input, enrichedWeeks, generalPlan);
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-semanas.zip"`);
     res.send(buffer);
