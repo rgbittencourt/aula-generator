@@ -26,6 +26,7 @@ function formInput() {
     content: $("#content").value,
     references: splitLines($("#references").value),
     videoLinks: splitLines($("#videos").value),
+    accessCode: $("#access-code")?.value || "",
     webPracticeEnabled: $("#practice-enabled").checked,
     webPractice: {
       enabled: $("#practice-enabled").checked,
@@ -150,6 +151,8 @@ function downloadWeek(index) {
 
 async function generate(fallback = false) {
   const input = formInput();
+  const accessCode = input.accessCode;
+  delete input.accessCode;
   if (!input.title.trim()) { showError("Informe o tema geral ou título do curso."); $("#course-title").focus(); return; }
   if (!input.objectives.length && !input.content.trim()) { showError("Informe ao menos um objetivo ou conteúdo-base para orientar a geração."); $("#objectives").focus(); return; }
   const button = fallback ? $("#fallback-button") : $("#generate-button");
@@ -162,7 +165,9 @@ async function generate(fallback = false) {
       renderWeeks(staticDemo(input));
       return;
     }
-    const response = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input, fallback }) });
+    const headers = { "Content-Type": "application/json" };
+    if (accessCode) headers["x-aula-access-code"] = accessCode;
+    const response = await fetch("/api/generate", { method: "POST", headers, body: JSON.stringify({ input, fallback }) });
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error(data.error || "Não foi possível gerar o curso.");
     renderWeeks(data);
@@ -193,13 +198,14 @@ async function loadHealth() {
   const status = $("#api-status");
   if (isGitHubPages) {
     status.innerHTML = '<span class="status-dot warning"></span>modo público · sem IA';
+    document.querySelectorAll(".vercel-access").forEach((item) => item.classList.add("hidden"));
     $("#generate-button").disabled = true;
     $("#generate-button").querySelector("span:first-child").textContent = "IA indisponível nesta URL";
     return;
   }
   try {
     const data = await (await fetch("/api/health")).json();
-    status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? "IA configurada" : "modo exemplo · chave pendente"}`;
+    status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · código necessário" : "IA configurada") : "modo exemplo · chave pendente"}`;
   } catch { status.innerHTML = '<span class="status-dot offline"></span>servidor indisponível'; }
 }
 

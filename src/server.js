@@ -6,6 +6,7 @@ import { calculateCourseWorkload } from "./calculations.js";
 import { buildFallbackLesson, normalizeCourseInput, normalizeWeeklyOutput, slugify, validateLesson } from "./aula-schema.js";
 import { generateWithAI } from "./ai.js";
 import { createWeeksZip } from "./zip.js";
+import { accessRequired, hasValidAccess } from "./access.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "..", "public");
@@ -20,12 +21,14 @@ app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     aiConfigured: Boolean(process.env.OPENAI_API_KEY),
+    accessRequired: accessRequired(),
     model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     output: ".aula.json por semana + ZIP"
   });
 });
 
 app.post("/api/generate", async (req, res) => {
+  if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
     const input = normalizeCourseInput(req.body?.input || req.body || {});
     const workload = calculateCourseWorkload(input);
