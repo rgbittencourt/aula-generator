@@ -38,12 +38,47 @@ function validDate(value) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+function normalizePractice(value = {}, index = 0) {
+  const practice = value && typeof value === "object" ? value : {};
+  return {
+    id: text(practice.id, `webpractice-${index + 1}`),
+    title: text(practice.title, `Webprática ${index + 1}`),
+    type: text(practice.type, "Pesquisa orientada"),
+    moments: splitLines(practice.moments || practice.moment),
+    objective: text(practice.objective),
+    instructions: text(practice.instructions),
+    product: text(practice.product),
+    assessment: text(practice.assessment),
+    durationMinutes: Math.max(0, number(practice.durationMinutes, 45))
+  };
+}
+
+function normalizeMaterial(value = {}, index = 0) {
+  const material = value && typeof value === "object" ? value : {};
+  return {
+    id: text(material.id, `material-${index + 1}`),
+    type: text(material.type, "Texto-base"),
+    title: text(material.title),
+    link: text(material.link || material.href),
+    moment: text(material.moment),
+    objective: text(material.objective),
+    alignment: text(material.alignment || material.contentAlignment),
+    use: text(material.use || material.howToUse),
+    notes: text(material.notes)
+  };
+}
+
 export function normalizeCourseInput(raw = {}) {
   const calendarMode = raw.calendarMode === "calendar" ? "calendar" : "week-number";
   const weeks = Math.min(52, Math.max(1, integer(raw.weeks, 1)));
   const hoursPerWeek = Math.min(80, Math.max(0, number(raw.hoursPerWeek, 4)));
   const practice = raw.webPractice && typeof raw.webPractice === "object" ? raw.webPractice : {};
-  const enabled = Boolean(raw.webPracticeEnabled ?? practice.enabled);
+  const enabled = Boolean(raw.webPracticeEnabled ?? practice.enabled ?? (Array.isArray(raw.webPractices) && raw.webPractices.length));
+  const rawPractices = Array.isArray(raw.webPractices) ? raw.webPractices : [];
+  const webPractices = enabled ? (rawPractices.length ? rawPractices.map(normalizePractice) : [normalizePractice(practice, 0)]) : [];
+  const legacyMoments = webPractices.flatMap((item) => item.moments);
+  const legacyInstructions = webPractices.map((item) => `${item.title}: ${item.instructions}`).filter(Boolean).join("\n");
+  const materials = Array.isArray(raw.materials) ? raw.materials.map(normalizeMaterial).filter((material) => material.title || material.objective || material.alignment || material.link || material.use) : [];
   return {
     title: text(raw.title || raw.generalTheme, "Curso sem título"),
     audience: text(raw.audience, "Adultos em formação"),
@@ -52,15 +87,18 @@ export function normalizeCourseInput(raw = {}) {
     content: text(raw.content),
     references: splitLines(raw.references),
     videoLinks: splitLines(raw.videoLinks),
+    videoSearchSuggestions: splitLines(raw.videoSearchSuggestions),
+    materials,
     weeks,
     hoursPerWeek,
     calendarMode,
     startDate: calendarMode === "calendar" && validDate(raw.startDate) ? raw.startDate : null,
+    webPractices,
     webPractice: {
       enabled,
-      moments: splitLines(practice.moments || raw.practiceMoments),
-      instructions: text(practice.instructions || raw.practiceInstructions),
-      durationMinutes: Math.max(0, number(practice.durationMinutes || raw.practiceDurationMinutes, 0))
+      moments: legacyMoments.length ? legacyMoments : splitLines(practice.moments || raw.practiceMoments),
+      instructions: legacyInstructions || text(practice.instructions || raw.practiceInstructions),
+      durationMinutes: webPractices.reduce((sum, item) => sum + item.durationMinutes, 0)
     },
     author: text(raw.author),
     role: text(raw.role),
@@ -172,17 +210,24 @@ function fallbackBlocks(input, index) {
       { id: newId("c-prose-", week, 3), type: "prose", props: { body: `<p>${content}</p>`, dropcap: false, dropcapTone: "terracotta" } }
     ] }}
   ];
-  if (input.webPractice.enabled) {
-    blocks.push({ id: newId("b-practice-", week, 4), type: "destaque", bg: "neutral-default", pad: "tight", props: {
-      title: "Webprática", body: `<p>${input.webPractice.instructions || "Aplique o conteúdo em uma atividade orientada na web."}</p>`, tone: "ocean", icon: ""
+  const practices = Array.isArray(input.webPractices) && input.webPractices.length ? input.webPractices : (input.webPractice.enabled ? [input.webPractice] : []);
+  practices.forEach((practice, practiceIndex) => {
+    const title = practice.title || `Webprática ${practiceIndex + 1}`;
+    const details = [practice.objective, practice.instructions, practice.product].filter(Boolean).join(" ") || "Aplique o conteúdo em uma atividade orientada na web.";
+    blocks.push({ id: newId("b-practice-", week, 4 + practiceIndex), type: "destaque", bg: "neutral-default", pad: "tight", props: {
+      title, body: `<p>${details}</p>`, tone: "ocean", icon: ""
     }});
-  }
+  });
   if (input.videoLinks.length) {
     const first = input.videoLinks[0];
     const match = first.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&#/]+)/i);
     if (match) blocks.push({ id: newId("b-video-", week, 5), type: "video", bg: "neutral-default", pad: "normal", props: { id: match[1], title: "Vídeo recomendado", caption: "Material complementar.", credit: "", start: "" } });
   }
-  if (input.references.length) blocks.push({ id: newId("b-materials-", week, 6), type: "materiais", bg: "neutral-default", pad: "normal", props: { title: "Referências e materiais", items: input.references.map((href, i) => ({ type: "artigo", title: `Referência ${i + 1}`, source: "Material indicado", href })) } });
+  const materialItems = [
+    ...input.materials.map((material) => ({ type: material.type, title: material.title || "Material de apoio", source: material.alignment || material.objective || material.use, href: material.link })),
+    ...input.references.map((href, i) => ({ type: "artigo", title: `Referência ${i + 1}`, source: "Material indicado", href }))
+  ].filter((item) => item.title || item.href);
+  if (materialItems.length) blocks.push({ id: newId("b-materials-", week, 20), type: "materiais", bg: "neutral-default", pad: "normal", props: { title: "Materiais de apoio", items: materialItems } });
   return blocks;
 }
 

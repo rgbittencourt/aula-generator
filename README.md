@@ -64,7 +64,14 @@ Depois de alterar `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` ou `AULA_A
 
 ## O que a IA gera
 
-O formulário aceita tema geral, público, nível, número de semanas, horas de estudo por semana, calendário por numeração ou data de início, webpráticas, objetivos, conteúdos, referências e links de vídeos. A IA retorna uma semana por objeto, com blocos compatíveis com o Aula Studio. Cada semana pode ser baixada como `.aula.json` e todas podem ser empacotadas em um ZIP.
+O fluxo tem duas etapas:
+
+1. **Preencher vazios com IA:** usa o tema, calendário, carga horária e informações já fornecidas para completar apenas os campos vazios do briefing. Sugere público, objetivos observáveis, conteúdos, referências para conferir e termos de busca de vídeos sem inventar URLs.
+2. **Gerar com IA:** transforma o briefing revisado em uma semana por objeto, com blocos compatíveis com o Aula Studio. Cada semana pode ser baixada como `.aula.json` e todas podem ser empacotadas em um ZIP.
+
+Webpráticas são cadastradas como uma lista independente. Quando ativadas, o briefing deve ter no mínimo uma prática; a IA pode propor várias, cada uma com tipo, momento, objetivo específico, instruções, produto/evidência, avaliação e duração. A interface preserva práticas já preenchidas e só completa o conjunto quando ele estiver vazio.
+
+Materiais de apoio também são itens independentes. Cada material pode indicar tipo, título, momento de uso, link real, objetivo, alinhamento com o conteúdo e como o estudante deverá utilizá-lo. A IA deve relacionar os materiais aos objetivos, textos, conceitos e webpráticas, mas não deve inventar links, DOI ou fontes verificadas. Todo material sugerido precisa ser conferido pelo professor antes da publicação.
 
 A distribuição detalhada de horas está preparada para receber as fórmulas da planilha. Até lá, o sistema registra a carga semanal e informa que a alocação interna está pendente.
 

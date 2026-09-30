@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { calculateCourseWorkload } from "./calculations.js";
 import { buildFallbackLesson, normalizeCourseInput, normalizeWeeklyOutput, slugify, validateLesson } from "./aula-schema.js";
-import { generateWithAI } from "./ai.js";
+import { assistBriefing, generateWithAI } from "./ai.js";
 import { createWeeksZip } from "./zip.js";
 import { accessRequired, hasValidAccess } from "./access.js";
 
@@ -49,6 +49,20 @@ app.post("/api/generate", async (req, res) => {
   } catch (error) {
     const status = error.code === "AI_KEY_MISSING" ? 503 : 400;
     res.status(status).json({ ok: false, error: error.message || "Não foi possível gerar o curso." });
+  }
+});
+
+app.post("/api/assist-briefing", async (req, res) => {
+  if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
+  try {
+    const input = normalizeCourseInput(req.body?.input || {});
+    const missingFields = Array.isArray(req.body?.missingFields) ? req.body.missingFields.slice(0, 20) : [];
+    const briefing = await assistBriefing(input, missingFields);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, briefing, filledFields: missingFields });
+  } catch (error) {
+    const status = error.code === "AI_KEY_MISSING" ? 503 : 400;
+    res.status(status).json({ ok: false, error: error.message || "Não foi possível completar o briefing." });
   }
 });
 

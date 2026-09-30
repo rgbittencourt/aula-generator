@@ -4,15 +4,25 @@ import JSZip from "jszip";
 import { buildFallbackLesson, normalizeCourseInput, normalizeWeeklyOutput, weekCalendar, validateLesson } from "../src/aula-schema.js";
 import { calculateCourseWorkload, calculateWeekWorkload } from "../src/calculations.js";
 import { createWeeksZip } from "../src/zip.js";
+import { buildBriefingPrompt } from "../src/ai.js";
 
-test("normaliza briefing com calendário real e webprática", () => {
-  const input = normalizeCourseInput({ title: "Cidades sustentáveis", weeks: "3", hoursPerWeek: "2.5", calendarMode: "calendar", startDate: "2026-10-05", objectives: "Analisar\nAplicar", webPracticeEnabled: true, practiceMoments: "Semana 2" });
+test("normaliza briefing com calendário real e webpráticas independentes", () => {
+  const input = normalizeCourseInput({ title: "Cidades sustentáveis", weeks: "3", hoursPerWeek: "2.5", calendarMode: "calendar", startDate: "2026-10-05", objectives: "Analisar\nAplicar", webPracticeEnabled: true, webPractices: [{ title: "Mapa do bairro", type: "Pesquisa orientada", moments: "Semana 2", objective: "Analisar" }, { title: "Debate", type: "Debate ou seminário", moments: "Semana 3", objective: "Avaliar" }], materials: [{ title: "Texto-base", type: "Texto-base", objective: "Preparar a análise", alignment: "Mobilidade urbana" }] });
   assert.equal(input.weeks, 3);
   assert.equal(input.hoursPerWeek, 2.5);
   assert.equal(input.startDate, "2026-10-05");
   assert.deepEqual(input.objectives, ["Analisar", "Aplicar"]);
   assert.equal(input.webPractice.enabled, true);
+  assert.equal(input.webPractices.length, 2);
+  assert.equal(input.materials[0].alignment, "Mobilidade urbana");
   assert.deepEqual(weekCalendar(input, 1), { weekNumber: 2, label: "Semana 2 · 12/10/2026", startDate: "2026-10-12", endDate: "2026-10-18" });
+});
+
+test("prompt do assistente exige práticas distintas e materiais alinhados", () => {
+  const prompt = buildBriefingPrompt(normalizeCourseInput({ title: "Curso", webPracticeEnabled: true }), ["webPractices", "materials"]);
+  assert.match(prompt, /webpráticas.*distintas/i);
+  assert.match(prompt, /materiais de apoio/i);
+  assert.match(prompt, /não links inventados/i);
 });
 
 test("fallback gera uma aula válida para cada semana", () => {

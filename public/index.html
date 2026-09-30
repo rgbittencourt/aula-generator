@@ -7,6 +7,9 @@
   <title>Gerador de Aulas</title>
   <link rel="icon" href="./logo.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="./styles.css" />
+  <style>
+    .ai-assist-button{height:36px;padding:0 11px;font-size:11px;white-space:nowrap}.item-card{background:#fbfcfd;border:1px solid #dfe4ea;border-radius:11px;padding:15px;margin-bottom:12px}.item-card-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px;color:#14213d;font-size:12px}.remove-item{border:0;background:#fbe5df;color:#bf4c34;border-radius:50%;width:25px;height:25px;font-size:18px;line-height:1}.remove-item:disabled{opacity:.3;cursor:not-allowed}.add-item-button{height:38px;font-size:12px;margin-bottom:10px}.material-mark{font-size:21px;color:#e76f51}.assistant-note{margin:14px 0 0}.assistant-note.error-note{color:#8e3724;background:#fbe5df;border-radius:8px;padding:9px}.stacked-list{display:flex;flex-direction:column;gap:2px}
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -54,28 +57,29 @@
           </section>
 
           <section class="panel">
-            <div class="panel-heading"><div><span class="step">03</span><div><h2>Intenção pedagógica</h2><p>Objetivos e conteúdo-base para a geração.</p></div></div></div>
+            <div class="panel-heading"><div><span class="step">03</span><div><h2>Intenção pedagógica</h2><p>Objetivos e conteúdo-base para a geração.</p></div></div><button class="button button-secondary ai-assist-button" type="button" id="assist-button"><span>Preencher vazios com IA</span><span class="button-arrow">✦</span></button></div>
             <label class="field"><span>Objetivos de aprendizagem <b>*</b></span><textarea id="objectives" name="objectives" rows="4" placeholder="Um objetivo por linha. Ex.: Identificar os principais desafios de mobilidade urbana."></textarea><small class="hint">Escreva verbos observáveis: analisar, comparar, aplicar, criar, avaliar.</small></label>
             <label class="field"><span>Conteúdos, recortes e orientações</span><textarea id="content" name="content" rows="5" placeholder="Conceitos obrigatórios, recorte regional, abordagem desejada, exemplos que devem aparecer…"></textarea></label>
+            <p class="assistant-note hidden hint" id="assistant-note"></p>
           </section>
 
           <section class="panel">
-            <div class="panel-heading"><div><span class="step">04</span><div><h2>Webpráticas</h2><p>Atividades de pesquisa, produção ou aplicação na web.</p></div></div><label class="switch"><input id="practice-enabled" type="checkbox" /><span></span></label></div>
+            <div class="panel-heading"><div><span class="step">04</span><div><h2>Webpráticas</h2><p>Atividades independentes de pesquisa, produção ou aplicação na web.</p></div></div><label class="switch"><input id="practice-enabled" type="checkbox" /><span></span></label></div>
             <div id="practice-fields" class="practice-fields disabled">
-              <label class="field"><span>Em que momentos devem aparecer?</span><input id="practice-moments" placeholder="Ex.: semanas 2 e 4; depois do módulo de conceitos" /></label>
-              <div class="field-grid two">
-                <label class="field"><span>Duração estimada (minutos)</span><input id="practice-duration" type="number" min="0" step="5" value="45" /></label>
-                <label class="field"><span>Tipo de prática</span><select id="practice-type"><option>Pesquisa orientada</option><option>Produção colaborativa</option><option>Estudo de caso</option><option>Curadoria de referências</option></select></label>
-              </div>
-              <label class="field"><span>Instruções gerais</span><textarea id="practice-instructions" rows="3" placeholder="O que o aluno deve fazer, observar, produzir ou entregar?"></textarea></label>
+              <div id="practice-list" class="stacked-list"></div>
+              <button class="button button-secondary add-item-button" type="button" id="add-practice">+ Adicionar outra webprática</button>
+              <p class="hint">Mínimo de uma webprática quando ativadas. Cada prática pode ter objetivo, produto e avaliação diferentes.</p>
             </div>
-            <p class="disabled-note" id="practice-note">Ative para incluir webpráticas no briefing da IA.</p>
+            <p class="disabled-note" id="practice-note">Ative para incluir uma ou mais webpráticas no briefing da IA.</p>
           </section>
 
           <section class="panel">
-            <div class="panel-heading"><div><span class="step">05</span><div><h2>Materiais de apoio</h2><p>Referências e links entram como insumos, não como fontes inventadas.</p></div></div></div>
+            <div class="panel-heading"><div><span class="step">05</span><div><h2>Materiais de apoio</h2><p>A IA ajuda a alinhar cada material aos objetivos, conteúdos e momento didático.</p></div></div><span class="material-mark">✦</span></div>
+            <div id="materials-list" class="stacked-list"></div>
+            <button class="button button-secondary add-item-button" type="button" id="add-material">+ Adicionar material de apoio</button>
             <label class="field"><span>Referências, livros e documentos</span><textarea id="references" rows="4" placeholder="Uma referência ou URL por linha"></textarea></label>
             <label class="field"><span>Links de vídeos</span><textarea id="videos" rows="3" placeholder="Um link do YouTube ou outra URL por linha"></textarea></label>
+            <label class="field"><span>Termos de busca para vídeos</span><textarea id="video-search-suggestions" rows="3" placeholder="A IA pode sugerir buscas sem inventar links"></textarea><small class="hint">São termos para você pesquisar e escolher vídeos reais; a IA não inventa URLs.</small></label>
           </section>
 
           <div class="form-actions">

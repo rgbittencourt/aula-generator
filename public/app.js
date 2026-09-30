@@ -10,8 +10,93 @@ function slugify(value) { return String(value || "curso").normalize("NFD").repla
 function downloadBlob(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
 function addDays(dateString, days) { const date = new Date(`${dateString}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); }
 
+let practiceSequence = 0;
+let materialSequence = 0;
+const selectOption = (value, option) => value === option ? "selected" : "";
+
+function practiceCard(data = {}) {
+  practiceSequence += 1;
+  const id = data.id || `webpractice-${practiceSequence}`;
+  const moments = Array.isArray(data.moments) ? data.moments.join("; ") : (data.moments || "");
+  return `<article class="item-card practice-card" data-id="${escapeHtml(id)}">
+    <div class="item-card-heading"><strong>Webprática <span class="item-index">${practiceSequence}</span></strong><button class="remove-item" type="button" data-remove-practice aria-label="Remover webprática">×</button></div>
+    <div class="field-grid two">
+      <label class="field"><span>Nome da prática</span><input class="practice-title" value="${escapeHtml(data.title || "")}" placeholder="Ex.: Mapa colaborativo do território" /></label>
+      <label class="field"><span>Tipo</span><select class="practice-type"><option ${selectOption(data.type, "Pesquisa orientada")}>Pesquisa orientada</option><option ${selectOption(data.type, "Produção colaborativa")}>Produção colaborativa</option><option ${selectOption(data.type, "Estudo de caso")}>Estudo de caso</option><option ${selectOption(data.type, "Curadoria de referências")}>Curadoria de referências</option><option ${selectOption(data.type, "Debate ou seminário")}>Debate ou seminário</option><option ${selectOption(data.type, "Projeto aplicado")}>Projeto aplicado</option></select></label>
+    </div>
+    <div class="field-grid two">
+      <label class="field"><span>Momento no calendário</span><input class="practice-moments" value="${escapeHtml(moments)}" placeholder="Ex.: semana 2, após o texto-base" /></label>
+      <label class="field"><span>Duração (minutos)</span><input class="practice-duration" type="number" min="5" step="5" value="${Number(data.durationMinutes) || 45}" /></label>
+    </div>
+    <label class="field"><span>Objetivo específico</span><input class="practice-objective" value="${escapeHtml(data.objective || "")}" placeholder="O que esta prática desenvolve?" /></label>
+    <label class="field"><span>Instruções para o estudante</span><textarea class="practice-instructions" rows="3" placeholder="O que fazer, observar, produzir ou entregar?">${escapeHtml(data.instructions || "")}</textarea></label>
+    <div class="field-grid two">
+      <label class="field"><span>Produto/evidência</span><input class="practice-product" value="${escapeHtml(data.product || "")}" placeholder="Ex.: síntese, mapa, debate registrado" /></label>
+      <label class="field"><span>Como será avaliada?</span><input class="practice-assessment" value="${escapeHtml(data.assessment || "")}" placeholder="Critério ou evidência de aprendizagem" /></label>
+    </div>
+  </article>`;
+}
+
+function materialCard(data = {}) {
+  materialSequence += 1;
+  const id = data.id || `material-${materialSequence}`;
+  return `<article class="item-card material-card" data-id="${escapeHtml(id)}">
+    <div class="item-card-heading"><strong>Material <span class="item-index">${materialSequence}</span></strong><button class="remove-item" type="button" data-remove-material aria-label="Remover material">×</button></div>
+    <div class="field-grid two">
+      <label class="field"><span>Título do material</span><input class="material-title" value="${escapeHtml(data.title || "")}" placeholder="Ex.: Texto-base sobre mobilidade urbana" /></label>
+      <label class="field"><span>Tipo</span><select class="material-type"><option ${selectOption(data.type, "Texto-base")}>Texto-base</option><option ${selectOption(data.type, "Artigo científico")}>Artigo científico</option><option ${selectOption(data.type, "Livro ou capítulo")}>Livro ou capítulo</option><option ${selectOption(data.type, "Vídeo")}>Vídeo</option><option ${selectOption(data.type, "Relatório ou dados")}>Relatório ou dados</option><option ${selectOption(data.type, "Infográfico")}>Infográfico</option><option ${selectOption(data.type, "Exercício")}>Exercício</option></select></label>
+    </div>
+    <div class="field-grid two">
+      <label class="field"><span>Momento de uso</span><input class="material-moment" value="${escapeHtml(data.moment || "")}" placeholder="Ex.: antes da semana 1; revisão da semana 3" /></label>
+      <label class="field"><span>Link real (opcional)</span><input class="material-link" type="url" value="${escapeHtml(data.link || "")}" placeholder="Cole somente um link conferido" /></label>
+    </div>
+    <label class="field"><span>Objetivo do material</span><input class="material-objective" value="${escapeHtml(data.objective || "")}" placeholder="Por que o estudante precisa deste material?" /></label>
+    <label class="field"><span>Alinhamento com o conteúdo</span><textarea class="material-alignment" rows="2" placeholder="Que conceito, objetivo ou webprática ele sustenta?">${escapeHtml(data.alignment || "")}</textarea></label>
+    <label class="field"><span>Como o estudante vai usar</span><textarea class="material-use" rows="2" placeholder="Ler, comparar, assistir com roteiro, extrair dados…">${escapeHtml(data.use || "")}</textarea></label>
+  </article>`;
+}
+
+function refreshItemButtons() {
+  const practiceCards = document.querySelectorAll("#practice-list .practice-card");
+  practiceCards.forEach((card, index) => { card.querySelector(".item-index").textContent = index + 1; card.querySelector("[data-remove-practice]").disabled = practiceCards.length <= 1; });
+  const materialCards = document.querySelectorAll("#materials-list .material-card");
+  materialCards.forEach((card, index) => { card.querySelector(".item-index").textContent = index + 1; card.querySelector("[data-remove-material]").disabled = materialCards.length <= 1; });
+}
+
+function addPractice(data = {}) { $("#practice-list").insertAdjacentHTML("beforeend", practiceCard(data)); refreshItemButtons(); togglePractice(); }
+function addMaterial(data = {}) { $("#materials-list").insertAdjacentHTML("beforeend", materialCard(data)); refreshItemButtons(); }
+
+function collectPractices() {
+  return [...document.querySelectorAll("#practice-list .practice-card")].map((card, index) => ({
+    id: card.dataset.id || `webpractice-${index + 1}`,
+    title: card.querySelector(".practice-title").value.trim(),
+    type: card.querySelector(".practice-type").value,
+    moments: splitLines(card.querySelector(".practice-moments").value.replace(/;/g, "\n")),
+    objective: card.querySelector(".practice-objective").value.trim(),
+    instructions: card.querySelector(".practice-instructions").value.trim(),
+    product: card.querySelector(".practice-product").value.trim(),
+    assessment: card.querySelector(".practice-assessment").value.trim(),
+    durationMinutes: Number(card.querySelector(".practice-duration").value) || 45
+  }));
+}
+
+function collectMaterials() {
+  return [...document.querySelectorAll("#materials-list .material-card")].map((card, index) => ({
+    id: card.dataset.id || `material-${index + 1}`,
+    type: card.querySelector(".material-type").value,
+    title: card.querySelector(".material-title").value.trim(),
+    link: card.querySelector(".material-link").value.trim(),
+    moment: card.querySelector(".material-moment").value.trim(),
+    objective: card.querySelector(".material-objective").value.trim(),
+    alignment: card.querySelector(".material-alignment").value.trim(),
+    use: card.querySelector(".material-use").value.trim(),
+    notes: ""
+  }));
+}
+
 function formInput() {
   const calendarMode = $("#calendar-mode").value;
+  const webPractices = collectPractices();
   return {
     title: $("#course-title").value,
     audience: $("#audience").value,
@@ -26,13 +111,16 @@ function formInput() {
     content: $("#content").value,
     references: splitLines($("#references").value),
     videoLinks: splitLines($("#videos").value),
+    videoSearchSuggestions: splitLines($("#video-search-suggestions").value),
+    materials: collectMaterials(),
     accessCode: $("#access-code")?.value || "",
     webPracticeEnabled: $("#practice-enabled").checked,
+    webPractices,
     webPractice: {
       enabled: $("#practice-enabled").checked,
-      moments: splitLines($("#practice-moments").value),
-      instructions: `${$("#practice-type").value}. ${$("#practice-instructions").value}`.trim(),
-      durationMinutes: Number($("#practice-duration").value) || 0
+      moments: webPractices.flatMap((practice) => practice.moments),
+      instructions: webPractices.map((practice) => `${practice.title}: ${practice.instructions}`).filter(Boolean).join("\n"),
+      durationMinutes: webPractices.reduce((sum, practice) => sum + practice.durationMinutes, 0)
     }
   };
 }
@@ -46,7 +134,8 @@ function updateSummary() {
   $("#summary-hours").textContent = `${hours} h`;
   $("#summary-total").textContent = `${hours * weeks} h`;
   $("#summary-calendar").textContent = calendar === "calendar" ? (formatDate($("#start-date").value) || "Data pendente") : "Por numeração";
-  $("#summary-practice").textContent = $("#practice-enabled").checked ? "Sim" : "Não";
+  const practiceCount = collectPractices().filter((practice) => practice.title || practice.objective || practice.instructions).length;
+  $("#summary-practice").textContent = $("#practice-enabled").checked ? `Sim · ${practiceCount || 1}` : "Não";
   $("#workload-preview strong").textContent = `${hours * weeks} horas totais`;
 }
 
@@ -61,7 +150,7 @@ function togglePractice() {
   const enabled = $("#practice-enabled").checked;
   $("#practice-fields").classList.toggle("disabled", !enabled);
   $("#practice-note").classList.toggle("hidden", enabled);
-  document.querySelectorAll("#practice-fields input, #practice-fields textarea, #practice-fields select").forEach((item) => { item.disabled = !enabled; });
+  document.querySelectorAll("#practice-fields input, #practice-fields textarea, #practice-fields select, #practice-fields button").forEach((item) => { item.disabled = !enabled; });
   updateSummary();
 }
 
@@ -77,6 +166,71 @@ function showError(message) {
   alert.className = "result-alert error-alert";
   alert.classList.remove("hidden");
   $("#results-section").classList.remove("hidden");
+}
+
+function showAssistantMessage(message, error = false) {
+  const note = $("#assistant-note");
+  note.textContent = message;
+  note.classList.toggle("error-note", error);
+  note.classList.remove("hidden");
+}
+
+function briefingMissingFields(input) {
+  const missing = [];
+  const meaningfulPractices = input.webPractices.filter((practice) => practice.title || practice.objective || practice.instructions);
+  const meaningfulMaterials = input.materials.filter((material) => material.title || material.objective || material.alignment || material.link);
+  if (!input.audience.trim()) missing.push("audience");
+  if (!input.objectives.length) missing.push("objectives");
+  if (!input.content.trim()) missing.push("content");
+  if (input.webPractice.enabled && !meaningfulPractices.length) missing.push("webPractices");
+  if (!input.references.length) missing.push("references");
+  if (!meaningfulMaterials.length) missing.push("materials");
+  if (!input.videoSearchSuggestions.length) missing.push("videoSearchSuggestions");
+  return missing;
+}
+
+async function assistBriefing() {
+  if (isGitHubPages) { showAssistantMessage("O preenchimento por IA fica disponível na versão Vercel protegida.", true); return; }
+  const input = formInput();
+  const accessCode = input.accessCode;
+  delete input.accessCode;
+  if (!input.title.trim()) { showAssistantMessage("Informe primeiro o tema geral ou título do curso.", true); $("#course-title").focus(); return; }
+  const missingFields = briefingMissingFields(input);
+  if (!missingFields.length) { showAssistantMessage("Não há campos vazios prioritários. Você pode revisar o briefing ou gerar as aulas."); return; }
+  const button = $("#assist-button");
+  button.dataset.label = "Preencher vazios com IA";
+  setBusy(button, true, "Preenchendo…");
+  showAssistantMessage("A IA está analisando o tema e preparando sugestões pedagógicas…");
+  try {
+    const headers = { "Content-Type": "application/json" };
+    if (accessCode) headers["x-aula-access-code"] = accessCode;
+    const response = await fetch("/api/assist-briefing", { method: "POST", headers, body: JSON.stringify({ input, missingFields }) });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Não foi possível preencher o briefing.");
+    const briefing = data.briefing || {};
+    const filled = [];
+    if (!$("#audience").value.trim() && briefing.audience) { $("#audience").value = briefing.audience; filled.push("público"); }
+    if (!$("#objectives").value.trim() && Array.isArray(briefing.objectives) && briefing.objectives.length) { $("#objectives").value = briefing.objectives.join("\n"); filled.push("objetivos"); }
+    if (!$("#content").value.trim() && briefing.content) { $("#content").value = briefing.content; filled.push("conteúdos"); }
+    if ($("#practice-enabled").checked && Array.isArray(briefing.webPractices) && briefing.webPractices.length && !collectPractices().some((practice) => practice.title || practice.objective || practice.instructions)) {
+      $("#practice-list").innerHTML = "";
+      practiceSequence = 0;
+      briefing.webPractices.forEach((practice) => addPractice(practice));
+      filled.push(`${briefing.webPractices.length} webprática(s) distintas`);
+    }
+    if (Array.isArray(briefing.materials) && briefing.materials.length && !collectMaterials().some((material) => material.title || material.objective || material.alignment || material.link)) {
+      $("#materials-list").innerHTML = "";
+      materialSequence = 0;
+      briefing.materials.forEach((material) => addMaterial(material));
+      filled.push(`${briefing.materials.length} materiais alinhados`);
+    }
+    if (!$("#references").value.trim() && Array.isArray(briefing.references) && briefing.references.length) { $("#references").value = briefing.references.map((item) => `[Sugestão para conferir] ${item}`).join("\n"); filled.push("referências sugeridas"); }
+    if (!$("#video-search-suggestions").value.trim() && Array.isArray(briefing.videoSearchSuggestions) && briefing.videoSearchSuggestions.length) { $("#video-search-suggestions").value = briefing.videoSearchSuggestions.join("\n"); filled.push("buscas de vídeos"); }
+    updateSummary();
+    const note = briefing.notes?.length ? ` Observações: ${briefing.notes.join(" ")}` : "";
+    showAssistantMessage(filled.length ? `Campos preenchidos: ${filled.join(", ")}. Revise as sugestões antes de gerar as aulas.${note}` : "A IA não encontrou campos vazios que pudesse completar com segurança.");
+  } catch (error) { showAssistantMessage(error.message, true); }
+  finally { setBusy(button, false, ""); }
 }
 
 function weekCalendar(input, index) {
@@ -100,12 +254,20 @@ function fallbackLesson(input, index) {
       { id: id("c-prose-", 4), type: "prose", props: { body: `<p>${escapeHtml(content)}</p>`, dropcap: false, dropcapTone: "terracotta" } }
     ] } }
   ];
-  if (input.webPractice.enabled) blocks.push({ id: id("b-practice-", 5), type: "destaque", bg: "neutral-default", pad: "tight", props: { title: "Webprática", body: `<p>${escapeHtml(input.webPractice.instructions || "Aplique o conteúdo em uma atividade orientada na web.")}</p>`, tone: "ocean", icon: "" } });
+  const practices = input.webPractices?.filter((practice) => practice.title || practice.objective || practice.instructions) || [];
+  practices.forEach((practice, practiceIndex) => {
+    const details = [practice.objective, practice.instructions, practice.product].filter(Boolean).join(" ") || "Aplique o conteúdo em uma atividade orientada na web.";
+    blocks.push({ id: id("b-practice-", 5 + practiceIndex), type: "destaque", bg: "neutral-default", pad: "tight", props: { title: practice.title || `Webprática ${practiceIndex + 1}`, body: `<p>${escapeHtml(details)}</p>`, tone: "ocean", icon: "" } });
+  });
   if (input.videoLinks.length) {
     const match = input.videoLinks[0].match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&#/]+)/i);
     if (match) blocks.push({ id: id("b-video-", 6), type: "video", bg: "neutral-default", pad: "normal", props: { id: match[1], title: "Vídeo recomendado", caption: "Material complementar.", credit: "", start: "" } });
   }
-  if (input.references.length) blocks.push({ id: id("b-materials-", 7), type: "materiais", bg: "neutral-default", pad: "normal", props: { title: "Referências e materiais", items: input.references.map((href, i) => ({ type: "artigo", title: `Referência ${i + 1}`, source: "Material indicado", href })) } });
+  const materialItems = [
+    ...(input.materials || []).filter((material) => material.title || material.objective || material.alignment || material.link || material.use).map((material) => ({ type: material.type, title: material.title || "Material de apoio", source: material.alignment || material.objective || material.use, href: material.link })),
+    ...input.references.map((href, i) => ({ type: "artigo", title: `Referência ${i + 1}`, source: "Material indicado", href }))
+  ].filter((item) => item.title || item.href);
+  if (materialItems.length) blocks.push({ id: id("b-materials-", 20), type: "materiais", bg: "neutral-default", pad: "normal", props: { title: "Materiais de apoio", items: materialItems } });
   return { meta: { title: `${input.title} — ${calendar.label}`, courseTitle: input.title, weekNumber: week, weekLabel: calendar.label, calendarStartDate: calendar.startDate, calendarEndDate: calendar.endDate, studyHours: input.hoursPerWeek, author: input.author, role: "", institution: input.institution, year: new Date().getFullYear().toString(), aiTool: "", aiUse: "", license: "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br" }, blocks };
 }
 
@@ -199,6 +361,8 @@ async function loadHealth() {
   if (isGitHubPages) {
     status.innerHTML = '<span class="status-dot warning"></span>modo público · sem IA';
     document.querySelectorAll(".vercel-access").forEach((item) => item.classList.add("hidden"));
+    $("#assist-button").disabled = true;
+    $("#assist-button").querySelector("span:first-child").textContent = "IA indisponível nesta URL";
     $("#generate-button").disabled = true;
     $("#generate-button").querySelector("span:first-child").textContent = "IA indisponível nesta URL";
     return;
@@ -206,15 +370,41 @@ async function loadHealth() {
   try {
     const data = await (await fetch("/api/health")).json();
     status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · código necessário" : "IA configurada") : "modo exemplo · chave pendente"}`;
+    if (!data.aiConfigured) {
+      $("#assist-button").disabled = true;
+      $("#assist-button").querySelector("span:first-child").textContent = "IA pendente";
+      $("#generate-button").disabled = true;
+      $("#generate-button").querySelector("span:first-child").textContent = "IA pendente";
+    }
   } catch { status.innerHTML = '<span class="status-dot offline"></span>servidor indisponível'; }
 }
 
+$("#add-practice").addEventListener("click", () => addPractice());
+$("#add-material").addEventListener("click", () => addMaterial());
+$("#practice-list").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-remove-practice]");
+  if (!button) return;
+  button.closest(".practice-card").remove();
+  if (!document.querySelector("#practice-list .practice-card")) addPractice();
+  refreshItemButtons(); togglePractice(); updateSummary();
+});
+$("#materials-list").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-remove-material]");
+  if (!button) return;
+  button.closest(".material-card").remove();
+  if (!document.querySelector("#materials-list .material-card")) addMaterial();
+  refreshItemButtons(); updateSummary();
+});
+addPractice();
+addMaterial();
 $("#course-form").addEventListener("submit", (event) => { event.preventDefault(); generate(false); });
 $("#fallback-button").addEventListener("click", () => generate(true));
+$("#assist-button").addEventListener("click", assistBriefing);
 $("#zip-button").addEventListener("click", downloadZip);
 $("#calendar-mode").addEventListener("change", toggleCalendar);
 $("#practice-enabled").addEventListener("change", togglePractice);
 document.querySelectorAll("#course-form input, #course-form textarea, #course-form select").forEach((field) => field.addEventListener("input", updateSummary));
 $("#generate-button").dataset.label = "Gerar com IA";
 $("#fallback-button").dataset.label = "Gerar exemplo local";
+$("#assist-button").dataset.label = "Preencher vazios com IA";
 toggleCalendar(); togglePractice(); updateSummary(); loadHealth();
