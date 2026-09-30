@@ -296,6 +296,7 @@ export function normalizeCourseInput(raw = {}) {
     references: splitLines(raw.references),
     videoLinks: splitLines(raw.videoLinks),
     videoSearchSuggestions: splitLines(raw.videoSearchSuggestions),
+    imageLinks: splitLines(raw.imageLinks),
     imageSearchSuggestions: splitLines(raw.imageSearchSuggestions),
     materials,
     weeks, hoursPerWeek, calendarMode,
@@ -352,6 +353,7 @@ function youtubeId(value) { const match = text(value).match(/(?:youtu\.be\/|yout
 function fallbackLessonPlan(input, index) {
   const videos = input.videoLinks.map((href, i) => normalizeResource({ id: `video-${i + 1}`, type: "video", title: `Vídeo fornecido ${i + 1}`, href, required: false, verificationStatus: "provided-needs-review" }, i, "video"));
   const suggestions = input.videoSearchSuggestions.map((searchQuery, i) => normalizeResource({ id: `video-search-${i + 1}`, type: "video", title: `Busca de vídeo ${i + 1}`, searchQuery, verificationStatus: "suggested-no-url", requiresVerification: true }, i, "video"));
+  const imageLinks = input.imageLinks.map((href, i) => normalizeResource({ id: `image-${i + 1}`, type: "image", title: `Imagem fornecida ${i + 1}`, href, required: false, verificationStatus: "provided-needs-review", requiresVerification: true }, i, "image"));
   const suppliedMaterials = input.materials.map((material) => ({ ...material, required: Boolean(material.required) }));
   return normalizeLessonPlan({
     weekNumber: index + 1,
@@ -359,7 +361,7 @@ function fallbackLessonPlan(input, index) {
     welcome: `Nesta semana, você vai relacionar ${input.title} a situações concretas e construir uma compreensão progressiva do tema.`,
     learningObjectives: input.objectives,
     contentSections: [{ number: "1", title: "Conteúdo da semana", body: input.content || `Estude os conceitos centrais de ${input.title} e relacione-os a exemplos práticos.`, subsections: [], reflection: { question: "Que problema real do seu contexto pode ser melhor compreendido com este tema?" }, resources: [] }],
-    resources: { videos: [...videos, ...suggestions], readingsRequired: [], readingsExtra: suppliedMaterials.map((item) => normalizeResource(item, 0, "reading-extra")), images: [], podcasts: [], datasets: [] },
+    resources: { videos: [...videos, ...suggestions], readingsRequired: [], readingsExtra: suppliedMaterials.map((item) => normalizeResource(item, 0, "reading-extra")), images: imageLinks, podcasts: [], datasets: [] },
     webPractices: input.webPractices,
     synthesis: "Retome os conceitos centrais, conecte-os aos exemplos e registre uma aplicação possível no seu contexto.",
     references: input.references,

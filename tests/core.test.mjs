@@ -8,7 +8,7 @@ import { createWeeksZip } from "../src/zip.js";
 import { buildBriefingPrompt, buildWeekGenerationPrompt } from "../src/ai.js";
 
 test("normaliza briefing com calendário real e webpráticas independentes", () => {
-  const input = normalizeCourseInput({ title: "Cidades sustentáveis", weeks: "3", hoursPerWeek: "2.5", calendarMode: "calendar", startDate: "2026-10-05", objectives: "Analisar\nAplicar", webPracticeEnabled: true, webPractices: [{ title: "Mapa do bairro", type: "Pesquisa orientada", moments: "Semana 2", objective: "Analisar" }, { title: "Debate", type: "Debate ou seminário", moments: "Semana 3", objective: "Avaliar" }], materials: [{ title: "Texto-base", type: "Texto-base", objective: "Preparar a análise", alignment: "Mobilidade urbana" }] });
+  const input = normalizeCourseInput({ title: "Cidades sustentáveis", weeks: "3", hoursPerWeek: "2.5", calendarMode: "calendar", startDate: "2026-10-05", objectives: "Analisar\nAplicar", imageLinks: "https://example.org/mapa.png", webPracticeEnabled: true, webPractices: [{ title: "Mapa do bairro", type: "Pesquisa orientada", moments: "Semana 2", objective: "Analisar" }, { title: "Debate", type: "Debate ou seminário", moments: "Semana 3", objective: "Avaliar" }], materials: [{ title: "Texto-base", type: "Texto-base", objective: "Preparar a análise", alignment: "Mobilidade urbana" }] });
   assert.equal(input.weeks, 3);
   assert.equal(input.hoursPerWeek, 2.5);
   assert.equal(input.startDate, "2026-10-05");
@@ -16,6 +16,7 @@ test("normaliza briefing com calendário real e webpráticas independentes", () 
   assert.equal(input.webPractice.enabled, true);
   assert.equal(input.webPractices.length, 2);
   assert.equal(input.materials[0].alignment, "Mobilidade urbana");
+  assert.deepEqual(input.imageLinks, ["https://example.org/mapa.png"]);
   assert.deepEqual(weekCalendar(input, 1), { weekNumber: 2, label: "Semana 2 · 12/10/2026", startDate: "2026-10-12", endDate: "2026-10-18" });
 });
 

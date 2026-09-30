@@ -112,6 +112,7 @@ function formInput() {
     references: splitLines($("#references").value),
     videoLinks: splitLines($("#videos").value),
     videoSearchSuggestions: splitLines($("#video-search-suggestions").value),
+    imageLinks: splitLines($("#image-links").value),
     imageSearchSuggestions: splitLines($("#image-search-suggestions").value),
     materials: collectMaterials(),
     accessCode: $("#access-code")?.value || "",

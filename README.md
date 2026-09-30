@@ -71,7 +71,7 @@ O fluxo tem duas etapas:
 
 Webpráticas são cadastradas como uma lista independente. Quando ativadas, o briefing deve ter no mínimo uma prática; a IA pode propor várias, cada uma com tipo, momento, objetivo específico, instruções, produto/evidência, avaliação e duração. A interface preserva práticas já preenchidas e só completa o conjunto quando ele estiver vazio.
 
-Materiais de apoio também são itens independentes. Cada material pode indicar tipo, título, momento de uso, link real, objetivo, alinhamento com o conteúdo e como o estudante deverá utilizá-lo. A IA deve relacionar os materiais aos objetivos, textos, conceitos e webpráticas, mas não deve inventar links, DOI ou fontes verificadas. Todo material sugerido precisa ser conferido pelo professor antes da publicação.
+Materiais de apoio também são itens independentes. Cada material pode indicar tipo, título, momento de uso, link real, objetivo, alinhamento com o conteúdo e como o estudante deverá utilizá-lo. O formulário aceita links reais de vídeos e imagens, além de termos de busca para recursos que ainda serão escolhidos. A IA deve relacionar os materiais aos objetivos, textos, conceitos e webpráticas, mas não deve inventar links, DOI ou fontes verificadas. Todo material sugerido precisa ser conferido pelo professor antes da publicação.
 
 A distribuição detalhada de horas usa o perfil importado das abas **Aplicativo** e **Material** da planilha compartilhada. O cálculo acontece depois que a semana é escrita: conteúdo digital usa palavras, leituras usam páginas/palavras e o tipo científico/popular, vídeos usam duração conferida, fóruns usam a regra de 2 horas por post e avaliações/práticas entram como itens próprios. Recursos sem dados suficientes ficam sinalizados para revisão.
 
