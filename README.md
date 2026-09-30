@@ -67,13 +67,33 @@ Depois de alterar `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` ou `AULA_A
 O fluxo tem duas etapas:
 
 1. **Preencher vazios com IA:** usa o tema, calendário, carga horária e informações já fornecidas para completar apenas os campos vazios do briefing. Sugere público, objetivos observáveis, conteúdos, referências para conferir e termos de busca de vídeos sem inventar URLs.
-2. **Gerar com IA:** transforma o briefing revisado em uma semana por objeto, com blocos compatíveis com o Aula Studio. Cada semana pode ser baixada como `.aula.json` e todas podem ser empacotadas em um ZIP.
+2. **Gerar com IA:** transforma o briefing revisado em uma semana por objeto, com blocos compatíveis com o Aula Studio. Depois de escrever cada semana, o backend pesquisa candidatos reais de vídeo, imagem/diagrama e leitura, pede à IA para selecionar os mais adequados e insere os recursos nos blocos editáveis. Cada semana pode ser baixada como `.aula.json` e todas podem ser empacotadas em um ZIP.
 
 Webpráticas são cadastradas como uma lista independente. Quando ativadas, o briefing deve ter no mínimo uma prática; a IA pode propor várias, cada uma com tipo, momento, objetivo específico, instruções, produto/evidência, avaliação e duração. A interface preserva práticas já preenchidas e só completa o conjunto quando ele estiver vazio.
 
 Materiais de apoio também são itens independentes. Cada material pode indicar tipo, título, momento de uso, link real, objetivo, alinhamento com o conteúdo e como o estudante deverá utilizá-lo. O formulário aceita links reais de vídeos e imagens, além de termos de busca para recursos que ainda serão escolhidos. A IA deve relacionar os materiais aos objetivos, textos, conceitos e webpráticas, mas não deve inventar links, DOI ou fontes verificadas. Todo material sugerido precisa ser conferido pelo professor antes da publicação.
 
 A distribuição detalhada de horas usa o perfil importado das abas **Aplicativo** e **Material** da planilha compartilhada. O cálculo acontece depois que a semana é escrita: conteúdo digital usa palavras, leituras usam páginas/palavras e o tipo científico/popular, vídeos usam duração conferida, fóruns usam a regra de 2 horas por post e avaliações/práticas entram como itens próprios. Recursos sem dados suficientes ficam sinalizados para revisão.
+
+## Pesquisa automática de recursos
+
+Após a geração textual, o sistema consulta **YouTube Data API v3** para vídeos, **Wikimedia Commons** para imagens e diagramas com metadados de crédito/licença e **Crossref** para referências acadêmicas. A IA não inventa URLs: ela recebe candidatos retornados pelos provedores, escolhe os que têm relação com a semana e grava a justificativa pedagógica, fonte, URL, duração e licença quando disponíveis. As alternativas permanecem no campo `lessonPlan.resourceResearch` para revisão.
+
+### Configurar a pesquisa de vídeos na Vercel
+
+1. Abra <https://console.cloud.google.com/> com a conta Google que administrará o projeto.
+2. Crie ou selecione um projeto, por exemplo `Aula Generator Resources`.
+3. Abra **APIs e serviços → Biblioteca**, procure **YouTube Data API v3** e clique em **Ativar**.
+4. Abra **APIs e serviços → Credenciais → Criar credenciais → Chave de API**.
+5. Copie a chave. Não a coloque no GitHub, no README ou nesta conversa.
+6. Na Vercel, abra **aula-generator → Settings → Environment Variables → Add Environment Variable**.
+7. Cadastre a chave com o nome `YOUTUBE_API_KEY`, tipo **Secret**, ambiente **Production**. Se quiser testar Deployments Preview, marque também Preview.
+8. Confirme, abra **Deployments**, escolha a implantação mais recente e faça **Redeploy**.
+9. Reabra a aplicação. O indicador poderá continuar mostrando o código de acesso, mas `/api/health` deverá informar `youtubeConfigured: true`.
+
+Sem `YOUTUBE_API_KEY`, a pesquisa de imagens/diagramas e leituras continua disponível, mas os vídeos ficam registrados como pendentes e não são inventados. `AULA_RESOURCE_RESEARCH=false` desativa todo o enriquecimento apenas para diagnóstico.
+
+Cada recurso selecionado vira um bloco compatível com a formatação do Aula Studio: `video`, `imagem` ou `materiais`. Isso permite abrir a aula e **editar o texto, trocar/remover uma imagem ou vídeo, inserir outro bloco e reorganizar a leitura** sem transformar a aula em HTML achatado.
 
 ## Uso local com IA
 

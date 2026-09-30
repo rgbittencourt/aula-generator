@@ -404,7 +404,7 @@ async function loadHealth() {
   }
   try {
     const data = await (await fetch("/api/health")).json();
-    status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · código necessário" : "IA configurada") : "modo exemplo · chave pendente"}`;
+    status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · código necessário" : "IA configurada") : "modo exemplo · chave pendente"}${data.aiConfigured && data.resourceResearch && !data.youtubeConfigured ? " · vídeos aguardando chave" : ""}`;
     if (!data.aiConfigured) {
       $("#assist-button").disabled = true;
       $("#assist-button").querySelector("span:first-child").textContent = "IA pendente";

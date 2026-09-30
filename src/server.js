@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "./calculations.js";
 import { buildFallbackLesson, normalizeCourseInput, normalizeWeeklyOutput, slugify, validateLesson } from "./aula-schema.js";
 import { assistBriefing, generateWithAI } from "./ai.js";
+import { enrichLessonsWithResources } from "./research.js";
 import { createWeeksZip } from "./zip.js";
 import { accessRequired, hasValidAccess } from "./access.js";
 
@@ -20,9 +21,11 @@ app.use(express.static(publicDir, { etag: true }));
 app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
-    aiConfigured: Boolean(process.env.OPENAI_API_KEY),
-    accessRequired: accessRequired(),
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      aiConfigured: Boolean(process.env.OPENAI_API_KEY),
+      accessRequired: accessRequired(),
+      resourceResearch: process.env.AULA_RESOURCE_RESEARCH !== "false",
+      youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     output: ".aula.json por semana + ZIP"
   });
 });
@@ -36,8 +39,9 @@ app.post("/api/generate", async (req, res) => {
       ? Array.from({ length: input.weeks }, (_, index) => buildFallbackLesson(input, index))
       : await generateWithAI(input);
     const normalizedWeeks = normalizeWeeklyOutput({ weeks }, input);
-    const workload = calculateCourseWorkload(input, input.formulaConfig, normalizedWeeks);
-    const enrichedWeeks = attachWorkloadToLessons(normalizedWeeks, workload);
+    const researchedWeeks = useFallback ? normalizedWeeks : await enrichLessonsWithResources(input, normalizedWeeks);
+    const workload = calculateCourseWorkload(input, input.formulaConfig, researchedWeeks);
+    const enrichedWeeks = attachWorkloadToLessons(researchedWeeks, workload);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks);
     res.json({
       ok: true,

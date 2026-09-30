@@ -45,14 +45,17 @@ test("normaliza aula rica sem perder recursos, avaliação e metadados", () => {
       welcome: "Uma abertura contextualizada.",
       learningObjectives: ["Analisar indicadores"],
       contentSections: [{ number: "1", title: "Base conceitual", body: "Texto desenvolvido", reflection: { question: "O que muda no seu contexto?" }, resources: [{ type: "artigo", title: "Leitura extra", searchQuery: "indicadores educação artigo", required: false }] }],
-      resources: { videos: [{ title: "Vídeo conferido", href: "https://youtu.be/abc123", verificationStatus: "provided-needs-review" }], images: [{ title: "Diagrama sugerido", searchQuery: "diagrama learning analytics", altText: "Diagrama do fluxo" }] },
+      resources: { videos: [{ title: "Vídeo conferido", href: "https://youtu.be/abc123", verificationStatus: "provided-needs-review" }], images: [{ title: "Diagrama selecionado", href: "https://upload.wikimedia.org/example.png", provider: "wikimedia-commons", sourcePage: "https://commons.wikimedia.org/wiki/File:Example.png", license: "CC BY-SA", altText: "Diagrama do fluxo" }] },
+      resourceResearch: { status: "ai-selected", alternatives: [{ candidateId: "commons:1" }] },
       assessment: { questions: [{ q: "O que é um indicador?", options: ["A", "B", "C", "D"], answer: 1, explanation: "Explicação." }] }
     },
     blocks: [{ type: "hero", props: { eyebrow: "Semana 1", title: "Indicadores", lead: "Começo" } }]
   }, input, 0);
   assert.equal(lesson.lessonPlan.contentSections[0].reflection.question, "O que muda no seu contexto?");
   assert.equal(lesson.lessonPlan.resources.videos[0].href, "https://youtu.be/abc123");
-  assert.equal(lesson.lessonPlan.resources.images[0].requiresVerification, true);
+  assert.equal(lesson.lessonPlan.resources.images[0].provider, "wikimedia-commons");
+  assert.equal(lesson.lessonPlan.resources.images[0].sourcePage, "https://commons.wikimedia.org/wiki/File:Example.png");
+  assert.equal(lesson.lessonPlan.resourceResearch.status, "ai-selected");
   assert.equal(lesson.lessonPlan.assessment.questions.length, 1);
   assert.equal(validateLesson(lesson), true);
 });

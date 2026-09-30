@@ -120,6 +120,44 @@ export async function assistBriefing(input, missingFields = []) {
   };
 }
 
+export async function selectResourcesWithAI(input, research) {
+  const candidates = {
+    videos: (research.videos || []).map((result) => ({ request: result.request, status: result.status, candidates: (result.candidates || []).slice(0, 5) })),
+    images: (research.images || []).map((result) => ({ request: result.request, status: result.status, candidates: (result.candidates || []).slice(0, 5) })),
+    readings: (research.readings || []).map((result) => ({ request: result.request, status: result.status, candidates: (result.candidates || []).slice(0, 5) }))
+  };
+  const prompt = `Você é o curador final de recursos educacionais. A semana já foi escrita por um designer instrucional. Agora escolha, entre os candidatos reais abaixo, os recursos que melhor aprofundam os objetivos e os conceitos da semana.
+
+Responda somente JSON válido com estas propriedades: videos, images, readings. Cada propriedade deve ser um array de objetos com candidateId, keep, reason, use, guidingQuestion, required, moment e query.
+
+Regras obrigatórias:
+- só escolha candidateId que exista nos candidatos recebidos;
+- nunca invente URL, título, autor, duração, licença ou DOI;
+- prefira material em ${input.language || "pt-BR"}, fonte institucional/acadêmica e recurso acessível;
+- escolha no máximo 2 vídeos, 3 imagens/diagramas e 3 leituras por semana;
+- elimine duplicatas e descarte recursos que não tenham relação clara com o conteúdo;
+- explique em reason por que o recurso foi escolhido e em use como ele será usado pedagogicamente;
+- marque required true somente quando o recurso for necessário para atingir um objetivo;
+- se nenhum candidato servir, retorne keep false para aquele pedido.
+
+Curso e briefing:
+${JSON.stringify({ title: input.title, audience: input.audience, level: input.level, objectives: input.objectives, content: input.content }, null, 2)}
+
+Candidatos reais localizados pelos provedores:
+${JSON.stringify(candidates, null, 2)}
+
+Retorne somente o JSON. Não escreva explicações fora dele.`;
+  const raw = await callJson([
+    { role: "system", content: "Você seleciona recursos reais. Nunca crie links ou dados bibliográficos." },
+    { role: "user", content: prompt }
+  ]);
+  return {
+    videos: Array.isArray(raw?.videos) ? raw.videos : [],
+    images: Array.isArray(raw?.images) ? raw.images : [],
+    readings: Array.isArray(raw?.readings) ? raw.readings : []
+  };
+}
+
 const BLOCK_TYPES = [...KNOWN_BLOCK_TYPES].join(", ");
 
 export function buildWeekGenerationPrompt(input, weekIndex = 0) {
@@ -143,7 +181,7 @@ lessonPlan deve conter:
 
 A avaliação semanal deve normalmente ter 6 questões objetivas: 4 de múltipla escolha com 4 alternativas e 2 de verdadeiro/falso, sempre alinhadas aos objetivos e com gabarito, explicação e versão Moodle GIFT quando possível.
 
-blocks deve transformar o lessonPlan em uma leitura editável no Aula Studio e usar somente estes tipos: ${BLOCK_TYPES}. Use hero para a abertura; topic com titulo/prose para seções; destaque, atencao e reflexao para caixas; video apenas com IDs reais do YouTube fornecidos; imagem apenas com src real fornecido ou sem src acompanhado de legenda, altText e crédito; materiais para links e leituras; quiz para a avaliação; sintese, referencias e outros blocos estruturais quando fizer sentido. Um topic deve colocar os blocos internos em props.children. Um quiz deve usar props.questions com q, options, answer e explanation.
+blocks deve transformar o lessonPlan em uma leitura editável no Aula Studio e usar somente estes tipos: ${BLOCK_TYPES}. Respeite a anatomia exata do registro: hero com eyebrow/title/lead; topic com props.children; titulo com text/level; prose com body HTML; destaque/atencao/reflexao com suas props próprias; video com id/title/caption/credit/start; imagem com src/slotId/caption/credit/ratio; materiais com title/items[{type,title,source,href}]; quiz com title/intro/avaliativo/passMark/questions; sintese com eyebrow/title/body; referencias com title/items[{html}]. Na primeira etapa, use searchQuery para recursos sem URL; depois da redação o servidor pesquisará candidatos reais, a IA os selecionará e os converterá em blocos de mídia e materiais. Não coloque formatos inventados nem props de outro bloco. Um quiz deve usar props.questions com q, options, answer e explanation.
 
 Regras de conteúdo e fontes:
 - escreva em ${input.language}, com linguagem humana, clara, específica e pedagogicamente provocadora;

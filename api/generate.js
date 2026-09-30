@@ -2,6 +2,7 @@ import { accessRequired, hasValidAccess } from "../src/access.js";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "../src/calculations.js";
 import { buildFallbackLesson, normalizeCourseInput, normalizeWeeklyOutput, slugify } from "../src/aula-schema.js";
 import { generateWithAI } from "../src/ai.js";
+import { enrichLessonsWithResources } from "../src/research.js";
 
 export default async function handler(request, response) {
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
@@ -11,8 +12,9 @@ export default async function handler(request, response) {
     const useFallback = Boolean(request.body?.fallback);
     const weeks = useFallback ? Array.from({ length: input.weeks }, (_, index) => buildFallbackLesson(input, index)) : await generateWithAI(input);
     const normalizedWeeks = normalizeWeeklyOutput({ weeks }, input);
-    const workload = calculateCourseWorkload(input, input.formulaConfig, normalizedWeeks);
-    const enrichedWeeks = attachWorkloadToLessons(normalizedWeeks, workload);
+    const researchedWeeks = useFallback ? normalizedWeeks : await enrichLessonsWithResources(input, normalizedWeeks);
+    const workload = calculateCourseWorkload(input, input.formulaConfig, researchedWeeks);
+    const enrichedWeeks = attachWorkloadToLessons(researchedWeeks, workload);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks);
     response.setHeader("Cache-Control", "no-store");
     return response.status(200).json({ ok: true, provider: useFallback ? "fallback" : "ai", model: useFallback ? null : (process.env.OPENAI_MODEL || "gpt-4o-mini"), input, workload, generalPlan, weeks: enrichedWeeks, filePrefix: slugify(input.title, "curso") });

@@ -50,11 +50,21 @@ function normalizeResource(value = {}, index = 0, defaultKind = "material") {
     guidingQuestion: text(resource.guidingQuestion || resource.question),
     durationMinutes: Math.max(0, number(resource.durationMinutes || resource.duration, 0)),
     pages: text(resource.pages),
+    wordCount: Math.max(0, number(resource.wordCount || resource.words, 0)),
+    year: text(resource.year),
     altText: text(resource.altText || resource.alt),
     caption: text(resource.caption),
     credit: text(resource.credit),
     license: text(resource.license),
+    licenseUrl: text(resource.licenseUrl),
+    sourcePage: text(resource.sourcePage),
+    provider: text(resource.provider),
+    thumbnail: text(resource.thumbnail),
     searchQuery: text(resource.searchQuery || resource.query),
+    candidateId: text(resource.candidateId),
+    researchRequestId: text(resource.researchRequestId),
+    selectionReason: text(resource.selectionReason),
+    pedagogicalUse: text(resource.pedagogicalUse),
     verificationStatus,
     requiresVerification: bool(resource.requiresVerification, !href || verificationStatus !== "verified"),
     notes: text(resource.notes)
@@ -270,6 +280,7 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
     glossary: normalizeGlossary(plan.glossary),
     references: splitLines(plan.references || input.references),
     assessment: normalizeAssessment(plan.assessment),
+    resourceResearch: object(plan.resourceResearch),
     timePlan: normalizeTimePlan(plan.timePlan),
     humanReview: bool(plan.humanReview ?? plan.requiresHumanReview, true),
     notes: splitLines(plan.notes)
@@ -384,6 +395,7 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
   });
   blocks.push({ id: newId("b-topic-", week, 1), type: "topic", bg: "neutral-default", pad: "normal", props: { children } });
   plan.resources.videos.filter((resource) => youtubeId(resource.href)).slice(0, 3).forEach((resource, resourceIndex) => blocks.push({ id: newId("b-video-", week, resourceIndex), type: "video", bg: "neutral-default", pad: "normal", props: { id: youtubeId(resource.href), title: resource.title, caption: resource.objective || "Vídeo complementar.", credit: resource.source || "", start: "" } }));
+  plan.resources.images.filter((resource) => resource.href).slice(0, 4).forEach((resource, resourceIndex) => blocks.push({ id: newId("b-image-", week, resourceIndex), type: "imagem", bg: "neutral-default", pad: "normal", props: { src: resource.href, slotId: "", caption: resource.caption || resource.title, credit: resource.credit || resource.source || "", ratio: "16/9" } }));
   const materials = [...plan.resources.readingsRequired, ...plan.resources.readingsExtra, ...plan.resources.podcasts, ...plan.resources.datasets].filter((item) => item.title || item.href).map((item) => ({ type: item.kind, title: `${item.required ? "Leitura obrigatória: " : "Material extra: "}${item.title}`, source: item.source || item.objective, href: item.href }));
   if (materials.length) blocks.push({ id: newId("b-materials-", week, 20), type: "materiais", bg: "neutral-default", pad: "normal", props: { title: "Materiais de apoio", items: materials } });
   plan.webPractices.forEach((practice, practiceIndex) => blocks.push({ id: newId("b-practice-", week, practiceIndex), type: "destaque", bg: "neutral-default", pad: "tight", props: { title: practice.title, body: `<p>${html([practice.objective, practice.instructions, practice.product].filter(Boolean).join(" "))}</p>`, tone: "ocean", icon: "" } }));
