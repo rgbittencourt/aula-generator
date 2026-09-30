@@ -1,8 +1,10 @@
 import JSZip from "jszip";
 import { slugify } from "./aula-schema.js";
 import { createWebPracticeFiles } from "./webpractice.js";
+import { createTeacherGuidePdf } from "./pdf.js";
+import { collectWebPracticeProjects } from "./teacher-guide.js";
 
-export async function createWeeksZip(input, weeks, generalPlan = null) {
+export async function createWeeksZip(input, weeks, generalPlan = null, teacherGuides = []) {
   const zip = new JSZip();
   const folder = zip.folder("semanas");
   for (const [index, lesson] of weeks.entries()) {
@@ -11,7 +13,9 @@ export async function createWeeksZip(input, weeks, generalPlan = null) {
     folder.file(`semana-${number}-${slug}.aula.json`, JSON.stringify(lesson, null, 2));
   }
   if (generalPlan) zip.file("planejamento-geral.json", JSON.stringify(generalPlan, null, 2));
-  const practices = generalPlan?.webPractices || weeks.flatMap((lesson) => lesson.lessonPlan?.webPractices || []);
+  const pdf = await createTeacherGuidePdf(input, teacherGuides, generalPlan);
+  zip.file("professor/guia-do-professor.pdf", pdf);
+  const practices = collectWebPracticeProjects(input, teacherGuides);
   createWebPracticeFiles(input, practices).forEach(({ path, content }) => zip.file(path, content));
   return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
 }

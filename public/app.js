@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
-const state = { input: null, weeks: [], workload: null, generalPlan: null, provider: null };
+const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 
 function splitLines(value) { return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : String(value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
@@ -117,6 +117,7 @@ function formInput() {
     startDate: calendarMode === "calendar" ? $("#start-date").value : null,
     objectives: splitLines($("#objectives").value),
     content: $("#content").value,
+    didacticMode: $("#didactic-mode").value,
     references: splitLines($("#references").value),
     videoLinks: splitLines($("#videos").value),
     videoSearchSuggestions: splitLines($("#video-search-suggestions").value),
@@ -283,9 +284,13 @@ function fallbackLesson(input, index) {
   return { meta: { title: `${input.title} — ${calendar.label}`, courseTitle: input.title, weekNumber: week, weekLabel: calendar.label, calendarStartDate: calendar.startDate, calendarEndDate: calendar.endDate, studyHours: input.hoursPerWeek, author: input.author, role: "", institution: input.institution, year: new Date().getFullYear().toString(), aiTool: "", aiUse: "", license: "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br" }, blocks };
 }
 
+function staticTeacherGuides(input, weeks) {
+  return weeks.map((_, index) => ({ weekNumber: index + 1, title: `${input.title} - Semana ${index + 1}`, purpose: "Orientar a aprendizagem da semana e revisar a coerência entre objetivos, conteúdo, atividades e avaliação.", didacticArc: { id: "descoberta-conceitual", label: "Descoberta conceitual", rationale: "Arco de exemplo para o modo público.", sequence: ["contexto", "conceito", "exemplo", "reflexao", "sintese"] }, objectives: input.objectives, alignmentMatrix: [], mediationQuestions: [], commonMisconceptions: [], interventions: [], differentiation: { support: [], standard: [], extension: [] }, accessibility: [], assessmentNotes: [], qualityReview: { status: "review", checks: [{ label: "Exemplo local: revise a semana antes de usar.", pass: false }] }, webPractices: input.webPractices || [], workloadAdvice: [] }));
+}
+
 function staticDemo(input) {
   const weeks = Array.from({ length: input.weeks }, (_, index) => fallbackLesson(input, index));
-  return { ok: true, provider: "static-demo", model: null, input, workload: { totalHours: input.hoursPerWeek * input.weeks, totalMinutes: Math.round(input.hoursPerWeek * input.weeks * 60), formulaStatus: "internal-profile", weeks: weeks.map((_, index) => ({ weekNumber: index + 1, totalHours: input.hoursPerWeek, totalMinutes: Math.round(input.hoursPerWeek * 60), formulaStatus: "internal-profile" })) }, weeks, filePrefix: slugify(input.title) };
+  return { ok: true, provider: "static-demo", model: null, input, teacherGuides: staticTeacherGuides(input, weeks), workload: { totalHours: input.hoursPerWeek * input.weeks, totalMinutes: Math.round(input.hoursPerWeek * input.weeks * 60), formulaStatus: "internal-profile", weeks: weeks.map((_, index) => ({ weekNumber: index + 1, totalHours: input.hoursPerWeek, totalMinutes: Math.round(input.hoursPerWeek * 60), formulaStatus: "internal-profile" })) }, weeks, filePrefix: slugify(input.title) };
 }
 
 function renderWorkload(workload) {
@@ -309,12 +314,13 @@ function renderGeneralPlan(plan) {
   const labels = { contentMinutes: "Conteúdo", resourcesMinutes: "Materiais e mídia", practiceMinutes: "Webpráticas", assessmentMinutes: "Avaliação", reviewMinutes: "Revisão", communicationMinutes: "Comunicação", projectMinutes: "Projetos", otherMinutes: "Outros" };
   const categoryMarkup = Object.entries(plan.categoryTotals || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<span>${escapeHtml(labels[key] || key)}: ${formatMinutes(value)}</span>`).join("");
   const unresolved = Array.isArray(plan.unresolvedResources) ? plan.unresolvedResources : [];
-  container.innerHTML = `<p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div>${unresolved.length ? `<div class="general-warning">${unresolved.length} recurso(s) precisam de conferência para fechar o cálculo: ${escapeHtml(unresolved.slice(0, 4).map((item) => item.title).join(", "))}${unresolved.length > 4 ? "…" : ""}</div>` : ""}`;
+  const arcs = (plan.didacticArcs || []).filter((arc) => arc.label).map((arc) => `<span class="arc-chip">${escapeHtml(arc.label)}</span>`).join("");
+  container.innerHTML = `<p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o guia do professor são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div>${unresolved.length ? `<div class="general-warning">${unresolved.length} recurso(s) precisam de conferência para fechar o cálculo: ${escapeHtml(unresolved.slice(0, 4).map((item) => item.title).join(", "))}${unresolved.length > 4 ? "…" : ""}</div>` : ""}`;
   container.classList.remove("hidden");
 }
 
 function renderWeeks(data) {
-  state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.provider = data.provider;
+  state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider;
   $("#results-title").textContent = `${data.weeks.length} semanas prontas para revisão`;
   $("#results-subtitle").textContent = data.provider === "static-demo" ? "Modo público GitHub Pages: exemplo gerado no navegador, sem API." : data.provider === "fallback" ? "Exemplo local gerado sem API; use-o para validar o fluxo." : `Gerado por IA com ${data.model || "o provedor configurado"}. Revise antes de publicar.`;
   $("#results-section").classList.remove("hidden");
@@ -329,7 +335,9 @@ function renderWeeks(data) {
     const date = meta.calendarStartDate ? `${formatDate(meta.calendarStartDate)}–${formatDate(meta.calendarEndDate)}` : meta.weekLabel;
     const calculated = workload?.calculatedMinutes != null ? formatMinutes(workload.calculatedMinutes) : `${workload?.totalHours ?? meta.studyHours ?? "—"} h`;
     const target = workload?.targetMinutes != null ? formatMinutes(workload.targetMinutes) : "meta —";
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><h3>${escapeHtml(meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${lesson.blocks?.length || 0} blocos</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div><button class="week-download" data-index="${index}" type="button">Baixar .aula.json <span>↓</span></button></article>`;
+    const guide = state.teacherGuides[index];
+    const arc = guide?.didacticArc?.label || lesson.lessonPlan?.didacticArc?.label || "Arco variável";
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div><h3>${escapeHtml(meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${lesson.blocks?.length || 0} blocos</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div><button class="week-download" data-index="${index}" type="button">Baixar JSON do aluno <span>↓</span></button></article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
   $("#week-grid").querySelectorAll(".week-download").forEach((button) => button.addEventListener("click", () => downloadWeek(Number(button.dataset.index))));
@@ -381,12 +389,26 @@ async function downloadZip() {
       const zip = new window.JSZip();
       state.weeks.forEach((lesson, index) => { const number = String(index + 1).padStart(2, "0"); zip.file(`semanas/semana-${number}-${slugify(lesson.meta?.title)}.aula.json`, JSON.stringify(lesson, null, 2)); });
       if (state.generalPlan) zip.file("planejamento-geral.json", JSON.stringify(state.generalPlan, null, 2));
+      zip.file("professor/LEIA-ME.txt", "O PDF do professor é gerado na versão Vercel com backend. Este modo público contém apenas o exemplo do aluno.");
       downloadBlob(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), `${slugify(state.input.title)}-semanas.zip`);
       return;
     }
-    const response = await fetch("/api/zip", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: state.input, weeks: state.weeks }) });
+    const response = await fetch("/api/zip", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível montar o ZIP."); }
     downloadBlob(await response.blob(), `${slugify(state.input.title)}-semanas.zip`);
+  } catch (error) { showError(error.message); }
+  finally { button.disabled = false; button.classList.remove("is-loading"); }
+}
+
+async function downloadTeacherPdf() {
+  if (!state.weeks.length) return;
+  if (isGitHubPages) { showError("O PDF do professor é gerado na URL Vercel, onde o backend está protegido. Use o pacote completo na versão com IA."); return; }
+  const button = $("#teacher-pdf-button");
+  button.disabled = true; button.classList.add("is-loading");
+  try {
+    const response = await fetch("/api/teacher-pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
+    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível criar o PDF do professor."); }
+    downloadBlob(await response.blob(), `${slugify(state.input.title)}-guia-do-professor.pdf`);
   } catch (error) { showError(error.message); }
   finally { button.disabled = false; button.classList.remove("is-loading"); }
 }
@@ -436,9 +458,15 @@ $("#course-form").addEventListener("submit", (event) => { event.preventDefault()
 $("#fallback-button").addEventListener("click", () => generate(true));
 $("#assist-button").addEventListener("click", assistBriefing);
 $("#zip-button").addEventListener("click", downloadZip);
+$("#teacher-pdf-button").addEventListener("click", downloadTeacherPdf);
 $("#calendar-mode").addEventListener("change", toggleCalendar);
 $("#practice-enabled").addEventListener("change", togglePractice);
 document.querySelectorAll("#course-form input, #course-form textarea, #course-form select").forEach((field) => field.addEventListener("input", updateSummary));
+document.querySelectorAll("#course-form input, #course-form textarea, #course-form select").forEach((field) => field.addEventListener("input", () => {
+  const fields = [...document.querySelectorAll("#course-form input, #course-form textarea, #course-form select")].filter((item) => !item.disabled && item.type !== "hidden");
+  const filled = fields.filter((item) => item.type === "checkbox" ? item.checked : String(item.value || "").trim()).length;
+  $("#briefing-progress").style.width = `${Math.round(filled / Math.max(1, fields.length) * 100)}%`;
+}));
 $("#generate-button").dataset.label = "Gerar com IA";
 $("#fallback-button").dataset.label = "Gerar exemplo local";
 $("#assist-button").dataset.label = "Preencher vazios com IA";

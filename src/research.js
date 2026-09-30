@@ -274,6 +274,11 @@ function syncResourceBlocks(lesson, selectedResources) {
     }
   }
   if (!additions.length) return blocks;
+  const topic = blocks.find((block) => ["topic", "topic-collapsible", "topic-slider"].includes(block.type));
+  if (topic) {
+    topic.props = { ...(topic.props || {}), children: [...(Array.isArray(topic.props?.children) ? topic.props.children : []), ...additions] };
+    return blocks;
+  }
   const anchor = blocks.findIndex((block) => ["quiz", "sintese", "referencias"].includes(block.type));
   const insertAt = anchor >= 0 ? anchor : blocks.length;
   blocks.splice(insertAt, 0, ...additions);

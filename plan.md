@@ -2,118 +2,82 @@
 
 ## Objetivo
 
-Criar uma aplicação local separada do `aula-studio` para planejar cursos e gerar uma aula editável por semana. A saída principal será um arquivo `.aula.json` por semana, compatível com o botão **Abrir** do Aula Studio, além de um ZIP consolidado.
+Construir um planejador pedagógico assistido por IA que gere semanas completas, coerentes e editáveis no Aula Studio, sem impor a mesma estrutura didática a todas as semanas. A experiência do estudante será exportada em `.aula.json`; o material de apoio ao professor será produzido separadamente em PDF.
 
 ## Decisões confirmadas
 
 - Repositório separado: `rgbittencourt/aula-generator`.
-- Aplicação local/GitHub privado; sem serviços Manus gerenciados.
-- Geração assistida por IA por meio de backend server-side.
-- Chave de API somente em `.env`, nunca no navegador ou no Git.
-- Calendário com duas modalidades selecionáveis ao iniciar o projeto:
-  - numeração de semanas;
-  - calendário real com data inicial.
-- Saída: um `.aula.json` por semana e ZIP com os JSONs semanais.
-- A futura planilha fornecerá as fórmulas oficiais de carga horária e distribuição; a camada de cálculo será substituível e testável.
+- Backend server-side com chave própria em ambiente seguro.
+- Calendário por numeração ou por data real.
+- Uma semana pode ter webprática ou não. Webpráticas são projetos independentes, podem receber um tema próprio e só entram na semana quando estiverem programadas.
+- Recursos audiovisuais, imagens, diagramas e leituras devem aparecer misturados ao texto no ponto didático em que serão usados, e não como uma seção obrigatoriamente separada.
+- O `.aula.json` contém somente a experiência do aluno e permanece compatível com o botão **Abrir** do Aula Studio.
+- O guia do professor fica fora do JSON do aluno e é exportado como PDF para leitura na tela.
+- Os cálculos permanecem no código da aplicação, em perfil interno versionado, sem dependência de fonte externa.
 
-## Arquitetura
+## Arquitetura de produção
 
-### Servidor
+A aplicação usa frontend estático e backend serverless no mesmo domínio Vercel. Os arquivos estáticos vivem em `public/`; as funções dinâmicas vivem em `api/`; os módulos compartilhados vivem em `src/`. O frontend público do GitHub Pages continua funcionando em modo exemplo, sem IA e sem segredos.
 
-Node.js 22 + Express, servindo o frontend estático e os endpoints:
+Rotas dinâmicas:
 
-- `GET /api/health` — verificação local;
-- `POST /api/generate` — recebe o briefing e chama um endpoint OpenAI-compatible usando `OPENAI_API_KEY`, `OPENAI_BASE_URL` e `OPENAI_MODEL` do ambiente;
-- `POST /api/zip` — valida e empacota as semanas em ZIP.
+- `GET /api/health` — estado do backend e dos provedores de pesquisa;
+- `POST /api/assist-briefing` — completa campos vazios do briefing;
+- `POST /api/generate` — gera semanas do aluno, guias do professor e projetos de webprática em estruturas separadas;
+- `POST /api/teacher-pdf` — devolve o PDF do guia do professor;
+- `POST /api/zip` — devolve o pacote com JSONs do aluno, planejamento geral, PDF do professor e projetos de webprática.
 
-O servidor usa o mesmo origin do frontend para evitar CORS no uso local. Nenhum segredo é enviado para o cliente.
+O frontend é servido sem cache compartilhado para o HTML mutável; APIs usam `no-store`. O ZIP e o PDF são respostas sob demanda e não são armazenados pelo servidor.
 
-### Frontend
+## Modelo pedagógico
 
-HTML/CSS/JavaScript modular, sem build obrigatório para facilitar uso local:
+A IA escolhe o arco didático adequado ao tema, aos objetivos, ao momento do curso e à carga disponível. Arcos possíveis incluem: descoberta conceitual, estudo de caso, oficina aplicada, análise de dados, debate orientado, revisão e síntese, ou uma combinação justificada. Não existe uma sequência obrigatória para todas as semanas.
 
-- formulário de briefing do curso;
-- escolha de calendário por semana ou data;
-- entrada de horas de estudo por semana;
-- configuração de webpráticas e momentos de aplicação;
-- conteúdos, objetivos, referências e links de vídeos;
-- escolha do número de semanas;
-- prévia das semanas geradas;
-- download individual dos JSONs e ZIP consolidado.
+Cada semana pode conter, quando fizer sentido:
 
-### Contrato de dados
+- abertura e contextualização;
+- diagnóstico inicial;
+- explicação conceitual;
+- exemplo ou estudo de caso;
+- perguntas de checagem;
+- recurso audiovisual, imagem, diagrama ou leitura inserido no ponto de uso;
+- atividade guiada;
+- webprática somente quando programada;
+- avaliação formativa e/ou somativa;
+- síntese e conexão com a próxima semana.
 
-O gerador produz:
+O gerador valida alinhamento entre objetivos, seções, atividades, evidências e avaliação. Também produz diferenciação essencial/padrão/aprofundamento, acessibilidade, revisão espiral e sugestões de ajuste quando a carga estimada ultrapassa a meta.
 
-```json
-{
-  "meta": {
-    "title": "Título da semana",
-    "courseTitle": "Curso",
-    "weekNumber": 1,
-    "weekLabel": "Semana 1",
-    "studyHours": 4,
-    "author": "",
-    "role": "",
-    "institution": "",
-    "year": "2026",
-    "aiTool": "",
-    "aiUse": "",
-    "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br"
-  },
-  "blocks": []
-}
+## Separação aluno/professor
+
+`src/aula-schema.js` normaliza o documento do aluno e projeta a webprática apenas como uma orientação curta quando ela aparece na aula. `src/teacher-guide.js` normaliza o guia completo do professor, incluindo intenção didática, matriz de alinhamento, diagnóstico, mediação, equívocos comuns, diferenciação, acessibilidade, rubrica e checklist de qualidade.
+
+O módulo `src/pdf.js` converte o guia em PDF legível na tela. O PDF geral contém a visão do curso, uma seção por semana, carga calculada e os projetos de webprática em anexos de planejamento. Nenhum `teacherGuide` ou pacote interno da webprática é inserido nos JSONs destinados ao Aula Studio.
+
+## Webpráticas independentes
+
+Webpráticas são cadastradas como projetos separados. Cada projeto possui tema, problema, papel do estudante, pré-requisitos, preparação do professor, preparação do estudante, materiais, roteiro, etapas, produto, rubrica, prompts, plano B, acessibilidade, continuidade e arquivos auxiliares. O pacote fica em `webpraticas/` dentro do ZIP e não é confundido com uma semana comum.
+
+## Recursos no ponto de uso
+
+A IA deve indicar `sectionNumber`, `moment`, `objective`, `guidingQuestion` e `pedagogicalUse` para cada vídeo, imagem, diagrama ou leitura. O transformador de blocos insere esses recursos dentro do tópico/seção correspondente do Aula Studio. Recursos globais sem seção explícita são inseridos após a primeira seção pertinente, nunca como uma lista isolada obrigatória.
+
+## Contratos e exportação
+
+Cada semana do aluno segue o contrato de blocos do Aula Studio: `id`, `type`, `bg`, `pad` e `props`, usando somente tipos conhecidos. O JSON semanal contém conteúdo, objetivos do aluno, recursos contextualizados, atividades, avaliação, síntese e metadados de carga necessários ao planejamento, mas não contém o guia do professor.
+
+O ZIP contém:
+
+```text
+semanas/semana-01-titulo.aula.json
+semanas/semana-02-titulo.aula.json
+planejamento-geral.json
+professor/guia-do-professor.pdf
+webpraticas/01-tema/guia-e-roteiro.md
+webpraticas/01-tema/pacote.json
+webpraticas/01-tema/arquivos/*
 ```
 
-Cada bloco seguirá o contrato atual do editor: `id`, `type`, `bg`, `pad` e `props`. O gerador só aceitará tipos conhecidos pelo catálogo do Aula Studio e preservará propriedades aninhadas necessárias para tópicos, accordions, colunas e linhas do tempo.
+## Validação
 
-## IA
-
-A IA recebe um briefing estruturado e deve retornar JSON com a lista de semanas e blocos. O servidor:
-
-1. normaliza e limita entradas;
-2. envia instruções pedagógicas e o catálogo de tipos;
-3. interpreta JSON mesmo quando o provedor não oferece schema estrito;
-4. valida semanas e blocos;
-5. corrige IDs, datas e metadados;
-6. rejeita resposta sem `blocks` ou com erro estrutural.
-
-O primeiro adaptador será OpenAI-compatible. Para outro provedor, basta alterar `OPENAI_BASE_URL`, `OPENAI_MODEL` e, se necessário, o adaptador server-side.
-
-## Cálculos
-
-A primeira versão calcula apenas o total semanal e a agenda base, mantendo a distribuição interna explicitamente como perfil provisório. O módulo `src/calculations.js` terá uma função pura e uma configuração de fórmulas, para que a planilha futura seja integrada sem alterar a UI ou o formato de saída.
-
-Quando a planilha for recebida, serão extraídos:
-
-- fórmulas;
-- unidades e conversões;
-- arredondamentos;
-- regras para webpráticas;
-- distribuição de minutos por conteúdo, prática, avaliação e revisão;
-- casos-limite e semanas incompletas.
-
-## Exportação
-
-- cada semana será baixável individualmente como `semana-01-slug.aula.json`;
-- o ZIP conterá os JSONs semanais em `semanas/`;
-- o JSON pode ser aberto diretamente pelo Aula Studio;
-- o SCORM/Moodle continuará sendo gerado no Aula Studio depois da revisão do JSON, preservando a separação entre planejamento e edição/publicação.
-
-## Desenvolvimento e validação
-
-- `npm install` seguido de `npm run dev`;
-- `npm test` para validação de schema, cálculo, normalização e ZIP;
-- `GET /api/health` para confirmar o servidor;
-- teste sem chave deve retornar erro claro, sem expor configuração;
-- teste com resposta fixture deve gerar JSONs e ZIP determinísticos;
-- nenhum `.env` real será commitado.
-
-## Escopo fora desta primeira etapa
-
-- login multiusuário;
-- banco de dados ou persistência remota;
-- publicação pública;
-- exportação SCORM diretamente no gerador;
-- sincronização automática com Moodle;
-- fórmulas finais antes do recebimento da planilha.
+A aplicação será validada por testes de contrato, separação aluno/professor, recursos incorporados, ausência de webprática quando não programada, geração de PDF, ZIP, fórmulas internas e sintaxe. O resultado do backend será inspecionado por código e smoke tests locais; a publicação Vercel será conferida somente após o push.

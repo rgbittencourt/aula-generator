@@ -3,6 +3,10 @@ import test from "node:test";
 import { buildFallbackLesson, normalizeCourseInput } from "../src/aula-schema.js";
 import { enrichLessonsWithResources } from "../src/research.js";
 
+function hasNestedBlock(blocks, type) {
+  return (blocks || []).some((block) => block.type === type || hasNestedBlock(block.props?.children, type));
+}
+
 test("pesquisa simulada seleciona imagem/leitura e gera blocos Aula Studio", async () => {
   const input = normalizeCourseInput({ title: "Indicadores educacionais", weeks: 1, hoursPerWeek: 2, content: "Indicadores e análise de dados para gestão educacional", objectives: ["Analisar indicadores"] });
   const lesson = buildFallbackLesson(input, 0);
@@ -23,8 +27,8 @@ test("pesquisa simulada seleciona imagem/leitura e gera blocos Aula Studio", asy
     assert.equal(result.lessonPlan.resourceResearch.status, "ai-selected");
     assert.equal(result.lessonPlan.resources.images[0].provider, "wikimedia-commons");
     assert.equal(result.lessonPlan.resources.readingsExtra[0].provider, "crossref");
-    assert.ok(result.blocks.some((block) => block.type === "imagem"));
-    assert.ok(result.blocks.some((block) => block.type === "materiais"));
+    assert.ok(hasNestedBlock(result.blocks, "imagem"));
+    assert.ok(hasNestedBlock(result.blocks, "materiais"));
   } finally {
     globalThis.fetch = previousFetch;
     if (previousResearch === undefined) delete process.env.AULA_RESOURCE_RESEARCH; else process.env.AULA_RESOURCE_RESEARCH = previousResearch;

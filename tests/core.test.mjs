@@ -6,6 +6,13 @@ import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload, cal
 import { digitalContentMinutes, readingMinutes } from "../src/formula-profile.js";
 import { createWeeksZip } from "../src/zip.js";
 import { buildBriefingPrompt, buildWeekGenerationPrompt } from "../src/ai.js";
+import { buildTeacherGuides } from "../src/teacher-guide.js";
+import { createTeacherGuidePdf } from "../src/pdf.js";
+
+function hasBlock(lesson, type) {
+  const visit = (blocks) => (blocks || []).some((block) => block.type === type || visit(block.props?.children));
+  return visit(lesson.blocks);
+}
 
 test("normaliza briefing com calendário real e webpráticas independentes", () => {
   const input = normalizeCourseInput({ title: "Cidades sustentáveis", weeks: "3", hoursPerWeek: "2.5", calendarMode: "calendar", startDate: "2026-10-05", objectives: "Analisar\nAplicar", imageLinks: "https://example.org/mapa.png", webPracticeEnabled: true, webPractices: [{ title: "Mapa do bairro", type: "Pesquisa orientada", moments: "Semana 2", objective: "Analisar" }, { title: "Debate", type: "Debate ou seminário", moments: "Semana 3", objective: "Avaliar" }], materials: [{ title: "Texto-base", type: "Texto-base", objective: "Preparar a análise", alignment: "Mobilidade urbana" }] });
@@ -32,9 +39,10 @@ test("prompt semanal exige unidade didática completa antes do cálculo de tempo
   const prompt = buildWeekGenerationPrompt(input, 0);
   assert.match(prompt, /uma semana de material didático/i);
   assert.match(prompt, /lessonPlan/i);
-  assert.match(prompt, /contentSections: 6 a 12/i);
+  assert.match(prompt, /contentSections: 4 a 10/i);
   assert.match(prompt, /timePlan com targetMinutes 0/i);
   assert.match(prompt, /nunca invente URLs/i);
+  assert.match(prompt, /teacherGuide/i);
 });
 
 test("normaliza aula rica sem perder recursos, avaliação e metadados", () => {
@@ -68,7 +76,26 @@ test("fallback gera uma aula válida para cada semana", () => {
   assert.ok(weeks[0].lessonPlan.contentSections.length >= 1);
   assert.ok(weeks[0].blocks.some((block) => block.type === "hero"));
   assert.ok(weeks[0].blocks.some((block) => block.type === "destaque"));
-  assert.ok(weeks[0].blocks.some((block) => block.type === "video"));
+  assert.ok(hasBlock(weeks[0], "video"));
+  assert.ok(weeks[0].lessonPlan.didacticArc.id);
+});
+
+test("JSON do aluno não carrega guia do professor e resume webprática separada", () => {
+  const input = normalizeCourseInput({ title: "Curso", weeks: 1, hoursPerWeek: 2, objectives: ["Aplicar"], webPracticeEnabled: true, webPractices: [{ title: "Projeto aplicado", objective: "Produzir evidência", teacherPreparation: ["Preparar dados"], artifacts: [{ filename: "modelo.md", content: "modelo" }] }] });
+  const lesson = buildFallbackLesson(input, 0);
+  assert.equal(Object.prototype.hasOwnProperty.call(lesson, "teacherGuide"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(lesson.lessonPlan.webPractices[0], "artifacts"), false);
+  const guides = buildTeacherGuides(input, [lesson], []);
+  assert.equal(guides[0].webPractices[0].artifacts.length, 1);
+});
+
+test("PDF do professor é gerado separadamente", async () => {
+  const input = normalizeCourseInput({ title: "Curso PDF", weeks: 1, hoursPerWeek: 2, objectives: ["Analisar"] });
+  const lesson = buildFallbackLesson(input, 0);
+  const guides = buildTeacherGuides(input, [lesson], []);
+  const pdf = await createTeacherGuidePdf(input, guides, buildGeneralPlan(input, calculateCourseWorkload(input, input.formulaConfig, [lesson]), [lesson], guides));
+  assert.ok(Buffer.isBuffer(pdf));
+  assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
 });
 
 test("cálculo deriva itens do conteúdo usando perfil interno versionado", () => {
@@ -107,6 +134,7 @@ test("ZIP contém um JSON rico por semana em semanas/", async () => {
   assert.equal(names.length, 2);
   assert.ok(names.every((name) => name.startsWith("semanas/semana-")));
   assert.ok(zip.files["planejamento-geral.json"]);
+  assert.ok(zip.files["professor/guia-do-professor.pdf"]);
   assert.ok(Object.keys(zip.files).some((name) => name.includes("webpraticas/") && name.endsWith("guia-e-roteiro.md")));
   assert.ok(Object.keys(zip.files).some((name) => name.endsWith("modelo.md")));
   const first = JSON.parse(await zip.files[names[0]].async("string"));

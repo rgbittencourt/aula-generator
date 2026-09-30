@@ -3,6 +3,7 @@ import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } fr
 import { buildFallbackLesson, normalizeCourseInput, normalizeWeeklyOutput, slugify } from "../src/aula-schema.js";
 import { generateWithAI } from "../src/ai.js";
 import { enrichLessonsWithResources } from "../src/research.js";
+import { buildTeacherGuides } from "../src/teacher-guide.js";
 
 export default async function handler(request, response) {
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
@@ -10,14 +11,15 @@ export default async function handler(request, response) {
   try {
     const input = normalizeCourseInput(request.body?.input || request.body || {});
     const useFallback = Boolean(request.body?.fallback);
-    const weeks = useFallback ? Array.from({ length: input.weeks }, (_, index) => buildFallbackLesson(input, index)) : await generateWithAI(input);
-    const normalizedWeeks = normalizeWeeklyOutput({ weeks }, input);
+    const generated = useFallback ? { weeks: Array.from({ length: input.weeks }, (_, index) => buildFallbackLesson(input, index)), teacherGuides: [] } : await generateWithAI(input);
+    const normalizedWeeks = normalizeWeeklyOutput({ weeks: generated.weeks }, input);
     const researchedWeeks = useFallback ? normalizedWeeks : await enrichLessonsWithResources(input, normalizedWeeks);
     const workload = calculateCourseWorkload(input, input.formulaConfig, researchedWeeks);
     const enrichedWeeks = attachWorkloadToLessons(researchedWeeks, workload);
-    const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks);
+    const teacherGuides = buildTeacherGuides(input, enrichedWeeks, generated.teacherGuides);
+    const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
     response.setHeader("Cache-Control", "no-store");
-    return response.status(200).json({ ok: true, provider: useFallback ? "fallback" : "ai", model: useFallback ? null : (process.env.OPENAI_MODEL || "gpt-4o-mini"), input, workload, generalPlan, weeks: enrichedWeeks, filePrefix: slugify(input.title, "curso") });
+    return response.status(200).json({ ok: true, provider: useFallback ? "fallback" : "ai", model: useFallback ? null : (process.env.OPENAI_MODEL || "gpt-4o-mini"), input, workload, generalPlan, weeks: enrichedWeeks, teacherGuides, filePrefix: slugify(input.title, "curso") });
   } catch (error) {
     const status = error.code === "AI_KEY_MISSING" ? 503 : 400;
     return response.status(status).json({ ok: false, error: error.message || "Não foi possível gerar o curso." });

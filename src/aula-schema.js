@@ -1,3 +1,5 @@
+import { normalizeDidacticArc, fallbackDidacticArc } from "./pedagogy.js";
+
 export const DEFAULT_LICENSE = "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br";
 
 export const KNOWN_BLOCK_TYPES = new Set([
@@ -60,6 +62,7 @@ function normalizeResource(value = {}, index = 0, defaultKind = "material") {
     sourcePage: text(resource.sourcePage),
     provider: text(resource.provider),
     thumbnail: text(resource.thumbnail),
+    sectionNumber: text(resource.sectionNumber || resource.section || resource.sectionId),
     searchQuery: text(resource.searchQuery || resource.query),
     candidateId: text(resource.candidateId),
     researchRequestId: text(resource.researchRequestId),
@@ -151,6 +154,21 @@ function normalizePractice(value = {}, index = 0) {
   };
 }
 
+function studentPractice(practice = {}) {
+  return {
+    id: text(practice.id),
+    title: text(practice.title),
+    type: text(practice.type),
+    moments: splitLines(practice.moments),
+    objective: text(practice.objective),
+    instructions: text(practice.instructions),
+    steps: Array.isArray(practice.steps) ? practice.steps.map((step) => ({ order: step.order, title: text(step.title), instructions: text(step.instructions), minutes: Math.max(0, number(step.minutes, 0)) })) : [],
+    product: text(practice.product || practice.delivery),
+    assessment: text(practice.assessment),
+    durationMinutes: Math.max(0, number(practice.durationMinutes, 0))
+  };
+}
+
 function normalizeMaterial(value = {}, index = 0) {
   const material = object(value);
   const normalized = normalizeResource({ ...material, kind: material.kind || material.type, href: material.link || material.href }, index, "material");
@@ -178,6 +196,7 @@ function normalizeSection(value = {}, index = 0) {
     caseStudy: Object.keys(caseStudy).length ? { title: text(caseStudy.title), context: text(caseStudy.context || caseStudy.body), data: text(caseStudy.data), questions: splitLines(caseStudy.questions) } : null,
     reflection: reflection ? (typeof reflection === "string" ? { question: text(reflection), body: "" } : { question: text(reflection.question || reflection.title), body: text(reflection.body || reflection.context) }) : null,
     keyTerms: splitLines(section.keyTerms || section.terms),
+    didacticRole: text(section.didacticRole || section.role),
     resources: normalizeResources(section.resources, "section-resource")
   };
 }
@@ -271,10 +290,15 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
     learningObjectives: splitLines(plan.learningObjectives || plan.objectives || input.objectives),
     prerequisites: splitLines(plan.prerequisites),
     contentDensity: text(plan.contentDensity, "completa"),
+    didacticArc: normalizeDidacticArc(plan.didacticArc, practices.length > 0, index),
     contentSections,
     resources: { videos, readingsRequired: requiredReadings, readingsExtra: extraReadings, images, podcasts, datasets },
-    webPractices: practices,
+    webPractices: practices.map(studentPractice),
     activities,
+    diagnostic: object(plan.diagnostic || plan.initialDiagnostic),
+    formativeChecks: Array.isArray(plan.formativeChecks || plan.checkpoints) ? (plan.formativeChecks || plan.checkpoints) : [],
+    differentiation: object(plan.differentiation),
+    selfAssessment: object(plan.selfAssessment || plan.studentSelfAssessment),
     synthesis: text(plan.synthesis),
     nextWeekConnection: text(plan.nextWeekConnection || plan.whatsNext),
     glossary: normalizeGlossary(plan.glossary),
@@ -311,6 +335,7 @@ export function normalizeCourseInput(raw = {}) {
     imageSearchSuggestions: splitLines(raw.imageSearchSuggestions),
     materials,
     weeks, hoursPerWeek, calendarMode,
+    didacticMode: text(raw.didacticMode, "auto"),
     startDate: calendarMode === "calendar" && validDate(raw.startDate) ? raw.startDate : null,
     webPractices,
     webPractice: { enabled, moments: legacyMoments.length ? legacyMoments : splitLines(practice.moments || raw.practiceMoments), instructions: legacyInstructions || text(practice.instructions || raw.practiceInstructions), durationMinutes: webPractices.reduce((sum, item) => sum + item.durationMinutes, 0) },
@@ -353,6 +378,22 @@ export function sanitizeBlock(raw, weekNumber = 1, path = "block", seen = new Se
   return { id, type, ...(ROOT_TYPES.has(type) ? { bg: text(raw.bg, "neutral-default"), pad: text(raw.pad, "normal") } : {}), props };
 }
 
+function integrateRootResources(blocks, weekNumber) {
+  const resourceTypes = new Set(["video", "imagem", "materiais", "audio"]);
+  const resourceBlocks = blocks.filter((block) => resourceTypes.has(block.type));
+  if (!resourceBlocks.length) return blocks;
+  const remaining = blocks.filter((block) => !resourceTypes.has(block.type));
+  let topic = remaining.find((block) => ["topic", "topic-collapsible", "topic-slider"].includes(block.type));
+  if (!topic) {
+    topic = { id: newId("b-topic-", weekNumber, 90), type: "topic", bg: "neutral-default", pad: "normal", props: { children: [] } };
+    remaining.push(topic);
+  }
+  topic.props = safeProps(topic.props);
+  topic.props.children = Array.isArray(topic.props.children) ? topic.props.children : [];
+  topic.props.children.push(...resourceBlocks);
+  return remaining;
+}
+
 export function weekMeta(input, index) {
   const calendar = weekCalendar(input, index);
   return { title: `${input.title} — ${calendar.label}`, courseTitle: input.title, weekNumber: calendar.weekNumber, weekLabel: calendar.label, calendarStartDate: calendar.startDate, calendarEndDate: calendar.endDate, studyHours: input.hoursPerWeek, author: input.author, role: input.role, institution: input.institution, year: input.year, aiTool: "", aiUse: "", license: input.license };
@@ -374,6 +415,7 @@ function fallbackLessonPlan(input, index) {
     contentSections: [{ number: "1", title: "Conteúdo da semana", body: input.content || `Estude os conceitos centrais de ${input.title} e relacione-os a exemplos práticos.`, subsections: [], reflection: { question: "Que problema real do seu contexto pode ser melhor compreendido com este tema?" }, resources: [] }],
     resources: { videos: [...videos, ...suggestions], readingsRequired: [], readingsExtra: suppliedMaterials.map((item) => normalizeResource(item, 0, "reading-extra")), images: imageLinks, podcasts: [], datasets: [] },
     webPractices: input.webPractices,
+    didacticArc: fallbackDidacticArc(input, index),
     synthesis: "Retome os conceitos centrais, conecte-os aos exemplos e registre uma aplicação possível no seu contexto.",
     references: input.references,
     assessment: { title: "Atividade avaliativa", format: "Questões para revisão", questions: [] },
@@ -385,19 +427,29 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
   const week = index + 1; const calendar = weekCalendar(input, index); const objective = plan.learningObjectives[0] || `Compreender os fundamentos de ${input.title}.`;
   const blocks = [{ id: newId("b-hero-", week, 0), type: "hero", bg: "neutral-default", pad: "normal", props: { eyebrow: calendar.label.toUpperCase(), title: `${plan.theme}: ${calendar.label}`, lead: objective, author: input.author || "Autor", authorImage: "", readTime: `${input.hoursPerWeek} h de estudo`, date: input.year } }];
   const children = [];
-  if (plan.welcome) { children.push({ id: newId("c-welcome-", week, children.length), type: "prose", props: { body: `<p>${html(plan.welcome)}</p>`, dropcap: false, dropcapTone: "terracotta" } }); }
+  if (plan.welcome) children.push({ id: newId("c-welcome-", week, children.length), type: "prose", props: { body: `<p>${html(plan.welcome)}</p>`, dropcap: false, dropcapTone: "terracotta" } });
   if (plan.learningObjectives.length) children.push({ id: newId("c-objectives-", week, children.length), type: "destaque", props: { title: "Objetivos de aprendizagem", body: `<ul>${plan.learningObjectives.map((item) => `<li>${html(item)}</li>`).join("")}</ul>`, tone: "sage", icon: "" } });
+  const allResources = [...plan.resources.videos, ...plan.resources.images, ...plan.resources.readingsRequired, ...plan.resources.readingsExtra, ...plan.resources.podcasts, ...plan.resources.datasets];
+  const usedResources = new Set();
+  const resourceChildren = (resources, sectionIndex) => {
+    const selected = resources.filter((resource) => {
+      const declared = Number.parseInt(resource.sectionNumber, 10);
+      return !usedResources.has(resource.id) && (!resource.sectionNumber || declared === sectionIndex + 1 || (!Number.isFinite(declared) && sectionIndex === 0));
+    });
+    selected.forEach((resource) => usedResources.add(resource.id));
+    const media = selected.filter((resource) => resource.kind === "video" && youtubeId(resource.href)).slice(0, 2).map((resource, resourceIndex) => ({ id: newId("c-video-", week, sectionIndex * 10 + resourceIndex), type: "video", props: { id: youtubeId(resource.href), title: resource.title, caption: resource.pedagogicalUse || resource.objective || "Vídeo para aprofundar o conceito desta seção.", credit: resource.credit || resource.source || "", start: "" } }));
+    const images = selected.filter((resource) => resource.kind === "image" && resource.href).slice(0, 2).map((resource, resourceIndex) => ({ id: newId("c-image-", week, sectionIndex * 10 + resourceIndex), type: "imagem", props: { src: resource.href, slotId: "", caption: resource.caption || resource.title, credit: resource.credit || resource.source || "", ratio: "16/9" } }));
+    const materials = selected.filter((resource) => !media.some((block) => block.props.title === resource.title) && !images.some((block) => block.props.caption === resource.title) && (resource.title || resource.href)).map((resource) => ({ type: resource.kind, title: `${resource.required ? "Leitura orientada: " : "Para aprofundar: "}${resource.title}`, source: resource.source || resource.objective || resource.pedagogicalUse, href: resource.href }));
+    return [...media, ...images, ...(materials.length ? [{ id: newId("c-materials-", week, sectionIndex), type: "materiais", props: { title: "Recurso para usar nesta seção", items: materials } }] : [])];
+  };
   plan.contentSections.forEach((section, sectionIndex) => {
     children.push({ id: newId("c-title-", week, sectionIndex + 2), type: "titulo", props: { text: `${section.number} ${section.title}`, level: "h2" } });
     if (section.body) children.push({ id: newId("c-prose-", week, sectionIndex + 20), type: "prose", props: { body: `<p>${html(section.body)}</p>`, dropcap: sectionIndex === 0, dropcapTone: "terracotta" } });
     section.subsections.forEach((sub, subIndex) => { children.push({ id: newId("c-subtitle-", week, sectionIndex * 10 + subIndex + 1), type: "titulo", props: { text: `${sub.number} ${sub.title}`, level: "h3" } }); if (sub.body) children.push({ id: newId("c-subprose-", week, sectionIndex * 10 + subIndex + 3), type: "prose", props: { body: `<p>${html(sub.body)}</p>`, dropcap: false, dropcapTone: "terracotta" } }); });
     if (section.reflection?.question) children.push({ id: newId("c-reflection-", week, sectionIndex + 1), type: "reflexao", props: { title: "Para refletir", question: html(section.reflection.question), body: html(section.reflection.body), tone: "lavender", icon: "" } });
+    children.push(...resourceChildren([...(section.resources || []), ...allResources], sectionIndex));
   });
   blocks.push({ id: newId("b-topic-", week, 1), type: "topic", bg: "neutral-default", pad: "normal", props: { children } });
-  plan.resources.videos.filter((resource) => youtubeId(resource.href)).slice(0, 3).forEach((resource, resourceIndex) => blocks.push({ id: newId("b-video-", week, resourceIndex), type: "video", bg: "neutral-default", pad: "normal", props: { id: youtubeId(resource.href), title: resource.title, caption: resource.objective || "Vídeo complementar.", credit: resource.source || "", start: "" } }));
-  plan.resources.images.filter((resource) => resource.href).slice(0, 4).forEach((resource, resourceIndex) => blocks.push({ id: newId("b-image-", week, resourceIndex), type: "imagem", bg: "neutral-default", pad: "normal", props: { src: resource.href, slotId: "", caption: resource.caption || resource.title, credit: resource.credit || resource.source || "", ratio: "16/9" } }));
-  const materials = [...plan.resources.readingsRequired, ...plan.resources.readingsExtra, ...plan.resources.podcasts, ...plan.resources.datasets].filter((item) => item.title || item.href).map((item) => ({ type: item.kind, title: `${item.required ? "Leitura obrigatória: " : "Material extra: "}${item.title}`, source: item.source || item.objective, href: item.href }));
-  if (materials.length) blocks.push({ id: newId("b-materials-", week, 20), type: "materiais", bg: "neutral-default", pad: "normal", props: { title: "Materiais de apoio", items: materials } });
   plan.webPractices.forEach((practice, practiceIndex) => blocks.push({ id: newId("b-practice-", week, practiceIndex), type: "destaque", bg: "neutral-default", pad: "tight", props: { title: practice.title, body: `<p>${html([practice.objective, practice.instructions, practice.product].filter(Boolean).join(" "))}</p>`, tone: "ocean", icon: "" } }));
   if (plan.synthesis) blocks.push({ id: newId("b-synthesis-", week, 0), type: "sintese", bg: "sage-deep", pad: "airy", props: { eyebrow: "Síntese", title: "A ideia que fecha a semana", body: `<p>${html(plan.synthesis)}</p>` } });
   if (plan.references.length) blocks.push({ id: newId("b-references-", week, 0), type: "referencias", bg: "neutral-default", pad: "normal", props: { title: "Referências", items: plan.references.map((item) => ({ html: html(item) })) } });
@@ -412,7 +464,7 @@ export function buildFallbackLesson(input, index) {
 
 export function normalizeLesson(raw, input, index) {
   const fallback = buildFallbackLesson(input, index); const source = raw && typeof raw === "object" ? raw : {}; const seen = new Set();
-  const blocks = Array.isArray(source.blocks) ? source.blocks.map((block, i) => sanitizeBlock(block, index + 1, `block-${i}`, seen)).filter(Boolean) : [];
+  const blocks = integrateRootResources(Array.isArray(source.blocks) ? source.blocks.map((block, i) => sanitizeBlock(block, index + 1, `block-${i}`, seen)).filter(Boolean) : [], index + 1);
   const lessonPlan = normalizeLessonPlan(source.lessonPlan || source.plan || fallback.lessonPlan, input, index);
   return { meta: { ...fallback.meta, ...(source.meta && typeof source.meta === "object" ? source.meta : {}), ...weekMeta(input, index) }, lessonPlan, blocks: blocks.length ? blocks : fallback.blocks };
 }

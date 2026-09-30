@@ -1,4 +1,5 @@
 import { KNOWN_BLOCK_TYPES, normalizeWeeklyOutput } from "./aula-schema.js";
+import { buildTeacherGuide } from "./teacher-guide.js";
 
 const providerBase = () => (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
 
@@ -162,26 +163,27 @@ const BLOCK_TYPES = [...KNOWN_BLOCK_TYPES].join(", ");
 
 export function buildWeekGenerationPrompt(input, weekIndex = 0) {
   const weekNumber = weekIndex + 1;
-  return `Gere UMA semana de material didático em JSON para o curso abaixo. Esta é a semana ${weekNumber} de ${input.weeks}. O resultado precisa ter nível de detalhamento próximo a uma unidade didática completa em DOCX: abertura, texto-base desenvolvido, seções numeradas, subseções quando úteis, estudo de caso, reflexões, recursos no ponto de uso, síntese, glossário, referências, avaliação e conexão com a próxima semana. Não entregue um resumo superficial nem apenas uma lista de links.
+  return `Gere UMA semana de material didático em JSON para o curso abaixo. Esta é a semana ${weekNumber} de ${input.weeks}. O resultado precisa ter nível de detalhamento próximo a uma unidade didática completa em DOCX: abertura, texto-base desenvolvido, seções numeradas, subseções quando úteis, estudo de caso quando fizer sentido, reflexões, recursos no ponto de uso, síntese, glossário, referências, avaliação e conexão com a próxima semana. Não entregue um resumo superficial nem apenas uma lista de links.
 
-Retorne um objeto com exatamente estas propriedades de alto nível: meta, lessonPlan e blocks.
+Retorne um objeto com exatamente estas propriedades de alto nível: meta, lessonPlan, blocks e teacherGuide. O teacherGuide é material exclusivo do professor e nunca deve ser repetido dentro de lessonPlan ou blocks.
 
 lessonPlan deve conter:
 - weekNumber, theme, welcome;
-- learningObjectives: 6 a 8 objetivos observáveis, coerentes com o curso e com esta semana;
-- prerequisites;
-- contentDensity: "completa";
-- contentSections: 6 a 12 seções. Cada seção deve ter number, title, body, subsections, caseStudy (quando fizer sentido), reflection (quando fizer sentido), keyTerms e resources. O body deve explicar conceitos, exemplos e implicações, com texto substancial. Evite repetir a mesma introdução em todas as seções;
-- resources com arrays videos, readingsRequired, readingsExtra, images, podcasts e datasets. Cada recurso deve conter title, source, author quando conhecido, href somente se foi fornecido no briefing, required, moment, objective, guidingQuestion, durationMinutes, altText/caption/credit para imagens, searchQuery quando o link não estiver disponível, verificationStatus e requiresVerification;
-- webPractices: preserve as práticas fornecidas e desenvolva cada prática de modo independente, com context, prerequisites, teacherPreparation, studentPreparation, materials, steps com minutos, product/delivery, criteria/rubric, prompts, roteiro com blocos e duração, plano B e continuidade;
-- para cada webprática, gere artifacts/files quando fizer sentido: cada artefato deve ter filename, title, format, purpose e content/template. Inclua arquivos-exemplo, guia do professor, roteiro do estudante, checklist, modelo de entrega, dados de apoio ou prompts prontos quando o tipo da prática exigir;
+- didacticArc: escolha o arco adequado entre descoberta-conceitual, estudo-de-caso, oficina-aplicada, analise-de-dados, debate-orientado e revisao-e-sintese. Retorne id, label, rationale e sequence. Não use o mesmo arco automaticamente quando outro for mais apropriado;
+- learningObjectives: 3 a 8 objetivos observáveis, coerentes com o curso e com esta semana;
+- prerequisites e contentDensity;
+- contentSections: 4 a 10 seções, conforme a complexidade real da semana. Cada seção deve ter number, title, didacticRole, body, subsections, caseStudy (quando fizer sentido), reflection (quando fizer sentido), keyTerms e resources. O body deve explicar conceitos, exemplos e implicações, com texto substancial. Evite repetir a mesma introdução em todas as seções;
+- resources com arrays videos, readingsRequired, readingsExtra, images, podcasts e datasets. Cada recurso deve conter title, source, author quando conhecido, href somente se foi fornecido no briefing, required, sectionNumber ou moment, objective, guidingQuestion, pedagogicalUse, durationMinutes, altText/caption/credit para imagens, searchQuery quando o link não estiver disponível, verificationStatus e requiresVerification;
+- webPractices: preserve somente as práticas fornecidas e programadas para esta semana. Se nenhuma prática estiver programada ou for necessária, retorne []. Nunca invente webprática apenas para preencher a estrutura. Na aula do aluno, deixe apenas uma orientação curta;
+- teacherGuide: material exclusivo do professor com purpose, didacticArc, objectives, alignmentMatrix, diagnostic, formativeChecks, mediationQuestions, commonMisconceptions, interventions, differentiation (support, standard, extension), accessibility, assessmentNotes, selfAssessment, spiralReview, resourceNotes, qualityReview e workloadAdvice;
+- para cada webprática programada no curso, desenvolva o projeto independente com context, prerequisites, teacherPreparation, studentPreparation, materials, steps com minutos, product/delivery, criteria/rubric, prompts, roteiro com blocos e duração, plano B, acessibilidade, continuidade e artifacts/files quando fizer sentido;
 - activities: registre fóruns, discussões, comunicações síncronas, projetos e outras atividades com type, title, count, durationMinutes ou unitDurationMinutes, hoursPerCommunication e required;
 - synthesis, nextWeekConnection, glossary, references e assessment;
 - timePlan com targetMinutes 0, items vazio e calculationMethod "derived-after-content". O servidor calculará os tempos depois de receber o conteúdo; não invente a distribuição de horas aqui.
 
 A avaliação semanal deve normalmente ter 6 questões objetivas: 4 de múltipla escolha com 4 alternativas e 2 de verdadeiro/falso, sempre alinhadas aos objetivos e com gabarito, explicação e versão Moodle GIFT quando possível.
 
-blocks deve transformar o lessonPlan em uma leitura editável no Aula Studio e usar somente estes tipos: ${BLOCK_TYPES}. Respeite a anatomia exata do registro: hero com eyebrow/title/lead; topic com props.children; titulo com text/level; prose com body HTML; destaque/atencao/reflexao com suas props próprias; video com id/title/caption/credit/start; imagem com src/slotId/caption/credit/ratio; materiais com title/items[{type,title,source,href}]; quiz com title/intro/avaliativo/passMark/questions; sintese com eyebrow/title/body; referencias com title/items[{html}]. Na primeira etapa, use searchQuery para recursos sem URL; depois da redação o servidor pesquisará candidatos reais, a IA os selecionará e os converterá em blocos de mídia e materiais. Não coloque formatos inventados nem props de outro bloco. Um quiz deve usar props.questions com q, options, answer e explanation.
+blocks deve transformar o lessonPlan em uma leitura editável no Aula Studio e usar somente estes tipos: ${BLOCK_TYPES}. Respeite a anatomia exata do registro: hero com eyebrow/title/lead; topic com props.children; titulo com text/level; prose com body HTML; destaque/atencao/reflexao com suas props próprias; video com id/title/caption/credit/start; imagem com src/slotId/caption/credit/ratio; materiais com title/items[{type,title,source,href}]; quiz com title/intro/avaliativo/passMark/questions; sintese com eyebrow/title/body; referencias com title/items[{html}]. Os blocos de vídeo, imagem e materiais devem aparecer dentro de topic, imediatamente depois da seção ou conceito que justificou o recurso; não crie uma galeria final obrigatória. Na primeira etapa, use searchQuery para recursos sem URL; depois da redação o servidor pesquisará candidatos reais, a IA os selecionará e os converterá em blocos editáveis. Não coloque formatos inventados nem props de outro bloco. Um quiz deve usar props.questions com q, options, answer e explanation.
 
 Regras de conteúdo e fontes:
 - escreva em ${input.language}, com linguagem humana, clara, específica e pedagogicamente provocadora;
@@ -189,6 +191,8 @@ Regras de conteúdo e fontes:
 - respeite o público (${input.audience}) e nível (${input.level});
 - use o recorte, os conteúdos e as práticas do briefing;
 - apresente vídeos, imagens, artigos e leituras como recursos contextualizados, com a função pedagógica e o momento de uso;
+- não force diagnóstico, vídeo, leitura, webprática ou quiz em toda semana; inclua apenas o que tiver função pedagógica;
+- se didacticMode for diferente de auto, trate-o como preferência de percurso e mantenha liberdade para adaptar a sequência ao conteúdo;
 - nunca invente URLs, DOI, durações, autores, números ou referências verificadas. Para um recurso ainda não conferido, use searchQuery e verificationStatus "suggested-no-url";
 - se houver um link real no briefing, preserve-o e marque verificationStatus "provided-needs-review";
 - não escreva markdown fora das strings do JSON e não inclua comentários.
@@ -200,7 +204,7 @@ Retorne somente JSON válido para esta semana.`;
 }
 
 export function buildGenerationPrompt(input) {
-  return `Gere ${input.weeks} semanas, uma por objeto, seguindo este contrato: cada semana deve ser produzida pelo mesmo padrão editorial completo exigido em buildWeekGenerationPrompt, com lessonPlan rico, recursos contextualizados, webpráticas e blocos Aula Studio. A carga horária será calculada depois do conteúdo.\n\n${JSON.stringify(input, null, 2)}`;
+  return `Gere ${input.weeks} semanas, uma por objeto, seguindo o contrato de buildWeekGenerationPrompt. Varie o arco didático conforme o conteúdo; não inclua webprática em semanas não programadas; misture recursos no ponto de uso; mantenha teacherGuide separado e produza blocks exclusivamente para o aluno no Aula Studio. A carga horária será calculada depois do conteúdo.\n\n${JSON.stringify(input, null, 2)}`;
 }
 
 async function generateOneWeek(input, index) {
@@ -218,5 +222,7 @@ export async function generateWithAI(input) {
     const batch = await Promise.all(Array.from({ length: Math.min(batchSize, input.weeks - start) }, (_, offset) => generateOneWeek(input, start + offset)));
     weeks.push(...batch);
   }
-  return normalizeWeeklyOutput({ weeks }, input);
+  const normalizedWeeks = normalizeWeeklyOutput({ weeks }, input);
+  const teacherGuides = normalizedWeeks.map((lesson, index) => buildTeacherGuide(input, lesson, { ...(weeks[index]?.teacherGuide || {}), webPractices: weeks[index]?.teacherGuide?.webPractices || weeks[index]?.lessonPlan?.webPractices || input.webPractices }, index));
+  return { weeks: normalizedWeeks, teacherGuides };
 }

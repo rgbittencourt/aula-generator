@@ -225,7 +225,7 @@ export function calculateCourseWorkload(input, formulaConfig = input.formulaConf
   };
 }
 
-export function buildGeneralPlan(input, workload, lessons = []) {
+export function buildGeneralPlan(input, workload, lessons = [], teacherGuides = []) {
   const categoryTotals = {};
   const unresolved = [];
   for (const week of workload.weeks || []) {
@@ -233,7 +233,8 @@ export function buildGeneralPlan(input, workload, lessons = []) {
     (week.unresolved || []).forEach((entry) => unresolved.push({ ...entry, weekNumber: week.weekNumber }));
   }
   const webPractices = [];
-  (lessons || []).forEach((lesson) => (lesson.lessonPlan?.webPractices || []).forEach((practice) => { if (!webPractices.some((current) => current.id === practice.id)) webPractices.push(practice); }));
+  (teacherGuides || []).forEach((guide) => (guide.webPractices || []).forEach((practice) => { if (!webPractices.some((current) => current.id === practice.id)) webPractices.push(practice); }));
+  if (!webPractices.length) (lessons || []).forEach((lesson) => (lesson.lessonPlan?.webPractices || []).forEach((practice) => { if (!webPractices.some((current) => current.id === practice.id)) webPractices.push(practice); }));
   if (!webPractices.length) input.webPractices.forEach((practice) => { if (!webPractices.some((current) => current.id === practice.id)) webPractices.push(practice); });
   const target = workload.totalTargetLearnerMinutes || workload.totalMinutes || 0;
   const calculated = workload.calculatedMinutes || workload.derivedMinutes || 0;
@@ -245,6 +246,8 @@ export function buildGeneralPlan(input, workload, lessons = []) {
     categoryTotals,
     weeks: (workload.weeks || []).map((week) => ({ weekNumber: week.weekNumber, targetMinutes: week.targetMinutes, calculatedMinutes: week.calculatedMinutes, requiredMinutes: week.requiredMinutes, optionalMinutes: week.optionalMinutes, varianceMinutes: week.varianceMinutes, fitStatus: week.fitStatus, items: week.items, unresolved: week.unresolved })),
     webPractices,
+    didacticArcs: (teacherGuides || []).map((guide) => ({ weekNumber: guide.weekNumber, id: guide.didacticArc?.id, label: guide.didacticArc?.label })),
+    teacherGuide: { available: Boolean(teacherGuides?.length), format: "pdf" },
     unresolvedResources: unresolved,
     notes: ["A carga da semana é calculada depois da redação do conteúdo.", "Links sem duração, leituras sem páginas/palavras e fontes não conferidas permanecem sinalizados para revisão humana."]
   };
