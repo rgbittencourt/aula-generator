@@ -584,6 +584,8 @@ PADRÃO ACADÊMICO CONFIGURADO: perfil {profile.level}, profundidade {profile.de
 
 O piso de palavras corresponde a 72% da meta configurada, nunca menos que 1.200 palavras. A meta, o número mínimo de seções e o número mínimo de referências são ajustados automaticamente a partir do nível herdado da Identidade do curso e das escolhas específicas do Perfil acadêmico.
 
+O gerador também constrói um **mapa longitudinal** antes de redigir as semanas. Esse mapa distribui tema, pergunta central, conceitos novos, objetivos específicos, sequência editorial, ponte entre semanas, marco de evidência e arco didático. As chamadas seguintes recebem resumos das semanas já geradas e uma regra do que não repetir. Se uma resposta em `AULA_SINGLE_PASS=true` ficar estruturalmente insuficiente, uma única regeneração compacta é tentada antes de a semana ser devolvida para revisão humana.
+
 #### 10.1.4 Prompt de preenchimento assistido do briefing
 
 O botão **Preencher vazios com IA** faz uma chamada com este sistema e este prompt de usuário:
@@ -678,6 +680,19 @@ Gere UMA semana de material didático: uma unidade didática semanal completa em
 
 O texto é o produto principal. Não entregue resumo, tópicos telegráficos, frases soltas, uma lista de links ou apenas instruções para o professor. Escreva para o estudante ler e aprender. O padrão de referência é uma aula em DOCX com abertura, objetivos, explicação conceitual, exemplos, casos, contrapontos críticos, síntese, glossário, referências e avaliação. Varie o arco didático conforme o tema. Webpráticas são aulas síncronas/laboratórios separados: nunca descreva, anuncie, instrua ou transforme a webprática em conteúdo-base desta semana.
 
+PADRÃO EDITORIAL DOS EXEMPLOS DE REFERÊNCIA:
+- escreva uma unidade com narrativa contínua, não uma coleção de tópicos; cada seção deve responder a uma pergunta e preparar a próxima;
+- produza 6–8 seções principais na sequência indicada, normalmente com 220–420 palavras substanciais em cada seção;
+- comece pela importância do problema e pelo contexto do estudante; depois defina conceitos, compare perspectivas, apresente um caso verificável, aplique critérios e discuta limites, riscos ou controvérsias;
+- insira recursos no ponto exato em que ajudam a entender o conceito, com finalidade e pergunta-guia; não crie uma galeria de links no final;
+- termine com síntese conceitual, conexão explícita com a próxima semana, glossário e avaliação alinhada; não finalize depois de apenas três seções.
+
+MAPA LONGITUDINAL OBRIGATÓRIO:
+- tema e título específicos desta semana: {weekFocus.theme};
+- pergunta central: {weekFocus.centralQuestion}; objetivos específicos: {weekFocus.objectives}; conceitos novos: {weekFocus.newConcepts};
+- sequência editorial: {weekFocus.sectionSequence}; arco preferencial: {weekFocus.arc}; ponte recebida: {weekFocus.bridgeFromPrevious}; ponte seguinte: {weekFocus.bridgeToNext};
+- elementos obrigatórios: {weekFocus.mustInclude}; o que não repetir ou antecipar: {weekFocus.doNotRepeat}.
+
 Retorne somente este objeto de alto nível: { meta, lessonPlan, teacherGuide }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. teacherGuide é exclusivo do professor e nunca deve ser repetido no conteúdo do aluno.
 
 lessonPlan obrigatório:
@@ -728,7 +743,7 @@ Retorne JSON completo, sem omitir propriedades obrigatórias.
 Para a geração múltipla, o prompt de lote é:
 
 ```text
-Gere {input.weeks} semanas, uma por objeto, seguindo o contrato de buildWeekGenerationPrompt e o academicProfile recebido. O processo esperado é planejamento acadêmico, redação completa, revisão crítica e reescrita condicional. Varie o arco didático conforme o conteúdo; não inclua webprática em semanas não programadas; misture recursos no ponto de uso; mantenha teacherGuide separado e produza blocks exclusivamente para o aluno no Aula Studio. A carga horária será calculada depois do conteúdo.
+Gere {input.weeks} semanas, uma por objeto, seguindo o contrato de buildWeekGenerationPrompt, o mapa longitudinal e o academicProfile recebido. Cada semana deve acrescentar conceitos e evidências, retomar a anterior sem copiá-la e preparar a seguinte. O processo esperado é planejamento acadêmico, redação completa, revisão crítica e reescrita condicional. Varie o arco didático conforme o conteúdo; não inclua webprática em semanas não programadas; misture recursos no ponto de uso; mantenha teacherGuide separado e produza blocks exclusivamente para o aluno no Aula Studio. A carga horária será calculada depois do conteúdo.
 
 {input completo em JSON indentado}
 ```
