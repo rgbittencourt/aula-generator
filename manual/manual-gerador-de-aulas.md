@@ -613,6 +613,8 @@ O gerador também constrói um **mapa longitudinal** antes de redigir as semanas
 
 Na classificação, **insuficiente** fica reservado para texto criticamente curto — abaixo de aproximadamente 75% do piso — ou para uma unidade sem núcleo mínimo de conteúdo desenvolvido. Uma aula com texto desenvolvido, ainda que esteja abaixo do piso completo ou pendente de título específico, referências, recursos, avaliação ou revisão pedagógica, fica em **revisão recomendada**; essas pendências não reduzem artificialmente a contagem de palavras. A aplicação continua tentando reparar automaticamente o déficit textual antes de devolver a semana.
 
+O checklist também confere os recursos no ponto de uso: vídeos, imagens e leituras dentro de uma seção precisam ter `sectionNumber`/momento e um `bridgeParagraph` desenvolvido. Isso verifica a presença da ligação estrutural; a coerência acadêmica, atualidade, acessibilidade, duração e licença do recurso continuam exigindo conferência docente.
+
 ### Como planejar mais de uma webprática
 
 No painel **Webpráticas síncronas**, ative o recurso, informe a quantidade de sessões desejada e clique em **Criar sessões**. O sistema cria os cartões faltantes e preserva os cartões já preenchidos. Cada cartão precisa receber título e semana/data antes da geração. O botão **Preencher vazios com IA** analisa os cartões por índice e completa apenas os campos vazios; a resposta deve conter exatamente a quantidade solicitada. As sessões continuam independentes do texto semanal e são exportadas como projetos DOCX.

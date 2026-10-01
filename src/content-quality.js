@@ -87,6 +87,10 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   const hasSynthesis = wordCount(plan.synthesis) >= 100;
   const hasNextWeekConnection = wordCount(plan.nextWeekConnection) >= 60;
   const hasAssessment = Array.isArray(plan.assessment?.questions) && plan.assessment.questions.length >= 4;
+  const sectionResources = sections.flatMap((section) => Array.isArray(section.resources) ? section.resources : []);
+  const contextualResources = sectionResources.filter((resource) => ["video", "audio", "image", "imagem", "artigo", "reading", "material"].includes(text(resource.kind || resource.type).toLowerCase()));
+  const hasResourceBridges = contextualResources.every((resource) => wordCount(resource.bridgeParagraph) >= 12 && Boolean(resource.sectionNumber || resource.moment));
+  const resourcesContextualized = contextualResources.length === 0 || hasResourceBridges;
   const hasHero = blocksContain(lesson?.blocks, (block) => block?.type === "hero" && text(block?.props?.title));
   const hasObjectiveBlock = blocksContain(lesson?.blocks, (block) => {
     const titleValue = text(block?.props?.title).toLowerCase();
@@ -113,7 +117,7 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   const repeatedTheme = themeOverlap >= 0.8;
   const objectiveOverlap = objectives.length && peerObjectives.length ? Math.max(...objectives.map((objective) => Math.max(...peerObjectives.map((peerObjective) => overlap(signature(objective), signature(peerObjective)))))) : 0;
   const repetitionDetected = repeatedTheme || objectiveOverlap >= 0.78;
-  const hardChecks = [hasSpecificTitle, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasNextWeekConnection, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, !target.requireCounterarguments || hasCounterpoint, !repetitionDetected];
+  const hardChecks = [hasSpecificTitle, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasNextWeekConnection, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, resourcesContextualized, !target.requireCounterarguments || hasCounterpoint, !repetitionDetected];
   const passedHardChecks = hardChecks.filter(Boolean).length;
   const wordRatio = Math.min(1, words / Math.max(1, target.minimumWords));
   const score = Math.round((passedHardChecks / hardChecks.length) * 70 + wordRatio * 30);
@@ -130,6 +134,7 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   if (!hasMinimumReferences) issues.push(`referências insuficientes: ${references.length}/${target.minimumReferences}`);
   if (!hasPrimarySources) issues.push(`fontes acadêmicas/oficiais insuficientes: ${primaryReferences.length}/${target.primarySourcesRequired}`);
   if (!hasEvidenceMap) issues.push("mapa de evidências incompleto");
+  if (!resourcesContextualized) issues.push("vídeos, imagens ou leituras sem ponte pedagógica e posição de uso verificável");
   if (unsupportedClaims.length) issues.push(`${unsupportedClaims.length} afirmação(ões) aguardam verificação humana`);
   if (target.requireCounterarguments && !hasCounterpoint) issues.push("contraponto, limite ou controvérsia ausente");
   if (!hasPedagogicalAlignment) issues.push("matriz/checklist pedagógico ainda não está completo");
@@ -153,7 +158,7 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
     sectionWordCounts,
     passedHardChecks,
     totalHardChecks: hardChecks.length,
-    checks: { hasSpecificTitle, hasObjectives, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasNextWeekConnection, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, hasCounterpoint, repetitionFree: !repetitionDetected, coreContentPresent, contentComplete },
+    checks: { hasSpecificTitle, hasObjectives, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasNextWeekConnection, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, resourcesContextualized, hasResourceBridges, resourceCount: contextualResources.length, hasCounterpoint, repetitionFree: !repetitionDetected, coreContentPresent, contentComplete },
     repetition: { detected: repetitionDetected, repeatedTheme, themeOverlap: Number(themeOverlap.toFixed(2)), objectiveOverlap: Number(objectiveOverlap.toFixed(2)), comparedWeeks: peerLessons.length },
     academic: { minimumReferences: target.minimumReferences, referenceCount: references.length, verifiedReferenceCount: verifiedReferences.length, primarySourceCount: primaryReferences.length, claimCount: claimEvidence.length, unsupportedClaimCount: unsupportedClaims.length },
     issues
