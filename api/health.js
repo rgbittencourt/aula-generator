@@ -13,6 +13,9 @@ export default function handler(_request, response) {
     academicPipeline: process.env.AULA_ACADEMIC_PIPELINE !== "false",
     academicReview: process.env.AULA_ACADEMIC_REVIEW !== "false",
     reviewBeforeExport: true,
+    maxTokens: Number(process.env.OPENAI_MAX_TOKENS || 16000),
+    maxRetries: Number(process.env.OPENAI_MAX_RETRIES || 3),
+    aiBatchSize: Math.min(3, Math.max(1, Number(process.env.AULA_AI_BATCH_SIZE) || 1)),
     output: ".aula.json por semana + ZIP + revisão/regeneração individual"
   });
 }

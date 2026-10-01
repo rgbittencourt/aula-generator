@@ -22,6 +22,23 @@ function formatSavedAt(value) {
   return date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+function depthFromCourseLevel(value) {
+  const level = String(value || "").toLowerCase();
+  if (level.includes("avanç") || level.includes("avanc")) return "avançado";
+  if (level.includes("inici")) return "básico";
+  return "aprofundado";
+}
+
+function updateAcademicInheritance() {
+  const values = {
+    "academic-inherited-discipline": $("#course-title")?.value.trim() || "A definir",
+    "academic-inherited-audience": $("#audience")?.value.trim() || "A definir",
+    "academic-inherited-level": $("#level")?.value || "A definir",
+    "academic-inherited-depth": depthFromCourseLevel($("#level")?.value)
+  };
+  Object.entries(values).forEach(([id, value]) => { const element = $("#" + id); if (element) element.textContent = value; });
+}
+
 function setSaveStatus(title, detail, tone = "") {
   const bar = $("#recovery-bar");
   if (!bar) return;
@@ -128,7 +145,7 @@ function applyInputToForm(input = {}) {
     element.value = Array.isArray(value) ? value.join("\n") : (value ?? "");
   });
   const profile = input.academicProfile || {};
-  const profileFields = { "academic-discipline": "discipline", "academic-level": "level", "academic-depth": "depth", "academic-target-words": "targetWords", "academic-min-sections": "minimumSections", "academic-min-references": "minimumReferences", "academic-primary-sources": "primarySourcesRequired", "citation-style": "citationStyle", "academic-scope": "historicalScope", "academic-authors": "requiredAuthors", "academic-frameworks": "requiredFrameworks", "academic-avoid": "avoidTopics", "academic-source-policy": "sourcePolicy" };
+  const profileFields = { "academic-target-words": "targetWords", "academic-min-sections": "minimumSections", "academic-min-references": "minimumReferences", "academic-primary-sources": "primarySourcesRequired", "citation-style": "citationStyle", "academic-scope": "historicalScope", "academic-authors": "requiredAuthors", "academic-frameworks": "requiredFrameworks", "academic-avoid": "avoidTopics", "academic-source-policy": "sourcePolicy" };
   Object.entries(profileFields).forEach(([elementId, key]) => { const element = $("#" + elementId); if (element) element.value = Array.isArray(profile[key]) ? profile[key].join("\n") : (profile[key] ?? element.value); });
   [["#require-counterpoints", "requireCounterarguments"], ["#require-comparisons", "requireConceptComparison"], ["#require-case-study", "requireCaseStudy"]].forEach(([selector, key]) => { if (profile[key] !== undefined) $(selector).checked = Boolean(profile[key]); });
   $("#practice-enabled").checked = Boolean(input.webPracticeEnabled || input.webPractice?.enabled);
@@ -143,6 +160,7 @@ function applyInputToForm(input = {}) {
   if ($("#access-code")) $("#access-code").value = "";
   toggleCalendar();
   togglePractice();
+  updateAcademicInheritance();
   updateSummary();
   updateProgress();
 }
@@ -290,9 +308,9 @@ function formInput() {
     content: $("#content").value,
     didacticMode: $("#didactic-mode").value,
     academicProfile: {
-      discipline: $("#academic-discipline").value.trim(),
-      level: $("#academic-level").value,
-      depth: $("#academic-depth").value,
+      discipline: $("#course-title").value.trim(),
+      level: $("#level").value,
+      depth: depthFromCourseLevel($("#level").value),
       targetWords: Number($("#academic-target-words").value) || 2800,
       minimumSections: Number($("#academic-min-sections").value) || 6,
       minimumReferences: Number($("#academic-min-references").value) || 0,
@@ -770,7 +788,7 @@ $("#lesson-modal").addEventListener("click", (event) => { if (event.target.id ==
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.previewIndex != null) closeLessonPreview(); });
 $("#calendar-mode").addEventListener("change", () => { toggleCalendar(); scheduleSave(); });
 $("#practice-enabled").addEventListener("change", () => { togglePractice(); scheduleSave(); });
-$("#course-form").addEventListener("input", () => { updateSummary(); updateProgress(); scheduleSave(); });
+$("#course-form").addEventListener("input", () => { updateAcademicInheritance(); updateSummary(); updateProgress(); scheduleSave(); });
 $("#save-backup-button").addEventListener("click", downloadBackup);
 $("#restore-backup-button").addEventListener("click", () => $("#backup-file-input").click());
 $("#backup-file-input").addEventListener("change", (event) => { restoreBackupFile(event.target.files?.[0]); event.target.value = ""; });
@@ -780,4 +798,4 @@ window.addEventListener("beforeunload", () => saveDraft("fechamento"));
 $("#generate-button").dataset.label = "Gerar com IA";
 $("#fallback-button").dataset.label = "Gerar exemplo local";
 $("#assist-button").dataset.label = "Preencher vazios com IA";
-toggleCalendar(); togglePractice(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
+toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();

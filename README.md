@@ -46,6 +46,8 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 | `OPENAI_MODEL` | `gpt-4o-mini` | Production, Preview e Development |
 | `OPENAI_CONTENT_MODEL` | opcional; modelo mais capaz para texto longo | Production, Preview e Development |
 | `OPENAI_MAX_TOKENS` | `16000` | Production, Preview e Development |
+| `OPENAI_MAX_RETRIES` | `3` | Production, Preview e Development |
+| `AULA_AI_BATCH_SIZE` | `1` | Production, Preview e Development |
 | `AULA_ACADEMIC_PIPELINE` | `true` | Production, Preview e Development |
 | `AULA_ACADEMIC_REVIEW` | `true` | Production, Preview e Development |
 | `AULA_AUTO_REPAIR` | `true` | Production, Preview e Development |
@@ -60,6 +62,21 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 12. Se uma semana estiver fraca ou precisar de outro foco, escreva a solicitação no final da prévia e clique em **Refazer esta semana com IA**. Somente a semana aberta será reescrita.
 
 Depois de alterar qualquer variável, abra **Deployments**, escolha a implantação mais recente e faça **Redeploy** para que a função receba os valores novos.
+
+### Erro 429: limite de tokens por minuto (TPM)
+
+Se aparecer uma mensagem como `Limit 30000, Used 23843, Requested 8631`, a chave está funcionando, mas a organização atingiu temporariamente o limite de tokens por minuto do modelo. Não adianta criar outra chave dentro da mesma organização: o limite é aplicado à organização/projeto/modelo.
+
+Para ampliar o limite:
+
+1. Abra <https://platform.openai.com/settings/organization/limits>.
+2. Confira a organização e o projeto associados à `OPENAI_API_KEY`.
+3. Veja a seção **Usage Tiers / Rate limits**.
+4. Use **Upgrade tier** quando a opção estiver disponível e conclua a etapa de créditos/uso solicitada pela OpenAI.
+5. Confirme o novo limite específico do modelo `gpt-4.1`.
+6. Faça **Redeploy** na Vercel somente se também tiver alterado variáveis de ambiente.
+
+O código já reduz o pico usando uma semana por vez (`AULA_AI_BATCH_SIZE=1`) e faz até três novas tentativas em respostas 429/503, respeitando `Retry-After`. Se ainda houver muitos 429, aguarde alguns segundos antes de clicar novamente e evite abrir várias gerações simultâneas. A OpenAI também recomenda manter `OPENAI_MAX_TOKENS` próximo do tamanho realmente esperado da resposta; para uma unidade menor, `10000–12000` pode reduzir o consumo de TPM, mas pode cortar uma aula que precise de mais espaço.
 
 ## O que a IA faz
 
@@ -77,7 +94,7 @@ O resultado também traz um checklist pedagógico: diagnóstico, checagens forma
 
 ### Perfil acadêmico e pipeline de texto
 
-O briefing possui um **Perfil acadêmico do conteúdo** com nível, profundidade, meta de palavras, mínimo de seções, referências, fontes acadêmicas/oficiais, escopo histórico, autores, quadros teóricos, tópicos a evitar e regras de contraponto, comparação e estudo de caso. Esses dados entram nos prompts e no checklist; não são apenas campos decorativos.
+O briefing possui um **Perfil acadêmico do conteúdo** com meta de palavras, mínimo de seções, referências, fontes acadêmicas/oficiais, escopo histórico, autores, quadros teóricos, tópicos a evitar e regras de contraponto, comparação e estudo de caso. Tema/área, público, nível da turma e profundidade são herdados automaticamente da **Identidade do curso**, sem preenchimento duplicado. Esses dados entram nos prompts e no checklist; não são apenas campos decorativos.
 
 Para evitar a geração superficial, a IA trabalha em três fases:
 
@@ -161,6 +178,8 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_CONTENT_MODEL=
 OPENAI_MAX_TOKENS=16000
+OPENAI_MAX_RETRIES=3
+AULA_AI_BATCH_SIZE=1
 AULA_ACADEMIC_PIPELINE=true
 AULA_ACADEMIC_REVIEW=true
 AULA_AUTO_REPAIR=true

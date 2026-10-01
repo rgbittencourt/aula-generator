@@ -18,3 +18,11 @@
 .profile-checks input{flex:0 0 auto;width:16px;height:16px;margin:1px 0 0;accent-color:var(--teal)}
 @media(max-width:900px){.profile-checks{grid-template-columns:1fr}.academic-profile-box{padding:17px}}
 @media(max-width:620px){.academic-profile-box{margin-top:18px;padding:15px}.academic-profile-box .field-grid + .field-grid{margin-top:14px}.profile-checks{gap:8px;margin-top:15px;padding-top:13px}}
+
+.academic-inherited{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 10px;padding:12px;border:1px solid #dfe8e6;border-radius:10px;background:#f2f8f6}
+.inherited-item{display:flex;flex-direction:column;gap:4px;min-width:0}
+.inherited-item span{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.inherited-item strong{overflow:hidden;color:#275d58;font-size:12px;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
+.inherited-note{display:block;margin:0 0 16px}
+@media(max-width:900px){.academic-inherited{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.academic-inherited{grid-template-columns:1fr 1fr;gap:8px;padding:10px}.inherited-item strong{font-size:11px}}

@@ -11,6 +11,17 @@ function parseJson(content) {
   return JSON.parse(text);
 }
 
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+function retryDelay(response, attempt) {
+  const retryAfter = Number(response.headers.get("retry-after"));
+  if (Number.isFinite(retryAfter) && retryAfter > 0) return Math.min(30000, Math.max(1000, retryAfter * 1000));
+  const reset = response.headers.get("x-ratelimit-reset-tokens") || response.headers.get("x-ratelimit-reset-project-tokens") || "";
+  const seconds = Number.parseFloat(reset);
+  if (Number.isFinite(seconds) && seconds > 0) return Math.min(30000, Math.max(1000, seconds * 1000));
+  return Math.min(30000, 1000 * (2 ** attempt) + Math.round(Math.random() * 500));
+}
+
 async function callJson(messages, options = {}) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -18,27 +29,37 @@ async function callJson(messages, options = {}) {
     error.code = "AI_KEY_MISSING";
     throw error;
   }
-  const response = await fetch(`${providerBase()}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: options.model || process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
-      temperature: options.temperature ?? 0.45,
-      max_tokens: Number(process.env.OPENAI_MAX_TOKENS || 16000),
-      response_format: { type: "json_object" },
-      messages
-    })
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
+  const maxAttempts = Math.max(1, Number(process.env.OPENAI_MAX_RETRIES || 3));
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const response = await fetch(`${providerBase()}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: options.model || process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
+        temperature: options.temperature ?? 0.45,
+        max_tokens: Number(process.env.OPENAI_MAX_TOKENS || 16000),
+        response_format: { type: "json_object" },
+        messages
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (response.ok) {
+      const content = payload?.choices?.[0]?.message?.content;
+      if (!content) throw new Error("A API de IA retornou uma resposta vazia.");
+      return parseJson(content);
+    }
     const detail = payload?.error?.message || `HTTP ${response.status}`;
+    const retryable = response.status === 429 || response.status === 503;
+    if (retryable && attempt < maxAttempts - 1) {
+      await wait(retryDelay(response, attempt));
+      continue;
+    }
     const error = new Error(`A API de IA recusou a solicitação: ${detail}`);
     error.code = "AI_PROVIDER_ERROR";
+    error.retryable = retryable;
     throw error;
   }
-  const content = payload?.choices?.[0]?.message?.content;
-  if (!content) throw new Error("A API de IA retornou uma resposta vazia.");
-  return parseJson(content);
+  throw new Error("A API de IA não respondeu após as tentativas configuradas.");
 }
 
 export function buildBriefingPrompt(input, missingFields = []) {
@@ -352,7 +373,7 @@ Retorne JSON completo agora.`;
 
 export async function generateWithAI(input) {
   const weeks = [];
-  const batchSize = Math.min(3, Math.max(1, Number(process.env.AULA_AI_BATCH_SIZE) || 3));
+  const batchSize = Math.min(3, Math.max(1, Number(process.env.AULA_AI_BATCH_SIZE) || 1));
   for (let start = 0; start < input.weeks; start += batchSize) {
     const batch = await Promise.all(Array.from({ length: Math.min(batchSize, input.weeks - start) }, (_, offset) => generateOneWeek(input, start + offset)));
     weeks.push(...batch);

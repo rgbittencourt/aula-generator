@@ -28,7 +28,9 @@ export const DEFAULT_ACADEMIC_PROFILE = Object.freeze({
 export function normalizeAcademicProfile(raw = {}, input = {}) {
   const source = object(raw);
   const level = text(source.level || input.academicLevel || input.level, DEFAULT_ACADEMIC_PROFILE.level);
-  const depth = text(source.depth, level.toLowerCase().includes("pós") || level.toLowerCase().includes("pos") ? "avançado" : DEFAULT_ACADEMIC_PROFILE.depth);
+  const normalizedLevel = level.toLowerCase();
+  const inheritedDepth = normalizedLevel.includes("avanç") || normalizedLevel.includes("avanc") || normalizedLevel.includes("pós") || normalizedLevel.includes("pos") ? "avançado" : normalizedLevel.includes("inici") || normalizedLevel.includes("bás") || normalizedLevel.includes("bas") ? "básico" : DEFAULT_ACADEMIC_PROFILE.depth;
+  const depth = text(source.depth, inheritedDepth);
   const hours = Math.max(0, Number(input.hoursPerWeek) || 0);
   const defaultWords = depth === "avançado" ? Math.max(3200, Math.round(hours * 700) || 3500) : depth === "básico" ? Math.max(1800, Math.round(hours * 500) || 2200) : Math.max(2400, Math.round(hours * 620) || 2800);
   return {

@@ -161,3 +161,10 @@ test("prompt acadêmico exige planejamento, evidência, fontes e revisão críti
   assert.match(prompt, /contraponto/i);
   assert.match(prompt, /não inventar dados bibliográficos/i);
 });
+
+test("herda identidade do curso no perfil acadêmico", () => {
+  const input = normalizeCourseInput({ title: "Gestão educacional", level: "Avançado", audience: "estudantes de graduação", weeks: 1, hoursPerWeek: 4 });
+  assert.equal(input.academicProfile.discipline, "Gestão educacional");
+  assert.equal(input.academicProfile.level, "Avançado");
+  assert.equal(input.academicProfile.depth, "avançado");
+});
