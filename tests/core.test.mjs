@@ -9,7 +9,7 @@ import { buildBriefingPrompt, buildWeekGenerationPrompt } from "../src/ai.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { createTeacherGuidePdf } from "../src/pdf.js";
 import { buildCourseProgression } from "../src/curriculum.js";
-import { measureLessonQuality } from "../src/content-quality.js";
+import { measureLessonQuality, qualityTargets } from "../src/content-quality.js";
 
 function hasBlock(lesson, type) {
   const visit = (blocks) => (blocks || []).some((block) => block.type === type || visit(block.props?.children));
@@ -61,7 +61,7 @@ test("prompt semanal exige unidade didática completa antes do cálculo de tempo
   const prompt = buildWeekGenerationPrompt(input, 4);
   assert.match(prompt, /uma semana de material didático/i);
   assert.match(prompt, /lessonPlan/i);
-  assert.match(prompt, /contentSections com 6–12/i);
+  assert.match(prompt, /contentSections com pelo menos/i);
   assert.match(prompt, /timePlan com targetMinutes 0/i);
   assert.match(prompt, /nunca invente URLs/i);
   assert.match(prompt, /teacherGuide/i);
@@ -69,6 +69,17 @@ test("prompt semanal exige unidade didática completa antes do cálculo de tempo
   assert.match(prompt, /REQUISITOS DE RECURSOS DESTA SEMANA/i);
   assert.match(prompt, /Ferramentas e Dashboards/i);
   assert.match(prompt, /Não começar por uma lista de softwares/i);
+});
+
+test("meta de 3.000 palavras vira piso textual com orçamento por seção", () => {
+  const input = normalizeCourseInput({ title: "Curso", weeks: 1, academicProfile: { targetWords: 3000, minimumSections: 6 } });
+  const target = qualityTargets(input);
+  const prompt = buildWeekGenerationPrompt(input, 0);
+  assert.equal(target.minimumWords, 3000);
+  assert.equal(target.requiredSectionCount, 7);
+  assert.match(prompt, /pelo menos 3000 palavras úteis/i);
+  assert.match(prompt, /aproximadamente 377 palavras/i);
+  assert.match(prompt, /não entregue uma versão aproximada ou resumida/i);
 });
 
 test("mapa longitudinal distribui o curso de gestão educacional sem repetir a mesma semana", () => {
@@ -208,7 +219,7 @@ test("prompt acadêmico exige planejamento, evidência, fontes e revisão críti
   const prompt = buildWeekGenerationPrompt(input, 0, { theme: "Estado e políticas educacionais", claimsRequiringEvidence: [{ claim: "afirmação" }] });
   assert.match(prompt, /Perfil acadêmico desta trilha/i);
   assert.match(prompt, /mapa de evidências/i);
-  assert.match(prompt, /fontes acadêmicas\/oficiais/i);
+  assert.match(prompt, /fonte\(s\) acadêmica\(s\) ou oficial\(is\)/i);
   assert.match(prompt, /contraponto/i);
   assert.match(prompt, /não inventar dados bibliográficos/i);
 });

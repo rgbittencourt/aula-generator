@@ -113,6 +113,36 @@ test("geração repara automaticamente uma semana em needs-review por ficar abai
   }
 });
 
+test("reparo marginal não é aceito como melhoria textual", async () => {
+  const previousFetch = global.fetch;
+  const previous = { key: process.env.OPENAI_API_KEY, singlePass: process.env.AULA_SINGLE_PASS, repair: process.env.AULA_AUTO_REPAIR, retries: process.env.OPENAI_MAX_RETRIES };
+  process.env.OPENAI_API_KEY = "test-key";
+  process.env.AULA_SINGLE_PASS = "true";
+  process.env.AULA_AUTO_REPAIR = "true";
+  process.env.OPENAI_MAX_RETRIES = "1";
+  let calls = 0;
+  const initial = qualityFixture(30);
+  const repaired = qualityFixture(32);
+  global.fetch = async () => {
+    calls += 1;
+    const fixture = calls === 1 ? initial : repaired;
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(fixture) } }] }), { status: 200 });
+  };
+  try {
+    const input = normalizeCourseInput({ title: "Curso de teste", weeks: 1, hoursPerWeek: 2, academicProfile: { targetWords: 3000, minimumReferences: 0, primarySourcesRequired: 0, requireCounterarguments: false } });
+    const result = await generateOneWeek(input, 0);
+    assert.equal(calls, 2);
+    assert.equal(result.lessonPlan.contentSections[0].body, initial.lessonPlan.contentSections[0].body);
+  } finally {
+    global.fetch = previousFetch;
+    for (const [key, value] of Object.entries(previous)) {
+      const envKey = { key: "OPENAI_API_KEY", singlePass: "AULA_SINGLE_PASS", repair: "AULA_AUTO_REPAIR", retries: "OPENAI_MAX_RETRIES" }[key];
+      if (value === undefined) delete process.env[envKey];
+      else process.env[envKey] = value;
+    }
+  }
+});
+
 test("regeneração corrige JSON inválido e repete a chamada", async () => {
   const previousFetch = global.fetch;
   const previousKey = process.env.OPENAI_API_KEY;
@@ -135,8 +165,8 @@ test("regeneração corrige JSON inválido e repete a chamada", async () => {
     const result = await regenerateWeekWithAI({ title: "Curso", weeks: 1, objectives: ["Aplicar"], content: "Conteúdo", webPractices: [] }, 0, { lessonPlan: { theme: "Semana atual" } }, "Corrija o exemplo.");
     assert.equal(calls, 2);
     assert.equal(requestBodies[0].max_tokens, 10000);
-    assert.equal(requestBodies[1].max_tokens, 7000);
-    assert.match(requestBodies[1].messages.at(-1).content, /versão compacta/i);
+    assert.equal(requestBodies[1].max_tokens, 10000);
+    assert.match(requestBodies[1].messages.at(-1).content, /somente.*lessonPlan/i);
     assert.equal(result.lessonPlan.theme, "Semana corrigida");
   } finally {
     global.fetch = previousFetch;

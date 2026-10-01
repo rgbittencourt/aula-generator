@@ -109,7 +109,7 @@ O botão de assistência completa somente campos vazios do briefing. A geração
 
 ### Controle de qualidade textual
 
-Antes de considerar uma semana pronta, o gerador verifica título específico, abertura, pelo menos quatro objetivos, cinco ou mais seções desenvolvidas, síntese, avaliação, blocos compatíveis com o Aula Studio e alinhamento entre objetivo, atividade, evidência e avaliação. A IA recebe uma exigência de texto longo e, se a primeira resposta ficar curta, executa uma segunda etapa de reparo editorial. A tela mostra palavras, seções, objetivos, nota estrutural e pendências.
+Antes de considerar uma semana pronta, o gerador verifica título específico, abertura, pelo menos quatro objetivos, seções desenvolvidas, síntese, avaliação, blocos compatíveis com o Aula Studio e alinhamento entre objetivo, atividade, evidência e avaliação. A meta configurada no Perfil acadêmico é tratada como **piso de palavras úteis**: uma meta de 3.000 exige pelo menos 3.000 palavras na medição da aula. O prompt distribui esse volume por seções e a tela mostra palavras, seções, objetivos, nota estrutural e pendências.
 
 O resultado também traz um checklist pedagógico: diagnóstico, checagens formativas, avaliação somativa com feedback, webprática completa quando houver, diferenciação, acessibilidade, recursos contextualizados e autoavaliação. Uma semana bloqueada deve ser refeita antes do uso no Aula Studio.
 
@@ -117,7 +117,7 @@ O resultado também traz um checklist pedagógico: diagnóstico, checagens forma
 
 As semanas não são mais geradas apenas contra a lista geral de objetivos do curso. O backend constrói um mapa longitudinal com tema, pergunta central, conceitos novos, objetivos específicos, sequência editorial, ponte entre semanas, marco de evidência e arco didático preferencial. Para o percurso de **Tecnologias para Gestão Educacional**, por exemplo, a sequência é: fundamentos; Governo Digital; SIGE; dados e Learning Analytics; dashboards; Vibe Coding e governança.
 
-Cada nova chamada recebe um resumo das semanas anteriores e uma regra explícita do que não deve ser repetido. A validação também compara títulos e objetivos entre semanas. Se uma semana ficar curta ou estruturalmente insuficiente, o modo `AULA_SINGLE_PASS=true` faz uma única tentativa adicional compacta, com orçamento menor, antes de devolvê-la para revisão humana.
+Cada nova chamada recebe um resumo das semanas anteriores e uma regra explícita do que não deve ser repetido. A validação também compara títulos e objetivos entre semanas. Se uma semana ficar curta, o modo `AULA_SINGLE_PASS=true` faz uma única reescrita textual: o reparo devolve somente `lessonPlan`, sem duplicar o guia do professor, usa quotas por seção e só aceita a versão se ela atingir o piso ou apresentar ganho substancial. Um acréscimo de 25, 45 ou 50 palavras não é tratado como correção; a semana permanece sinalizada para revisão em vez de gastar novas chamadas em melhorias marginais.
 
 ### Perfil acadêmico e pipeline de texto
 

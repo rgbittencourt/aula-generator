@@ -29,13 +29,20 @@ function sectionWords(section = {}) {
 export function qualityTargets(input = {}) {
   const profile = normalizeAcademicProfile(input.academicProfile, input);
   const targetWords = profile.targetWords;
-  const minimumWords = Math.max(1400, Math.round(targetWords * 0.90));
+  const sectionCount = Math.max(profile.minimumSections, targetWords >= 3000 ? 7 : 6);
+  const fixedWords = Math.max(300, Math.round(targetWords * 0.12));
+  const sectionTargetWords = Math.max(220, Math.round((targetWords - fixedWords) / sectionCount));
+  const minimumWords = Math.max(1400, targetWords);
   return {
     minimumWords,
     targetWords,
     minimumSections: profile.minimumSections,
+    requiredSectionCount: sectionCount,
+    sectionTargetWords,
+    sectionMinimumWords: Math.max(180, Math.round(sectionTargetWords * 0.88)),
+    sectionMaximumWords: Math.round(sectionTargetWords * 1.18),
     minimumObjectives: 4,
-    minimumSectionWords: Math.max(120, Math.round(targetWords / Math.max(4, profile.minimumSections * 1.65))),
+    minimumSectionWords: Math.max(180, Math.round(sectionTargetWords * 0.88)),
     minimumWelcomeWords: 80,
     minimumReferences: profile.minimumReferences,
     primarySourcesRequired: profile.primarySourcesRequired,
@@ -50,24 +57,31 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   const sections = Array.isArray(plan.contentSections) ? plan.contentSections : [];
   const objectives = Array.isArray(plan.learningObjectives) ? plan.learningObjectives.filter(Boolean) : [];
   const sectionWordCounts = sections.map(sectionWords);
-  const bodyText = [
+  const instructionalText = [
     plan.welcome,
     ...sections.flatMap((section) => [section.title, section.body, ...(section.subsections || []).flatMap((item) => [item.title, item.body]), section.caseStudy?.context, section.caseStudy?.data, section.reflection?.question, section.reflection?.body]),
     plan.synthesis,
     plan.nextWeekConnection,
     ...(Array.isArray(plan.glossary) ? plan.glossary.flatMap((item) => [item.term, item.definition]) : []),
+    plan.diagnostic?.prompt,
+    ...(Array.isArray(plan.activities) ? plan.activities.flatMap((item) => [item.title, item.instructions, item.evidence]) : []),
+    ...(Array.isArray(plan.formativeChecks) ? plan.formativeChecks.flatMap((item) => [item.prompt, item.feedback]) : [])
+  ].filter(Boolean).join(" ");
+  const metadataText = [
     ...(Array.isArray(plan.references) ? plan.references.flatMap((item) => [item?.citation || item?.title || item?.href || item, ...(item?.authors || [])]) : []),
     ...(Array.isArray(plan.assessment?.questions) ? plan.assessment.questions.flatMap((item) => [item.q, item.explanation, ...(item.options || [])]) : [])
   ].filter(Boolean).join(" ");
-  const words = wordCount(bodyText);
+  const words = wordCount(instructionalText);
+  const metadataWordCount = wordCount(metadataText);
   const title = text(plan.theme || lesson?.meta?.title);
   const hasSpecificTitle = Boolean(title) && !genericTitles.has(title.toLowerCase()) && !/^semana\s*\d+$/iu.test(title);
   const hasObjectives = objectives.length >= 1;
   const hasDetailedObjectives = objectives.length >= qualityTargets(input).minimumObjectives;
-  const hasSections = sections.length >= qualityTargets(input).minimumSections;
-  const hasDevelopedSections = sectionWordCounts.filter((count) => count >= qualityTargets(input).minimumSectionWords).length >= Math.min(4, qualityTargets(input).minimumSections);
+  const hasSections = sections.length >= qualityTargets(input).requiredSectionCount;
+  const hasDevelopedSections = sections.length >= qualityTargets(input).requiredSectionCount && sectionWordCounts.every((count) => count >= qualityTargets(input).minimumSectionWords);
   const hasWelcome = wordCount(plan.welcome) >= qualityTargets(input).minimumWelcomeWords;
-  const hasSynthesis = wordCount(plan.synthesis) >= 35;
+  const hasSynthesis = wordCount(plan.synthesis) >= 100;
+  const hasNextWeekConnection = wordCount(plan.nextWeekConnection) >= 60;
   const hasAssessment = Array.isArray(plan.assessment?.questions) && plan.assessment.questions.length >= 4;
   const hasHero = (lesson?.blocks || []).some((block) => block?.type === "hero" && text(block?.props?.title));
   const hasObjectiveBlock = (lesson?.blocks || []).some((block) => {
@@ -95,7 +109,7 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   const repeatedTheme = themeOverlap >= 0.8;
   const objectiveOverlap = objectives.length && peerObjectives.length ? Math.max(...objectives.map((objective) => Math.max(...peerObjectives.map((peerObjective) => overlap(signature(objective), signature(peerObjective)))))) : 0;
   const repetitionDetected = repeatedTheme || objectiveOverlap >= 0.78;
-  const hardChecks = [hasSpecificTitle, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, !target.requireCounterarguments || hasCounterpoint, !repetitionDetected];
+  const hardChecks = [hasSpecificTitle, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasNextWeekConnection, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, !target.requireCounterarguments || hasCounterpoint, !repetitionDetected];
   const passedHardChecks = hardChecks.filter(Boolean).length;
   const wordRatio = Math.min(1, words / Math.max(1, target.minimumWords));
   const score = Math.round((passedHardChecks / hardChecks.length) * 70 + wordRatio * 30);
@@ -107,6 +121,7 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   if (!hasWelcome) issues.push("boas-vindas ausentes ou curtas");
   if (words < target.minimumWords) issues.push(`conteúdo curto: ${words} palavras; piso ${target.minimumWords}`);
   if (!hasSynthesis) issues.push("síntese conceitual ausente ou curta");
+  if (!hasNextWeekConnection) issues.push("conexão com a próxima semana ausente ou curta");
   if (!hasAssessment) issues.push("avaliação alinhada ausente ou incompleta");
   if (!hasMinimumReferences) issues.push(`referências insuficientes: ${references.length}/${target.minimumReferences}`);
   if (!hasPrimarySources) issues.push(`fontes acadêmicas/oficiais insuficientes: ${primaryReferences.length}/${target.primarySourcesRequired}`);
@@ -118,11 +133,12 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   if (!hasHero) issues.push("bloco hero/título ausente no JSON");
   if (!hasObjectiveBlock) issues.push("bloco visível de objetivos ausente no JSON");
   if (!hasTopic) issues.push("tópico de conteúdo ausente ou vazio no JSON");
-  const structural = hasSpecificTitle && hasDetailedObjectives && hasSections && hasDevelopedSections && hasWelcome && hasHero && hasObjectiveBlock && hasTopic && hasPedagogicalAlignment && hasMinimumReferences && hasPrimarySources && hasEvidenceMap && (!target.requireCounterarguments || hasCounterpoint) && !repetitionDetected;
+  const structural = hasSpecificTitle && hasDetailedObjectives && hasSections && hasDevelopedSections && hasWelcome && hasSynthesis && hasNextWeekConnection && hasHero && hasObjectiveBlock && hasTopic && hasPedagogicalAlignment && hasMinimumReferences && hasPrimarySources && hasEvidenceMap && (!target.requireCounterarguments || hasCounterpoint) && !repetitionDetected;
   return {
     status: structural && words >= target.minimumWords && hasSynthesis && hasAssessment ? "complete" : structural ? "needs-review" : "insufficient",
     score,
     wordCount: words,
+    metadataWordCount,
     targetWords: target.targetWords,
     minimumWords: target.minimumWords,
     objectiveCount: objectives.length,
@@ -130,7 +146,7 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
     sectionWordCounts,
     passedHardChecks,
     totalHardChecks: hardChecks.length,
-    checks: { hasSpecificTitle, hasObjectives, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, hasCounterpoint, repetitionFree: !repetitionDetected },
+    checks: { hasSpecificTitle, hasObjectives, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasNextWeekConnection, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, hasCounterpoint, repetitionFree: !repetitionDetected },
     repetition: { detected: repetitionDetected, repeatedTheme, themeOverlap: Number(themeOverlap.toFixed(2)), objectiveOverlap: Number(objectiveOverlap.toFixed(2)), comparedWeeks: peerLessons.length },
     academic: { minimumReferences: target.minimumReferences, referenceCount: references.length, verifiedReferenceCount: verifiedReferences.length, primarySourceCount: primaryReferences.length, claimCount: claimEvidence.length, unsupportedClaimCount: unsupportedClaims.length },
     issues
@@ -140,5 +156,5 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
 export function qualityPromptGuidance(input = {}) {
   const target = qualityTargets(input);
   const profile = normalizeAcademicProfile(input.academicProfile, input);
-  return `PADRÃO ACADÊMICO CONFIGURADO: perfil ${profile.level}, profundidade ${profile.depth}, disciplina ${profile.discipline || "a definir"}. Escreva pelo menos ${target.minimumWords} palavras úteis (meta ${target.targetWords}), ${target.minimumSections} ou mais seções desenvolvidas, pelo menos ${target.minimumObjectives} objetivos observáveis e uma abertura de no mínimo ${target.minimumWelcomeWords} palavras. Entregue pelo menos ${target.minimumReferences} referências, incluindo ${target.primarySourcesRequired} fonte(s) acadêmica(s) ou oficial(is) — fontes acadêmicas/oficiais. Regra: não inventar dados bibliográficos. Nenhuma seção pode ter apenas uma frase. A semana precisa de título específico, síntese, avaliação e conexão com a próxima semana. ${target.requireCounterarguments ? "Inclua limite, controvérsia ou contraponto.\n" : ""}${target.requireConceptComparison ? "Compare conceitos próximos ou interpretações alternativas quando pertinente.\n" : ""}Toda afirmação central deve aparecer no mapa de evidências; quando não houver fonte, marque needs-human-review em vez de inventar dados.`;
+  return `PADRÃO ACADÊMICO CONFIGURADO: perfil ${profile.level}, profundidade ${profile.depth}, disciplina ${profile.discipline || "a definir"}. A meta de ${target.targetWords} palavras é um piso obrigatório de texto útil: não entregue uma versão aproximada ou resumida. Distribua o corpo em ${target.requiredSectionCount} seções desenvolvidas, com aproximadamente ${target.sectionTargetWords} palavras em cada seção (mínimo ${target.sectionMinimumWords}, máximo ${target.sectionMaximumWords}), além de abertura de ${target.minimumWelcomeWords}–160 palavras, síntese de pelo menos 100 palavras e conexão final de pelo menos 60 palavras. O total do texto deve atingir pelo menos ${target.minimumWords} palavras. Entregue pelo menos ${target.minimumObjectives} objetivos observáveis e ${target.minimumReferences} referências, incluindo ${target.primarySourcesRequired} fonte(s) acadêmica(s) ou oficial(is). Regra: não inventar dados bibliográficos. Nenhuma seção pode ter apenas uma frase ou ser substituída por uma lista. A semana precisa de título específico, síntese, avaliação e conexão com a próxima semana. ${target.requireCounterarguments ? "Inclua limite, controvérsia ou contraponto.\n" : ""}${target.requireConceptComparison ? "Compare conceitos próximos ou interpretações alternativas quando pertinente.\n" : ""}Toda afirmação central deve aparecer no mapa de evidências; quando não houver fonte, marque needs-human-review em vez de inventar dados.`;
 }

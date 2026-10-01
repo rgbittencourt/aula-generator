@@ -427,7 +427,7 @@ Esses quatro dados não precisam ser preenchidos novamente. No perfil acadêmico
 |---|---|
 | Estilo de citação | Autor-data, ABNT, APA ou sem preferência. |
 | Escopo histórico/geográfico | Delimita exemplos, casos e fontes. |
-| Meta de palavras | Alvo aproximado de texto útil por semana; não é preenchimento artificial. |
+| Meta de palavras | Piso mínimo de texto útil por semana; o gerador distribui a meta por seções e não aceita acréscimos marginais como correção. |
 | Mínimo de seções | Garante progressão em partes legíveis, com títulos específicos. |
 | Mínimo de referências | Piso de referências estruturadas que deverão ser conferidas. |
 | Fontes acadêmicas/oficiais | Quantidade mínima de fontes institucionais, acadêmicas ou oficiais. |
@@ -604,12 +604,12 @@ Responda somente JSON válido conforme o contrato solicitado. Nunca mostre sua v
 Antes do prompt semanal, o sistema calcula e injeta uma orientação equivalente a esta, com os valores do perfil atual:
 
 ```text
-PADRÃO ACADÊMICO CONFIGURADO: perfil {profile.level}, profundidade {profile.depth}, disciplina {profile.discipline ou "a definir"}. Escreva pelo menos {minimumWords} palavras úteis (meta {targetWords}), {minimumSections} ou mais seções desenvolvidas, pelo menos 4 objetivos observáveis e uma abertura de no mínimo 80 palavras. Entregue pelo menos {minimumReferences} referências, incluindo {primarySourcesRequired} fonte(s) acadêmica(s) ou oficial(is) — fontes acadêmicas/oficiais. Regra: não inventar dados bibliográficos. Nenhuma seção pode ter apenas uma frase. A semana precisa de título específico, síntese, avaliação e conexão com a próxima semana. {se requireCounterarguments: "Inclua limite, controvérsia ou contraponto."} {se requireConceptComparison: "Compare conceitos próximos ou interpretações alternativas quando pertinente."} Toda afirmação central deve aparecer no mapa de evidências; quando não houver fonte, marque needs-human-review em vez de inventar dados.
+PADRÃO ACADÊMICO CONFIGURADO: perfil {profile.level}, profundidade {profile.depth}, disciplina {profile.discipline ou "a definir"}. A meta de {targetWords} palavras é um piso obrigatório, não uma estimativa. Distribua o corpo em {requiredSectionCount} seções, com aproximadamente {sectionTargetWords} palavras por seção (mínimo {sectionMinimumWords}), além de abertura, síntese e conexão final. O total deve atingir pelo menos {minimumWords} palavras úteis. Entregue pelo menos 4 objetivos observáveis e {minimumReferences} referências, incluindo {primarySourcesRequired} fonte(s) acadêmica(s) ou oficial(is). Regra: não inventar dados bibliográficos. Nenhuma seção pode ter apenas uma frase. A semana precisa de título específico, síntese, avaliação e conexão com a próxima semana. {se requireCounterarguments: "Inclua limite, controvérsia ou contraponto."} {se requireConceptComparison: "Compare conceitos próximos ou interpretações alternativas quando pertinente."} Toda afirmação central deve aparecer no mapa de evidências; quando não houver fonte, marque needs-human-review em vez de inventar dados.
 ```
 
-O piso de palavras corresponde a 90% da meta configurada, nunca menos que 1.400 palavras. Assim, uma meta de 3.000 palavras exige pelo menos 2.700 antes de a semana ser considerada completa. A meta, o número mínimo de seções e o número mínimo de referências são ajustados automaticamente a partir do nível herdado da Identidade do curso e das escolhas específicas do Perfil acadêmico.
+O piso de palavras corresponde à própria meta configurada, nunca menos que 1.400 palavras. Assim, uma meta de 3.000 palavras exige pelo menos 3.000 antes de a semana ser considerada completa. A medição considera o texto didático do aluno — abertura, seções, exemplos, síntese, conexão e orientações de aprendizagem — e não pode ser inflada apenas com referências, alternativas de prova ou outros metadados. Para orientar a redação, o sistema calcula uma quantidade de seções e uma faixa de palavras por seção. A meta, o número mínimo de seções e o número mínimo de referências são ajustados automaticamente a partir do nível herdado da Identidade do curso e das escolhas específicas do Perfil acadêmico.
 
-O gerador também constrói um **mapa longitudinal** antes de redigir as semanas. Esse mapa distribui tema, pergunta central, conceitos novos, objetivos específicos, sequência editorial, ponte entre semanas, marco de evidência e arco didático. As chamadas seguintes recebem resumos das semanas já geradas e uma regra do que não repetir. Se uma resposta em `AULA_SINGLE_PASS=true` ficar estruturalmente insuficiente, uma única regeneração compacta é tentada antes de a semana ser devolvida para revisão humana.
+O gerador também constrói um **mapa longitudinal** antes de redigir as semanas. Esse mapa distribui tema, pergunta central, conceitos novos, objetivos específicos, sequência editorial, ponte entre semanas, marco de evidência e arco didático. As chamadas seguintes recebem resumos das semanas já geradas e uma regra do que não repetir. Se uma resposta em `AULA_SINGLE_PASS=true` ficar curta, uma única regeneração textual é tentada: ela retorna apenas `lessonPlan`, sem duplicar o guia do professor, e só é aceita se alcançar o piso ou crescer substancialmente. Uma correção que acrescente apenas poucas palavras não é aceita como solução.
 
 #### 10.1.4 Prompt de preenchimento assistido do briefing
 
@@ -707,10 +707,10 @@ O texto é o produto principal. Não entregue resumo, tópicos telegráficos, fr
 
 PADRÃO EDITORIAL DOS EXEMPLOS DE REFERÊNCIA:
 - escreva uma unidade com narrativa contínua, não uma coleção de tópicos; cada seção deve responder a uma pergunta e preparar a próxima;
-- produza 6–8 seções principais na sequência indicada, normalmente com 220–420 palavras substanciais em cada seção;
+- produza pelo menos `{requiredSectionCount}` seções principais na sequência indicada; cada corpo de seção deve ter aproximadamente `{sectionTargetWords}` palavras, nunca menos que `{sectionMinimumWords}`;
 - comece pela importância do problema e pelo contexto do estudante; depois defina conceitos, compare perspectivas, apresente um caso verificável, aplique critérios e discuta limites, riscos ou controvérsias;
 - insira recursos no ponto exato em que ajudam a entender o conceito, com finalidade e pergunta-guia; não crie uma galeria de links no final;
-- termine com síntese conceitual, conexão explícita com a próxima semana, glossário e avaliação alinhada; não finalize depois de apenas três seções.
+- termine com síntese conceitual de pelo menos 100 palavras, conexão explícita com a próxima semana de pelo menos 60 palavras, glossário e avaliação alinhada; não finalize depois de apenas três seções.
 
 MAPA LONGITUDINAL OBRIGATÓRIO:
 - tema e título específicos desta semana: {weekFocus.theme};
@@ -718,13 +718,13 @@ MAPA LONGITUDINAL OBRIGATÓRIO:
 - sequência editorial: {weekFocus.sectionSequence}; arco preferencial: {weekFocus.arc}; ponte recebida: {weekFocus.bridgeFromPrevious}; ponte seguinte: {weekFocus.bridgeToNext};
 - elementos obrigatórios: {weekFocus.mustInclude}; o que não repetir ou antecipar: {weekFocus.doNotRepeat}.
 
-Retorne somente este objeto de alto nível: { meta, lessonPlan, teacherGuide }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. teacherGuide é exclusivo do professor e nunca deve ser repetido no conteúdo do aluno.
+Retorne somente este objeto de alto nível: { meta, lessonPlan, teacherGuide }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. O lessonPlan é a prioridade; mantenha teacherGuide conciso e sem repetir o conteúdo da aula.
 
 lessonPlan obrigatório:
 - weekNumber, theme (título específico e informativo, nunca "Conteúdo da semana"), welcome (80–160 palavras, contextualizada e ligada ao percurso), didacticArc com sequence, phasePlan e omissionReasons. A phasePlan pode omitir etapas, mas deve justificar a omissão;
 - learningObjectives com 4–8 objetivos observáveis, específicos desta semana, usando verbos como explicar, comparar, analisar, aplicar, avaliar ou criar;
 - prerequisites e contentDensity;
-- contentSections com 6–12 seções/subseções quando a complexidade pedir. Cada seção deve ter number, title, didacticRole, body com 180–450 palavras substanciais, subsections, caseStudy quando pertinente, reflection quando pertinente, keyTerms e resources. A progressão deve ir do problema/pergunta para conceitos, exemplos ou evidências, aplicação e crítica. Não repita a mesma introdução em seções diferentes;
+- contentSections com pelo menos `{requiredSectionCount}` seções principais. Cada seção deve ter number, title, didacticRole, body com aproximadamente `{sectionTargetWords}` palavras (mínimo `{sectionMinimumWords}`), subsections, caseStudy quando pertinente, reflection quando pertinente, keyTerms e resources. A progressão deve ir do problema/pergunta para conceitos, exemplos ou evidências, aplicação e crítica. Não repita a mesma introdução em seções diferentes;
 - resources com videos, readingsRequired, readingsExtra, images, podcasts e datasets. Cada recurso deve conter title, source, author quando conhecido, href somente se foi fornecido no briefing ou retornado por um provedor, required, sectionNumber ou moment, objective, guidingQuestion, pedagogicalUse, durationMinutes, altText/caption/credit para imagens, searchQuery quando o link não estiver disponível, verificationStatus e requiresVerification;
 - webPractices: retorne sempre [] dentro de lessonPlan. Se houver prática programada para esta semana, desenvolva o projeto completo exclusivamente em teacherGuide.webPracticeProjects, com problem, context, studentRole, challenge, deliverable, prerequisites, materials, data, steps (cada uma com minutes, instructions e evidence), criteria, rubric com níveis, examples, revision, fallbackPlan, accessibility, prompts, artifacts e versões simplified/advanced;
 - diagnostic com pergunta/problema inicial, evidência esperada e feedback; formativeChecks com perguntas durante o texto, momento, evidência, feedback e ação de intervenção;
@@ -734,14 +734,14 @@ lessonPlan obrigatório:
 - accessibility com alternativas para baixa conexão, linguagem clara, uso em celular, diagramas e mídias;
 - selfAssessment com perguntas de autoavaliação, escala e feedback;
 - spiralReview com previousConceptsReviewed, newConcepts, preparationForNextWeek, cumulativeEvidence e projectMilestone;
-- synthesis com pelo menos 80 palavras, nextWeekConnection com pelo menos 40 palavras, glossary com 5–10 termos, references como objetos estruturados e assessment;
+- synthesis com pelo menos 100 palavras, nextWeekConnection com pelo menos 60 palavras, glossary com 5–10 termos, references como objetos estruturados e assessment;
 - claimEvidence: mapa de evidências com id, claim, sectionNumber, sourceIds, sourceType, supportLevel, verificationStatus e note. Afirmações sem fonte devem usar supportLevel "insufficient" e verificationStatus "needs-human-review";
 - assessment com normalmente 6 questões: 4 múltipla escolha com 4 alternativas e 2 verdadeiro/falso, alinhadas a objetivos e texto, com resposta e explicação;
 - timePlan com targetMinutes 0, items vazio e calculationMethod "derived-after-content".
 
 Regras de escrita:
 - escreva em {input.language}, com linguagem humana, clara, específica, variada e pedagogicamente provocadora;
-- produza aproximadamente {profile.targetWords} palavras e pelo menos {profile.minimumSections} seções substanciais; cada seção precisa de ideia central, explicação conceitual, exemplo/aplicação e limite ou pergunta crítica quando pertinente;
+- produza pelo menos `{targetWords}` palavras úteis no conjunto do texto do aluno. Essa é uma meta mínima operacional, não uma estimativa; conte e amplie antes de devolver o JSON. A aula do aluno tem prioridade absoluta sobre o guia do professor;
 - inclua pelo menos {profile.minimumReferences} referências, sendo {profile.primarySourcesRequired} acadêmica(s) ou oficial(is), sem inventar dados bibliográficos; use a política: {profile.sourcePolicy};
 - {counterpointRule}; {comparisonRule}; {caseStudyRule};
 - conecte o tema à realidade do público ({input.audience}) e do nível ({input.level}); use os exemplos, recortes regionais e instituições fornecidos no briefing;
@@ -863,7 +863,7 @@ Quando a medição estrutural ou a revisão crítica solicita reescrita, a chama
 [SYSTEM]
 {ACADEMIC_SYSTEM_PROMPT}
 
-Você está na etapa de reparo. Reescreva somente o que for necessário, sem alongamento artificial, mantendo o que já estiver correto.
+Você está na etapa de reparo textual. Priorize o texto do aluno e não faça um acréscimo marginal. Preserve fatos, referências e recursos válidos, mas reescreva as seções curtas até cumprir o piso de palavras e o orçamento por seção.
 
 [USER]
 A semana {weekNumber} abaixo foi rejeitada por insuficiência textual. Reescreva a unidade inteira, não faça um resumo e não remova conteúdo que já esteja bom.
@@ -873,7 +873,7 @@ A semana {weekNumber} abaixo foi rejeitada por insuficiência textual. Reescreva
 Problemas estruturais detectados: {quality.issues separados por "; " ou "conteúdo abaixo do padrão"}.
 Problemas acadêmicos detectados: {academicReview.issues.description separados por "; " ou "nenhum relatório disponível"}.
 
-Entregue somente { lessonPlan, teacherGuide }. lessonPlan precisa ter título específico, welcome, 4–8 objetivos observáveis, contentSections conforme o academicProfile, exemplos/caso/contraponto, synthesis, nextWeekConnection, glossary, references estruturadas, claimEvidence, assessment com 6 questões e timePlan. Não gere blocks. Não invente URLs ou referências verificadas; use searchQuery para recursos sem link. Preserve o mapa de evidências e marque toda pendência como needs-human-review.
+Entregue somente { "lessonPlan": { ... } }. Não gere blocks nem teacherGuide; o servidor preservará ou reconstruirá o guia do professor. O lessonPlan precisa ter título específico, welcome, 4–8 objetivos observáveis, pelo menos {requiredSectionCount} seções com aproximadamente {sectionTargetWords} palavras cada, exemplos/caso/contraponto, synthesis, nextWeekConnection, glossary, references estruturadas, claimEvidence, assessment com 6 questões e timePlan. A meta mínima é {minimumWords} palavras úteis. Não invente URLs ou referências verificadas; use searchQuery para recursos sem link. Preserve o mapa de evidências e marque toda pendência como needs-human-review.
 
 Semana a revisar:
 {raw.lessonPlan ou raw completo em JSON indentado}
@@ -930,7 +930,7 @@ Após a regeneração, o sistema revisa novamente a semana e recalcula o Planeja
 | Redação semanal | `0.42` | Prioriza texto desenvolvido com variação controlada. |
 | Curadoria de recursos | `0.45` | Escolhe apenas candidatos reais. |
 | Revisão crítica | `0.20` | Deve diagnosticar, não reescrever. |
-| Reparo | `0.35` | Reescreve sem alongamento artificial. |
+| Reparo | `0.35` | Reescreve as seções curtas até cumprir o piso e as quotas, sem aceitar acréscimos marginais. |
 | Regeneração | `0.35` | Altera somente a semana solicitada. |
 
 Todas as etapas usam o modelo definido por `OPENAI_CONTENT_MODEL`; se essa variável estiver vazia, usam `OPENAI_MODEL`. Todas usam `OPENAI_MAX_TOKENS`, `OPENAI_MAX_RETRIES` e o mecanismo de espera progressiva descrito na seção 10.2.

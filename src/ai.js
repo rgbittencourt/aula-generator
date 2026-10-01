@@ -1,5 +1,5 @@
 import { KNOWN_BLOCK_TYPES, normalizeLesson, normalizeWeeklyOutput, practiceScheduledForWeek, resourcePlanForWeek } from "./aula-schema.js";
-import { measureLessonQuality, qualityPromptGuidance } from "./content-quality.js";
+import { measureLessonQuality, qualityPromptGuidance, qualityTargets } from "./content-quality.js";
 import { buildTeacherGuide } from "./teacher-guide.js";
 import { ACADEMIC_SYSTEM_PROMPT, buildAcademicPlanPrompt, buildAcademicReviewPrompt, normalizeAcademicPlan, normalizeAcademicReview, normalizeAcademicProfile } from "./academic.js";
 import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
@@ -286,6 +286,7 @@ export function buildWeekGenerationPrompt(input, weekIndex = 0, academicPlan = n
   const weekFocus = progressionForWeek(input, weekIndex, progressionMap);
   const previous = weekFocus.bridgeFromPrevious || (weekNumber > 1 ? `A semana anterior foi a ${weekNumber - 1}; retome um conceito dela e mostre como esta semana avança.` : "Esta é a abertura do curso; construa a base conceitual e anuncie o percurso.");
   const profile = normalizeAcademicProfile(input.academicProfile, input);
+  const textBudget = qualityTargets(input);
   const scheduledPractices = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, weekIndex));
   const resourcePlan = resourcePlanForWeek(input, weekIndex);
   const previousSummaries = (previousWeeks || []).slice(-3).map((lesson, index) => ({
@@ -302,10 +303,10 @@ O texto é o produto principal. Não entregue resumo, tópicos telegráficos, fr
 
 PADRÃO EDITORIAL DOS EXEMPLOS DE REFERÊNCIA:
 - escreva uma unidade com narrativa contínua, não uma coleção de tópicos; cada seção deve responder a uma pergunta e preparar a próxima;
-- produza 6–8 seções principais na sequência indicada, normalmente com 220–420 palavras substanciais em cada seção, além de subseções quando o conceito exigir;
+- produza pelo menos ${textBudget.requiredSectionCount} seções principais na sequência indicada; cada corpo de seção deve ter aproximadamente ${textBudget.sectionTargetWords} palavras, nunca menos que ${textBudget.sectionMinimumWords} nem mais que ${textBudget.sectionMaximumWords}, além de subseções quando o conceito exigir;
 - comece pela importância do problema e pelo contexto do estudante; depois defina conceitos, compare perspectivas, apresente um caso verificável, aplique critérios e discuta limites, riscos ou controvérsias;
 - insira vídeos, imagens, artigos e documentos no ponto exato em que ajudam a entender a seção, com pergunta-guia e finalidade; não crie uma galeria de links no final;
-- termine com síntese conceitual, conexão explícita com a próxima semana, glossário e avaliação alinhada; não finalize depois de apenas três seções;
+- termine com síntese conceitual de pelo menos 100 palavras, conexão explícita com a próxima semana de pelo menos 60 palavras, glossário e avaliação alinhada; não finalize depois de apenas três seções;
 - antes de responder, confira internamente se cada objetivo específico aparece em pelo menos uma seção, atividade e questão de avaliação.
 
 MAPA LONGITUDINAL OBRIGATÓRIO — não ignore este bloco e não substitua seus objetivos por toda a lista geral do curso:
@@ -329,13 +330,13 @@ REQUISITOS DE RECURSOS DESTA SEMANA — cumpra estas quantidades sem inventar li
 Semanas já geradas (use somente para continuidade; não copie seus títulos, objetivos ou seções):
 ${JSON.stringify(previousSummaries, null, 2)}
 
-Retorne somente este objeto de alto nível: { meta, lessonPlan, teacherGuide }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. teacherGuide é exclusivo do professor e nunca deve ser repetido no conteúdo do aluno.
+Retorne somente este objeto de alto nível: { meta, lessonPlan, teacherGuide }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. O lessonPlan é a prioridade: cumpra primeiro o orçamento textual do aluno e mantenha teacherGuide conciso, sem repetir o conteúdo da aula.
 
 lessonPlan obrigatório:
 - weekNumber, theme (título específico e informativo, nunca "Conteúdo da semana"), welcome (80–160 palavras, contextualizada e ligada ao percurso), didacticArc com sequence, phasePlan e omissionReasons. A phasePlan pode omitir etapas, mas deve justificar a omissão;
 - learningObjectives com 4–8 objetivos observáveis, específicos desta semana, usando verbos como explicar, comparar, analisar, aplicar, avaliar ou criar;
 - prerequisites e contentDensity;
-- contentSections com 6–12 seções/subseções quando a complexidade pedir. Cada seção deve ter number, title, didacticRole, body com 180–450 palavras substanciais, subsections, caseStudy quando pertinente, reflection quando pertinente, keyTerms e resources. A progressão deve ir do problema/pergunta para conceitos, exemplos ou evidências, aplicação e crítica. Não repita a mesma introdução em seções diferentes;
+- contentSections com pelo menos ${textBudget.requiredSectionCount} seções principais. Cada seção deve ter number, title, didacticRole, body com aproximadamente ${textBudget.sectionTargetWords} palavras (mínimo ${textBudget.sectionMinimumWords}, máximo ${textBudget.sectionMaximumWords}), subsections, caseStudy quando pertinente, reflection quando pertinente, keyTerms e resources. A progressão deve ir do problema/pergunta para conceitos, exemplos ou evidências, aplicação e crítica. Não repita a mesma introdução em seções diferentes;
 - resources com videos, readingsRequired, readingsExtra, images, podcasts e datasets. Cada recurso deve conter title, source, author quando conhecido, href somente se foi fornecido no briefing ou retornado por um provedor, required, sectionNumber ou moment, objective, guidingQuestion, pedagogicalUse, durationMinutes, altText/caption/credit para imagens, searchQuery quando o link não estiver disponível, verificationStatus e requiresVerification;
 - webPractices: retorne sempre [] dentro de lessonPlan. Se houver prática programada para esta semana, desenvolva o projeto completo exclusivamente em teacherGuide.webPracticeProjects, com problem, context, studentRole, challenge, deliverable, prerequisites, materials, data, steps (cada uma com minutes, instructions e evidence), criteria, rubric com níveis, examples, revision, fallbackPlan, accessibility, prompts, artifacts e versões simplified/advanced;
 - diagnostic com pergunta/problema inicial, evidência esperada e feedback; formativeChecks com perguntas durante o texto, momento, evidência, feedback e ação de intervenção;
@@ -345,14 +346,14 @@ lessonPlan obrigatório:
 - accessibility com alternativas para baixa conexão, linguagem clara, uso em celular, diagramas e mídias;
 - selfAssessment com perguntas de autoavaliação, escala e feedback;
 - spiralReview com previousConceptsReviewed, newConcepts, preparationForNextWeek, cumulativeEvidence e projectMilestone;
-- synthesis com pelo menos 80 palavras, nextWeekConnection com pelo menos 40 palavras, glossary com 5–10 termos, references como objetos estruturados e assessment;
+- synthesis com pelo menos 100 palavras, nextWeekConnection com pelo menos 60 palavras, glossary com 5–10 termos, references como objetos estruturados e assessment;
 - claimEvidence: mapa de evidências com id, claim, sectionNumber, sourceIds, sourceType, supportLevel, verificationStatus e note. Afirmações sem fonte devem usar supportLevel "insufficient" e verificationStatus "needs-human-review";
 - assessment com normalmente 6 questões: 4 múltipla escolha com 4 alternativas e 2 verdadeiro/falso, alinhadas a objetivos e texto, com resposta e explicação;
 - timePlan com targetMinutes 0, items vazio e calculationMethod "derived-after-content".
 
 Regras de escrita:
 - escreva em ${input.language}, com linguagem humana, clara, específica, variada e pedagogicamente provocadora;
-- produza aproximadamente ${profile.targetWords} palavras e pelo menos ${profile.minimumSections} seções substanciais; cada seção precisa de ideia central, explicação conceitual, exemplo/aplicação e limite ou pergunta crítica quando pertinente;
+- produza pelo menos ${textBudget.targetWords} palavras úteis no conjunto do texto do aluno. Essa é uma meta mínima operacional, não uma estimativa: conte e amplie antes de devolver o JSON. A aula do aluno tem prioridade absoluta sobre o guia do professor;
 - inclua pelo menos ${profile.minimumReferences} referências, sendo ${profile.primarySourcesRequired} acadêmica(s) ou oficial(is), sem inventar dados bibliográficos; use a política: ${profile.sourcePolicy};
 - ${profile.requireCounterarguments ? "inclua pelo menos um contraponto, controvérsia ou limite" : "inclua contraponto apenas quando pertinente"}; ${profile.requireConceptComparison ? "compare conceitos próximos ou abordagens alternativas quando pertinente" : "não force comparação se ela não for pertinente"}; ${profile.requireCaseStudy ? "inclua estudo de caso ou exemplo contextualizado" : "use exemplo contextualizado quando ajudar"};
 - conecte o tema à realidade do público (${input.audience}) e do nível (${input.level}); use os exemplos, recortes regionais e instituições fornecidos no briefing;
@@ -362,7 +363,7 @@ Regras de escrita:
 - nunca invente URLs, DOI, durações, autores, números ou referências verificadas. Para recurso ainda não conferido, use searchQuery e verificationStatus "suggested-no-url";
 - não escreva markdown fora das strings do JSON e não inclua comentários.
 
-teacherGuide deve trazer purpose, didacticArc, alignmentMatrix, diagnostic, formativeChecks, mediationQuestions, commonMisconceptions, interventions, differentiation, accessibility, assessmentNotes, selfAssessment, spiralReview, resourceNotes, qualityReview e workloadAdvice. Se houver webprática programada, inclua em webPracticeProjects a preparação do professor e do aluno, agenda, roteiro com minutos, falas/prompts, produto, critérios, rubrica, plano B, acessibilidade e artefatos. Esse projeto será exportado em DOCX separado.
+teacherGuide deve trazer purpose, didacticArc, alignmentMatrix, diagnostic, formativeChecks, mediationQuestions, commonMisconceptions, interventions, differentiation, accessibility, assessmentNotes, selfAssessment, spiralReview, resourceNotes, qualityReview e workloadAdvice em formato conciso, sem copiar a aula. Se houver webprática programada, inclua em webPracticeProjects a preparação do professor e do aluno, agenda, roteiro com minutos, falas/prompts, produto, critérios, rubrica, plano B, acessibilidade e artefatos. Esse projeto será exportado em DOCX separado e é a única exceção que pode ser detalhada fora do texto do aluno.
 
 Perfil acadêmico desta trilha:
 ${JSON.stringify(profile, null, 2)}
@@ -409,7 +410,7 @@ ${JSON.stringify(academicPlan, null, 2)}
 
 Retorne JSON completo agora.`;
   return callJson([
-    { role: "system", content: `${ACADEMIC_SYSTEM_PROMPT}\n\nVocê está na etapa de reparo. Reescreva somente o que for necessário, sem alongamento artificial, mantendo o que já estiver correto.` },
+    { role: "system", content: `${ACADEMIC_SYSTEM_PROMPT}\n\nVocê está na etapa de reparo textual. Preserve o que estiver correto, mas cumpra o piso de palavras e as quotas por seção; não faça um acréscimo marginal nem devolva uma versão resumida.` },
     { role: "user", content: prompt }
   ], { temperature: 0.35 });
 }
@@ -482,13 +483,17 @@ export async function generateOneWeek(input, index, options = {}) {
   enforceWeekFocus(raw, weekFocus, weekNumber);
   const initialLesson = normalizeLesson(raw, input, index);
   const initialQuality = measureLessonQuality(initialLesson, input, { peerLessons: options.previousWeeks || [] });
-  if (!singlePass && process.env.AULA_AUTO_REPAIR !== "false" && (initialQuality.status !== "complete" || academicReview.rewriteRequired)) {
+  const repairableIssues = initialQuality.issues.some((issue) => /conteúdo curto|poucas seções|seções ainda|boas-vindas|síntese|avaliação|objetivos insuficientes|título principal|tópico de conteúdo|bloco hero|bloco visível|matriz/i.test(issue));
+  if (!singlePass && process.env.AULA_AUTO_REPAIR !== "false" && (repairableIssues || academicReview.rewriteRequired)) {
     try {
       const repaired = await repairWeekWithAI(input, index, raw, initialQuality, academicPlan, academicReview);
       const repairedLesson = normalizeLesson(repaired, input, index);
       const repairedQuality = measureLessonQuality(repairedLesson, input, { peerLessons: options.previousWeeks || [] });
-      if (repairedQuality.wordCount >= initialQuality.wordCount || repairedQuality.score > initialQuality.score) {
-        raw = repaired;
+      const requiredGain = Math.max(250, Math.round(qualityTargets(input).targetWords * 0.10));
+      const substantialRepair = repairedQuality.wordCount - initialQuality.wordCount >= requiredGain;
+      const reachesMinimum = repairedQuality.wordCount >= repairedQuality.minimumWords;
+      if (reachesMinimum || (substantialRepair && repairedQuality.score >= initialQuality.score)) {
+        raw = mergeRepairedResponse(raw, repaired);
         if (useAcademicPipeline && process.env.AULA_ACADEMIC_REVIEW !== "false") {
           try { academicReview = await reviewWeekWithAI(input, index, academicPlan, raw); } catch { /* preserva o relatório anterior */ }
         }
@@ -497,19 +502,22 @@ export async function generateOneWeek(input, index, options = {}) {
       // A versão inicial será devolvida com pendência explícita para revisão humana.
     }
   }
-  if (singlePass && process.env.AULA_AUTO_REPAIR !== "false" && initialQuality.status !== "complete") {
+  if (singlePass && process.env.AULA_AUTO_REPAIR !== "false" && (repairableIssues || initialQuality.status === "insufficient")) {
     try {
       const repaired = await regenerateWeekWithAI(
         input,
         index,
         initialLesson,
         `A análise automática encontrou estes problemas: ${initialQuality.issues.join("; ")}. Não devolva a semana ainda incompleta. Amplie substancialmente o texto até cumprir o piso de ${initialQuality.minimumWords} palavras e a meta de ${initialQuality.targetWords}, sem repetir outras semanas. Preserve o foco "${weekFocus.theme}", desenvolva as seções da sequência ${weekFocus.sectionSequence.join("; ")}, inclua um caso ou aplicação verificável, contraponto, síntese, conexão com a próxima semana e avaliação alinhada.`,
-        { maxTokens: 8000, retryMaxTokens: 6000, progression }
+        { maxTokens: regenerationTokenBudget(input), retryMaxTokens: regenerationTokenBudget(input), progression }
       );
       enforceWeekFocus(repaired, weekFocus, weekNumber);
       const repairedLesson = normalizeLesson(repaired, input, index);
       const repairedQuality = measureLessonQuality(repairedLesson, input, { peerLessons: options.previousWeeks || [] });
-      if (repairedQuality.status === "complete" || repairedQuality.wordCount > initialQuality.wordCount || repairedQuality.score > initialQuality.score) raw = repaired;
+      const requiredGain = Math.max(250, Math.round(qualityTargets(input).targetWords * 0.10));
+      const substantialRepair = repairedQuality.wordCount - initialQuality.wordCount >= requiredGain;
+      const reachesMinimum = repairedQuality.wordCount >= repairedQuality.minimumWords;
+      if (reachesMinimum || (substantialRepair && repairedQuality.score >= initialQuality.score)) raw = mergeRepairedResponse(raw, repaired);
     } catch {
       // Preserva a primeira versão com a pendência de qualidade visível ao professor.
     }
@@ -536,6 +544,24 @@ function compactRegenerationSection(section = {}) {
     counterpoint: clip(section.counterpoint, 800),
     didacticRole: section.didacticRole,
     resources: (section.resources || []).map((resource) => ({ title: resource.title, kind: resource.kind, href: resource.href, required: resource.required, objective: resource.objective, pedagogicalUse: resource.pedagogicalUse })).slice(0, 6)
+  };
+}
+
+function regenerationTokenBudget(input, options = {}) {
+  const target = qualityTargets(input).targetWords;
+  const configured = Number(options.maxTokens || process.env.OPENAI_REGEN_MAX_TOKENS || 10000);
+  // O reparo devolve apenas lessonPlan. Para 3.000 palavras, 8–10 mil
+  // tokens permitem texto substancial e JSON completo sem carregar o guia.
+  return Math.min(14000, Math.max(8000, configured, Math.ceil(target * 2.2)));
+}
+
+function mergeRepairedResponse(original, repaired) {
+  const base = original && typeof original === "object" ? original : {};
+  const next = repaired && typeof repaired === "object" ? repaired : {};
+  return {
+    ...base,
+    ...next,
+    teacherGuide: next.teacherGuide || base.teacherGuide || {}
   };
 }
 
@@ -579,14 +605,16 @@ export async function regenerateWeekWithAI(input, index, currentWeek, instructio
     timePlan: { targetMinutes: currentPlan.timePlan?.targetMinutes },
     didacticArc: { id: currentPlan.didacticArc?.id, label: currentPlan.didacticArc?.label, sequence: currentPlan.didacticArc?.sequence }
   };
+  const textBudget = qualityTargets(input);
   const prompt = `Refaça somente a semana ${weekNumber} do curso abaixo. O professor pediu esta alteração:
 
 "${String(instruction || "").trim()}"
 
-Preserve o que estiver bom, mas cumpra a solicitação de forma visível. A semana deve continuar sendo uma unidade didática completa, não um resumo. ${qualityPromptGuidance(input)}
+Preserve os fatos, referências e recursos válidos, mas cumpra a solicitação de forma visível. A semana deve continuar sendo uma unidade didática completa, não um resumo. ${qualityPromptGuidance(input)}
+Esta é uma correção de insuficiência textual. Não faça um acréscimo marginal de 20, 30 ou 50 palavras. Reescreva e amplie as seções abaixo do orçamento até atingir o piso de ${textBudget.minimumWords} palavras. Cada seção deve conter explicação conceitual, exemplo ou aplicação, consequência/limite e transição para a próxima. Se o texto atual estiver curto, substitua o corpo curto por um corpo desenvolvido; não apenas acrescente uma frase ao final.
 Faça uma revisão acadêmica explícita: corrija afirmações sem suporte, diferencie fato e interpretação, acrescente contraponto quando exigido, preserve o mapa de evidências e não invente fontes. ${normalizeAcademicProfile(input.academicProfile, input).sourcePolicy}
 
-Retorne apenas { lessonPlan, teacherGuide }. Não gere blocks; o servidor os monta para o Aula Studio. lessonPlan deve manter título específico, welcome, objetivos observáveis, seções conforme o perfil, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. lessonPlan.webPractices deve ser sempre []; não inclua qualquer descrição ou instrução da sessão prática no texto-base. Preserve um eventual projeto prático apenas em teacherGuide.webPracticeProjects. Não invente URLs ou fontes verificadas. Para evitar truncamento, não repita em teacherGuide objetivos, matriz, diagnóstico, checagens, avaliação, revisão espiral ou o conteúdo da aula; esses campos serão reconstruídos pelo servidor. Retorne somente orientações professorais específicas e, se não houver webprática, mantenha teacherGuide conciso.
+Retorne somente { "lessonPlan": { ... } }. Não gere blocks nem teacherGuide; o servidor preservará/reconstruirá o guia do professor. O lessonPlan deve manter título específico, welcome, objetivos observáveis, pelo menos ${textBudget.requiredSectionCount} seções conforme o orçamento, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. lessonPlan.webPractices deve ser sempre []; não inclua qualquer descrição ou instrução da sessão prática no texto-base. Não invente URLs ou fontes verificadas. A prioridade desta resposta é o texto substancial do aluno; não reduza o corpo para economizar tokens.
 
 Briefing essencial do curso:
 ${JSON.stringify(compactInput, null, 2)}
@@ -601,15 +629,15 @@ Semana atual, em formato compacto:
 ${JSON.stringify(compactWeek, null, 2)}
 
 Retorne JSON completo agora.`;
-  const regenerationMaxTokens = Math.min(Number(options.maxTokens || process.env.OPENAI_REGEN_MAX_TOKENS || 10000), 12000);
+  const regenerationMaxTokens = regenerationTokenBudget(input, options);
   let raw = await callJson([
     { role: "system", content: ACADEMIC_SYSTEM_PROMPT },
     { role: "user", content: prompt }
   ], {
     temperature: 0.35,
     maxTokens: regenerationMaxTokens,
-    retryMaxTokens: Math.min(regenerationMaxTokens, Number(options.retryMaxTokens || 7000)),
-    formatRetryInstruction: "A resposta anterior foi truncada ou continha JSON inválido. Refaça agora uma versão compacta, mas completa, do mesmo objeto. Mantenha 4 a 8 objetivos, 5 a 8 seções desenvolvidas, 4 a 6 questões avaliativas e os campos essenciais; não repita a aula no teacherGuide. Responda somente JSON válido, sem markdown, comentários, texto extra ou vírgulas finais."
+    retryMaxTokens: regenerationMaxTokens,
+    formatRetryInstruction: `A resposta anterior foi truncada ou continha JSON inválido. Refaça agora somente { "lessonPlan": { ... } }, sem teacherGuide e sem blocks. Preserve a meta mínima de ${textBudget.minimumWords} palavras, ${textBudget.requiredSectionCount} seções com aproximadamente ${textBudget.sectionTargetWords} palavras cada, síntese e avaliação. Responda somente JSON válido, sem markdown, comentários, texto extra ou vírgulas finais.`
   });
   let academicReview = { status: "not-run", issues: [], strengths: [], unsupportedClaims: [], rewriteRequired: false };
   if (!singlePass && process.env.AULA_ACADEMIC_REVIEW !== "false") {
@@ -621,7 +649,7 @@ Retorne JSON completo agora.`;
       if (process.env.AULA_ACADEMIC_REVIEW !== "false") academicReview = await reviewWeekWithAI(input, index, academicPlan, raw);
     } catch { /* a semana segue para revisão humana */ }
   }
-  return { ...raw, academicPlan, teacherGuide: { ...(raw?.teacherGuide || {}), academicPlan, academicReview, claimEvidence: raw?.lessonPlan?.claimEvidence || academicPlan.claimsRequiringEvidence || [] } };
+  return { ...raw, academicPlan, ...(raw?.teacherGuide ? { teacherGuide: { ...raw.teacherGuide, academicPlan, academicReview, claimEvidence: raw?.lessonPlan?.claimEvidence || academicPlan.claimsRequiringEvidence || [] } } : {}) };
 }
 
 export async function generateWithAI(input) {
