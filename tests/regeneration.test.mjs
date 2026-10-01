@@ -72,8 +72,10 @@ test("regeneração corrige JSON inválido e repete a chamada", async () => {
   process.env.OPENAI_API_KEY = "test-key";
   process.env.OPENAI_MAX_RETRIES = "2";
   let calls = 0;
+  const requestBodies = [];
   global.fetch = async (_url, options) => {
     calls += 1;
+    requestBodies.push(JSON.parse(options.body));
     if (calls === 1) {
       const malformed = '{"lessonPlan":{"theme":"Semana corrigida"},"teacherGuide":{oops:1}}';
       return new Response(JSON.stringify({ choices: [{ message: { content: malformed } }] }), { status: 200 });
@@ -84,6 +86,9 @@ test("regeneração corrige JSON inválido e repete a chamada", async () => {
   try {
     const result = await regenerateWeekWithAI({ title: "Curso", weeks: 1, objectives: ["Aplicar"], content: "Conteúdo", webPractices: [] }, 0, { lessonPlan: { theme: "Semana atual" } }, "Corrija o exemplo.");
     assert.equal(calls, 2);
+    assert.equal(requestBodies[0].max_tokens, 10000);
+    assert.equal(requestBodies[1].max_tokens, 7000);
+    assert.match(requestBodies[1].messages.at(-1).content, /versão compacta/i);
     assert.equal(result.lessonPlan.theme, "Semana corrigida");
   } finally {
     global.fetch = previousFetch;

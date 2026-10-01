@@ -90,8 +90,9 @@ async function callJson(messages, options = {}) {
   const maxAttempts = Math.max(1, Number(process.env.OPENAI_MAX_RETRIES || 3));
   let formatRetry = false;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const retryingFormat = formatRetry;
     const requestMessages = formatRetry
-      ? [...messages, { role: "user", content: "A resposta anterior veio em formato JSON inválido. Gere novamente exatamente o mesmo objeto, sem markdown, comentários ou texto fora do JSON; use aspas duplas em todas as propriedades e não deixe vírgula antes de } ou ]." }]
+      ? [...messages, { role: "user", content: options.formatRetryInstruction || "A resposta anterior veio em formato JSON inválido ou foi truncada. Gere novamente uma versão compacta e completa do mesmo objeto, sem markdown, comentários ou texto fora do JSON; use aspas duplas em todas as propriedades e não deixe vírgula antes de } ou ]." }]
       : messages;
     const response = await fetch(`${providerBase()}/chat/completions`, {
       method: "POST",
@@ -99,7 +100,7 @@ async function callJson(messages, options = {}) {
       body: JSON.stringify({
         model: options.model || process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
         temperature: options.temperature ?? 0.45,
-        max_tokens: Math.max(256, Number(options.maxTokens || process.env.OPENAI_MAX_TOKENS || 16000)),
+        max_tokens: Math.max(256, Number(retryingFormat ? (options.retryMaxTokens || options.maxTokens || process.env.OPENAI_MAX_TOKENS || 16000) : (options.maxTokens || process.env.OPENAI_MAX_TOKENS || 16000))),
         response_format: { type: "json_object" },
         messages: requestMessages
       })
@@ -434,6 +435,23 @@ export async function generateOneWeek(input, index, options = {}) {
   };
 }
 
+const clip = (value, limit) => String(value ?? "").slice(0, limit);
+
+function compactRegenerationSection(section = {}) {
+  return {
+    number: section.number,
+    title: section.title,
+    body: clip(section.body, 2800),
+    subsections: (section.subsections || []).map((sub) => ({ number: sub.number, title: sub.title, body: clip(sub.body, 900) })).slice(0, 4),
+    caseStudy: section.caseStudy ? { context: clip(section.caseStudy.context, 1100), data: clip(section.caseStudy.data, 800), question: clip(section.caseStudy.question, 400), response: clip(section.caseStudy.response, 400) } : null,
+    reflection: section.reflection ? { question: clip(section.reflection.question, 400), body: clip(section.reflection.body, 600) } : null,
+    keyTerms: (section.keyTerms || []).slice(0, 6),
+    counterpoint: clip(section.counterpoint, 800),
+    didacticRole: section.didacticRole,
+    resources: (section.resources || []).map((resource) => ({ title: resource.title, kind: resource.kind, href: resource.href, required: resource.required, objective: resource.objective, pedagogicalUse: resource.pedagogicalUse })).slice(0, 6)
+  };
+}
+
 export async function regenerateWeekWithAI(input, index, currentWeek, instruction) {
   const weekNumber = index + 1;
   const singlePass = process.env.AULA_SINGLE_PASS !== "false";
@@ -459,28 +477,17 @@ export async function regenerateWeekWithAI(input, index, currentWeek, instructio
     theme: currentPlan.theme,
     welcome: currentPlan.welcome,
     learningObjectives: currentPlan.learningObjectives || currentPlan.objectives,
-    contentSections: (currentPlan.contentSections || []).map((section) => ({
-      number: section.number,
-      title: section.title,
-      body: String(section.body || "").slice(0, 6500),
-      subsections: (section.subsections || []).map((sub) => ({ number: sub.number, title: sub.title, body: String(sub.body || "").slice(0, 3000) })).slice(0, 8),
-      caseStudy: section.caseStudy,
-      reflection: section.reflection,
-      keyTerms: section.keyTerms,
-      counterpoint: section.counterpoint,
-      didacticRole: section.didacticRole,
-      resources: (section.resources || []).map((resource) => ({ title: resource.title, kind: resource.kind, href: resource.href, required: resource.required, objective: resource.objective, pedagogicalUse: resource.pedagogicalUse })).slice(0, 8)
-    })).slice(0, 12),
-    activities: (currentPlan.activities || []).slice(0, 10),
-    formativeChecks: (currentPlan.formativeChecks || []).slice(0, 8),
-    synthesis: currentPlan.synthesis,
-    nextWeekConnection: currentPlan.nextWeekConnection,
-    glossary: (currentPlan.glossary || []).slice(0, 20),
-    references: (currentPlan.references || []).slice(0, 12),
-    claimEvidence: (currentPlan.claimEvidence || []).slice(0, 20),
-    assessment: { ...currentPlan.assessment, questions: (currentPlan.assessment?.questions || []).slice(0, 8) },
-    timePlan: currentPlan.timePlan,
-    didacticArc: currentPlan.didacticArc
+    contentSections: (currentPlan.contentSections || []).map(compactRegenerationSection).slice(0, 8),
+    activities: (currentPlan.activities || []).map((activity) => ({ id: activity.id, title: activity.title, type: activity.type, instructions: clip(activity.instructions, 1200), evidence: clip(activity.evidence, 600), durationMinutes: activity.durationMinutes })).slice(0, 8),
+    formativeChecks: (currentPlan.formativeChecks || []).map((check) => ({ id: check.id, moment: check.moment, prompt: clip(check.prompt || check.question, 800), feedback: clip(check.feedback, 800) })).slice(0, 6),
+    synthesis: clip(currentPlan.synthesis, 3000),
+    nextWeekConnection: clip(currentPlan.nextWeekConnection, 1600),
+    glossary: (currentPlan.glossary || []).slice(0, 12).map((item) => ({ term: item.term, definition: clip(item.definition, 500) })),
+    references: (currentPlan.references || []).slice(0, 8).map((item) => typeof item === "string" ? item : ({ citation: clip(item.citation || item.title, 700), href: item.href, verificationStatus: item.verificationStatus })),
+    claimEvidence: (currentPlan.claimEvidence || []).slice(0, 12).map((item) => ({ id: item.id, claim: clip(item.claim, 700), sourceIds: item.sourceIds, verificationStatus: item.verificationStatus, note: clip(item.note, 400) })),
+    assessment: { title: currentPlan.assessment?.title, format: currentPlan.assessment?.format, questions: (currentPlan.assessment?.questions || []).map((question) => ({ id: question.id, q: clip(question.q, 1000), options: (question.options || []).slice(0, 6).map((option) => clip(option, 350)), answer: question.answer, explanation: clip(question.explanation, 900) })).slice(0, 8) },
+    timePlan: { targetMinutes: currentPlan.timePlan?.targetMinutes },
+    didacticArc: { id: currentPlan.didacticArc?.id, label: currentPlan.didacticArc?.label, sequence: currentPlan.didacticArc?.sequence }
   };
   const prompt = `Refaça somente a semana ${weekNumber} do curso abaixo. O professor pediu esta alteração:
 
@@ -489,7 +496,7 @@ export async function regenerateWeekWithAI(input, index, currentWeek, instructio
 Preserve o que estiver bom, mas cumpra a solicitação de forma visível. A semana deve continuar sendo uma unidade didática completa, não um resumo. ${qualityPromptGuidance(input)}
 Faça uma revisão acadêmica explícita: corrija afirmações sem suporte, diferencie fato e interpretação, acrescente contraponto quando exigido, preserve o mapa de evidências e não invente fontes. ${normalizeAcademicProfile(input.academicProfile, input).sourcePolicy}
 
-Retorne apenas { lessonPlan, teacherGuide }. Não gere blocks; o servidor os monta para o Aula Studio. lessonPlan deve manter título específico, welcome, objetivos observáveis, seções conforme o perfil, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. lessonPlan.webPractices deve ser sempre []; não inclua qualquer descrição ou instrução da sessão prática no texto-base. Preserve um eventual projeto prático apenas em teacherGuide.webPracticeProjects. Não invente URLs ou fontes verificadas.
+Retorne apenas { lessonPlan, teacherGuide }. Não gere blocks; o servidor os monta para o Aula Studio. lessonPlan deve manter título específico, welcome, objetivos observáveis, seções conforme o perfil, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. lessonPlan.webPractices deve ser sempre []; não inclua qualquer descrição ou instrução da sessão prática no texto-base. Preserve um eventual projeto prático apenas em teacherGuide.webPracticeProjects. Não invente URLs ou fontes verificadas. Para evitar truncamento, não repita em teacherGuide objetivos, matriz, diagnóstico, checagens, avaliação, revisão espiral ou o conteúdo da aula; esses campos serão reconstruídos pelo servidor. Retorne somente orientações professorais específicas e, se não houver webprática, mantenha teacherGuide conciso.
 
 Briefing essencial do curso:
 ${JSON.stringify(compactInput, null, 2)}
@@ -501,10 +508,16 @@ Semana atual, em formato compacto:
 ${JSON.stringify(compactWeek, null, 2)}
 
 Retorne JSON completo agora.`;
+  const regenerationMaxTokens = Math.min(Number(process.env.OPENAI_REGEN_MAX_TOKENS || 10000), 12000);
   let raw = await callJson([
     { role: "system", content: ACADEMIC_SYSTEM_PROMPT },
     { role: "user", content: prompt }
-  ], { temperature: 0.35, maxTokens: Math.min(Number(process.env.OPENAI_REGEN_MAX_TOKENS || 10000), 12000) });
+  ], {
+    temperature: 0.35,
+    maxTokens: regenerationMaxTokens,
+    retryMaxTokens: Math.min(regenerationMaxTokens, 7000),
+    formatRetryInstruction: "A resposta anterior foi truncada ou continha JSON inválido. Refaça agora uma versão compacta, mas completa, do mesmo objeto. Mantenha 4 a 8 objetivos, 5 a 8 seções desenvolvidas, 4 a 6 questões avaliativas e os campos essenciais; não repita a aula no teacherGuide. Responda somente JSON válido, sem markdown, comentários, texto extra ou vírgulas finais."
+  });
   let academicReview = { status: "not-run", issues: [], strengths: [], unsupportedClaims: [], rewriteRequired: false };
   if (!singlePass && process.env.AULA_ACADEMIC_REVIEW !== "false") {
     try { academicReview = await reviewWeekWithAI(input, index, academicPlan, raw); } catch { academicReview = { status: "needs-human-review", issues: [{ severity: "high", type: "review-unavailable", description: "A revisão acadêmica automática não pôde ser concluída.", suggestedRepair: "Faça a conferência humana antes da exportação." }], strengths: [], unsupportedClaims: [], rewriteRequired: true }; }
