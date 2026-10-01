@@ -1010,6 +1010,24 @@ async function downloadTeacherPdf() {
   finally { button.disabled = false; button.classList.remove("is-loading"); }
 }
 
+async function recalculateQuality() {
+  if (!state.weeks.length || isGitHubPages) { if (isGitHubPages) showError("O recálculo do curso está disponível na versão Vercel com backend."); return; }
+  const button = $("#recalculate-button");
+  button.disabled = true; button.classList.add("is-loading");
+  try {
+    const headers = { "Content-Type": "application/json" };
+    const accessCode = $("#access-code")?.value.trim();
+    if (accessCode) headers["x-aula-access-code"] = accessCode;
+    const response = await fetch("/api/assemble-course", { method: "POST", headers, body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
+    const data = await readApiResponse(response, "Não foi possível recalcular a qualidade do curso.");
+    renderWeeks({ ...data, input: state.input });
+    $("#result-alert").className = "result-alert";
+    $("#result-alert").textContent = "Qualidade, checklist e carga recalculados sem nova chamada de IA.";
+    $("#result-alert").classList.remove("hidden");
+  } catch (error) { showError(error.message); }
+  finally { button.disabled = false; button.classList.remove("is-loading"); }
+}
+
 async function loadHealth() {
   const status = $("#api-status");
   if (isGitHubPages) {
@@ -1057,6 +1075,7 @@ $("#fallback-button").addEventListener("click", () => generate(true));
 $("#assist-button").addEventListener("click", assistBriefing);
 $("#zip-button").addEventListener("click", downloadZip);
 $("#teacher-pdf-button").addEventListener("click", downloadTeacherPdf);
+$("#recalculate-button").addEventListener("click", recalculateQuality);
 $("#close-lesson-modal").addEventListener("click", closeLessonPreview);
 $("#close-lesson-modal-secondary").addEventListener("click", closeLessonPreview);
 $("#regenerate-week-button").addEventListener("click", regenerateSelectedWeek);
