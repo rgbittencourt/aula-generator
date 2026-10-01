@@ -113,6 +113,12 @@ Antes de considerar uma semana pronta, o gerador verifica título específico, a
 
 O resultado também traz um checklist pedagógico: diagnóstico, checagens formativas, avaliação somativa com feedback, webprática completa quando houver, diferenciação, acessibilidade, recursos contextualizados e autoavaliação. Uma semana bloqueada deve ser refeita antes do uso no Aula Studio.
 
+### Progressão longitudinal
+
+As semanas não são mais geradas apenas contra a lista geral de objetivos do curso. O backend constrói um mapa longitudinal com tema, pergunta central, conceitos novos, objetivos específicos, sequência editorial, ponte entre semanas, marco de evidência e arco didático preferencial. Para o percurso de **Tecnologias para Gestão Educacional**, por exemplo, a sequência é: fundamentos; Governo Digital; SIGE; dados e Learning Analytics; dashboards; Vibe Coding e governança.
+
+Cada nova chamada recebe um resumo das semanas anteriores e uma regra explícita do que não deve ser repetido. A validação também compara títulos e objetivos entre semanas. Se uma semana ficar curta ou estruturalmente insuficiente, o modo `AULA_SINGLE_PASS=true` faz uma única tentativa adicional compacta, com orçamento menor, antes de devolvê-la para revisão humana.
+
 ### Perfil acadêmico e pipeline de texto
 
 O briefing possui um **Perfil acadêmico do conteúdo** com meta de palavras, mínimo de seções, referências, fontes acadêmicas/oficiais, escopo histórico, autores, quadros teóricos, tópicos a evitar e regras de contraponto, comparação e estudo de caso. Tema/área, público, nível da turma e profundidade são herdados automaticamente da **Identidade do curso**, sem preenchimento duplicado. Esses dados entram nos prompts e no checklist; não são apenas campos decorativos.
@@ -123,7 +129,7 @@ Para evitar a geração superficial, a IA possui um pipeline acadêmico completo
 2. **Redação:** escreve a semana completa para o aluno e o guia separado do professor, incluindo `claimEvidence` e referências estruturadas.
 3. **Revisão crítica:** procura superficialidade, desalinhamento, repetição, fonte inventada, afirmação sem suporte, falta de contraponto e problemas de acessibilidade. Se necessário, executa um reparo e revisa novamente.
 
-O manual contém os prompts efetivos e o contrato JSON de cada fase. A produção usa por padrão `AULA_SINGLE_PASS=true`: o prompt acadêmico completo é executado uma semana por vez, e a validação humana/estrutural ocorre antes da exportação. O pipeline de planejamento, revisão e reparo adicionais pode ser ativado com `AULA_SINGLE_PASS=false`, quando houver margem de duração na hospedagem.
+O manual contém os prompts efetivos e o contrato JSON de cada fase. A produção usa por padrão `AULA_SINGLE_PASS=true`: o prompt acadêmico completo é executado uma semana por vez, com mapa longitudinal e continuidade das semanas anteriores. Se o resultado for insuficiente, uma única regeneração compacta tenta ampliar a unidade sem duplicar o guia do professor. O pipeline de planejamento, revisão e reparo acadêmico adicionais pode ser ativado com `AULA_SINGLE_PASS=false`, quando houver margem de duração na hospedagem.
 
 ### Por que a geração agora é dividida por semana
 

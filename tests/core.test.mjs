@@ -8,6 +8,8 @@ import { createWeeksZip } from "../src/zip.js";
 import { buildBriefingPrompt, buildWeekGenerationPrompt } from "../src/ai.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { createTeacherGuidePdf } from "../src/pdf.js";
+import { buildCourseProgression } from "../src/curriculum.js";
+import { measureLessonQuality } from "../src/content-quality.js";
 
 function hasBlock(lesson, type) {
   const visit = (blocks) => (blocks || []).some((block) => block.type === type || visit(block.props?.children));
@@ -45,14 +47,39 @@ test("prompt do assistente exige práticas distintas, materiais alinhados e font
 });
 
 test("prompt semanal exige unidade didática completa antes do cálculo de tempo", () => {
-  const input = normalizeCourseInput({ title: "Gestão educacional", weeks: 4, hoursPerWeek: 10, objectives: ["Analisar políticas públicas"] });
-  const prompt = buildWeekGenerationPrompt(input, 0);
+  const input = normalizeCourseInput({ title: "Tecnologias para Gestão Educacional", weeks: 6, hoursPerWeek: 10, objectives: ["Analisar políticas públicas"] });
+  const prompt = buildWeekGenerationPrompt(input, 4);
   assert.match(prompt, /uma semana de material didático/i);
   assert.match(prompt, /lessonPlan/i);
   assert.match(prompt, /contentSections com 6–12/i);
   assert.match(prompt, /timePlan com targetMinutes 0/i);
   assert.match(prompt, /nunca invente URLs/i);
   assert.match(prompt, /teacherGuide/i);
+  assert.match(prompt, /MAPA LONGITUDINAL OBRIGATÓRIO/i);
+  assert.match(prompt, /Ferramentas e Dashboards/i);
+  assert.match(prompt, /Não começar por uma lista de softwares/i);
+});
+
+test("mapa longitudinal distribui o curso de gestão educacional sem repetir a mesma semana", () => {
+  const input = normalizeCourseInput({ title: "Tecnologias para Gestão Educacional", weeks: 6, objectives: ["Analisar fundamentos", "Avaliar políticas", "Comparar sistemas", "Interpretar dados", "Explorar ferramentas", "Planejar inovação"] });
+  const progression = buildCourseProgression(input);
+  assert.equal(progression.weeks.length, 6);
+  assert.equal(new Set(progression.weeks.map((week) => week.theme)).size, 6);
+  assert.equal(new Set(progression.weeks.map((week) => week.arc)).size >= 4, true);
+  assert.match(progression.weeks[1].theme, /Governo Digital/i);
+  assert.match(progression.weeks[2].theme, /SIGE|SIGAA|SUAP/i);
+  assert.match(progression.weeks[3].theme, /Learning Analytics/i);
+  assert.match(progression.weeks[4].theme, /Dashboard/i);
+  assert.match(progression.weeks[5].theme, /Vibe Coding/i);
+});
+
+test("qualidade detecta repetição de tema ou objetivo entre semanas", () => {
+  const input = normalizeCourseInput({ title: "Curso", weeks: 2, objectives: ["Analisar o tema"] });
+  const lesson = { lessonPlan: { theme: "Fundamentos do tema", learningObjectives: ["Analisar o tema"] } };
+  const quality = measureLessonQuality(lesson, input, { peerLessons: [{ lessonPlan: { theme: "Fundamentos do tema", learningObjectives: ["Analisar o tema"] } }] });
+  assert.equal(quality.repetition.detected, true);
+  assert.equal(quality.checks.repetitionFree, false);
+  assert.match(quality.issues.join(" "), /repetição longitudinal/i);
 });
 
 test("normaliza aula rica sem perder recursos, avaliação e metadados", () => {

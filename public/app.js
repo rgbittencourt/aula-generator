@@ -748,7 +748,19 @@ async function generateDistributed(input, accessCode, button) {
     const response = await fetch("/api/generate-week", {
       method: "POST",
       headers,
-      body: JSON.stringify({ input, weekIndex: index })
+      body: JSON.stringify({
+        input,
+        weekIndex: index,
+        previousWeeks: weeks.filter(Boolean).map((lesson) => ({
+          meta: { weekNumber: lesson.meta?.weekNumber, title: lesson.meta?.title },
+          lessonPlan: {
+            weekNumber: lesson.lessonPlan?.weekNumber,
+            theme: lesson.lessonPlan?.theme,
+            learningObjectives: (lesson.lessonPlan?.learningObjectives || []).slice(0, 4),
+            contentSections: (lesson.lessonPlan?.contentSections || []).map((section) => ({ title: section.title })).slice(0, 8)
+          }
+        }))
+      })
     });
     const data = await readApiResponse(response, `Não foi possível gerar a semana ${index + 1}.`);
     weeks[index] = data.week;

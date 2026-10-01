@@ -3,6 +3,7 @@ import { normalizeCourseInput, normalizeLesson } from "../src/aula-schema.js";
 import { generateOneWeek } from "../src/ai.js";
 import { enrichLessonsWithResources } from "../src/research.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
+import { buildCourseProgression } from "../src/curriculum.js";
 
 export default async function handler(request, response) {
   response.setHeader("Cache-Control", "no-store");
@@ -11,7 +12,7 @@ export default async function handler(request, response) {
   try {
     const input = normalizeCourseInput(request.body?.input || request.body || {});
     const index = Math.max(0, Math.min(input.weeks - 1, Number.parseInt(request.body?.weekIndex, 10) || 0));
-    const raw = await generateOneWeek(input, index);
+    const raw = await generateOneWeek(input, index, { progression: buildCourseProgression(input), previousWeeks: request.body?.previousWeeks || [] });
     const normalized = normalizeLesson(raw, input, index);
     const researched = process.env.AULA_RESOURCE_RESEARCH === "false"
       ? normalized

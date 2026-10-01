@@ -2,6 +2,7 @@ import { KNOWN_BLOCK_TYPES, normalizeLesson, normalizeWeeklyOutput, practiceSche
 import { measureLessonQuality, qualityPromptGuidance } from "./content-quality.js";
 import { buildTeacherGuide } from "./teacher-guide.js";
 import { ACADEMIC_SYSTEM_PROMPT, buildAcademicPlanPrompt, buildAcademicReviewPrompt, normalizeAcademicPlan, normalizeAcademicReview, normalizeAcademicProfile } from "./academic.js";
+import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
 
 const providerBase = () => (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
 
@@ -275,16 +276,48 @@ Retorne somente o JSON. Não escreva explicações fora dele.`;
 
 const BLOCK_TYPES = [...KNOWN_BLOCK_TYPES].join(", ");
 
-export function buildWeekGenerationPrompt(input, weekIndex = 0, academicPlan = null) {
+export function buildWeekGenerationPrompt(input, weekIndex = 0, academicPlan = null, progression = null, previousWeeks = []) {
   const weekNumber = weekIndex + 1;
-  const previous = weekNumber > 1 ? `A semana anterior foi a ${weekNumber - 1}; retome um conceito dela e mostre como esta semana avança.` : "Esta é a abertura do curso; construa a base conceitual e anuncie o percurso.";
+  const progressionMap = progression || buildCourseProgression(input);
+  const weekFocus = progressionForWeek(input, weekIndex, progressionMap);
+  const previous = weekFocus.bridgeFromPrevious || (weekNumber > 1 ? `A semana anterior foi a ${weekNumber - 1}; retome um conceito dela e mostre como esta semana avança.` : "Esta é a abertura do curso; construa a base conceitual e anuncie o percurso.");
   const profile = normalizeAcademicProfile(input.academicProfile, input);
   const scheduledPractices = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, weekIndex));
+  const previousSummaries = (previousWeeks || []).slice(-3).map((lesson, index) => ({
+    weekNumber: lesson?.lessonPlan?.weekNumber || index + 1,
+    theme: lesson?.lessonPlan?.theme || lesson?.meta?.title,
+    objectives: (lesson?.lessonPlan?.learningObjectives || []).slice(0, 4),
+    sectionTitles: (lesson?.lessonPlan?.contentSections || []).map((section) => section.title).filter(Boolean).slice(0, 8)
+  }));
   return `Gere UMA semana de material didático: uma unidade didática semanal completa em JSON para o curso abaixo. Esta é a semana ${weekNumber} de ${input.weeks}. ${previous}
 
 ${qualityPromptGuidance(input)}
 
 O texto é o produto principal. Não entregue resumo, tópicos telegráficos, frases soltas, uma lista de links ou apenas instruções para o professor. Escreva para o estudante ler e aprender. O padrão de referência é uma aula em DOCX com abertura, objetivos, explicação conceitual, exemplos, casos, contrapontos críticos, síntese, glossário, referências e avaliação. Varie o arco didático conforme o tema. Webpráticas são aulas síncronas/laboratórios separados: nunca descreva, anuncie, instrua ou transforme a webprática em conteúdo-base desta semana.
+
+PADRÃO EDITORIAL DOS EXEMPLOS DE REFERÊNCIA:
+- escreva uma unidade com narrativa contínua, não uma coleção de tópicos; cada seção deve responder a uma pergunta e preparar a próxima;
+- produza 6–8 seções principais na sequência indicada, normalmente com 220–420 palavras substanciais em cada seção, além de subseções quando o conceito exigir;
+- comece pela importância do problema e pelo contexto do estudante; depois defina conceitos, compare perspectivas, apresente um caso verificável, aplique critérios e discuta limites, riscos ou controvérsias;
+- insira vídeos, imagens, artigos e documentos no ponto exato em que ajudam a entender a seção, com pergunta-guia e finalidade; não crie uma galeria de links no final;
+- termine com síntese conceitual, conexão explícita com a próxima semana, glossário e avaliação alinhada; não finalize depois de apenas três seções;
+- antes de responder, confira internamente se cada objetivo específico aparece em pelo menos uma seção, atividade e questão de avaliação.
+
+MAPA LONGITUDINAL OBRIGATÓRIO — não ignore este bloco e não substitua seus objetivos por toda a lista geral do curso:
+- Tema e título desta semana: ${weekFocus.theme}
+- Pergunta central: ${weekFocus.centralQuestion}
+- Objetivos específicos desta semana: ${JSON.stringify(weekFocus.objectives)}
+- Conceitos novos que precisam ser definidos: ${JSON.stringify(weekFocus.newConcepts)}
+- Sequência editorial sugerida: ${JSON.stringify(weekFocus.sectionSequence)}
+- Arco didático preferencial: ${weekFocus.arc}
+- Ponte recebida: ${weekFocus.bridgeFromPrevious}
+- Ponte para a próxima semana: ${weekFocus.bridgeToNext}
+- Marco/evidência da etapa: ${weekFocus.projectMilestone}
+- Elementos obrigatórios: ${JSON.stringify(weekFocus.mustInclude)}
+- O que não repetir nem antecipar: ${weekFocus.doNotRepeat}
+
+Semanas já geradas (use somente para continuidade; não copie seus títulos, objetivos ou seções):
+${JSON.stringify(previousSummaries, null, 2)}
 
 Retorne somente este objeto de alto nível: { meta, lessonPlan, teacherGuide }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. teacherGuide é exclusivo do professor e nunca deve ser repetido no conteúdo do aluno.
 
@@ -323,6 +356,9 @@ teacherGuide deve trazer purpose, didacticArc, alignmentMatrix, diagnostic, form
 
 Perfil acadêmico desta trilha:
 ${JSON.stringify(profile, null, 2)}
+
+Mapa completo do curso para garantir progressão e não repetição:
+${JSON.stringify(progressionMap, null, 2)}
 
 Planejamento acadêmico prévio desta semana:
 ${JSON.stringify(academicPlan || { status: "não disponível; construa um plano interno antes de escrever" }, null, 2)}
@@ -376,48 +412,71 @@ async function reviewWeekWithAI(input, index, academicPlan, draft) {
   return normalizeAcademicReview(rawReview);
 }
 
-async function planWeekWithAI(input, index) {
+async function planWeekWithAI(input, index, progression = null) {
+  const weekFocus = progressionForWeek(input, index, progression || buildCourseProgression(input));
   try {
     const rawPlan = await callJson([
       { role: "system", content: `${ACADEMIC_SYSTEM_PROMPT}\n\nVocê está na etapa de planejamento acadêmico. Planeje antes de redigir e retorne somente o JSON do plano.` },
-      { role: "user", content: buildAcademicPlanPrompt(input, index) }
+      { role: "user", content: buildAcademicPlanPrompt(input, index, weekFocus) }
     ], { temperature: 0.25 });
     return normalizeAcademicPlan(rawPlan, input, index);
   } catch {
-    return normalizeAcademicPlan({ weekNumber: index + 1, theme: `${input.title} — Semana ${index + 1}`, objectives: input.objectives }, input, index);
+    return normalizeAcademicPlan({ weekNumber: index + 1, theme: weekFocus.theme, centralQuestion: weekFocus.centralQuestion, objectives: weekFocus.objectives, centralConcepts: weekFocus.newConcepts, sectionSequence: weekFocus.sectionSequence.map((title, sectionIndex) => ({ number: String(sectionIndex + 1), title })) }, input, index);
   }
 }
 
+function enforceWeekFocus(raw, weekFocus, weekNumber) {
+  if (!raw?.lessonPlan || typeof raw.lessonPlan !== "object") return raw;
+  raw.lessonPlan.theme = weekFocus.theme;
+  raw.lessonPlan.weekNumber = weekNumber;
+  raw.lessonPlan.learningObjectives = weekFocus.objectives;
+  raw.lessonPlan.didacticArc = { ...(raw.lessonPlan.didacticArc || {}), id: weekFocus.arc };
+  raw.lessonPlan.spiralReview = {
+    ...(raw.lessonPlan.spiralReview || {}),
+    previousConceptsReviewed: weekNumber > 1 ? (raw.lessonPlan.spiralReview?.previousConceptsReviewed || [weekFocus.bridgeFromPrevious]) : [],
+    newConcepts: weekFocus.newConcepts,
+    preparationForNextWeek: [weekFocus.bridgeToNext],
+    projectMilestone: weekFocus.projectMilestone
+  };
+  return raw;
+}
+
 export async function generateOneWeek(input, index, options = {}) {
+  const weekNumber = index + 1;
   const useAcademicPipeline = process.env.AULA_ACADEMIC_PIPELINE !== "false";
   // A Vercel Hobby encerra funções longas. O modo de uma etapa mantém o prompt
   // acadêmico completo, mas evita as chamadas extras de planejamento/revisão na
   // mesma requisição. O pipeline completo continua disponível com false.
   const singlePass = options.singlePass ?? process.env.AULA_SINGLE_PASS !== "false";
+  const progression = options.progression || buildCourseProgression(input);
+  const weekFocus = progressionForWeek(input, index, progression);
   const academicPlan = !singlePass && useAcademicPipeline
-    ? await planWeekWithAI(input, index)
+    ? await planWeekWithAI(input, index, progression)
     : normalizeAcademicPlan({
         weekNumber: index + 1,
-        theme: `${input.title} — Semana ${index + 1}`,
-        objectives: input.objectives,
-        centralConcepts: input.objectives,
-        sectionSequence: []
+        theme: weekFocus.theme,
+        centralQuestion: weekFocus.centralQuestion,
+        objectives: weekFocus.objectives,
+        centralConcepts: weekFocus.newConcepts,
+        sectionSequence: weekFocus.sectionSequence.map((title, sectionIndex) => ({ number: String(sectionIndex + 1), title, purpose: "Desenvolver a progressão específica da semana." })),
+        controversies: [weekFocus.doNotRepeat]
       }, input, index);
   let raw = await callJson([
     { role: "system", content: ACADEMIC_SYSTEM_PROMPT },
-    { role: "user", content: buildWeekGenerationPrompt(input, index, academicPlan) }
+    { role: "user", content: buildWeekGenerationPrompt(input, index, academicPlan, progression, options.previousWeeks) }
   ], { temperature: 0.42 });
   let academicReview = { status: "not-run", issues: [], strengths: [], unsupportedClaims: [], rewriteRequired: false };
   if (!singlePass && useAcademicPipeline && process.env.AULA_ACADEMIC_REVIEW !== "false") {
     try { academicReview = await reviewWeekWithAI(input, index, academicPlan, raw); } catch { academicReview = { status: "needs-human-review", issues: [{ severity: "high", type: "review-unavailable", description: "A revisão acadêmica automática não pôde ser concluída.", suggestedRepair: "Faça a conferência humana antes da exportação." }], strengths: [], unsupportedClaims: [], rewriteRequired: true }; }
   }
+  enforceWeekFocus(raw, weekFocus, weekNumber);
   const initialLesson = normalizeLesson(raw, input, index);
-  const initialQuality = measureLessonQuality(initialLesson, input);
+  const initialQuality = measureLessonQuality(initialLesson, input, { peerLessons: options.previousWeeks || [] });
   if (!singlePass && process.env.AULA_AUTO_REPAIR !== "false" && (initialQuality.status !== "complete" || academicReview.rewriteRequired)) {
     try {
       const repaired = await repairWeekWithAI(input, index, raw, initialQuality, academicPlan, academicReview);
       const repairedLesson = normalizeLesson(repaired, input, index);
-      const repairedQuality = measureLessonQuality(repairedLesson, input);
+      const repairedQuality = measureLessonQuality(repairedLesson, input, { peerLessons: options.previousWeeks || [] });
       if (repairedQuality.wordCount >= initialQuality.wordCount || repairedQuality.score > initialQuality.score) {
         raw = repaired;
         if (useAcademicPipeline && process.env.AULA_ACADEMIC_REVIEW !== "false") {
@@ -428,6 +487,24 @@ export async function generateOneWeek(input, index, options = {}) {
       // A versão inicial será devolvida com pendência explícita para revisão humana.
     }
   }
+  if (singlePass && process.env.AULA_AUTO_REPAIR !== "false" && initialQuality.status === "insufficient") {
+    try {
+      const repaired = await regenerateWeekWithAI(
+        input,
+        index,
+        initialLesson,
+        `A semana ficou insuficiente. Amplie substancialmente o texto sem repetir outras semanas. Preserve o foco "${weekFocus.theme}", desenvolva as seções da sequência ${weekFocus.sectionSequence.join("; ")}, inclua um caso ou aplicação verificável, contraponto, síntese, conexão com a próxima semana e avaliação alinhada.`,
+        { maxTokens: 8000, retryMaxTokens: 6000, progression }
+      );
+      enforceWeekFocus(repaired, weekFocus, weekNumber);
+      const repairedLesson = normalizeLesson(repaired, input, index);
+      const repairedQuality = measureLessonQuality(repairedLesson, input, { peerLessons: options.previousWeeks || [] });
+      if (repairedQuality.wordCount > initialQuality.wordCount && repairedQuality.score >= initialQuality.score) raw = repaired;
+    } catch {
+      // Preserva a primeira versão com a pendência de qualidade visível ao professor.
+    }
+  }
+  enforceWeekFocus(raw, weekFocus, weekNumber);
   return {
     ...(raw?.lessonPlan || raw?.blocks ? raw : raw?.week || raw),
     academicPlan,
@@ -452,9 +529,11 @@ function compactRegenerationSection(section = {}) {
   };
 }
 
-export async function regenerateWeekWithAI(input, index, currentWeek, instruction) {
+export async function regenerateWeekWithAI(input, index, currentWeek, instruction, options = {}) {
   const weekNumber = index + 1;
   const singlePass = process.env.AULA_SINGLE_PASS !== "false";
+  const progression = options.progression || buildCourseProgression(input);
+  const weekFocus = progressionForWeek(input, index, progression);
   const currentPlan = currentWeek?.lessonPlan || currentWeek || {};
   const academicPlan = singlePass
     ? normalizeAcademicPlan({ weekNumber, theme: currentPlan.theme || `${input.title} — Semana ${weekNumber}`, objectives: input.objectives }, input, index)
@@ -501,6 +580,9 @@ Retorne apenas { lessonPlan, teacherGuide }. Não gere blocks; o servidor os mon
 Briefing essencial do curso:
 ${JSON.stringify(compactInput, null, 2)}
 
+Foco longitudinal obrigatório desta semana:
+${JSON.stringify(weekFocus, null, 2)}
+
 Planejamento acadêmico atualizado:
 ${JSON.stringify(academicPlan, null, 2)}
 
@@ -508,14 +590,14 @@ Semana atual, em formato compacto:
 ${JSON.stringify(compactWeek, null, 2)}
 
 Retorne JSON completo agora.`;
-  const regenerationMaxTokens = Math.min(Number(process.env.OPENAI_REGEN_MAX_TOKENS || 10000), 12000);
+  const regenerationMaxTokens = Math.min(Number(options.maxTokens || process.env.OPENAI_REGEN_MAX_TOKENS || 10000), 12000);
   let raw = await callJson([
     { role: "system", content: ACADEMIC_SYSTEM_PROMPT },
     { role: "user", content: prompt }
   ], {
     temperature: 0.35,
     maxTokens: regenerationMaxTokens,
-    retryMaxTokens: Math.min(regenerationMaxTokens, 7000),
+    retryMaxTokens: Math.min(regenerationMaxTokens, Number(options.retryMaxTokens || 7000)),
     formatRetryInstruction: "A resposta anterior foi truncada ou continha JSON inválido. Refaça agora uma versão compacta, mas completa, do mesmo objeto. Mantenha 4 a 8 objetivos, 5 a 8 seções desenvolvidas, 4 a 6 questões avaliativas e os campos essenciais; não repita a aula no teacherGuide. Responda somente JSON válido, sem markdown, comentários, texto extra ou vírgulas finais."
   });
   let academicReview = { status: "not-run", issues: [], strengths: [], unsupportedClaims: [], rewriteRequired: false };
@@ -533,9 +615,10 @@ Retorne JSON completo agora.`;
 
 export async function generateWithAI(input) {
   const weeks = [];
+  const progression = buildCourseProgression(input);
   const batchSize = Math.min(3, Math.max(1, Number(process.env.AULA_AI_BATCH_SIZE) || 1));
   for (let start = 0; start < input.weeks; start += batchSize) {
-    const batch = await Promise.all(Array.from({ length: Math.min(batchSize, input.weeks - start) }, (_, offset) => generateOneWeek(input, start + offset)));
+    const batch = await Promise.all(Array.from({ length: Math.min(batchSize, input.weeks - start) }, (_, offset) => generateOneWeek(input, start + offset, { progression, previousWeeks: weeks })));
     weeks.push(...batch);
   }
   const normalizedWeeks = normalizeWeeklyOutput({ weeks }, input);

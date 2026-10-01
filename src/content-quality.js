@@ -3,6 +3,18 @@ import { normalizeAcademicProfile } from "./academic.js";
 const wordCount = (value) => String(value ?? "").trim().split(/\s+/u).filter(Boolean).length;
 const text = (value) => String(value ?? "").trim();
 const genericTitles = new Set(["", "conteúdo da semana", "sem título", "seção 1", "aula", "semana"]);
+const stopWords = new Set("a ao aos as com da das de do dos e em entre essa esse esta este para por que um uma o os no nos na nas se sem sua seu suas seus como mais menos sobre ou".split(" "));
+
+function signature(value) {
+  return new Set(text(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/u).filter((word) => word.length >= 4 && !stopWords.has(word)));
+}
+
+function overlap(left, right) {
+  if (!left.size || !right.size) return 0;
+  let shared = 0;
+  for (const token of left) if (right.has(token)) shared += 1;
+  return shared / Math.max(1, Math.min(left.size, right.size));
+}
 
 function sectionWords(section = {}) {
   return wordCount([
@@ -33,7 +45,7 @@ export function qualityTargets(input = {}) {
   };
 }
 
-export function measureLessonQuality(lesson = {}, input = {}) {
+export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   const plan = lesson?.lessonPlan || lesson?.plan || {};
   const sections = Array.isArray(plan.contentSections) ? plan.contentSections : [];
   const objectives = Array.isArray(plan.learningObjectives) ? plan.learningObjectives.filter(Boolean) : [];
@@ -75,7 +87,15 @@ export function measureLessonQuality(lesson = {}, input = {}) {
   const hasPrimarySources = primaryReferences.length >= target.primarySourcesRequired;
   const hasEvidenceMap = claimEvidence.length === 0 || claimEvidence.every((claim) => claim.sourceIds.length > 0 || claim.verificationStatus === "needs-human-review");
   const hasCounterpoint = sections.some((section) => section.counterpoint || section.reflection || section.caseStudy) || Boolean(plan.academicPlan?.controversies?.length);
-  const hardChecks = [hasSpecificTitle, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, !target.requireCounterarguments || hasCounterpoint];
+  const peerLessons = Array.isArray(context.peerLessons) ? context.peerLessons : [];
+  const peerThemes = peerLessons.map((peer) => peer?.lessonPlan?.theme || peer?.meta?.title).filter(Boolean);
+  const peerObjectives = peerLessons.flatMap((peer) => peer?.lessonPlan?.learningObjectives || []);
+  const currentThemeSignature = signature(title);
+  const themeOverlap = peerThemes.length ? Math.max(...peerThemes.map((peerTheme) => overlap(currentThemeSignature, signature(peerTheme)))) : 0;
+  const repeatedTheme = themeOverlap >= 0.8;
+  const objectiveOverlap = objectives.length && peerObjectives.length ? Math.max(...objectives.map((objective) => Math.max(...peerObjectives.map((peerObjective) => overlap(signature(objective), signature(peerObjective)))))) : 0;
+  const repetitionDetected = repeatedTheme || objectiveOverlap >= 0.78;
+  const hardChecks = [hasSpecificTitle, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, !target.requireCounterarguments || hasCounterpoint, !repetitionDetected];
   const passedHardChecks = hardChecks.filter(Boolean).length;
   const wordRatio = Math.min(1, words / Math.max(1, target.minimumWords));
   const score = Math.round((passedHardChecks / hardChecks.length) * 70 + wordRatio * 30);
@@ -94,10 +114,11 @@ export function measureLessonQuality(lesson = {}, input = {}) {
   if (unsupportedClaims.length) issues.push(`${unsupportedClaims.length} afirmação(ões) aguardam verificação humana`);
   if (target.requireCounterarguments && !hasCounterpoint) issues.push("contraponto, limite ou controvérsia ausente");
   if (!hasPedagogicalAlignment) issues.push("matriz/checklist pedagógico ainda não está completo");
+  if (repetitionDetected) issues.push(`possível repetição longitudinal: tema/objetivos coincidem com semana anterior (sobreposição ${Math.round(Math.max(themeOverlap, objectiveOverlap) * 100)}%)`);
   if (!hasHero) issues.push("bloco hero/título ausente no JSON");
   if (!hasObjectiveBlock) issues.push("bloco visível de objetivos ausente no JSON");
   if (!hasTopic) issues.push("tópico de conteúdo ausente ou vazio no JSON");
-  const structural = hasSpecificTitle && hasDetailedObjectives && hasSections && hasDevelopedSections && hasWelcome && hasHero && hasObjectiveBlock && hasTopic && hasPedagogicalAlignment && hasMinimumReferences && hasPrimarySources && hasEvidenceMap && (!target.requireCounterarguments || hasCounterpoint);
+  const structural = hasSpecificTitle && hasDetailedObjectives && hasSections && hasDevelopedSections && hasWelcome && hasHero && hasObjectiveBlock && hasTopic && hasPedagogicalAlignment && hasMinimumReferences && hasPrimarySources && hasEvidenceMap && (!target.requireCounterarguments || hasCounterpoint) && !repetitionDetected;
   return {
     status: structural && words >= target.minimumWords && hasSynthesis && hasAssessment ? "complete" : structural ? "needs-review" : "insufficient",
     score,
@@ -109,7 +130,8 @@ export function measureLessonQuality(lesson = {}, input = {}) {
     sectionWordCounts,
     passedHardChecks,
     totalHardChecks: hardChecks.length,
-    checks: { hasSpecificTitle, hasObjectives, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, hasCounterpoint },
+    checks: { hasSpecificTitle, hasObjectives, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, hasCounterpoint, repetitionFree: !repetitionDetected },
+    repetition: { detected: repetitionDetected, repeatedTheme, themeOverlap: Number(themeOverlap.toFixed(2)), objectiveOverlap: Number(objectiveOverlap.toFixed(2)), comparedWeeks: peerLessons.length },
     academic: { minimumReferences: target.minimumReferences, referenceCount: references.length, verifiedReferenceCount: verifiedReferences.length, primarySourceCount: primaryReferences.length, claimCount: claimEvidence.length, unsupportedClaimCount: unsupportedClaims.length },
     issues
   };

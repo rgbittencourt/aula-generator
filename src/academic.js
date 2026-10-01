@@ -102,7 +102,7 @@ REGRAS PEDAGÓGICAS:
 
 Responda somente JSON válido conforme o contrato solicitado. Nunca mostre sua verificação interna.`;
 
-export function buildAcademicPlanPrompt(input, weekIndex = 0) {
+export function buildAcademicPlanPrompt(input, weekIndex = 0, weekFocus = null) {
   const profile = normalizeAcademicProfile(input.academicProfile, input);
   const weekNumber = weekIndex + 1;
   return `Planeje academicamente a semana ${weekNumber} de ${input.weeks} antes da redação. Não escreva ainda a aula completa.
@@ -130,7 +130,10 @@ ${JSON.stringify(profile, null, 2)}
 Briefing:
 ${JSON.stringify({ title: input.title, audience: input.audience, level: input.level, discipline: profile.discipline, objectives: input.objectives, content: input.content, references: input.references }, null, 2)}
 
-Regras: planeje uma progressão argumentativa real; não crie referências bibliográficas específicas sem fonte fornecida; inclua contrapontos quando o perfil exigir; não trate o planejamento como uma lista superficial.`;
+Foco longitudinal obrigatório desta semana:
+${JSON.stringify(weekFocus || { theme: `${input.title} — Semana ${weekNumber}`, objectives: input.objectives }, null, 2)}
+
+Regras: planeje uma progressão argumentativa real; use o foco longitudinal como recorte desta semana e não repita todos os objetivos do curso; não crie referências bibliográficas específicas sem fonte fornecida; inclua contrapontos quando o perfil exigir; não trate o planejamento como uma lista superficial.`;
 }
 
 export function normalizeAcademicPlan(raw = {}, input = {}, index = 0) {
