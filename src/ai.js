@@ -150,10 +150,13 @@ Regras:
 - escreva em português do Brasil, com linguagem humana, clara e pedagogicamente útil;
 - produza objetivos observáveis, progressivos e adequados ao público e ao nível;
 - organize o conteúdo em uma sequência didática coerente com o número de semanas e a carga horária;
+- examine também cada item de webPractices pelo índice informado em "Campos que precisam de preenchimento". Preserve id, título, agenda e qualquer valor já fornecido; complete somente as propriedades vazias daquela webprática, sem substituir uma sessão existente por outra;
+- considere títulos automáticos como "Webprática 1", "Webprática 2" e semelhantes como placeholders, não como títulos fornecidos, quando o campo title estiver listado para preenchimento;
 - respeite o academicProfile recebido, especialmente profundidade, quantidade de seções, referências e exigência de contrapontos;
 - se webpráticas estiverem ativadas, gere no mínimo uma e, quando pedagogicamente justificável, várias práticas distintas. Cada objeto deve conter title, type, modality, weekNumber/date quando disponível, startTime/endTime quando disponíveis, platform/tool, context, problem, objective, preparation, teacherPreparation, studentPreparation, materials, instructions, steps, product, criteria, rubric, assessment, continuation, fallbackPlan, prompts, artifacts, resources, roteiro com blocos cronometrados e durationMinutes;
 - trate cada webprática como aula síncrona ou laboratório independente, com roteiro operacional próprio; nunca a transforme em leitura, seção, atividade ou bloco do texto-base semanal;
 - alinhe cada webprática a objetivos e conteúdos específicos, distribuindo-as em semanas e datas coerentes do calendário;
+- quando uma webprática já existir parcialmente, devolva o mesmo item/id e preencha os campos solicitados, especialmente título, semana/data, ferramenta, objetivo, contexto, preparação, materiais, produto e plano B. Não crie uma segunda prática para substituir a primeira;
 - gere materiais de apoio como objetos com type, title, link, moment, required, objective, alignment, use, pages, durationMinutes e notes. Eles devem servir aos objetivos e conteúdos, indicar por que serão usados, em que momento entram e como o estudante trabalhará com eles;
 - para referências e artigos, sugira obras, autores, documentos ou fontes que o professor deve conferir; não invente URLs, DOI, páginas ou dados bibliográficos específicos;
 - para vídeos e imagens, gere termos de busca e intenção pedagógica; use links somente quando já tiverem sido fornecidos pelo usuário;
@@ -173,7 +176,7 @@ function safeNumber(value, fallback = 0) { const n = Number(value); return Numbe
 function normalizeBriefingPractice(practice, index) {
   return {
     id: text(practice?.id) || `webpractice-${index + 1}`,
-    title: text(practice?.title) || `Webprática ${index + 1}`,
+    title: text(practice?.title || practice?.sessionTitle),
     type: text(practice?.type) || "Laboratório prático",
     modality: text(practice?.modality || practice?.format) || "Aula síncrona / laboratório prático",
     weekNumber: Math.max(0, safeNumber(practice?.weekNumber || practice?.week, 0)),

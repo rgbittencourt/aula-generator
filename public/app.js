@@ -437,15 +437,83 @@ function showAssistantMessage(message, error = false) {
   note.classList.remove("hidden");
 }
 
+function fillPracticeField(card, selector, value) {
+  const field = card?.querySelector(selector);
+  const textValue = Array.isArray(value) ? value.filter(Boolean).join("\n") : String(value ?? "").trim();
+  if (!field || !textValue || String(field.value || "").trim()) return false;
+  field.value = textValue;
+  return true;
+}
+
+function fillPracticeSuggestion(card, suggestion = {}) {
+  const values = [
+    [".practice-title", suggestion.title || suggestion.sessionTitle],
+    [".practice-week", Number(suggestion.weekNumber || suggestion.week) || ""],
+    [".practice-date", suggestion.date || suggestion.sessionDate],
+    [".practice-day", suggestion.dayOfWeek || suggestion.day],
+    [".practice-start", suggestion.startTime || suggestion.start],
+    [".practice-end", suggestion.endTime || suggestion.end],
+    [".practice-platform", suggestion.platform || suggestion.environment],
+    [".practice-tool", suggestion.tool || suggestion.tools],
+    [".practice-objective", suggestion.objective],
+    [".practice-context", suggestion.context || suggestion.problem || suggestion.challenge],
+    [".practice-preparation", suggestion.preparation || suggestion.prerequisites],
+    [".practice-materials", suggestion.materials],
+    [".practice-product", suggestion.product || suggestion.deliverable],
+    [".practice-fallback", suggestion.fallbackPlan || suggestion.planB]
+  ];
+  return values.reduce((count, [selector, value]) => count + (fillPracticeField(card, selector, value) ? 1 : 0), 0);
+}
+
+function mergeBriefingPractices(suggestions = []) {
+  if (!suggestions.length) return 0;
+  const current = collectPractices();
+  const hasMeaningfulPractice = current.some((practice) => practice.title || practice.objective || practice.context || practice.tool || practice.product);
+  if (!hasMeaningfulPractice) {
+    $("#practice-list").innerHTML = "";
+    practiceSequence = 0;
+    suggestions.forEach((practice) => addPractice(practice));
+    return suggestions.length;
+  }
+  let filledFields = 0;
+  suggestions.forEach((suggestion, index) => {
+    let cards = [...document.querySelectorAll("#practice-list .practice-card")];
+    let card = cards.find((item) => suggestion.id && item.dataset.id === suggestion.id) || cards[index];
+    if (!card) {
+      addPractice({ id: suggestion.id });
+      cards = [...document.querySelectorAll("#practice-list .practice-card")];
+      card = cards.at(-1);
+    }
+    filledFields += fillPracticeSuggestion(card, suggestion);
+  });
+  refreshItemButtons();
+  return filledFields;
+}
+
 function briefingMissingFields(input) {
   const missing = [];
-  const meaningfulPractices = input.webPractices.filter((practice) => practice.title || practice.objective || practice.context);
+  const practiceFields = ["title", "weekNumber/date", "startTime/endTime", "platform", "tool", "objective", "context", "preparation", "materials", "product", "fallbackPlan"];
+  const meaningfulPractices = input.webPractices.filter((practice) => practice.title || practice.objective || practice.context || practice.tool || practice.product);
   const meaningfulMaterials = input.materials.filter((material) => material.title || material.objective || material.alignment || material.link);
   if (!input.audience.trim()) missing.push("audience");
   if (!input.objectives.length) missing.push("objectives");
   if (!input.content.trim()) missing.push("content");
   if (input.webPractice.enabled && !meaningfulPractices.length) missing.push("webPractices");
-  if (input.webPractice.enabled && meaningfulPractices.some((practice) => !practice.title || (!practice.weekNumber && !practice.date))) missing.push("webPracticeSchedule");
+  if (input.webPractice.enabled) {
+    input.webPractices.forEach((practice, index) => {
+      if (!practice.title) missing.push(`webPractices[${index}].title`);
+      if (!practice.weekNumber && !practice.date) missing.push(`webPractices[${index}].weekNumber/date`);
+      if (!practice.objective) missing.push(`webPractices[${index}].objective`);
+      if (!practice.context) missing.push(`webPractices[${index}].context`);
+      if (!practice.tool) missing.push(`webPractices[${index}].tool`);
+      if (!practice.platform) missing.push(`webPractices[${index}].platform`);
+      if (!practice.preparation) missing.push(`webPractices[${index}].preparation`);
+      if (!practice.materials?.length) missing.push(`webPractices[${index}].materials`);
+      if (!practice.product) missing.push(`webPractices[${index}].product`);
+      if (!practice.fallbackPlan) missing.push(`webPractices[${index}].fallbackPlan`);
+    });
+    if (!input.webPractices.length) missing.push(...practiceFields.map((field) => `webPractices[0].${field}`));
+  }
   if (!input.references.length) missing.push("references");
   if (!meaningfulMaterials.length) missing.push("materials");
   if (!input.videoSearchSuggestions.length) missing.push("videoSearchSuggestions");
@@ -475,11 +543,9 @@ async function assistBriefing() {
     if (!$("#audience").value.trim() && briefing.audience) { $("#audience").value = briefing.audience; filled.push("público"); }
     if (!$("#objectives").value.trim() && Array.isArray(briefing.objectives) && briefing.objectives.length) { $("#objectives").value = briefing.objectives.join("\n"); filled.push("objetivos"); }
     if (!$("#content").value.trim() && briefing.content) { $("#content").value = briefing.content; filled.push("conteúdos"); }
-    if ($("#practice-enabled").checked && Array.isArray(briefing.webPractices) && briefing.webPractices.length && !collectPractices().some((practice) => practice.title || practice.objective || practice.context)) {
-      $("#practice-list").innerHTML = "";
-      practiceSequence = 0;
-      briefing.webPractices.forEach((practice) => addPractice(practice));
-      filled.push(`${briefing.webPractices.length} webprática(s) distintas`);
+    if ($("#practice-enabled").checked && Array.isArray(briefing.webPractices) && briefing.webPractices.length) {
+      const practiceFieldsFilled = mergeBriefingPractices(briefing.webPractices);
+      if (practiceFieldsFilled) filled.push(`${briefing.webPractices.length} webprática(s) analisadas (${practiceFieldsFilled} campo(s) completado(s))`);
     }
     if (Array.isArray(briefing.materials) && briefing.materials.length && !collectMaterials().some((material) => material.title || material.objective || material.alignment || material.link)) {
       $("#materials-list").innerHTML = "";

@@ -42,6 +42,9 @@ test("agenda webprática por data ou semana ocorre uma única vez", () => {
 test("prompt do assistente exige práticas distintas, materiais alinhados e fontes sem URLs inventadas", () => {
   const prompt = buildBriefingPrompt(normalizeCourseInput({ title: "Curso", webPracticeEnabled: true }), ["webPractices", "materials"]);
   assert.match(prompt, /webpráticas.*distintas/i);
+  assert.match(prompt, /cada item de webPractices pelo índice/i);
+  assert.match(prompt, /mesmo item\/id/i);
+  assert.match(prompt, /títulos automáticos.*placeholders/i);
   assert.match(prompt, /materiais de apoio/i);
   assert.match(prompt, /não invente URLs/i);
 });
