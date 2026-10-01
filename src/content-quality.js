@@ -29,7 +29,7 @@ function sectionWords(section = {}) {
 export function qualityTargets(input = {}) {
   const profile = normalizeAcademicProfile(input.academicProfile, input);
   const targetWords = profile.targetWords;
-  const minimumWords = Math.max(1200, Math.round(targetWords * 0.72));
+  const minimumWords = Math.max(1400, Math.round(targetWords * 0.90));
   return {
     minimumWords,
     targetWords,

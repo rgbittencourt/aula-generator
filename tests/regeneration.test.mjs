@@ -1,6 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { regenerateWeekWithAI } from "../src/ai.js";
+import { generateOneWeek, regenerateWeekWithAI } from "../src/ai.js";
+import { normalizeCourseInput } from "../src/aula-schema.js";
+
+function qualityFixture(wordsPerSection) {
+  const body = "Explicação conceitual contextualizada com exemplo, aplicação e limite crítico. ".repeat(wordsPerSection);
+  return {
+    lessonPlan: {
+      theme: "Semana de teste",
+      welcome: "Abertura contextualizada para orientar a leitura e situar o problema desta semana. ".repeat(12),
+      learningObjectives: ["Explicar o conceito", "Comparar perspectivas", "Analisar um caso", "Aplicar critérios"],
+      contentSections: Array.from({ length: 6 }, (_, index) => ({ number: String(index + 1), title: `Seção ${index + 1}`, body, reflection: { question: "Qual consequência aparece neste caso?", body: "Reflita sobre a aplicação no seu contexto." } })),
+      synthesis: body,
+      nextWeekConnection: body,
+      assessment: { questions: Array.from({ length: 4 }, (_, index) => ({ q: `Questão ${index + 1}`, options: ["A", "B", "C", "D"], answer: 0, explanation: "A resposta retoma o conceito trabalhado." })) },
+      alignmentMatrix: ["Explicar o conceito", "Comparar perspectivas", "Analisar um caso", "Aplicar critérios"].map((objective, index) => ({ objective, contentSections: [String(index + 1)], activities: [`activity-${index + 1}`], evidence: "Resposta fundamentada", assessmentQuestions: [`question-${index + 1}`] })),
+      pedagogicalReview: { status: "ready" },
+      references: []
+    },
+    teacherGuide: {}
+  };
+}
 
 test("regeneração single-pass usa contexto compacto e orçamento próprio", async () => {
   const previousFetch = global.fetch;
@@ -59,6 +79,34 @@ test("regeneração single-pass usa contexto compacto e orçamento próprio", as
     global.fetch = previousFetch;
     for (const [key, value] of Object.entries(previous)) {
       const envKey = { key: "OPENAI_API_KEY", singlePass: "AULA_SINGLE_PASS", review: "AULA_ACADEMIC_REVIEW", repair: "AULA_AUTO_REPAIR", regenTokens: "OPENAI_REGEN_MAX_TOKENS" }[key];
+      if (value === undefined) delete process.env[envKey];
+      else process.env[envKey] = value;
+    }
+  }
+});
+
+test("geração repara automaticamente uma semana em needs-review por ficar abaixo da meta", async () => {
+  const previousFetch = global.fetch;
+  const previous = { key: process.env.OPENAI_API_KEY, singlePass: process.env.AULA_SINGLE_PASS, repair: process.env.AULA_AUTO_REPAIR, retries: process.env.OPENAI_MAX_RETRIES };
+  process.env.OPENAI_API_KEY = "test-key";
+  process.env.AULA_SINGLE_PASS = "true";
+  process.env.AULA_AUTO_REPAIR = "true";
+  process.env.OPENAI_MAX_RETRIES = "1";
+  let calls = 0;
+  global.fetch = async () => {
+    calls += 1;
+    const fixture = calls === 1 ? qualityFixture(720) : qualityFixture(1000);
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(fixture) } }] }), { status: 200 });
+  };
+  try {
+    const input = normalizeCourseInput({ title: "Curso de teste", weeks: 1, hoursPerWeek: 4, objectives: ["Explicar o conceito"], academicProfile: { targetWords: 7000, minimumReferences: 0, primarySourcesRequired: 0, requireCounterarguments: false } });
+    const result = await generateOneWeek(input, 0);
+    assert.equal(calls, 2, "a semana abaixo da meta deve acionar uma segunda chamada de reparo");
+    assert.ok(result.lessonPlan.contentSections[0].body.length > "Explicação conceitual contextualizada com exemplo, aplicação e limite crítico. ".repeat(720).length);
+  } finally {
+    global.fetch = previousFetch;
+    for (const [key, value] of Object.entries(previous)) {
+      const envKey = { key: "OPENAI_API_KEY", singlePass: "AULA_SINGLE_PASS", repair: "AULA_AUTO_REPAIR", retries: "OPENAI_MAX_RETRIES" }[key];
       if (value === undefined) delete process.env[envKey];
       else process.env[envKey] = value;
     }

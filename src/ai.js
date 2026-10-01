@@ -487,19 +487,19 @@ export async function generateOneWeek(input, index, options = {}) {
       // A versão inicial será devolvida com pendência explícita para revisão humana.
     }
   }
-  if (singlePass && process.env.AULA_AUTO_REPAIR !== "false" && initialQuality.status === "insufficient") {
+  if (singlePass && process.env.AULA_AUTO_REPAIR !== "false" && initialQuality.status !== "complete") {
     try {
       const repaired = await regenerateWeekWithAI(
         input,
         index,
         initialLesson,
-        `A semana ficou insuficiente. Amplie substancialmente o texto sem repetir outras semanas. Preserve o foco "${weekFocus.theme}", desenvolva as seções da sequência ${weekFocus.sectionSequence.join("; ")}, inclua um caso ou aplicação verificável, contraponto, síntese, conexão com a próxima semana e avaliação alinhada.`,
+        `A análise automática encontrou estes problemas: ${initialQuality.issues.join("; ")}. Não devolva a semana ainda incompleta. Amplie substancialmente o texto até cumprir o piso de ${initialQuality.minimumWords} palavras e a meta de ${initialQuality.targetWords}, sem repetir outras semanas. Preserve o foco "${weekFocus.theme}", desenvolva as seções da sequência ${weekFocus.sectionSequence.join("; ")}, inclua um caso ou aplicação verificável, contraponto, síntese, conexão com a próxima semana e avaliação alinhada.`,
         { maxTokens: 8000, retryMaxTokens: 6000, progression }
       );
       enforceWeekFocus(repaired, weekFocus, weekNumber);
       const repairedLesson = normalizeLesson(repaired, input, index);
       const repairedQuality = measureLessonQuality(repairedLesson, input, { peerLessons: options.previousWeeks || [] });
-      if (repairedQuality.wordCount > initialQuality.wordCount && repairedQuality.score >= initialQuality.score) raw = repaired;
+      if (repairedQuality.status === "complete" || repairedQuality.wordCount > initialQuality.wordCount || repairedQuality.score > initialQuality.score) raw = repaired;
     } catch {
       // Preserva a primeira versão com a pendência de qualidade visível ao professor.
     }
