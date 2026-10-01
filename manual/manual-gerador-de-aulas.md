@@ -2,7 +2,7 @@
 
 ## Da ideia inicial ao JSON semanal, guia do professor e publicação no Moodle
 
-**Versão do manual:** 1.2  
+**Versão do manual:** 1.3
 **Data:** 30 de setembro de 2026  
 **Aplicação:** Gerador de Aulas  
 **URL pública:** <https://aula-generator.vercel.app/>  
@@ -23,6 +23,7 @@
 9. [Gerando as semanas com IA](#9-gerando-as-semanas-com-ia)
 10. [Como a IA organiza cada semana](#10-como-a-ia-organiza-cada-semana)
 10.1. [Perfil acadêmico e prompts do sistema](#101-perfil-acadêmico-e-prompts-do-sistema)
+10.2. [Limites de tokens e geração sequencial](#102-limites-de-tokens-e-geração-sequencial)
 11. [Webpráticas](#11-webpráticas)
 12. [Materiais de apoio e recursos multimídia](#12-materiais-de-apoio-e-recursos-multimídia)
 13. [Cálculo da carga de estudo](#13-cálculo-da-carga-de-estudo)
@@ -32,9 +33,11 @@
 17. [Abrindo o JSON no Aula Studio](#17-abrindo-o-json-no-aula-studio)
 18. [Publicando no Moodle via SCORM](#18-publicando-no-moodle-via-scorm)
 19. [Configuração da OpenAI](#19-configuração-da-openai)
+19.1. [Limite TPM e aumento de tier](#191-limite-tpm-e-aumento-de-tier)
 20. [Pesquisa automática de vídeos, imagens e leituras](#20-pesquisa-automática-de-vídeos-imagens-e-leituras)
 21. [Uso local e modo de exemplo](#21-uso-local-e-modo-de-exemplo)
 22. [Problemas comuns e soluções](#22-problemas-comuns-e-soluções)
+22.3. [Erro 429 de limite TPM](#223-erro-429-de-limite-tpm)
 23. [Checklist de qualidade antes da publicação](#23-checklist-de-qualidade-antes-da-publicação)
 24. [Estrutura técnica do JSON semanal](#24-estrutura-técnica-do-json-semanal)
 25. [Perguntas frequentes](#25-perguntas-frequentes)
@@ -364,16 +367,23 @@ A preferência não é uma receita fixa. Mesmo que se escolha um arco, a IA pode
 
 O bloco **Perfil acadêmico do conteúdo** controla a exigência textual da geração. Ele não é apenas informativo: seus valores entram no planejamento da semana, no prompt de redação, na revisão crítica e no checklist antes da exportação.
 
+A versão atual evita duplicidade com a **Identidade do curso**. A própria tela mostra um resumo dos dados herdados:
+
+- **Tema/área:** herdado do tema geral ou título do curso;
+- **Público:** herdado do campo Público;
+- **Nível da turma:** herdado do campo Nível da turma;
+- **Profundidade aplicada:** derivada automaticamente do nível escolhido.
+
+Esses quatro dados não precisam ser preenchidos novamente. No perfil acadêmico ficam apenas as decisões específicas de rigor e dimensionamento:
+
 | Campo | Como orientar o gerador |
 |---|---|
-| Disciplina/área | Define vocabulário, exemplos e fontes procuradas. |
-| Nível acadêmico | Graduação, pós-graduação, formação profissional ou educação básica. |
-| Profundidade | Ajusta densidade argumentativa, quantidade de exemplos e contrapontos. |
+| Estilo de citação | Autor-data, ABNT, APA ou sem preferência. |
+| Escopo histórico/geográfico | Delimita exemplos, casos e fontes. |
 | Meta de palavras | Alvo aproximado de texto útil por semana; não é preenchimento artificial. |
 | Mínimo de seções | Garante progressão em partes legíveis, com títulos específicos. |
 | Mínimo de referências | Piso de referências estruturadas que deverão ser conferidas. |
 | Fontes acadêmicas/oficiais | Quantidade mínima de fontes institucionais, acadêmicas ou oficiais. |
-| Escopo histórico/geográfico | Impede que a IA use exemplos fora do recorte desejado. |
 | Autores e quadros teóricos | Orienta a abordagem, sem permitir citações inventadas. |
 | Tópicos a evitar | Restringe abordagens ou conteúdos indesejados. |
 | Política de fontes | Define que toda pendência deve ser sinalizada para revisão humana. |
@@ -426,6 +436,8 @@ Depois de revisar o briefing:
 6. Aguarde a escrita do conteúdo, a pesquisa de recursos e o cálculo.
 
 A geração pode envolver mais de uma etapa do backend. O sistema primeiro redige a semana e depois pode consultar YouTube, Wikimedia Commons e Crossref para localizar candidatos de recursos.
+
+Por segurança, as semanas são processadas **uma por vez**. Uma unidade pode passar pelas etapas de planejamento acadêmico, redação, revisão crítica, eventual reparo, pesquisa de recursos e cálculo. Isso reduz picos de tokens por minuto, embora possa tornar a geração de um curso longo mais demorada. Em respostas temporárias 429 ou 503, o backend aguarda e tenta novamente automaticamente.
 
 ### 9.1 Diferença entre exemplo local e geração com IA
 
@@ -613,12 +625,29 @@ Quando o professor abre uma semana e escreve uma solicitação, o prompt recebe 
 |---|---:|---|
 | `OPENAI_CONTENT_MODEL` | usa `OPENAI_MODEL` | Modelo usado para texto longo. |
 | `OPENAI_MAX_TOKENS` | `16000` | Limite de saída por chamada; aumente apenas se o modelo/projeto aceitar. |
+| `OPENAI_MAX_RETRIES` | `3` | Tentativas automáticas para respostas 429/503, respeitando `Retry-After`. |
+| `AULA_AI_BATCH_SIZE` | `1` | Número de semanas processadas em paralelo; `1` reduz picos de TPM. |
 | `AULA_ACADEMIC_PIPELINE` | `true` | Liga planejamento, redação e revisão acadêmica. |
 | `AULA_ACADEMIC_REVIEW` | `true` | Executa a revisão crítica e o relatório de pendências. |
 | `AULA_AUTO_REPAIR` | `true` | Permite uma reescrita automática quando houver falha. |
 | `AULA_RESOURCE_RESEARCH` | `true` | Pesquisa candidatos de vídeos, imagens e leituras. |
 
 Essas variáveis não substituem a leitura do professor. Elas controlam o processo de geração; aprovação de fonte, adequação curricular e publicação continuam sendo decisões humanas.
+
+
+### 10.2 Limites de tokens e geração sequencial
+
+A API OpenAI mede, entre outros indicadores, **TPM — tokens por minuto**. Como cada semana pode gerar várias chamadas — planejamento, redação, revisão e reparo — um curso com muitas semanas ou várias solicitações simultâneas pode atingir esse limite mesmo com a chave correta.
+
+O Gerador foi configurado para:
+
+1. processar uma semana por vez por padrão;
+2. respeitar o cabeçalho `Retry-After` quando a OpenAI enviar um prazo;
+3. usar espera progressiva com pequena variação entre tentativas;
+4. repetir até três vezes erros temporários `429` ou `503`;
+5. informar no healthcheck `maxTokens`, `maxRetries` e `aiBatchSize`.
+
+Não clique repetidamente em **Gerar com IA** enquanto a solicitação anterior estiver em andamento. Se o curso for muito longo, aguarde a conclusão de cada geração antes de iniciar uma nova.
 
 ---
 
@@ -1060,7 +1089,14 @@ Na Vercel, em **Settings → Environment Variables**, configure:
 |---|---|
 | `OPENAI_API_KEY` | chave secreta da API OpenAI |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` |
-| `OPENAI_MODEL` | `gpt-4o-mini` |
+| `OPENAI_MODEL` | modelo padrão, por exemplo `gpt-4o-mini` |
+| `OPENAI_CONTENT_MODEL` | modelo escolhido para texto longo, por exemplo `gpt-4.1` |
+| `OPENAI_MAX_TOKENS` | `16000` para aulas longas; considere `12000` se houver 429 frequente |
+| `OPENAI_MAX_RETRIES` | `3` |
+| `AULA_AI_BATCH_SIZE` | `1` |
+| `AULA_ACADEMIC_PIPELINE` | `true` |
+| `AULA_ACADEMIC_REVIEW` | `true` |
+| `AULA_AUTO_REPAIR` | `true` |
 | `AULA_ACCESS_CODE` | código privado para acessar a IA |
 | `YOUTUBE_API_KEY` | chave opcional de pesquisa de vídeos |
 
@@ -1074,6 +1110,32 @@ Use o tipo **Secret** para as chaves. Depois de salvar alterações, faça **Red
 | `YOUTUBE_API_KEY` | pesquisar candidatos de vídeos |
 | `AULA_ACCESS_CODE` | proteger o endpoint público da aplicação |
 | senha do ChatGPT | entrar na conta ChatGPT; não deve ser colocada no aplicativo |
+
+### 19.4 Limite TPM e aumento de tier
+
+Uma mensagem como:
+
+```text
+Rate limit reached for gpt-4.1
+TPM limit: 30000, Used: 23843, Requested: 8631
+```
+
+indica que a organização atingiu temporariamente o limite de tokens por minuto. Isso não significa que a chave esteja inválida. Também não é resolvido criando outra chave na mesma organização, porque o limite é aplicado à organização, ao projeto e ao modelo.
+
+Para ampliar o limite:
+
+1. Acesse <https://platform.openai.com/settings/organization/limits>.
+2. Confirme a organização e o projeto associados à chave usada na Vercel.
+3. Localize **Usage Tiers** ou **Rate limits**.
+4. Clique em **Upgrade tier**, se a opção estiver disponível.
+5. Siga as instruções da OpenAI sobre créditos, uso ou cobrança.
+6. Confirme o novo limite específico do modelo usado em `OPENAI_CONTENT_MODEL`.
+7. Mantenha a mesma chave se ela continuar vinculada ao projeto correto.
+8. Faça **Redeploy** na Vercel apenas quando também tiver alterado variáveis de ambiente.
+
+Os nomes e opções podem variar conforme a organização. Se **Upgrade tier** não aparecer, o usuário precisa ser administrador da organização ou concluir a configuração solicitada no painel OpenAI. A documentação oficial está em <https://developers.openai.com/api/docs/guides/rate-limits>.
+
+Para reduzir o consumo sem perder imediatamente o padrão de texto longo, mantenha `AULA_AI_BATCH_SIZE=1`, evite gerações simultâneas e aguarde alguns segundos após um 429. Se necessário, reduza `OPENAI_MAX_TOKENS` de `16000` para `12000`, sabendo que um valor menor pode limitar uma aula muito extensa.
 
 ---
 
@@ -1144,6 +1206,13 @@ Exemplo de configuração:
 OPENAI_API_KEY=chave-local
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
+OPENAI_CONTENT_MODEL=gpt-4.1
+OPENAI_MAX_TOKENS=16000
+OPENAI_MAX_RETRIES=3
+AULA_AI_BATCH_SIZE=1
+AULA_ACADEMIC_PIPELINE=true
+AULA_ACADEMIC_REVIEW=true
+AULA_AUTO_REPAIR=true
 AULA_ACCESS_CODE=um-codigo-privado
 YOUTUBE_API_KEY=chave-do-youtube
 AULA_RESOURCE_RESEARCH=true
@@ -1175,6 +1244,8 @@ Não use o conteúdo estrutural do fallback como versão final de uma disciplina
 | “Informe o código de acesso” | O código da Vercel não foi informado | Digite o valor de `AULA_ACCESS_CODE` no campo da tela |
 | Erro 401 | Código incorreto ou ausente | Confirme a variável na Vercel e faça Redeploy |
 | IA indisponível | `OPENAI_API_KEY` não chegou ao ambiente | Cadastre a chave como Secret e faça Redeploy |
+| Erro 429 / `Rate limit reached` | Limite TPM/RPM temporário da organização, projeto ou modelo | Aguarde; o sistema tenta novamente. Para ampliar, siga a seção 22.3 |
+| Erro 503 / modelo sobrecarregado | Sobrecarga temporária do provedor | Aguarde o retry automático e tente novamente sem abrir gerações paralelas |
 | “vídeos aguardando chave” | `YOUTUBE_API_KEY` ausente no ambiente atual | Cadastre a chave no Production e faça Redeploy |
 | IA funciona, mas não há vídeos | Busca do YouTube não configurada ou sem candidatos | Confira a chave, o healthcheck e os termos de busca |
 | Página pública mostra IA desativada | Você abriu a versão GitHub Pages | Use a URL da Vercel para geração com IA |
@@ -1214,7 +1285,20 @@ Em produção:
 https://aula-generator.vercel.app/api/health
 ```
 
-O resultado esperado é um JSON com campos como `aiConfigured`, `accessRequired`, `resourceResearch`, `youtubeConfigured` e `model`.
+O resultado esperado é um JSON com campos como `aiConfigured`, `accessRequired`, `resourceResearch`, `youtubeConfigured`, `model`, `maxTokens`, `maxRetries` e `aiBatchSize`.
+
+### 22.3 Erro 429 de limite TPM
+
+Se a resposta mostrar `Limit`, `Used` e `Requested`, faça o seguinte:
+
+1. Não crie várias chaves novas.
+2. Aguarde o intervalo informado pela API, normalmente alguns segundos.
+3. Verifique se `aiBatchSize` está em `1` no healthcheck.
+4. Evite duas gerações ou regenerações simultâneas.
+5. Se o problema persistir, confira a página de limites da OpenAI e avalie o **Upgrade tier**.
+6. Se necessário, altere `OPENAI_MAX_TOKENS` para `12000` na Vercel e faça Redeploy.
+
+A chave da OpenAI continua protegida; o Gerador usa apenas o backend para fazer essas chamadas.
 
 ---
 
@@ -1394,6 +1478,14 @@ Sim. O modo local permite testar a aplicação e gerar exemplos. Para geração 
 ### A chave do ChatGPT funciona na aplicação?
 
 Não. A aplicação precisa de uma chave de API da plataforma OpenAI. A senha da conta ChatGPT não deve ser usada como credencial do backend.
+
+### Por que aparece erro 429 mesmo com a chave correta?
+
+Porque a organização atingiu temporariamente o limite de tokens por minuto do modelo. O sistema agora processa uma semana por vez e tenta novamente respostas temporárias, mas o aumento permanente deve ser feito em **Settings → Organization → Limits** na plataforma OpenAI.
+
+### Por que não vejo mais disciplina, nível e profundidade dentro do Perfil acadêmico?
+
+Esses dados são definidos uma única vez na **Identidade do curso**. O Perfil acadêmico mostra um resumo herdado e calcula a profundidade aplicada a partir do nível da turma. Isso evita contradições, como a Identidade indicar um curso avançado e o Perfil acadêmico indicar graduação ou conteúdo básico.
 
 ### O ZIP do Gerador já é o ZIP do Moodle?
 
