@@ -715,6 +715,15 @@ function openLessonPreview(index) {
   document.body.style.overflow = "hidden";
 }
 
+function startWeekRevision(index) {
+  openLessonPreview(index);
+  window.setTimeout(() => {
+    const field = $("#week-revision");
+    field?.scrollIntoView({ behavior: "smooth", block: "center" });
+    field?.focus();
+  }, 80);
+}
+
 function closeLessonPreview() {
   $("#lesson-modal").classList.add("hidden");
   $("#lesson-modal").setAttribute("aria-hidden", "true");
@@ -930,10 +939,11 @@ function renderWeeks(data) {
     const manuallyApproved = Boolean(state.weekApprovals?.[index]);
     const qualityLabel = manuallyApproved ? "conferida e liberada por você" : ({ complete: "conteúdo completo", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[quality.status] || "qualidade não medida");
     const approvalButton = quality.status !== "complete" ? `<button class="week-approve ${manuallyApproved ? "is-approved" : ""}" data-index="${index}" type="button">${manuallyApproved ? "Desfazer liberação" : "Liberar após conferência"}</button>` : "";
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div><h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div><span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(quality.status || "needs-review")}">${escapeHtml(qualityLabel)}</span><div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="week-download" data-index="${index}" type="button">Baixar JSON <span>↓</span></button>${approvalButton}</div></article>`;
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div><h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div><span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(quality.status || "needs-review")}">${escapeHtml(qualityLabel)}</span><div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-revise" data-index="${index}" type="button">Refazer semana <span>↻</span></button><button class="week-download" data-index="${index}" type="button">Baixar JSON <span>↓</span></button>${approvalButton}</div></article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
   $("#week-grid").querySelectorAll(".week-preview").forEach((button) => button.addEventListener("click", () => openLessonPreview(Number(button.dataset.index))));
+  $("#week-grid").querySelectorAll(".week-revise").forEach((button) => button.addEventListener("click", () => startWeekRevision(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-download").forEach((button) => button.addEventListener("click", () => downloadWeek(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-approve").forEach((button) => button.addEventListener("click", () => toggleWeekApproval(Number(button.dataset.index))));
   renderGeneralPlan(data.generalPlan);
