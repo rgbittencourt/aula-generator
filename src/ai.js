@@ -1,4 +1,4 @@
-import { KNOWN_BLOCK_TYPES, normalizeLesson, normalizeWeeklyOutput, practiceScheduledForWeek } from "./aula-schema.js";
+import { KNOWN_BLOCK_TYPES, normalizeLesson, normalizeWeeklyOutput, practiceScheduledForWeek, resourcePlanForWeek } from "./aula-schema.js";
 import { measureLessonQuality, qualityPromptGuidance } from "./content-quality.js";
 import { buildTeacherGuide } from "./teacher-guide.js";
 import { ACADEMIC_SYSTEM_PROMPT, buildAcademicPlanPrompt, buildAcademicReviewPrompt, normalizeAcademicPlan, normalizeAcademicReview, normalizeAcademicProfile } from "./academic.js";
@@ -237,6 +237,7 @@ export async function assistBriefing(input, missingFields = []) {
 }
 
 export async function selectResourcesWithAI(input, research) {
+  const resourceTargets = research.resourceTargets || { videosPerWeek: 2, articlesPerWeek: 3, requiredReadingsPerWeek: 1, requiredReadingLevel: "essential" };
   const candidates = {
     videos: (research.videos || []).map((result) => ({ request: result.request, status: result.status, candidates: (result.candidates || []).slice(0, 5) })),
     images: (research.images || []).map((result) => ({ request: result.request, status: result.status, candidates: (result.candidates || []).slice(0, 5) })),
@@ -252,7 +253,7 @@ Regras obrigatórias:
 - prefira material em ${input.language || "pt-BR"}, fonte institucional/acadêmica e recurso acessível;
 - avalie explicitamente: alinhamento a um objetivo, confiabilidade/qualidade da fonte, atualidade, acessibilidade, duração em relação à carga, licença/crédito, idioma e momento didático;
 - um vídeo sem legenda/transcrição deve trazer uma alternativa textual; uma imagem/diagrama deve trazer altText ou uma alternativa descritiva;
-- escolha no máximo 2 vídeos, 3 imagens/diagramas e 3 leituras por semana;
+- escolha até ${resourceTargets.videosPerWeek} vídeo(s), até 3 imagens/diagramas, ${resourceTargets.articlesPerWeek} artigo(s) e ${Math.max(resourceTargets.articlesPerWeek, resourceTargets.requiredReadingsPerWeek)} leitura(s) por semana, respeitando as metas desta semana; o nível de leitura obrigatória é ${resourceTargets.requiredReadingLevel};
 - elimine duplicatas e descarte recursos que não tenham relação clara com o conteúdo;
 - explique em reason por que o recurso foi escolhido e em use como ele será usado pedagogicamente;
 - marque required true somente quando o recurso for necessário para atingir um objetivo;
@@ -286,6 +287,7 @@ export function buildWeekGenerationPrompt(input, weekIndex = 0, academicPlan = n
   const previous = weekFocus.bridgeFromPrevious || (weekNumber > 1 ? `A semana anterior foi a ${weekNumber - 1}; retome um conceito dela e mostre como esta semana avança.` : "Esta é a abertura do curso; construa a base conceitual e anuncie o percurso.");
   const profile = normalizeAcademicProfile(input.academicProfile, input);
   const scheduledPractices = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, weekIndex));
+  const resourcePlan = resourcePlanForWeek(input, weekIndex);
   const previousSummaries = (previousWeeks || []).slice(-3).map((lesson, index) => ({
     weekNumber: lesson?.lessonPlan?.weekNumber || index + 1,
     theme: lesson?.lessonPlan?.theme || lesson?.meta?.title,
@@ -318,6 +320,11 @@ MAPA LONGITUDINAL OBRIGATÓRIO — não ignore este bloco e não substitua seus 
 - Marco/evidência da etapa: ${weekFocus.projectMilestone}
 - Elementos obrigatórios: ${JSON.stringify(weekFocus.mustInclude)}
 - O que não repetir nem antecipar: ${weekFocus.doNotRepeat}
+
+REQUISITOS DE RECURSOS DESTA SEMANA — cumpra estas quantidades sem inventar links:
+- vídeos: ${resourcePlan.videosPerWeek}; artigos acadêmicos: ${resourcePlan.articlesPerWeek}; leituras obrigatórias totais: ${resourcePlan.requiredReadingsPerWeek}; nível de leitura obrigatória: ${resourcePlan.requiredReadingLevel};
+- artigos podem contar como parte das leituras obrigatórias, sem duplicar artificialmente a lista. Se não houver URL verificável, use searchQuery e verificationStatus "suggested-no-url" para que a pesquisa/curadoria localize candidatos depois;
+- distribua os recursos nas seções em que serão usados. Se uma meta for 0, não force esse tipo de recurso na semana.
 
 Semanas já geradas (use somente para continuidade; não copie seus títulos, objetivos ou seções):
 ${JSON.stringify(previousSummaries, null, 2)}
@@ -552,6 +559,7 @@ export async function regenerateWeekWithAI(input, index, currentWeek, instructio
     academicProfile: normalizeAcademicProfile(input.academicProfile, input),
     references: (input.references || []).slice(0, 12),
     materials: (input.materials || []).slice(0, 12).map((item) => ({ title: item.title, type: item.type, link: item.link, moment: item.moment, objective: item.objective, alignment: item.alignment, use: item.use, pages: item.pages, durationMinutes: item.durationMinutes })),
+    resourcePlan: resourcePlanForWeek(input, index),
     webPractices: [],
     weekToGenerate: weekNumber
   };

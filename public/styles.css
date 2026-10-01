@@ -41,3 +41,16 @@
 .schedule-item .button{height:36px;padding:0 11px;flex:0 0 auto;font-size:11px}
 @media(max-width:980px){.field-grid.four{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.field-grid.four{grid-template-columns:1fr}.schedule-item{align-items:flex-start;flex-direction:column}.schedule-item .button{width:100%}}
+
+/* Plano de recursos por semana */
+.resource-plan-heading{display:flex;justify-content:space-between;gap:16px;align-items:baseline;margin:18px 0 8px;color:var(--navy)}
+.resource-plan-heading small{color:var(--muted);font-size:12px}
+.resource-plan-weeks{display:grid;gap:8px}
+.resource-plan-week{display:grid;grid-template-columns:100px repeat(4,minmax(110px,1fr));gap:8px;align-items:end;padding:12px;border:1px solid #e1e5e8;border-radius:10px;background:#fbfcfb}
+.resource-plan-week-label{padding-bottom:9px;color:#43584b;font-size:12px;font-weight:700}
+.resource-plan-week .field{margin:0}
+.resource-plan-week .field span{font-size:10px}
+.resource-plan-week input,.resource-plan-week select{min-height:36px;padding:8px;font-size:12px}
+.resource-plan-week .resource-override::placeholder{color:#8a949e}
+@media(max-width:860px){.resource-plan-week{grid-template-columns:repeat(2,minmax(0,1fr))}.resource-plan-week-label{grid-column:1/-1;padding-bottom:0}}
+@media(max-width:540px){.resource-plan-heading{display:block}.resource-plan-heading small{display:block;margin-top:4px}.resource-plan-week{grid-template-columns:1fr}}

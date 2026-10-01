@@ -26,7 +26,7 @@ test("pesquisa simulada seleciona imagem/leitura e gera blocos Aula Studio", asy
     const [result] = await enrichLessonsWithResources(input, [lesson]);
     assert.equal(result.lessonPlan.resourceResearch.status, "ai-selected");
     assert.equal(result.lessonPlan.resources.images[0].provider, "wikimedia-commons");
-    assert.equal(result.lessonPlan.resources.readingsExtra[0].provider, "crossref");
+    assert.equal(result.lessonPlan.resources.readingsRequired[0].provider, "crossref");
     assert.ok(hasNestedBlock(result.blocks, "imagem"));
     assert.ok(hasNestedBlock(result.blocks, "materiais"));
   } finally {

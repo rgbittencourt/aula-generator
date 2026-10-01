@@ -160,9 +160,57 @@ function applyInputToForm(input = {}) {
   if ($("#access-code")) $("#access-code").value = "";
   toggleCalendar();
   togglePractice();
+  const resourcePlan = input.resourcePlan || {};
+  const resourceDefaults = resourcePlan.default || {};
+  if ($("#resource-default-videos")) $("#resource-default-videos").value = Number.isFinite(Number(resourceDefaults.videosPerWeek)) ? resourceDefaults.videosPerWeek : 1;
+  if ($("#resource-default-articles")) $("#resource-default-articles").value = Number.isFinite(Number(resourceDefaults.articlesPerWeek)) ? resourceDefaults.articlesPerWeek : 1;
+  if ($("#resource-default-required")) $("#resource-default-required").value = Number.isFinite(Number(resourceDefaults.requiredReadingsPerWeek)) ? resourceDefaults.requiredReadingsPerWeek : 1;
+  if ($("#resource-default-level")) $("#resource-default-level").value = resourceDefaults.requiredReadingLevel || "essential";
+  renderResourcePlanWeeks(resourcePlan);
   updateAcademicInheritance();
   updateSummary();
   updateProgress();
+}
+
+function optionalResourceCount(value) {
+  const source = String(value ?? "").trim();
+  if (!source) return null;
+  return Math.min(12, Math.max(0, Number(source) || 0));
+}
+
+function collectResourcePlan() {
+  const weeks = [...document.querySelectorAll("[data-resource-week]")].map((row) => ({
+    weekNumber: Number(row.dataset.resourceWeek),
+    videosPerWeek: optionalResourceCount(row.querySelector("[data-resource-videos]")?.value),
+    articlesPerWeek: optionalResourceCount(row.querySelector("[data-resource-articles]")?.value),
+    requiredReadingsPerWeek: optionalResourceCount(row.querySelector("[data-resource-required]")?.value),
+    requiredReadingLevel: row.querySelector("[data-resource-level]")?.value || null
+  }));
+  return {
+    default: {
+      videosPerWeek: Math.min(12, Math.max(0, Number($("#resource-default-videos")?.value) || 0)),
+      articlesPerWeek: Math.min(12, Math.max(0, Number($("#resource-default-articles")?.value) || 0)),
+      requiredReadingsPerWeek: Math.min(12, Math.max(0, Number($("#resource-default-required")?.value) || 0)),
+      requiredReadingLevel: $("#resource-default-level")?.value || "essential"
+    },
+    weeks
+  };
+}
+
+function renderResourcePlanWeeks(plan = {}) {
+  const container = $("#resource-plan-weeks");
+  if (!container) return;
+  const weeks = Math.min(52, Math.max(1, Number($("#weeks")?.value) || 1));
+  const entries = Array.isArray(plan.weeks) ? plan.weeks : [];
+  const byWeek = new Map(entries.map((entry) => [Number(entry.weekNumber || entry.week), entry]));
+  const field = (label, attribute, value, type = "number") => type === "select"
+    ? `<label class="field"><span>${label}</span><select data-resource-${attribute} class="resource-override"><option value="">Padrão</option><option value="none" ${value === "none" ? "selected" : ""}>Nenhuma</option><option value="essential" ${value === "essential" ? "selected" : ""}>Essencial</option><option value="advanced" ${value === "advanced" ? "selected" : ""}>Aprofundada</option><option value="dense" ${value === "dense" ? "selected" : ""}>Densa</option></select></label>`
+    : `<label class="field"><span>${label}</span><input data-resource-${attribute} class="resource-override" type="number" min="0" max="12" step="1" value="${value ?? ""}" placeholder="padrão" /></label>`;
+  container.innerHTML = Array.from({ length: weeks }, (_, index) => {
+    const weekNumber = index + 1;
+    const entry = byWeek.get(weekNumber) || {};
+    return `<div class="resource-plan-week" data-resource-week="${weekNumber}"><div class="resource-plan-week-label">Semana ${weekNumber}</div>${field("Vídeos", "videos", entry.videosPerWeek)}${field("Artigos", "articles", entry.articlesPerWeek)}${field("Leituras obrigatórias", "required", entry.requiredReadingsPerWeek)}${field("Nível de leitura", "level", entry.requiredReadingLevel, "select")}</div>`;
+  }).join("");
 }
 
 function restoreSnapshot(snapshot) {
@@ -353,6 +401,7 @@ function formInput() {
     imageLinks: splitLines($("#image-links").value),
     imageSearchSuggestions: splitLines($("#image-search-suggestions").value),
     materials: collectMaterials(),
+    resourcePlan: collectResourcePlan(),
     accessCode: $("#access-code")?.value || "",
     webPracticeEnabled: $("#practice-enabled").checked,
     webPractices,
@@ -375,6 +424,8 @@ function updateSummary() {
   $("#summary-hours").textContent = `${hours} h`;
   $("#summary-total").textContent = `${hours * weeks} h`;
   $("#summary-calendar").textContent = calendar === "calendar" ? (formatDate($("#start-date").value) || "Data pendente") : "Por numeração";
+  const resourceDefaults = collectResourcePlan().default;
+  $("#summary-resources").textContent = `${resourceDefaults.videosPerWeek} vídeo(s) · ${resourceDefaults.articlesPerWeek} artigo(s) · ${resourceDefaults.requiredReadingsPerWeek} leitura(s)`;
   const practiceCount = collectPractices().filter((practice) => practice.title || practice.objective || practice.context).length;
   $("#summary-practice").textContent = $("#practice-enabled").checked ? `Sim · ${practiceCount || 1}` : "Não";
   $("#workload-preview strong").textContent = `${hours * weeks} horas totais`;
@@ -962,6 +1013,7 @@ $("#regenerate-week-button").addEventListener("click", regenerateSelectedWeek);
 $("#lesson-modal").addEventListener("click", (event) => { if (event.target.id === "lesson-modal") closeLessonPreview(); });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.previewIndex != null) closeLessonPreview(); });
 $("#calendar-mode").addEventListener("change", () => { toggleCalendar(); scheduleSave(); });
+$("#weeks").addEventListener("input", () => { renderResourcePlanWeeks(collectResourcePlan()); updateSummary(); updateProgress(); scheduleSave(); });
 $("#practice-enabled").addEventListener("change", () => { togglePractice(); scheduleSave(); });
 $("#course-form").addEventListener("input", () => { updateAcademicInheritance(); updateSummary(); updateProgress(); scheduleSave(); });
 $("#save-backup-button").addEventListener("click", downloadBackup);
@@ -973,4 +1025,4 @@ window.addEventListener("beforeunload", () => saveDraft("fechamento"));
 $("#generate-button").dataset.label = "Gerar com IA";
 $("#fallback-button").dataset.label = "Gerar exemplo local";
 $("#assist-button").dataset.label = "Preencher vazios com IA";
-toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
+renderResourcePlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();

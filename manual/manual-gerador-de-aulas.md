@@ -243,13 +243,14 @@ Esse resumo é preliminar. O cálculo mais preciso acontece depois que o conteú
 
 ### 5.3 Seções numeradas
 
-A tela divide o briefing em cinco áreas:
+A tela divide o briefing em seis áreas:
 
 1. **Identidade do curso**
 2. **Tempo e calendário**
-3. **Intenção pedagógica**
-4. **Webpráticas**
-5. **Materiais de apoio**
+3. **Recursos e leituras por semana**
+4. **Intenção pedagógica**
+5. **Webpráticas**
+6. **Materiais de apoio**
 
 Ao final ficam as referências, os links e os botões de geração.
 
@@ -335,6 +336,30 @@ Informe:
 No modo **Semana 1, Semana 2…**, o sistema não precisa de uma data de início.
 
 No modo **Data de início real**, o sistema calcula cada semana em blocos de sete dias. Se a data inicial for 05/10/2026, a primeira semana será de 05/10 a 11/10, a segunda de 12/10 a 18/10 e assim por diante.
+
+### 7.2.1 Recursos e leituras por semana
+
+No painel **Recursos e leituras por semana**, informe o padrão do curso:
+
+- **Vídeos por semana:** quantidade de vídeos que a IA deve procurar e contextualizar;
+- **Artigos por semana:** quantidade de artigos acadêmicos que a curadoria deve localizar;
+- **Leituras obrigatórias:** quantidade total de leituras que o estudante deverá realizar;
+- **Nível da leitura obrigatória:** nenhuma, essencial, aprofundada ou densa.
+
+Os artigos podem contar como parte das leituras obrigatórias. Portanto, se você definir um artigo e uma leitura obrigatória, o sistema tentará usar o artigo como essa leitura, sem duplicar artificialmente o material.
+
+Abaixo dos padrões existe a tabela **Distribuição específica por semana**. Cada linha permite substituir os valores de uma semana. Deixe o campo como **Padrão** para herdar a configuração geral. Para não inserir um tipo de recurso em determinada semana, informe `0` naquela linha.
+
+Exemplo:
+
+| Semana | Vídeos | Artigos | Leituras obrigatórias | Nível |
+|---|---:|---:|---:|---|
+| Padrão | 1 | 1 | 1 | Essencial |
+| Semana 1 | 0 | 2 | 2 | Aprofundada |
+| Semana 2 | Padrão | 0 | 0 | Nenhuma |
+| Semana 3 | 2 | 1 | 1 | Densa |
+
+O pedido é enviado à redação semanal, à curadoria da IA e à pesquisa dos provedores. Se um provedor não retornar candidatos suficientes, a semana registra a pendência em vez de inventar links.
 
 ### 7.3 Objetivos de aprendizagem
 
@@ -769,7 +794,7 @@ Regras obrigatórias:
 - prefira material em {input.language ou "pt-BR"}, fonte institucional/acadêmica e recurso acessível;
 - avalie explicitamente: alinhamento a um objetivo, confiabilidade/qualidade da fonte, atualidade, acessibilidade, duração em relação à carga, licença/crédito, idioma e momento didático;
 - um vídeo sem legenda/transcrição deve trazer uma alternativa textual; uma imagem/diagrama deve trazer altText ou uma alternativa descritiva;
-- escolha no máximo 2 vídeos, 3 imagens/diagramas e 3 leituras por semana;
+- escolha até `{resourcePlan.videosPerWeek}` vídeo(s), até 3 imagens/diagramas, `{resourcePlan.articlesPerWeek}` artigo(s) e `{max(resourcePlan.articlesPerWeek, resourcePlan.requiredReadingsPerWeek)}` leitura(s), respeitando o nível `{resourcePlan.requiredReadingLevel}` desta semana;
 - elimine duplicatas e descarte recursos que não tenham relação clara com o conteúdo;
 - explique em reason por que o recurso foi escolhido e em use como ele será usado pedagogicamente;
 - marque required true somente quando o recurso for necessário para atingir um objetivo;

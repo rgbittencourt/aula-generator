@@ -73,7 +73,20 @@
           </section>
 
           <section class="panel">
-            <div class="panel-heading"><div><span class="step">03</span><div><h2>Intenção pedagógica</h2><p>Objetivos e conteúdo-base para a geração.</p></div></div><button class="button button-secondary ai-assist-button" type="button" id="assist-button"><span>Preencher vazios com IA</span><span class="button-arrow">✦</span></button></div>
+            <div class="panel-heading"><div><span class="step">03</span><div><h2>Recursos e leituras por semana</h2><p>Defina o volume padrão e ajuste semanas específicas.</p></div></div><span class="material-mark">◌</span></div>
+            <div class="field-grid four">
+              <label class="field"><span>Vídeos por semana</span><input id="resource-default-videos" type="number" min="0" max="12" step="1" value="1" /></label>
+              <label class="field"><span>Artigos por semana</span><input id="resource-default-articles" type="number" min="0" max="12" step="1" value="1" /></label>
+              <label class="field"><span>Leituras obrigatórias</span><input id="resource-default-required" type="number" min="0" max="12" step="1" value="1" /></label>
+              <label class="field"><span>Nível da leitura obrigatória</span><select id="resource-default-level"><option value="none">Nenhuma</option><option value="essential" selected>Essencial</option><option value="advanced">Aprofundada</option><option value="dense">Densa</option></select></label>
+            </div>
+            <p class="hint">Artigos são leituras acadêmicas sugeridas e podem contar como parte das leituras obrigatórias. Use 0 quando uma semana não deve receber esse tipo de recurso.</p>
+            <div class="resource-plan-heading"><strong>Distribuição específica por semana</strong><small>Deixe “padrão” para herdar os valores acima; altere apenas as semanas que terão outra quantidade.</small></div>
+            <div id="resource-plan-weeks" class="resource-plan-weeks"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading"><div><span class="step">04</span><div><h2>Intenção pedagógica</h2><p>Objetivos e conteúdo-base para a geração.</p></div></div><button class="button button-secondary ai-assist-button" type="button" id="assist-button"><span>Preencher vazios com IA</span><span class="button-arrow">✦</span></button></div>
             <label class="field"><span>Objetivos de aprendizagem <b>*</b></span><textarea id="objectives" name="objectives" rows="4" placeholder="Um objetivo por linha. Ex.: Identificar os principais desafios de mobilidade urbana."></textarea><small class="hint">Escreva verbos observáveis: analisar, comparar, aplicar, criar, avaliar.</small></label>
             <label class="field"><span>Conteúdos, recortes e orientações</span><textarea id="content" name="content" rows="5" placeholder="Conceitos obrigatórios, recorte regional, abordagem desejada, exemplos que devem aparecer…"></textarea></label>
             <label class="field"><span>Preferência de arco para esta trilha</span><select id="didactic-mode" name="didacticMode"><option value="auto" selected>A IA escolhe em cada semana</option><option value="descoberta-conceitual">Descoberta conceitual</option><option value="estudo-de-caso">Estudo de caso</option><option value="oficina-aplicada">Oficina aplicada</option><option value="analise-de-dados">Análise de dados</option><option value="debate-orientado">Debate orientado</option><option value="revisao-e-sintese">Revisão e síntese</option></select><small class="hint">É uma preferência, não uma receita. A IA pode variar o arco quando o conteúdo pedir outro caminho.</small></label>
@@ -82,7 +95,7 @@
           </section>
 
               <section class="panel">
-            <div class="panel-heading"><div><span class="step">04</span><div><h2>Webpráticas síncronas</h2><p>Aulas práticas/laboratórios com agenda própria, separadas do texto-base semanal.</p></div></div><label class="switch"><input id="practice-enabled" type="checkbox" /><span></span></label></div>
+            <div class="panel-heading"><div><span class="step">05</span><div><h2>Webpráticas síncronas</h2><p>Aulas práticas/laboratórios com agenda própria, separadas do texto-base semanal.</p></div></div><label class="switch"><input id="practice-enabled" type="checkbox" /><span></span></label></div>
               <div id="practice-fields" class="practice-fields disabled">
               <div id="practice-list" class="stacked-list"></div>
               <button class="button button-secondary add-item-button" type="button" id="add-practice">+ Adicionar outra webprática</button>
@@ -92,7 +105,7 @@
           </section>
 
           <section class="panel">
-            <div class="panel-heading"><div><span class="step">05</span><div><h2>Materiais de apoio</h2><p>A IA ajuda a alinhar cada material aos objetivos, conteúdos e momento didático.</p></div></div><span class="material-mark">✦</span></div>
+            <div class="panel-heading"><div><span class="step">06</span><div><h2>Materiais de apoio</h2><p>A IA ajuda a alinhar cada material aos objetivos, conteúdos e momento didático.</p></div></div><span class="material-mark">✦</span></div>
             <div id="materials-list" class="stacked-list"></div>
             <button class="button button-secondary add-item-button" type="button" id="add-material">+ Adicionar material de apoio</button>
             <label class="field"><span>Referências, livros e documentos</span><textarea id="references" rows="4" placeholder="Uma referência ou URL por linha"></textarea></label>
@@ -119,6 +132,7 @@
               <div><dt>Estudo semanal</dt><dd id="summary-hours">4 h</dd></div>
               <div><dt>Carga total</dt><dd id="summary-total">16 h</dd></div>
               <div><dt>Calendário</dt><dd id="summary-calendar">Por numeração</dd></div>
+              <div><dt>Recursos por semana</dt><dd id="summary-resources">1 vídeo · 1 artigo</dd></div>
               <div><dt>Webpráticas</dt><dd id="summary-practice">Não</dd></div>
             </dl>
             <div class="formula-note"><span>ƒx</span><p><strong>Perfil interno de dimensionamento</strong> Leituras, artigos, vídeos, fóruns, práticas e avaliações são dimensionados depois que a semana é escrita.</p></div>

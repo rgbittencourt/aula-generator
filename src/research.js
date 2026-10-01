@@ -24,11 +24,26 @@ function baseQuery(input, lesson) {
   return [plan.theme || input.title, sectionTitles, input.language === "pt-BR" ? "português" : input.language].filter(Boolean).join(" — ").slice(0, 240);
 }
 
+function resourceTargetsFor(input, lesson) {
+  const weekNumber = Number(lesson?.meta?.weekNumber || 1);
+  const plan = input.resourcePlan || {};
+  const defaults = plan.default || { videosPerWeek: 1, articlesPerWeek: 1, requiredReadingsPerWeek: 1, requiredReadingLevel: "essential" };
+  const override = (plan.weeks || []).find((entry) => Number(entry.weekNumber) === weekNumber) || {};
+  return {
+    videosPerWeek: override.videosPerWeek ?? defaults.videosPerWeek ?? 1,
+    articlesPerWeek: override.articlesPerWeek ?? defaults.articlesPerWeek ?? 1,
+    requiredReadingsPerWeek: override.requiredReadingsPerWeek ?? defaults.requiredReadingsPerWeek ?? 1,
+    requiredReadingLevel: override.requiredReadingLevel || defaults.requiredReadingLevel || "essential"
+  };
+}
+
 function requestsFor(type, input, lesson) {
   const resources = lesson?.lessonPlan?.resources || {};
   const source = type === "video" ? resources.videos : type === "image" ? resources.images : [...(resources.readingsRequired || []), ...(resources.readingsExtra || [])];
   const fallback = baseQuery(input, lesson);
   const items = Array.isArray(source) ? source : [];
+  const targets = resourceTargetsFor(input, lesson);
+  const target = type === "video" ? Number(targets.videosPerWeek || 0) : type === "reading" ? Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)) : 1;
   const requests = items.filter((resource) => !resource.href).map((resource, index) => ({
     requestId: text(resource.id, `${type}-request-${index + 1}`),
     type,
@@ -37,10 +52,14 @@ function requestsFor(type, input, lesson) {
     objective: resource.objective,
     moment: resource.moment,
     required: Boolean(resource.required),
-    kind: resource.kind || resource.type
+    kind: resource.kind || resource.type,
+    readingLevel: type === "reading" ? targets.requiredReadingLevel : ""
   }));
-  if (!requests.length && !items.some((resource) => resource.href)) requests.push({ requestId: `${type}-generated-1`, type, query: fallback, title: `${type} para ${lesson?.lessonPlan?.theme || input.title}`, objective: "Enriquecer a unidade com um recurso contextualizado.", moment: "ponto de uso", required: type !== "image" });
-  return requests.slice(0, 5);
+  const providedCount = items.filter((resource) => resource.href).length;
+  for (let index = providedCount + requests.length; index < target; index += 1) {
+    requests.push({ requestId: `${type}-generated-${index + 1}`, type, query: `${fallback} ${type === "reading" ? "artigo acadêmico" : "recurso educacional"}`, title: `${type === "reading" ? "Artigo acadêmico" : "Vídeo"} ${index + 1} para ${lesson?.lessonPlan?.theme || input.title}`, objective: "Enriquecer a unidade com um recurso contextualizado.", moment: "ponto de uso", required: type === "reading" && index < Number(targets.requiredReadingsPerWeek || 0), readingLevel: type === "reading" ? targets.requiredReadingLevel : "" });
+  }
+  return requests.slice(0, Math.max(5, target));
 }
 
 function isoDurationToMinutes(value) {
@@ -170,6 +189,7 @@ function compactResearch(research) {
     searchedAt: research.searchedAt,
     providers: research.providers,
     queries: research.queries,
+    targets: research.targets || research.resourceTargets,
     selections: research.selections,
     selectionFallbacks: research.selectionFallbacks || [],
     alternatives: research.alternatives
@@ -259,6 +279,7 @@ function fallbackSelection(results) {
 
 function ensureSelectionCoverage(selection, type, results, limit) {
   const raw = Array.isArray(selection?.[type]) ? selection[type] : null;
+  if (limit <= 0) return { items: [], fallback: "" };
   const candidateIds = new Set(results.flatMap((result) => result.candidates || []).map((candidate) => candidate.candidateId));
   const hasCandidates = candidateIds.size > 0;
   const hasInvalidPositiveSelection = Array.isArray(raw) && raw.some((item) => item?.keep !== false && !candidateIds.has(item?.candidateId));
@@ -267,6 +288,11 @@ function ensureSelectionCoverage(selection, type, results, limit) {
   // rastreável e ainda pendente de aprovação humana.
   if (hasCandidates && (raw === null || raw.length === 0 || hasInvalidPositiveSelection)) {
     return { items: fallbackSelection(results).slice(0, limit), fallback: `${type}: resposta da curadoria sem seleção utilizável; primeiro candidato inserido para revisão humana.` };
+  }
+  if (hasCandidates && limit > 0) {
+    const selectedIds = new Set((raw || []).filter((item) => item?.keep !== false && candidateIds.has(item?.candidateId)).map((item) => item.candidateId));
+    const additions = fallbackSelection(results).filter((item) => !selectedIds.has(item.candidateId));
+    if (selectedIds.size < limit && additions.length) return { items: [...(raw || []), ...additions].slice(0, limit), fallback: `${type}: a curadoria foi completada com candidatos adicionais para atingir a quantidade solicitada.` };
   }
   return { items: raw || [], fallback: "" };
 }
@@ -326,31 +352,36 @@ function syncResourceBlocks(lesson, selectedResources) {
 export async function enrichLessonsWithResources(input, lessons) {
   if (process.env.AULA_RESOURCE_RESEARCH === "false") return lessons;
   return Promise.all(lessons.map(async (lesson) => {
+    const targets = resourceTargetsFor(input, lesson);
     const videoRequests = requestsFor("video", input, lesson);
     const imageRequests = requestsFor("image", input, lesson);
     const readingRequests = requestsFor("reading", input, lesson);
     const [videos, images, readings] = await Promise.all([researchGroup("video", videoRequests, input), researchGroup("image", imageRequests, input), researchGroup("reading", readingRequests, input)]);
-    const research = { status: "searched", searchedAt: new Date().toISOString(), providers: { youtube: videos.map((result) => result.status), wikimediaCommons: images.map((result) => result.status), crossref: readings.map((result) => result.status) }, queries: { videos: videoRequests, images: imageRequests, readings: readingRequests }, videos, images, readings };
+    const research = { status: "searched", searchedAt: new Date().toISOString(), targets, providers: { youtube: videos.map((result) => result.status), wikimediaCommons: images.map((result) => result.status), crossref: readings.map((result) => result.status) }, queries: { videos: videoRequests, images: imageRequests, readings: readingRequests }, videos, images, readings };
     const candidateCount = flattenCandidates(research).length;
     if (!candidateCount) return { ...lesson, lessonPlan: { ...lesson.lessonPlan, resourceResearch: { ...compactResearch({ ...research, status: "no-candidates" }), note: "Não foram encontrados candidatos. Para vídeos, cadastre YOUTUBE_API_KEY na Vercel; imagens e leituras usam provedores públicos." } } };
     let selection;
     let selectionStatus = "ai-selected";
     try {
-      selection = await selectResourcesWithAI(input, { videos, images, readings });
+      selection = await selectResourcesWithAI(input, { videos, images, readings, resourceTargets: targets });
     } catch (error) {
       selectionStatus = "fallback-ranking";
       selection = { videos: fallbackSelection(videos), images: fallbackSelection(images), readings: fallbackSelection(readings), error: error.message };
     }
-    const videoSelection = ensureSelectionCoverage(selection, "videos", videos, 2);
+    const videoSelection = ensureSelectionCoverage(selection, "videos", videos, Number(targets.videosPerWeek || 0));
     const imageSelection = ensureSelectionCoverage(selection, "images", images, 3);
-    const readingSelection = ensureSelectionCoverage(selection, "readings", readings, 3);
+    const readingSelection = ensureSelectionCoverage(selection, "readings", readings, Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)));
     const selectionFallbacks = [videoSelection.fallback, imageSelection.fallback, readingSelection.fallback].filter(Boolean);
     if (selectionFallbacks.length && selectionStatus === "ai-selected") selectionStatus = "ai-selected-with-provider-fallback";
     selection = { ...selection, videos: videoSelection.items, images: imageSelection.items, readings: readingSelection.items, fallbacks: selectionFallbacks };
     const chosenVideos = selectedEntries("videos", selection, videos);
     const chosenImages = selectedEntries("images", selection, images);
     const chosenReadings = selectedEntries("readings", selection, readings);
-    const selectedResources = { videos: chosenVideos.chosen, images: chosenImages.chosen, readings: chosenReadings.chosen };
+    const selectedResources = {
+      videos: chosenVideos.chosen,
+      images: chosenImages.chosen,
+      readings: chosenReadings.chosen.map((resource, index) => ({ ...resource, required: resource.required || index < Number(targets.requiredReadingsPerWeek || 0) }))
+    };
     const existingResources = lesson.lessonPlan.resources || {};
     const selectedRequests = new Set([...selectedResources.videos, ...selectedResources.images, ...selectedResources.readings].map((resource) => resource.researchRequestId));
     const withoutPlaceholders = (resources = []) => resources.filter((resource) => resource.href || !selectedRequests.has(resource.id));
@@ -358,8 +389,8 @@ export async function enrichLessonsWithResources(input, lessons) {
       ...existingResources,
       videos: [...withoutPlaceholders(existingResources.videos), ...selectedResources.videos],
       images: [...withoutPlaceholders(existingResources.images), ...selectedResources.images],
-      readingsRequired: withoutPlaceholders(existingResources.readingsRequired),
-      readingsExtra: [...withoutPlaceholders(existingResources.readingsExtra), ...selectedResources.readings]
+      readingsRequired: [...withoutPlaceholders(existingResources.readingsRequired), ...selectedResources.readings.filter((resource) => resource.required)],
+      readingsExtra: [...withoutPlaceholders(existingResources.readingsExtra), ...selectedResources.readings.filter((resource) => !resource.required)]
     };
     const alternatives = flattenCandidates(research).filter((candidate) => !selectedResources.videos.concat(selectedResources.images, selectedResources.readings).some((resource) => resource.candidateId === candidate.candidateId)).slice(0, 30);
     const resourceResearch = compactResearch({ ...research, status: selectionStatus, selections: selection, selectionFallbacks, alternatives });

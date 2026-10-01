@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import JSZip from "jszip";
-import { buildFallbackLesson, normalizeCourseInput, normalizeLesson, normalizeWeeklyOutput, weekCalendar, validateLesson } from "../src/aula-schema.js";
+import { buildFallbackLesson, normalizeCourseInput, normalizeLesson, normalizeWeeklyOutput, resourcePlanForWeek, weekCalendar, validateLesson } from "../src/aula-schema.js";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload, calculateWeekWorkload } from "../src/calculations.js";
 import { digitalContentMinutes, readingMinutes } from "../src/formula-profile.js";
 import { createWeeksZip } from "../src/zip.js";
@@ -27,6 +27,13 @@ test("normaliza briefing com calendário real e webpráticas independentes", () 
   assert.equal(input.materials[0].alignment, "Mobilidade urbana");
   assert.deepEqual(input.imageLinks, ["https://example.org/mapa.png"]);
   assert.deepEqual(weekCalendar(input, 1), { weekNumber: 2, label: "Semana 2 · 12/10/2026", startDate: "2026-10-12", endDate: "2026-10-18" });
+});
+
+test("normaliza metas de vídeos, artigos e leituras por semana", () => {
+  const input = normalizeCourseInput({ title: "Curso", weeks: 3, resourcePlan: { default: { videosPerWeek: 2, articlesPerWeek: 1, requiredReadingsPerWeek: 1, requiredReadingLevel: "essential" }, weeks: [{ weekNumber: 2, videosPerWeek: 0, articlesPerWeek: 3, requiredReadingsPerWeek: 2, requiredReadingLevel: "dense" }] } });
+  assert.deepEqual(resourcePlanForWeek(input, 0), { weekNumber: 1, videosPerWeek: 2, articlesPerWeek: 1, requiredReadingsPerWeek: 1, requiredReadingLevel: "essential" });
+  assert.deepEqual(resourcePlanForWeek(input, 1), { weekNumber: 2, videosPerWeek: 0, articlesPerWeek: 3, requiredReadingsPerWeek: 2, requiredReadingLevel: "dense" });
+  assert.equal(resourcePlanForWeek(input, 2).videosPerWeek, 2);
 });
 
 test("agenda webprática por data ou semana ocorre uma única vez", () => {
@@ -59,6 +66,7 @@ test("prompt semanal exige unidade didática completa antes do cálculo de tempo
   assert.match(prompt, /nunca invente URLs/i);
   assert.match(prompt, /teacherGuide/i);
   assert.match(prompt, /MAPA LONGITUDINAL OBRIGATÓRIO/i);
+  assert.match(prompt, /REQUISITOS DE RECURSOS DESTA SEMANA/i);
   assert.match(prompt, /Ferramentas e Dashboards/i);
   assert.match(prompt, /Não começar por uma lista de softwares/i);
 });

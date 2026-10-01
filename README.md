@@ -139,6 +139,12 @@ Uma turma com várias semanas e revisão acadêmica pode gerar um volume grande 
 
 Não existe uma sequência rígida para todas as semanas. A IA escolhe um arco adequado — descoberta conceitual, caso, oficina, análise de dados, debate ou síntese — e registra quais fases estão ativas: abertura, diagnóstico, explicação, exemplo, prática guiada, prática independente, reflexão, avaliação e síntese. Quando uma fase é omitida, a omissão recebe justificativa. Vídeos, imagens e leituras entram dentro do tópico/conceito que os torna úteis; não são despejados em uma galeria final.
 
+### Metas de recursos por semana
+
+O briefing possui um painel **Recursos e leituras por semana**. Nele, defina quantos vídeos, artigos acadêmicos e leituras obrigatórias devem ser procurados por semana, além do nível da leitura obrigatória. A tabela de distribuição permite substituir o padrão em semanas específicas: use `0` para não solicitar aquele recurso em uma semana e deixe `Padrão` para herdar a configuração geral. Artigos podem contar como leituras obrigatórias, evitando duplicação.
+
+Essas metas entram no prompt semanal, na curadoria da IA e nas solicitações ao YouTube/Crossref. A pesquisa só insere URLs retornadas por provedores ou fornecidas no briefing; quando não há candidatos suficientes, a pendência fica marcada para revisão humana. Imagens continuam sendo pesquisadas como enriquecimento contextual, e todos os recursos selecionados viram blocos editáveis na prévia e no JSON do aluno.
+
 ## Separação aluno e professor
 
 A aplicação produz duas camadas diferentes:

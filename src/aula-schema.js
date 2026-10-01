@@ -20,6 +20,59 @@ const integer = (value, fallback) => { const n = Number.parseInt(value, 10); ret
 const number = (value, fallback) => { const n = Number(value); return Number.isFinite(n) ? n : fallback; };
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const bool = (value, fallback = false) => value === undefined || value === null ? fallback : Boolean(value);
+const RESOURCE_READING_LEVELS = new Set(["none", "essential", "advanced", "dense"]);
+
+function resourceCount(value, fallback = 0) {
+  if (value === "" || value === null || value === undefined) return fallback;
+  return Math.min(12, Math.max(0, integer(value, fallback)));
+}
+
+function resourceReadingLevel(value, fallback = "essential") {
+  const level = text(value).toLowerCase();
+  return RESOURCE_READING_LEVELS.has(level) ? level : fallback;
+}
+
+function normalizeResourceTarget(value = {}, defaults = {}) {
+  const source = object(value);
+  return {
+    videosPerWeek: resourceCount(source.videosPerWeek ?? source.videos ?? source.videoCount, defaults.videosPerWeek ?? 1),
+    articlesPerWeek: resourceCount(source.articlesPerWeek ?? source.articles ?? source.articleCount, defaults.articlesPerWeek ?? 1),
+    requiredReadingsPerWeek: resourceCount(source.requiredReadingsPerWeek ?? source.requiredReadings ?? source.mandatoryReadings, defaults.requiredReadingsPerWeek ?? 1),
+    requiredReadingLevel: resourceReadingLevel(source.requiredReadingLevel ?? source.readingLevel, defaults.requiredReadingLevel ?? "essential")
+  };
+}
+
+export function normalizeResourcePlan(value = {}, weeks = 1) {
+  const source = object(value);
+  const defaults = normalizeResourceTarget(source.default || source.defaults || source, { videosPerWeek: 1, articlesPerWeek: 1, requiredReadingsPerWeek: 1, requiredReadingLevel: "essential" });
+  const entries = Array.isArray(source.weeks) ? source.weeks : [];
+  const weekPlans = entries.map((entry) => {
+    const item = object(entry);
+    const weekNumber = integer(item.weekNumber || item.week, 0);
+    if (weekNumber < 1 || weekNumber > weeks) return null;
+    return {
+      weekNumber,
+      videosPerWeek: item.videosPerWeek === "" || item.videos === "" || item.videoCount === "" ? null : resourceCount(item.videosPerWeek ?? item.videos ?? item.videoCount, defaults.videosPerWeek),
+      articlesPerWeek: item.articlesPerWeek === "" || item.articles === "" || item.articleCount === "" ? null : resourceCount(item.articlesPerWeek ?? item.articles ?? item.articleCount, defaults.articlesPerWeek),
+      requiredReadingsPerWeek: item.requiredReadingsPerWeek === "" || item.requiredReadings === "" || item.mandatoryReadings === "" ? null : resourceCount(item.requiredReadingsPerWeek ?? item.requiredReadings ?? item.mandatoryReadings, defaults.requiredReadingsPerWeek),
+      requiredReadingLevel: text(item.requiredReadingLevel || item.readingLevel) ? resourceReadingLevel(item.requiredReadingLevel || item.readingLevel, defaults.requiredReadingLevel) : null
+    };
+  }).filter(Boolean).filter((entry, index, list) => list.findIndex((candidate) => candidate.weekNumber === entry.weekNumber) === index);
+  return { default: defaults, weeks: weekPlans };
+}
+
+export function resourcePlanForWeek(input = {}, index = 0) {
+  const plan = input.resourcePlan || normalizeResourcePlan({}, input.weeks || 1);
+  const defaults = plan.default || normalizeResourcePlan({}, input.weeks || 1).default;
+  const override = (plan.weeks || []).find((entry) => entry.weekNumber === index + 1) || {};
+  return {
+    weekNumber: index + 1,
+    videosPerWeek: resourceCount(override.videosPerWeek, defaults.videosPerWeek),
+    articlesPerWeek: resourceCount(override.articlesPerWeek, defaults.articlesPerWeek),
+    requiredReadingsPerWeek: resourceCount(override.requiredReadingsPerWeek, defaults.requiredReadingsPerWeek),
+    requiredReadingLevel: resourceReadingLevel(override.requiredReadingLevel, defaults.requiredReadingLevel)
+  };
+}
 
 function defaultWeeklyObjectives(input = {}, index = 0) {
   const supplied = splitLines(input.objectives);
@@ -510,6 +563,7 @@ export function normalizeCourseInput(raw = {}) {
     startDate: calendarMode === "calendar" && validDate(raw.startDate) ? raw.startDate : null,
     webPractices,
     webPractice: { enabled, moments: legacyMoments.length ? legacyMoments : splitLines(practice.moments || raw.practiceMoments), instructions: legacyInstructions || text(practice.instructions || raw.practiceInstructions), durationMinutes: webPractices.reduce((sum, item) => sum + item.durationMinutes, 0) },
+    resourcePlan: normalizeResourcePlan(raw.resourcePlan || raw.weeklyResourcePlan, weeks),
     author: text(raw.author), role: text(raw.role), institution: text(raw.institution), year: text(raw.year, String(new Date().getFullYear())), language: text(raw.language, "pt-BR"),
     license: text(raw.license, DEFAULT_LICENSE),
     formulaConfig: raw.formulaConfig && typeof raw.formulaConfig === "object" ? raw.formulaConfig : null,
