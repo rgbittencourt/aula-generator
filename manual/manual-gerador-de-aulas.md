@@ -622,7 +622,7 @@ No painel **Webpráticas síncronas**, ative o recurso, informe a quantidade de 
 Depois da geração, abra **Planejamento geral**. O painel apresenta duas listas:
 
 - **Recursos que precisam de conferência**: marque a caixa depois de abrir o link, confirmar coerência com a semana, duração ou páginas, acessibilidade e licença/crédito;
-- **Checklist pedagógico**: marque a caixa depois de revisar o item. A mensagem “Atendido automaticamente” é o resultado da análise da aplicação; “Conferido por você” é o seu registro manual.
+- **Checklist pedagógico**: todos os itens são exibidos. Os itens aprovados automaticamente pela IA já aparecem marcados; desmarque qualquer item que queira refazer ou revisar novamente. A mensagem “Atendido automaticamente pela IA” é o resultado da análise da aplicação; “Marcado por você” e “Desmarcado por você para refazer” são suas decisões manuais.
 
 As marcações são salvas no navegador e entram no **Baixar backup**. Elas não alteram artificialmente o resultado automático: se um item estiver pendente, é necessário corrigir a aula ou o recurso e gerar/revisar novamente.
 

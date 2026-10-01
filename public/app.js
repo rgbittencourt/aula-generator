@@ -800,6 +800,11 @@ function formatMinutes(value) {
 
 function reviewItemKey(item = {}) { return `${item.weekNumber || 0}:${item.id || slugify(item.title || item.label || "item")}`; }
 
+function reviewCheckChecked(item = {}, reviewMarks = state.reviewMarks || createReviewMarks()) {
+  const key = reviewItemKey(item);
+  return reviewMarks.checks?.[key] === undefined ? Boolean(item.pass) : Boolean(reviewMarks.checks[key]);
+}
+
 function toggleReviewMark(kind, key, checked) {
   state.reviewMarks = state.reviewMarks || createReviewMarks();
   state.reviewMarks[kind] = state.reviewMarks[kind] || {};
@@ -819,13 +824,15 @@ function renderGeneralPlan(plan) {
   const checklist = Array.isArray(plan.pedagogicalChecklist) ? plan.pedagogicalChecklist : [];
   const passed = checklist.filter((item) => item.pass).length;
   const reviewMarks = state.reviewMarks || createReviewMarks();
-  const reviewedChecks = checklist.filter((item) => reviewMarks.checks?.[reviewItemKey(item)]).length;
+  const checkedChecks = checklist.filter((item) => reviewCheckChecked(item, reviewMarks)).length;
   const checklistRows = checklist.map((item) => {
     const key = reviewItemKey(item);
-    const marked = Boolean(reviewMarks.checks?.[key]);
-    return `<label class="review-row ${marked ? "is-marked" : ""}"><input type="checkbox" data-review-kind="checks" data-review-key="${escapeHtml(key)}" ${marked ? "checked" : ""} /><span><strong>Semana ${escapeHtml(item.weekNumber)} · ${escapeHtml(item.label)}</strong><small>${item.pass ? "Atendido automaticamente" : "Pendente na análise automática"}${marked ? " · Conferido por você" : ""}</small></span></label>`;
+    const override = reviewMarks.checks?.[key];
+    const checked = reviewCheckChecked(item, reviewMarks);
+    const stateLabel = override === undefined ? (item.pass ? "Atendido automaticamente pela IA" : "Pendente na análise automática") : (override ? "Marcado por você" : "Desmarcado por você para refazer");
+    return `<label class="review-row ${checked ? "is-marked" : ""}"><input type="checkbox" data-review-kind="checks" data-review-key="${escapeHtml(key)}" ${checked ? "checked" : ""} /><span><strong>Semana ${escapeHtml(item.weekNumber)} · ${escapeHtml(item.label)}</strong><small>${stateLabel}</small></span></label>`;
   }).join("");
-  const checklistMarkup = checklist.length ? `<details class="review-panel" open><summary><strong>Checklist pedagógico: ${passed}/${checklist.length} itens atendidos</strong><small>${reviewedChecks}/${checklist.length} itens conferidos manualmente. Marcar como conferido registra sua revisão, mas não transforma um item automático pendente em aprovado.</small></summary><div class="review-list">${checklistRows}</div></details>` : "";
+  const checklistMarkup = checklist.length ? `<details class="review-panel" open><summary><strong>Checklist pedagógico: ${passed}/${checklist.length} itens atendidos automaticamente</strong><small>${checkedChecks}/${checklist.length} atualmente marcados. Os itens aprovados pela IA começam marcados; desmarque qualquer item que queira refazer ou revisar novamente.</small></summary><div class="review-list">${checklistRows}</div></details>` : "";
   const progressionMarkup = Array.isArray(plan.progression) && plan.progression.length ? `<div class="general-warning"><strong>Progressão curricular</strong><ul>${plan.progression.map((item) => `<li>Semana ${item.weekNumber}: ${escapeHtml(item.theme || "")} ${item.projectMilestone ? `— ${escapeHtml(item.projectMilestone)}` : ""}</li>`).join("")}</ul></div>` : "";
   const practices = Array.isArray(plan.webPracticeSchedule) ? plan.webPracticeSchedule : [];
   const practiceMarkup = practices.length ? `<section class="webpractice-schedule"><div class="schedule-heading"><div><p class="eyebrow">SESSÕES PRÁTICAS INDEPENDENTES</p><h3>Webpráticas programadas</h3><p>Estas sessões não entram no texto-base nem no JSON do aluno. Cada uma é exportada como roteiro DOCX para o professor.</p></div></div><div class="schedule-list">${practices.map((practice, index) => `<article class="schedule-item"><div><strong>${escapeHtml(practice.title || `Webprática ${index + 1}`)}</strong><span>${escapeHtml([practice.weekNumber ? `Semana ${practice.weekNumber}` : "", practice.date ? formatDate(practice.date) : "", practice.dayOfWeek, [practice.startTime, practice.endTime].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "Agenda a confirmar")}</span><small>${escapeHtml([practice.modality, practice.tool, practice.platform].filter(Boolean).join(" · ") || "Sessão síncrona / laboratório prático")}</small></div><button class="button button-secondary webpractice-download" data-practice-id="${escapeHtml(practice.id || "")}" type="button">Baixar DOCX <span>↓</span></button></article>`).join("")}</div></section>` : "";
