@@ -2,7 +2,7 @@
 
 ## Da ideia inicial ao JSON semanal, guia do professor e publicação no Moodle
 
-**Versão do manual:** 1.4
+**Versão do manual:** 1.5
 **Data:** 30 de setembro de 2026  
 **Aplicação:** Gerador de Aulas  
 **URL pública:** <https://aula-generator.vercel.app/>  
@@ -68,7 +68,7 @@ A aplicação pode trabalhar com semanas numeradas ou com um calendário real. T
 
 ## 2. O que é produzido
 
-Ao concluir uma geração, o sistema disponibiliza três tipos de saída.
+Ao concluir uma geração, o sistema disponibiliza o conteúdo semanal e os materiais do professor. Depois, o arquivo `.aula.json` do aluno pode ser aberto no Aula Studio e exportado no formato adequado ao uso final.
 
 ### 2.1 JSON do aluno
 
@@ -110,7 +110,7 @@ O PDF é separado da aula do aluno. Ele foi pensado para leitura na tela e inclu
 - conferência dos recursos;
 - recomendações de carga e qualidade.
 
-### 2.3 Pacote completo ZIP
+### 2.3 Pacote completo ZIP do Gerador
 
 O pacote reúne o curso inteiro em uma única estrutura:
 
@@ -123,6 +123,22 @@ webpraticas/01-tema/guia-e-roteiro.md
 webpraticas/01-tema/pacote.json
 webpraticas/01-tema/arquivos/*
 ```
+
+### 2.4 Formatos de saída do Aula Studio
+
+Depois de abrir o arquivo `.aula.json` no Aula Studio, use o menu **Exportar** para escolher o formato necessário:
+
+| Opção | Arquivo gerado | Uso principal |
+|---|---|---|
+| **Projeto JSON** | `.aula.json` | Continuar editando, fazer backup ou abrir novamente no Aula Studio |
+| **Arquivo HTML** | `.html` | Abrir diretamente no navegador como um arquivo único autocontido |
+| **Pacote HTML** | `.html.zip` | Distribuir uma versão web com `index.html`, imagens, fontes e assets |
+| **Pacote SCORM** | `.scorm.zip` | Importar no Moodle ou em outro LMS compatível com SCORM |
+| **Imprimir PDF** | janela de impressão/PDF | Gerar uma versão estática para leitura ou arquivo |
+
+O **JSON** é o formato editável do projeto. O **HTML** é a aula renderizada para navegador. O **SCORM** é um pacote HTML acompanhado de `imsmanifest.xml` e da ponte de comunicação com o LMS.
+
+O pacote SCORM pode ser gerado em **SCORM 1.2**, opção padrão de maior compatibilidade, ou **SCORM 2004**, conforme a escolha feita na janela de exportação. Quando houver um quiz avaliativo, o pacote também pode receber a nota mínima de aprovação configurada.
 
 ---
 
@@ -1177,7 +1193,7 @@ Faça duas leituras diferentes.
 
 ## 16. Baixando os arquivos
 
-Depois da geração, existem três ações principais.
+Depois da geração, existem as ações de revisão e exportação. Primeiro revise a semana e, depois, abra o JSON no Aula Studio para escolher o formato final.
 
 ### 16.1 Baixar JSON do aluno
 
@@ -1199,6 +1215,22 @@ O botão **Guia do professor PDF** baixa um documento separado para leitura e me
 O botão **Pacote completo ZIP** reúne todas as semanas, o Planejamento Geral, o PDF e as webpráticas.
 
 Use o ZIP para arquivar a versão gerada, transferir o projeto ou manter uma cópia antes da edição no Aula Studio.
+
+### 16.4 Escolher um formato no Aula Studio
+
+1. Baixe o **JSON do aluno** da semana que deseja revisar.
+2. Abra o Aula Studio e clique em **Abrir**.
+3. Selecione o arquivo com extensão `.aula.json`.
+4. Confira a aula no modo **Visualizar** e faça os ajustes necessários.
+5. Clique em **Exportar**.
+6. Escolha uma das opções:
+   - **Projeto JSON (.aula.json)** para manter uma cópia editável;
+   - **Arquivo HTML (.html)** para obter uma página única;
+   - **Pacote HTML (.zip)** para receber a versão web com assets separados;
+   - **Pacote SCORM (.zip)** para enviar ao Moodle ou a outro LMS.
+7. Para uma versão de leitura, use **Imprimir PDF**.
+
+O arquivo `.html` pode ser aberto com duplo clique no navegador. O pacote `.html.zip` deve ser descompactado e iniciado pelo `index.html`. O pacote `.scorm.zip` deve ser enviado ao Moodle sem descompactar.
 
 ---
 

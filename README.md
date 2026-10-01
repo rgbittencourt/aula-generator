@@ -2,6 +2,17 @@
 
 Aplicação para transformar um briefing de curso em uma trilha semanal de aulas compatível com o **Aula Studio**. A interface combina uma área de planejamento editorial com uma prévia organizada por semanas. A linguagem visual se inspira na clareza do Aula Studio — papel, tipografia editorial, barra de progresso, blocos e sumário — sem copiar a aplicação.
 
+## Identidade visual
+
+Os assets de marca ficam versionados para uso no cabeçalho, favicon, capas e compartilhamento:
+
+- `public/brand/gerador-de-aulas-mark.svg`: símbolo quadrado;
+- `public/brand/gerador-de-aulas-logo.svg`: logo horizontal;
+- `public/brand/gerador-de-aulas-cover.svg`: capa editorial horizontal;
+- `public/favicon.svg`: favicon do Gerador de Aulas.
+
+O Aula Studio mantém sua identidade complementar em `assets/aula-mark.svg`, `assets/brand/aula-studio-logo.svg`, `assets/brand/aula-studio-cover.svg` e `assets/favicon.svg`.
+
 ## Situação atual
 
 - **GitHub Pages:** versão pública estática em <https://rgbittencourt.github.io/aula-generator/>. Gera exemplos e ZIP diretamente no navegador, sem IA.
