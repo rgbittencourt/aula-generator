@@ -157,6 +157,45 @@ test("normaliza aula rica sem perder recursos, avaliação e metadados", () => {
   assert.equal(validateLesson(lesson), true);
 });
 
+test("posiciona vídeo raiz depois do texto da seção indicada", () => {
+  const input = normalizeCourseInput({ title: "Sistemas educacionais", weeks: 1, hoursPerWeek: 4 });
+  const lesson = normalizeLesson({
+    lessonPlan: {
+      theme: "Sistemas e fluxos de informação",
+      learningObjectives: ["Analisar sistemas"],
+      contentSections: [
+        { number: "1", title: "Problema", body: "Texto da primeira seção." },
+        { number: "2", title: "Arquitetura", body: "Texto da seção em que o vídeo será usado." },
+        { number: "3", title: "Aplicação", body: "Texto da terceira seção." }
+      ],
+      resources: { videos: [{ id: "video-arquitetura", title: "Vídeo de arquitetura", href: "https://youtu.be/abc123", sectionNumber: 2, bridgeParagraph: "Observe no vídeo como a arquitetura organiza os fluxos apresentados nesta seção." }] }
+    },
+    blocks: [
+      { type: "hero", props: { title: "Sistemas", lead: "Analisar sistemas" } },
+      { type: "destaque", props: { title: "Objetivos de aprendizagem", body: "Analisar sistemas" } },
+      { type: "prose", props: { body: "Abertura" } },
+      { type: "topic", props: { children: [
+        { type: "titulo", props: { text: "1 Problema", level: "h2" } },
+        { type: "prose", props: { body: "Texto da primeira seção." } },
+        { type: "titulo", props: { text: "2 Arquitetura", level: "h2" } },
+        { type: "prose", props: { body: "Texto da seção em que o vídeo será usado." } },
+        { type: "titulo", props: { text: "3 Aplicação", level: "h2" } },
+        { type: "prose", props: { body: "Texto da terceira seção." } },
+        { type: "video", props: { resourceId: "video-arquitetura", id: "abc123", title: "Vídeo de arquitetura" } }
+      ] } },
+    ]
+  }, input, 0);
+  const topic = lesson.blocks.find((block) => block.type === "topic");
+  const children = topic.props.children;
+  const sectionTwo = children.findIndex((block) => block.props?.text === "2 Arquitetura");
+  const sectionThree = children.findIndex((block) => block.props?.text === "3 Aplicação");
+  const video = children.findIndex((block) => block.type === "video" && block.props?.resourceId === "video-arquitetura");
+  const bridge = children.findIndex((block) => block.type === "prose" && block.props?.resourceId === "video-arquitetura");
+  assert.ok(sectionTwo >= 0 && sectionThree > sectionTwo);
+  assert.ok(bridge > sectionTwo && bridge < sectionThree);
+  assert.ok(video > bridge && video < sectionThree);
+});
+
 test("fallback gera uma aula válida para cada semana", () => {
   const input = normalizeCourseInput({ title: "História da ciência", weeks: 2, hoursPerWeek: 4, objectives: ["Comparar teorias"], webPracticeEnabled: true, practiceInstructions: "Faça uma pesquisa orientada.", videoLinks: "https://www.youtube.com/watch?v=abc123" });
   const weeks = normalizeWeeklyOutput({ weeks: [buildFallbackLesson(input, 0), buildFallbackLesson(input, 1)] }, input);

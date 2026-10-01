@@ -378,7 +378,10 @@ function syncResourceBlocks(lesson, selectedResources) {
     [...additionsBySection.entries()].sort(([left], [right]) => left - right).forEach(([sectionIndex, sectionAdditions]) => {
       const anchor = anchors.find((entry) => entry.number === sectionIndex + 1);
       const next = anchors.find((entry) => entry.number > sectionIndex + 1);
-      const insertAt = (next?.index ?? children.length) + offset;
+      const start = anchor?.index ?? -1;
+      const end = next?.index ?? children.length;
+      const body = children.findIndex((child, childIndex) => childIndex > start && childIndex < end && child.type === "prose" && !child.props?.resourceId);
+      const insertAt = (body >= 0 ? body + 1 : start + 1) + offset;
       children.splice(insertAt, 0, ...sectionAdditions);
       offset += sectionAdditions.length;
     });

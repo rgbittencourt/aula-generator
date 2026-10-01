@@ -627,19 +627,65 @@ export function sanitizeBlock(raw, weekNumber = 1, path = "block", seen = new Se
   return { id, type, ...(ROOT_TYPES.has(type) ? { bg: text(raw.bg, "neutral-default"), pad: text(raw.pad, "normal") } : {}), props };
 }
 
-function integrateRootResources(blocks, weekNumber) {
+function resourceForBlock(block, plan = {}) {
+  const resources = Object.values(plan.resources || {}).flatMap((items) => Array.isArray(items) ? items : []);
+  const resourceId = text(block?.props?.resourceId || block?.props?.items?.[0]?.resourceId);
+  if (resourceId) return resources.find((resource) => resource.id === resourceId) || null;
+  const title = text(block?.props?.title || block?.props?.caption || block?.props?.items?.[0]?.title);
+  return title ? resources.find((resource) => resource.title === title) || null : null;
+}
+
+function resourceSectionIndex(resource, plan = {}, sectionCount = 1, fallbackIndex = 0) {
+  const explicit = Number.parseInt(resource?.sectionNumber, 10);
+  if (Number.isInteger(explicit) && explicit >= 1 && explicit <= sectionCount) return explicit - 1;
+  const sections = Array.isArray(plan.contentSections) ? plan.contentSections : [];
+  const found = sections.findIndex((section) => (section.resources || []).some((item) => item.id === resource?.id));
+  return found >= 0 ? found : Math.min(Math.max(0, fallbackIndex), Math.max(0, sectionCount - 1));
+}
+
+function resourceBridgeBlock(resource, weekNumber, sectionIndex, resourceIndex) {
+  const bridge = resource?.bridgeParagraph || resource?.pedagogicalUse || resource?.objective || `Use este recurso neste ponto para relacionar ${resource?.title || "o material"} ao conceito estudado nesta seção.`;
+  return { id: newId("c-resource-bridge-", weekNumber, sectionIndex * 10 + resourceIndex), type: "prose", props: { body: richHtml(bridge), dropcap: false, dropcapTone: "terracotta", resourceId: resource?.id || "" } };
+}
+
+function integrateRootResources(blocks, weekNumber, plan = {}) {
   const resourceTypes = new Set(["video", "imagem", "materiais", "audio"]);
-  const resourceBlocks = blocks.filter((block) => resourceTypes.has(block.type));
-  if (!resourceBlocks.length) return blocks;
+  const rootResourceBlocks = blocks.filter((block) => resourceTypes.has(block.type));
   const remaining = blocks.filter((block) => !resourceTypes.has(block.type));
   let topic = remaining.find((block) => ["topic", "topic-collapsible", "topic-slider"].includes(block.type));
+  const nestedResourceBlocks = topic && Array.isArray(topic.props?.children) ? topic.props.children.filter((block) => resourceTypes.has(block.type)) : [];
+  const resourceBlocks = [...rootResourceBlocks, ...nestedResourceBlocks];
+  if (!resourceBlocks.length) return blocks;
   if (!topic) {
     topic = { id: newId("b-topic-", weekNumber, 90), type: "topic", bg: "neutral-default", pad: "normal", props: { children: [] } };
     remaining.push(topic);
   }
   topic.props = safeProps(topic.props);
-  topic.props.children = Array.isArray(topic.props.children) ? topic.props.children : [];
-  topic.props.children.push(...resourceBlocks);
+  const resourceIds = new Set(resourceBlocks.map((block) => text(block.props?.resourceId || block.props?.items?.[0]?.resourceId || resourceForBlock(block, plan)?.id)).filter(Boolean));
+  topic.props.children = (Array.isArray(topic.props.children) ? topic.props.children : []).filter((block) => !(resourceTypes.has(block.type) || (block.type === "prose" && resourceIds.has(text(block.props?.resourceId)))));
+  const children = topic.props.children;
+  const anchors = children.map((child, index) => ({ index, number: Number.parseInt(text(child.props?.text).match(/^\s*(\d+)/)?.[1], 10) })).filter((anchor) => Number.isInteger(anchor.number));
+  const grouped = new Map();
+  resourceBlocks.forEach((block, resourceIndex) => {
+    const resource = resourceForBlock(block, plan);
+    const sectionCount = Math.max(1, Array.isArray(plan.contentSections) && plan.contentSections.length ? plan.contentSections.length : anchors.length);
+    const sectionIndex = resourceSectionIndex(resource, plan, sectionCount, resourceIndex);
+    const additions = grouped.get(sectionIndex) || [];
+    additions.push(resourceBridgeBlock(resource, weekNumber, sectionIndex, resourceIndex), block);
+    grouped.set(sectionIndex, additions);
+  });
+  let offset = 0;
+  [...grouped.entries()].sort(([left], [right]) => left - right).forEach(([sectionIndex, additions]) => {
+    const anchor = anchors.find((entry) => entry.number === sectionIndex + 1);
+    const next = anchors.find((entry) => entry.number > sectionIndex + 1);
+    const start = anchor?.index ?? -1;
+    const end = next?.index ?? children.length;
+    const body = children.findIndex((child, index) => index > start && index < end && child.type === "prose" && !child.props?.resourceId);
+    const insertAt = (body >= 0 ? body + 1 : start + 1) + offset;
+    children.splice(Math.max(0, insertAt), 0, ...additions);
+    offset += additions.length;
+  });
+  topic.props.children = children;
   return remaining;
 }
 
@@ -696,17 +742,17 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
     });
     selected.forEach((resource) => usedResources.add(resource.id));
     const bridges = selected.map((resource, resourceIndex) => ({ id: newId("c-resource-bridge-", week, sectionIndex * 10 + resourceIndex), type: "prose", props: { body: richHtml(resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || `Use este recurso neste ponto para relacionar ${resource.title || "o material"} ao conceito estudado nesta seção.`), dropcap: false, dropcapTone: "terracotta", resourceId: resource.id } }));
-    const media = selected.filter((resource) => resource.kind === "video" && youtubeId(resource.href)).slice(0, 2).map((resource, resourceIndex) => ({ id: newId("c-video-", week, sectionIndex * 10 + resourceIndex), type: "video", props: { id: youtubeId(resource.href), title: resource.title, caption: resource.pedagogicalUse || resource.objective || "Vídeo para aprofundar o conceito desta seção.", credit: resource.credit || resource.source || "", start: "" } }));
-    const images = selected.filter((resource) => resource.kind === "image" && resource.href).slice(0, 2).map((resource, resourceIndex) => ({ id: newId("c-image-", week, sectionIndex * 10 + resourceIndex), type: "imagem", props: { src: resource.href, slotId: "", caption: resource.caption || resource.title, credit: resource.credit || resource.source || "", ratio: "16/9" } }));
+    const media = selected.filter((resource) => resource.kind === "video" && youtubeId(resource.href)).slice(0, 2).map((resource, resourceIndex) => ({ id: newId("c-video-", week, sectionIndex * 10 + resourceIndex), type: "video", props: { id: youtubeId(resource.href), title: resource.title, caption: resource.pedagogicalUse || resource.objective || "Vídeo para aprofundar o conceito desta seção.", credit: resource.credit || resource.source || "", start: "", resourceId: resource.id } }));
+    const images = selected.filter((resource) => resource.kind === "image" && resource.href).slice(0, 2).map((resource, resourceIndex) => ({ id: newId("c-image-", week, sectionIndex * 10 + resourceIndex), type: "imagem", props: { src: resource.href, slotId: "", caption: resource.caption || resource.title, credit: resource.credit || resource.source || "", ratio: "16/9", resourceId: resource.id } }));
     const materials = selected.filter((resource) => !media.some((block) => block.props.title === resource.title) && !images.some((block) => block.props.caption === resource.title) && (resource.title || resource.href)).map((resource) => ({ type: resource.kind, title: `${resource.required ? "Leitura orientada: " : "Para aprofundar: "}${resource.title}`, source: resource.source || resource.objective || resource.pedagogicalUse, href: resource.href, resourceId: resource.id }));
     return [...bridges, ...media, ...images, ...(materials.length ? [{ id: newId("c-materials-", week, sectionIndex), type: "materiais", props: { title: "Recurso para usar nesta seção", items: materials } }] : [])];
   };
   plan.contentSections.forEach((section, sectionIndex) => {
     children.push({ id: newId("c-title-", week, sectionIndex + 2), type: "titulo", props: { text: `${section.number} ${section.title}`, level: "h2" } });
     if (section.body) children.push({ id: newId("c-prose-", week, sectionIndex + 20), type: "prose", props: { body: richHtml(section.body), dropcap: sectionIndex === 0, dropcapTone: "terracotta" } });
+    children.push(...resourceChildren([...(section.resources || []), ...allResources], sectionIndex));
     section.subsections.forEach((sub, subIndex) => { children.push({ id: newId("c-subtitle-", week, sectionIndex * 10 + subIndex + 1), type: "titulo", props: { text: `${sub.number} ${sub.title}`, level: "h3" } }); if (sub.body) children.push({ id: newId("c-subprose-", week, sectionIndex * 10 + subIndex + 3), type: "prose", props: { body: richHtml(sub.body), dropcap: false, dropcapTone: "terracotta" } }); });
     if (section.reflection?.question) children.push({ id: newId("c-reflection-", week, sectionIndex + 1), type: "reflexao", props: { title: "Para refletir", question: html(section.reflection.question), body: html(section.reflection.body), tone: "lavender", icon: "" } });
-    children.push(...resourceChildren([...(section.resources || []), ...allResources], sectionIndex));
   });
   blocks.push({ id: newId("b-topic-", week, 1), type: "topic", bg: "neutral-default", pad: "normal", props: { children } });
   if (plan.synthesis) blocks.push({ id: newId("b-synthesis-", week, 0), type: "sintese", bg: "sage-deep", pad: "airy", props: { eyebrow: "Síntese", title: "A ideia que fecha a semana", body: richHtml(plan.synthesis) } });
@@ -724,9 +770,9 @@ export function normalizeLesson(raw, input, index) {
   const fallback = buildFallbackLesson(input, index);
   const source = raw && typeof raw === "object" ? raw : {};
   const seen = new Set();
-  const sourceBlocks = integrateRootResources(Array.isArray(source.blocks) ? source.blocks.map((block, i) => sanitizeBlock(block, index + 1, `block-${i}`, seen)).filter(Boolean) : [], index + 1);
   const directPlan = source.contentSections || source.sections || source.theme || source.welcome || source.learningObjectives ? source : {};
   const lessonPlan = normalizeLessonPlan(source.lessonPlan || source.plan || directPlan, input, index);
+  const sourceBlocks = integrateRootResources(Array.isArray(source.blocks) ? source.blocks.map((block, i) => sanitizeBlock(block, index + 1, `block-${i}`, seen)).filter(Boolean) : [], index + 1, lessonPlan);
   const hasHero = sourceBlocks.some((block) => block.type === "hero" && text(block.props?.title));
   const hasTopic = sourceBlocks.some((block) => ["topic", "topic-collapsible", "topic-slider"].includes(block.type) && Array.isArray(block.props?.children) && block.props.children.length > 0);
   const hasObjectives = sourceBlocks.some((block) => block.type === "destaque" && text(block.props?.title).toLowerCase().includes("objetiv"));
