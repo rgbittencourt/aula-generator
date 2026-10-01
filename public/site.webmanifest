@@ -1,0 +1,15 @@
+{
+  "name": "Gerador de Aulas",
+  "short_name": "Gerador de Aulas",
+  "description": "Planejamento pedagógico e geração de aulas semanais.",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#FFFDF8",
+  "theme_color": "#14213D",
+  "icons": [
+    { "src": "./favicon-32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "./apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any maskable" },
+    { "src": "./brand/gerador-de-aulas-mark.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

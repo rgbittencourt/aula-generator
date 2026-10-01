@@ -7,9 +7,14 @@ Aplicação para transformar um briefing de curso em uma trilha semanal de aulas
 Os assets de marca ficam versionados para uso no cabeçalho, favicon, capas e compartilhamento:
 
 - `public/brand/gerador-de-aulas-mark.svg`: símbolo quadrado;
+- `public/brand/gerador-de-aulas-mark.png`: símbolo raster de alta resolução;
 - `public/brand/gerador-de-aulas-logo.svg`: logo horizontal;
+- `public/brand/gerador-de-aulas-logo.png`: logo raster para documentos e apresentações;
 - `public/brand/gerador-de-aulas-cover.svg`: capa editorial horizontal;
-- `public/favicon.svg`: favicon do Gerador de Aulas.
+- `public/brand/gerador-de-aulas-cover.png`: capa PNG para redes sociais e compartilhamento;
+- `public/favicon.svg` e `public/favicon-32.png`: favicons SVG e PNG;
+- `public/apple-touch-icon.png`: ícone para iPhone/iPad;
+- `public/site.webmanifest`: metadados de instalação como aplicativo.
 
 O Aula Studio mantém sua identidade complementar em `assets/aula-mark.svg`, `assets/brand/aula-studio-logo.svg`, `assets/brand/aula-studio-cover.svg` e `assets/favicon.svg`.
 
