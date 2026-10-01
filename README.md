@@ -62,6 +62,7 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 | `OPENAI_MODEL` | `gpt-4o-mini` | Production, Preview e Development |
 | `OPENAI_CONTENT_MODEL` | opcional; modelo mais capaz para texto longo | Production, Preview e Development |
 | `OPENAI_MAX_TOKENS` | `16000` | Production, Preview e Development |
+| `OPENAI_REGEN_MAX_TOKENS` | `10000` para refazer uma semana | Production, Preview e Development |
 | `AULA_SINGLE_PASS` | `true` | Production, Preview e Development |
 | `AULA_RESEARCH_TIMEOUT_MS` | `8000` | Production, Preview e Development |
 | `OPENAI_MAX_RETRIES` | `3` | Production, Preview e Development |
@@ -95,6 +96,8 @@ Para ampliar o limite:
 6. Faça **Redeploy** na Vercel somente se também tiver alterado variáveis de ambiente.
 
 O código já reduz o pico usando uma semana por vez (`AULA_AI_BATCH_SIZE=1`) e faz até três novas tentativas em respostas 429/503, respeitando `Retry-After`. Se ainda houver muitos 429, aguarde alguns segundos antes de clicar novamente e evite abrir várias gerações simultâneas. A OpenAI também recomenda manter `OPENAI_MAX_TOKENS` próximo do tamanho realmente esperado da resposta; para uma unidade menor, `10000–12000` pode reduzir o consumo de TPM, mas pode cortar uma aula que precise de mais espaço.
+
+Ao usar **Refazer esta semana com IA**, o sistema envia somente um briefing essencial e uma versão compacta da semana selecionada. Com `AULA_SINGLE_PASS=true`, a regeneração faz uma única chamada de redação e não dispara planejamento/revisão/reparo extras. O orçamento separado `OPENAI_REGEN_MAX_TOKENS` evita que uma regeneração ultrapasse o limite de tokens por minuto mesmo quando `OPENAI_MAX_TOKENS` está configurado para aulas novas mais longas.
 
 ## O que a IA faz
 

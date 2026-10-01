@@ -381,7 +381,8 @@ function togglePractice() {
 function setBusy(button, busy, label) {
   button.disabled = busy;
   button.classList.toggle("is-loading", busy);
-  button.querySelector("span:first-child").textContent = busy ? label : button.dataset.label;
+  const labelNode = button.querySelector(".button-label") || button.querySelector("span:first-child");
+  if (labelNode) labelNode.textContent = busy ? label : button.dataset.label;
 }
 
 function showError(message) {

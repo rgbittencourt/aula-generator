@@ -37,7 +37,7 @@ async function callJson(messages, options = {}) {
       body: JSON.stringify({
         model: options.model || process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
         temperature: options.temperature ?? 0.45,
-        max_tokens: Number(process.env.OPENAI_MAX_TOKENS || 16000),
+        max_tokens: Math.max(256, Number(options.maxTokens || process.env.OPENAI_MAX_TOKENS || 16000)),
         response_format: { type: "json_object" },
         messages
       })
@@ -55,7 +55,7 @@ async function callJson(messages, options = {}) {
       continue;
     }
     const error = new Error(`A API de IA recusou a solicitação: ${detail}`);
-    error.code = "AI_PROVIDER_ERROR";
+    error.code = /tokens per min|request too large|rate limit/i.test(detail) ? "AI_TPM_LIMIT" : "AI_PROVIDER_ERROR";
     error.retryable = retryable;
     throw error;
   }
@@ -346,7 +346,52 @@ export async function generateOneWeek(input, index, options = {}) {
 
 export async function regenerateWeekWithAI(input, index, currentWeek, instruction) {
   const weekNumber = index + 1;
-  const academicPlan = await planWeekWithAI(input, index);
+  const singlePass = process.env.AULA_SINGLE_PASS !== "false";
+  const currentPlan = currentWeek?.lessonPlan || currentWeek || {};
+  const academicPlan = singlePass
+    ? normalizeAcademicPlan({ weekNumber, theme: currentPlan.theme || `${input.title} — Semana ${weekNumber}`, objectives: input.objectives }, input, index)
+    : await planWeekWithAI(input, index);
+  const compactInput = {
+    title: input.title,
+    audience: input.audience,
+    level: input.level,
+    language: input.language,
+    hoursPerWeek: input.hoursPerWeek,
+    objectives: (input.objectives || []).slice(0, 12),
+    content: String(input.content || "").slice(0, 7000),
+    academicProfile: normalizeAcademicProfile(input.academicProfile, input),
+    references: (input.references || []).slice(0, 12),
+    materials: (input.materials || []).slice(0, 12).map((item) => ({ title: item.title, type: item.type, link: item.link, moment: item.moment, objective: item.objective, alignment: item.alignment, use: item.use, pages: item.pages, durationMinutes: item.durationMinutes })),
+    webPractices: (input.webPractices || []).slice(0, 6).map((item) => ({ title: item.title, moments: item.moments, objective: item.objective, instructions: item.instructions, product: item.product, durationMinutes: item.durationMinutes })),
+    weekToGenerate: weekNumber
+  };
+  const compactWeek = {
+    theme: currentPlan.theme,
+    welcome: currentPlan.welcome,
+    learningObjectives: currentPlan.learningObjectives || currentPlan.objectives,
+    contentSections: (currentPlan.contentSections || []).map((section) => ({
+      number: section.number,
+      title: section.title,
+      body: String(section.body || "").slice(0, 6500),
+      subsections: (section.subsections || []).map((sub) => ({ number: sub.number, title: sub.title, body: String(sub.body || "").slice(0, 3000) })).slice(0, 8),
+      caseStudy: section.caseStudy,
+      reflection: section.reflection,
+      keyTerms: section.keyTerms,
+      counterpoint: section.counterpoint,
+      didacticRole: section.didacticRole,
+      resources: (section.resources || []).map((resource) => ({ title: resource.title, kind: resource.kind, href: resource.href, required: resource.required, objective: resource.objective, pedagogicalUse: resource.pedagogicalUse })).slice(0, 8)
+    })).slice(0, 12),
+    activities: (currentPlan.activities || []).slice(0, 10),
+    formativeChecks: (currentPlan.formativeChecks || []).slice(0, 8),
+    synthesis: currentPlan.synthesis,
+    nextWeekConnection: currentPlan.nextWeekConnection,
+    glossary: (currentPlan.glossary || []).slice(0, 20),
+    references: (currentPlan.references || []).slice(0, 12),
+    claimEvidence: (currentPlan.claimEvidence || []).slice(0, 20),
+    assessment: { ...currentPlan.assessment, questions: (currentPlan.assessment?.questions || []).slice(0, 8) },
+    timePlan: currentPlan.timePlan,
+    didacticArc: currentPlan.didacticArc
+  };
   const prompt = `Refaça somente a semana ${weekNumber} do curso abaixo. O professor pediu esta alteração:
 
 "${String(instruction || "").trim()}"
@@ -356,25 +401,25 @@ Faça uma revisão acadêmica explícita: corrija afirmações sem suporte, dife
 
 Retorne apenas { lessonPlan, teacherGuide }. Não gere blocks; o servidor os monta para o Aula Studio. lessonPlan deve manter título específico, welcome, objetivos observáveis, seções conforme o perfil, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. Não invente URLs ou fontes verificadas.
 
-Briefing do curso:
-${JSON.stringify({ ...input, weekToGenerate: weekNumber }, null, 2)}
+Briefing essencial do curso:
+${JSON.stringify(compactInput, null, 2)}
 
 Planejamento acadêmico atualizado:
 ${JSON.stringify(academicPlan, null, 2)}
 
-Semana atual:
-${JSON.stringify(currentWeek?.lessonPlan || currentWeek, null, 2)}
+Semana atual, em formato compacto:
+${JSON.stringify(compactWeek, null, 2)}
 
 Retorne JSON completo agora.`;
-  const raw = await callJson([
+  let raw = await callJson([
     { role: "system", content: ACADEMIC_SYSTEM_PROMPT },
     { role: "user", content: prompt }
-  ], { temperature: 0.35 });
+  ], { temperature: 0.35, maxTokens: Math.min(Number(process.env.OPENAI_REGEN_MAX_TOKENS || 10000), 12000) });
   let academicReview = { status: "not-run", issues: [], strengths: [], unsupportedClaims: [], rewriteRequired: false };
-  if (process.env.AULA_ACADEMIC_REVIEW !== "false") {
+  if (!singlePass && process.env.AULA_ACADEMIC_REVIEW !== "false") {
     try { academicReview = await reviewWeekWithAI(input, index, academicPlan, raw); } catch { academicReview = { status: "needs-human-review", issues: [{ severity: "high", type: "review-unavailable", description: "A revisão acadêmica automática não pôde ser concluída.", suggestedRepair: "Faça a conferência humana antes da exportação." }], strengths: [], unsupportedClaims: [], rewriteRequired: true }; }
   }
-  if (process.env.AULA_AUTO_REPAIR !== "false" && academicReview.rewriteRequired) {
+  if (!singlePass && process.env.AULA_AUTO_REPAIR !== "false" && academicReview.rewriteRequired) {
     try {
       raw = await repairWeekWithAI(input, index, raw, { issues: ["a revisão acadêmica solicitou reescrita"] }, academicPlan, academicReview);
       if (process.env.AULA_ACADEMIC_REVIEW !== "false") academicReview = await reviewWeekWithAI(input, index, academicPlan, raw);

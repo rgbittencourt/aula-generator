@@ -38,6 +38,7 @@ app.get("/api/health", (_req, res) => {
       researchTimeoutMs: Math.max(3000, Number(process.env.AULA_RESEARCH_TIMEOUT_MS || 8000)),
       reviewBeforeExport: true,
       maxTokens: Number(process.env.OPENAI_MAX_TOKENS || 16000),
+      regenerationMaxTokens: Math.min(Number(process.env.OPENAI_REGEN_MAX_TOKENS || 10000), 12000),
       maxRetries: Number(process.env.OPENAI_MAX_RETRIES || 3),
       aiBatchSize: Math.min(3, Math.max(1, Number(process.env.AULA_AI_BATCH_SIZE) || 1)),
       output: ".aula.json por semana + ZIP + revisão/regeneração individual"
@@ -129,7 +130,7 @@ app.post("/api/regenerate-week", async (req, res) => {
     const validation = validateCourse(input, enrichedWeeks, workload, teacherGuides);
     res.json({ ok: true, provider: "ai-regenerate", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", weekIndex: index, instruction, input, workload, generalPlan: { ...generalPlan, validation }, validation, week: enrichedWeeks[index], weeks: enrichedWeeks, teacherGuides });
   } catch (error) {
-    const status = error.code === "AI_KEY_MISSING" ? 503 : 400;
+    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : 400;
     res.status(status).json({ ok: false, error: error.message || "Não foi possível refazer a semana." });
   }
 });
