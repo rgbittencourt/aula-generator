@@ -21,11 +21,18 @@ function normalizeGuide(source = {}, plan = {}, input = {}, index = 0) {
   const inputPractices = Array.isArray(input.webPractices) ? input.webPractices : [];
   const generatedPractices = Array.isArray(raw.webPracticeProjects) && raw.webPracticeProjects.length
     ? raw.webPracticeProjects
-    : (Array.isArray(raw.webPractices) && raw.webPractices.length ? raw.webPractices : inputPractices);
-  const practices = generatedPractices.map((practice) => {
+    : (Array.isArray(raw.webPractices) ? raw.webPractices : []);
+  const candidatePractices = [...inputPractices, ...generatedPractices];
+  const mergedPractices = [];
+  candidatePractices.forEach((practice) => {
     const original = inputPractices.find((item) => text(item.id) === text(practice?.id) || text(item.title) === text(practice?.title));
-    return { ...(original || {}), ...(practice || {}) };
-  }).filter((practice) => practiceScheduledForWeek(practice, input, index));
+    const merged = { ...(original || {}), ...(practice || {}) };
+    const key = text(merged.id || merged.title);
+    const existingIndex = mergedPractices.findIndex((item) => text(item.id || item.title) === key || (text(item.title) && text(item.title) === text(merged.title)));
+    if (existingIndex >= 0) mergedPractices[existingIndex] = { ...mergedPractices[existingIndex], ...merged };
+    else if (key) mergedPractices.push(merged);
+  });
+  const practices = mergedPractices.filter((practice) => practiceScheduledForWeek(practice, input, index));
   const review = pedagogicalReview(plan);
   return {
     weekNumber: index + 1,

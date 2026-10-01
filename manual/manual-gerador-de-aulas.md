@@ -613,6 +613,19 @@ O gerador também constrói um **mapa longitudinal** antes de redigir as semanas
 
 Na classificação, **insuficiente** significa que o texto didático não atingiu o piso ou não possui a estrutura mínima de uma aula. Uma aula com texto desenvolvido, mas ainda pendente de referências, recursos ou revisão pedagógica, fica em **revisão recomendada**; essa pendência não reduz artificialmente a contagem de palavras.
 
+### Como planejar mais de uma webprática
+
+No painel **Webpráticas síncronas**, ative o recurso, informe a quantidade de sessões desejada e clique em **Criar sessões**. O sistema cria os cartões faltantes e preserva os cartões já preenchidos. Cada cartão precisa receber título e semana/data antes da geração. O botão **Preencher vazios com IA** analisa os cartões por índice e completa apenas os campos vazios; a resposta deve conter exatamente a quantidade solicitada. As sessões continuam independentes do texto semanal e são exportadas como projetos DOCX.
+
+### Como marcar o que já foi conferido
+
+Depois da geração, abra **Planejamento geral**. O painel apresenta duas listas:
+
+- **Recursos que precisam de conferência**: marque a caixa depois de abrir o link, confirmar coerência com a semana, duração ou páginas, acessibilidade e licença/crédito;
+- **Checklist pedagógico**: marque a caixa depois de revisar o item. A mensagem “Atendido automaticamente” é o resultado da análise da aplicação; “Conferido por você” é o seu registro manual.
+
+As marcações são salvas no navegador e entram no **Baixar backup**. Elas não alteram artificialmente o resultado automático: se um item estiver pendente, é necessário corrigir a aula ou o recurso e gerar/revisar novamente.
+
 #### 10.1.4 Prompt de preenchimento assistido do briefing
 
 O botão **Preencher vazios com IA** faz uma chamada com este sistema e este prompt de usuário:

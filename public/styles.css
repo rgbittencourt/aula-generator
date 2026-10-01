@@ -54,3 +54,24 @@
 .resource-plan-week .resource-override::placeholder{color:#8a949e}
 @media(max-width:860px){.resource-plan-week{grid-template-columns:repeat(2,minmax(0,1fr))}.resource-plan-week-label{grid-column:1/-1;padding-bottom:0}}
 @media(max-width:540px){.resource-plan-heading{display:block}.resource-plan-heading small{display:block;margin-top:4px}.resource-plan-week{grid-template-columns:1fr}}
+
+/* Conferência manual persistente */
+.review-panel{margin-top:12px;padding:12px 14px;border:1px solid #e9d8ac;border-radius:10px;background:#fff8e8;color:#76530d}
+.review-panel summary{display:flex;flex-direction:column;gap:3px;cursor:pointer;list-style:none}
+.review-panel summary::-webkit-details-marker{display:none}
+.review-panel summary strong{color:#5e4721;font-size:12px}
+.review-panel summary small{color:#806b43;font-size:11px;line-height:1.45}
+.review-list{display:grid;gap:6px;margin-top:12px;max-height:390px;overflow:auto;padding-right:3px}
+.review-row{display:flex;align-items:flex-start;gap:9px;padding:9px 10px;border:1px solid #eadfc7;border-radius:8px;background:#fffdf7;color:#5e5548;cursor:pointer}
+.review-row:hover{border-color:#d6bd7c}
+.review-row.is-marked{border-color:#bfe4df;background:#edf8f6;color:#275d58}
+.review-row input{flex:0 0 auto;width:16px;height:16px;margin:1px 0 0;accent-color:var(--teal)}
+.review-row span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.review-row strong{font-size:11px;line-height:1.35;color:var(--navy)}
+.review-row small{font-size:10px;line-height:1.35;color:inherit}
+.resource-review-panel{background:#fff3dc}
+.practice-count-controls{margin-bottom:14px;padding:12px;border:1px solid #dfe8e6;border-radius:10px;background:#f7fbfa}
+.practice-count-controls .field{margin:0}
+.action-field{justify-content:flex-end}
+.action-field .button{height:42px;width:max-content}
+@media(max-width:620px){.practice-count-controls .action-field .button{width:100%}}

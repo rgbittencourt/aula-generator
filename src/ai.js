@@ -153,6 +153,7 @@ async function callJson(messages, options = {}) {
 }
 
 export function buildBriefingPrompt(input, missingFields = []) {
+  const requestedPracticeCount = Array.isArray(input.webPractices) ? input.webPractices.length : 0;
   return `Atue como designer instrucional e assistente de planejamento de curso. Complete somente os campos que estão vazios no briefing abaixo. Responda somente JSON válido com estas propriedades: audience (string), objectives (array de strings), content (string), webPractices (array de objetos), materials (array de objetos), references (array de strings), videoSearchSuggestions (array de strings), imageSearchSuggestions (array de strings), notes (array de strings).
 
 Campos que precisam de preenchimento: ${missingFields.length ? missingFields.join(", ") : "nenhum; apenas revise e sugira melhorias"}.
@@ -174,6 +175,7 @@ Regras:
 - para vídeos e imagens, gere termos de busca e intenção pedagógica; use links somente quando já tiverem sido fornecidos pelo usuário;
 - não preencha nome de autor ou instituição, pois esses dados devem vir do usuário;
 - não escreva markdown fora das strings do JSON.
+- QUANTIDADE DE WEBPRÁTICAS: o briefing recebeu ${requestedPracticeCount} item(ns). Se esse número for maior que zero, retorne exatamente ${requestedPracticeCount} webprática(s), na mesma ordem e preservando cada id; nunca reduza a lista a uma só prática e nunca descarte um item parcialmente preenchido. Se o número for zero e as webpráticas estiverem ativadas, crie pelo menos uma.
 
 Briefing atual:
 ${JSON.stringify(input, null, 2)}
@@ -235,14 +237,36 @@ function normalizeBriefingMaterial(material, index) {
   };
 }
 
+function mergeBriefingPractice(original = {}, suggestion = {}, index = 0) {
+  const base = normalizeBriefingPractice(original, index);
+  const proposed = normalizeBriefingPractice({ ...base, ...suggestion }, index);
+  const fields = ["title", "type", "modality", "weekNumber", "date", "dayOfWeek", "startTime", "endTime", "platform", "tool", "sessionTitle", "moments", "objective", "preparation", "materials", "instructions", "steps", "product", "assessment", "criteria", "continuation", "fallbackPlan", "resources", "durationMinutes"];
+  const merged = { ...base };
+  fields.forEach((field) => {
+    const current = merged[field];
+    const empty = Array.isArray(current) ? current.length === 0 : !String(current ?? "").trim() || (field === "weekNumber" && !Number(current));
+    if (empty && proposed[field] !== undefined && (Array.isArray(proposed[field]) ? proposed[field].length : String(proposed[field] ?? "").trim())) merged[field] = proposed[field];
+  });
+  merged.id = base.id || proposed.id || `webpractice-${index + 1}`;
+  return merged;
+}
+
 export async function assistBriefing(input, missingFields = []) {
   const raw = await callJson([
     { role: "system", content: `${ACADEMIC_SYSTEM_PROMPT}\n\nNesta etapa, complete somente os campos vazios do briefing. Não invente URLs, fontes verificadas ou dados factuais não fornecidos.` },
     { role: "user", content: buildBriefingPrompt(input, missingFields) }
   ]);
+  const requestedPractices = Array.isArray(input.webPractices) ? input.webPractices : [];
+  const suggestedPractices = Array.isArray(raw.webPractices) ? raw.webPractices.map(normalizeBriefingPractice) : [];
+  const practices = requestedPractices.length
+    ? requestedPractices.map((practice, index) => {
+        const suggestion = suggestedPractices.find((candidate) => candidate.id === practice.id || (candidate.title && candidate.title === practice.title)) || suggestedPractices[index] || {};
+        return mergeBriefingPractice(practice, suggestion, index);
+      })
+    : suggestedPractices;
   return {
     audience: text(raw.audience), objectives: stringList(raw.objectives), content: text(raw.content),
-    webPractices: Array.isArray(raw.webPractices) ? raw.webPractices.map(normalizeBriefingPractice) : [],
+    webPractices: practices,
     materials: Array.isArray(raw.materials) ? raw.materials.map(normalizeBriefingMaterial) : [],
     references: stringList(raw.references), videoSearchSuggestions: stringList(raw.videoSearchSuggestions), imageSearchSuggestions: stringList(raw.imageSearchSuggestions), notes: stringList(raw.notes)
   };

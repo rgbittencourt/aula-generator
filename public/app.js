@@ -1,6 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
-const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null };
+const createReviewMarks = () => ({ resources: {}, checks: {} });
+const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks() };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
 const DRAFT_MAX_AGE_DAYS = 30;
@@ -83,6 +84,7 @@ function currentSnapshot() {
       generalPlan: state.generalPlan,
       teacherGuides: state.teacherGuides,
       validation: state.validation,
+      reviewMarks: state.reviewMarks,
       weeks: state.weeks
     } : null
   };
@@ -153,6 +155,7 @@ function applyInputToForm(input = {}) {
   practiceSequence = 0;
   const practices = Array.isArray(input.webPractices) && input.webPractices.length ? input.webPractices : [{}];
   practices.forEach((practice) => addPractice(practice));
+  if ($("#practice-count")) $("#practice-count").value = practices.length;
   $("#materials-list").innerHTML = "";
   materialSequence = 0;
   const materials = Array.isArray(input.materials) && input.materials.length ? input.materials : [{}];
@@ -216,6 +219,7 @@ function renderResourcePlanWeeks(plan = {}) {
 function restoreSnapshot(snapshot) {
   if (!snapshot?.form) return;
   applyInputToForm(snapshot.form);
+  state.reviewMarks = snapshot.results?.reviewMarks || snapshot.reviewMarks || createReviewMarks();
   hideDraftRecovery();
   if (snapshot.results?.weeks?.length) {
     renderWeeks({ ...snapshot.results, input: snapshot.results.input || snapshot.form });
@@ -316,8 +320,18 @@ function refreshItemButtons() {
   materialCards.forEach((card, index) => { card.querySelector(".item-index").textContent = index + 1; card.querySelector("[data-remove-material]").disabled = materialCards.length <= 1; });
 }
 
-function addPractice(data = {}) { $("#practice-list").insertAdjacentHTML("beforeend", practiceCard(data)); refreshItemButtons(); togglePractice(); }
+function syncPracticeCount() { const count = document.querySelectorAll("#practice-list .practice-card").length; if ($("#practice-count")) $("#practice-count").value = count; return count; }
+function addPractice(data = {}) { $("#practice-list").insertAdjacentHTML("beforeend", practiceCard(data)); refreshItemButtons(); syncPracticeCount(); togglePractice(); }
 function addMaterial(data = {}) { $("#materials-list").insertAdjacentHTML("beforeend", materialCard(data)); refreshItemButtons(); }
+
+function applyPracticeCount() {
+  const requested = Math.min(12, Math.max(1, Number($("#practice-count")?.value) || 1));
+  const current = document.querySelectorAll("#practice-list .practice-card").length;
+  while (document.querySelectorAll("#practice-list .practice-card").length < requested) addPractice();
+  syncPracticeCount();
+  if (current > requested) showAssistantMessage(`Já existem ${current} webprática(s) preenchidas. A redução não remove dados automaticamente; use × nos cartões que deseja retirar.`);
+  updateSummary(); updateProgress(); scheduleSave();
+}
 
 function collectPractices() {
   return [...document.querySelectorAll("#practice-list .practice-card")].map((card, index) => ({
@@ -524,6 +538,7 @@ function mergeBriefingPractices(suggestions = []) {
     $("#practice-list").innerHTML = "";
     practiceSequence = 0;
     suggestions.forEach((practice) => addPractice(practice));
+    syncPracticeCount();
     return suggestions.length;
   }
   let filledFields = 0;
@@ -538,6 +553,7 @@ function mergeBriefingPractices(suggestions = []) {
     filledFields += fillPracticeSuggestion(card, suggestion);
   });
   refreshItemButtons();
+  syncPracticeCount();
   return filledFields;
 }
 
@@ -782,6 +798,16 @@ function formatMinutes(value) {
   return `${(minutes / 60).toFixed(1)} h`;
 }
 
+function reviewItemKey(item = {}) { return `${item.weekNumber || 0}:${item.id || slugify(item.title || item.label || "item")}`; }
+
+function toggleReviewMark(kind, key, checked) {
+  state.reviewMarks = state.reviewMarks || createReviewMarks();
+  state.reviewMarks[kind] = state.reviewMarks[kind] || {};
+  state.reviewMarks[kind][key] = checked;
+  saveDraft("conferência manual");
+  renderGeneralPlan(state.generalPlan);
+}
+
 function renderGeneralPlan(plan) {
   const container = $("#general-plan");
   if (!container || !plan?.totals) { container?.classList.add("hidden"); return; }
@@ -792,17 +818,32 @@ function renderGeneralPlan(plan) {
   const arcs = (plan.didacticArcs || []).filter((arc) => arc.label).map((arc) => `<span class="arc-chip">${escapeHtml(arc.label)}</span>`).join("");
   const checklist = Array.isArray(plan.pedagogicalChecklist) ? plan.pedagogicalChecklist : [];
   const passed = checklist.filter((item) => item.pass).length;
-  const checklistMarkup = checklist.length ? `<div class="general-warning ${passed === checklist.length ? "checklist-ok" : ""}"><strong>Checklist pedagógico: ${passed}/${checklist.length} itens atendidos</strong><ul>${checklist.filter((item) => !item.pass).slice(0, 8).map((item) => `<li>Semana ${item.weekNumber}: ${escapeHtml(item.label)}</li>`).join("") || "<li>Todos os itens essenciais foram atendidos; faça a aprovação humana dos recursos.</li>"}</ul></div>` : "";
+  const reviewMarks = state.reviewMarks || createReviewMarks();
+  const reviewedChecks = checklist.filter((item) => reviewMarks.checks?.[reviewItemKey(item)]).length;
+  const checklistRows = checklist.map((item) => {
+    const key = reviewItemKey(item);
+    const marked = Boolean(reviewMarks.checks?.[key]);
+    return `<label class="review-row ${marked ? "is-marked" : ""}"><input type="checkbox" data-review-kind="checks" data-review-key="${escapeHtml(key)}" ${marked ? "checked" : ""} /><span><strong>Semana ${escapeHtml(item.weekNumber)} · ${escapeHtml(item.label)}</strong><small>${item.pass ? "Atendido automaticamente" : "Pendente na análise automática"}${marked ? " · Conferido por você" : ""}</small></span></label>`;
+  }).join("");
+  const checklistMarkup = checklist.length ? `<details class="review-panel" open><summary><strong>Checklist pedagógico: ${passed}/${checklist.length} itens atendidos</strong><small>${reviewedChecks}/${checklist.length} itens conferidos manualmente. Marcar como conferido registra sua revisão, mas não transforma um item automático pendente em aprovado.</small></summary><div class="review-list">${checklistRows}</div></details>` : "";
   const progressionMarkup = Array.isArray(plan.progression) && plan.progression.length ? `<div class="general-warning"><strong>Progressão curricular</strong><ul>${plan.progression.map((item) => `<li>Semana ${item.weekNumber}: ${escapeHtml(item.theme || "")} ${item.projectMilestone ? `— ${escapeHtml(item.projectMilestone)}` : ""}</li>`).join("")}</ul></div>` : "";
   const practices = Array.isArray(plan.webPracticeSchedule) ? plan.webPracticeSchedule : [];
   const practiceMarkup = practices.length ? `<section class="webpractice-schedule"><div class="schedule-heading"><div><p class="eyebrow">SESSÕES PRÁTICAS INDEPENDENTES</p><h3>Webpráticas programadas</h3><p>Estas sessões não entram no texto-base nem no JSON do aluno. Cada uma é exportada como roteiro DOCX para o professor.</p></div></div><div class="schedule-list">${practices.map((practice, index) => `<article class="schedule-item"><div><strong>${escapeHtml(practice.title || `Webprática ${index + 1}`)}</strong><span>${escapeHtml([practice.weekNumber ? `Semana ${practice.weekNumber}` : "", practice.date ? formatDate(practice.date) : "", practice.dayOfWeek, [practice.startTime, practice.endTime].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "Agenda a confirmar")}</span><small>${escapeHtml([practice.modality, practice.tool, practice.platform].filter(Boolean).join(" · ") || "Sessão síncrona / laboratório prático")}</small></div><button class="button button-secondary webpractice-download" data-practice-id="${escapeHtml(practice.id || "")}" type="button">Baixar DOCX <span>↓</span></button></article>`).join("")}</div></section>` : "";
-  container.innerHTML = `<p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o guia do professor são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div>${unresolved.length ? `<div class="general-warning">${unresolved.length} recurso(s) precisam de conferência para fechar o cálculo: ${escapeHtml(unresolved.slice(0, 4).map((item) => item.title).join(", "))}${unresolved.length > 4 ? "…" : ""}</div>` : ""}${checklistMarkup}${progressionMarkup}${practiceMarkup}`;
+  const reviewedResources = unresolved.filter((item) => reviewMarks.resources?.[reviewItemKey(item)]).length;
+  const resourceRows = unresolved.map((item) => {
+    const key = reviewItemKey(item);
+    const marked = Boolean(reviewMarks.resources?.[key]);
+    return `<label class="review-row ${marked ? "is-marked" : ""}"><input type="checkbox" data-review-kind="resources" data-review-key="${escapeHtml(key)}" ${marked ? "checked" : ""} /><span><strong>Semana ${escapeHtml(item.weekNumber)} · ${escapeHtml(item.title || "Recurso sem título")}</strong><small>${escapeHtml(item.status || "Conferência pendente")}${marked ? " · Conferido por você" : ""}</small></span></label>`;
+  }).join("");
+  const resourcesMarkup = unresolved.length ? `<details class="review-panel resource-review-panel" open><summary><strong>${unresolved.length} recurso(s) precisam de conferência</strong><small>${reviewedResources}/${unresolved.length} marcados por você. Abra cada link, confirme coerência, duração/páginas, acessibilidade e licença antes de exportar.</small></summary><div class="review-list">${resourceRows}</div></details>` : "";
+  container.innerHTML = `<p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o guia do professor são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div>${resourcesMarkup}${checklistMarkup}${progressionMarkup}${practiceMarkup}`;
+  container.querySelectorAll("[data-review-kind]").forEach((checkbox) => checkbox.addEventListener("change", () => toggleReviewMark(checkbox.dataset.reviewKind, checkbox.dataset.reviewKey, checkbox.checked)));
   container.querySelectorAll(".webpractice-download").forEach((button) => button.addEventListener("click", () => downloadWebPractice(button.dataset.practiceId)));
   container.classList.remove("hidden");
 }
 
 function renderWeeks(data) {
-  state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider; state.validation = data.validation || data.generalPlan?.validation || null;
+  state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider; state.validation = data.validation || data.generalPlan?.validation || null; state.reviewMarks = data.reviewMarks || state.reviewMarks || createReviewMarks();
   $("#results-title").textContent = `${data.weeks.length} semanas prontas para revisão`;
   $("#results-subtitle").textContent = data.provider === "static-demo" ? "Modo público GitHub Pages: exemplo gerado no navegador, sem API." : data.provider === "fallback" ? "Exemplo local gerado sem API; use-o para validar o fluxo." : `Gerado por IA com ${data.model || "o provedor configurado"}. Revise antes de publicar.`;
   $("#results-section").classList.remove("hidden");
@@ -911,6 +952,7 @@ async function generate(fallback = false) {
     const incomplete = input.webPractices.find((practice) => !practice.title || (!practice.weekNumber && !practice.date));
     if (incomplete) { showError("Cada webprática precisa de um título e de uma semana ou data de ocorrência. Ela não será alocada automaticamente."); return; }
   }
+  state.reviewMarks = createReviewMarks();
   const button = fallback ? $("#fallback-button") : $("#generate-button");
   button.dataset.label = fallback ? "Gerar exemplo local" : "Gerar com IA";
   setBusy(button, true, fallback ? "Montando exemplo…" : "Gerando material…");
@@ -985,13 +1027,14 @@ async function loadHealth() {
 }
 
 $("#add-practice").addEventListener("click", () => { addPractice(); scheduleSave(); });
+$("#apply-practice-count").addEventListener("click", applyPracticeCount);
 $("#add-material").addEventListener("click", () => { addMaterial(); scheduleSave(); });
 $("#practice-list").addEventListener("click", (event) => {
   const button = event.target.closest("[data-remove-practice]");
   if (!button) return;
   button.closest(".practice-card").remove();
   if (!document.querySelector("#practice-list .practice-card")) addPractice();
-  refreshItemButtons(); togglePractice(); updateSummary(); scheduleSave();
+  refreshItemButtons(); syncPracticeCount(); togglePractice(); updateSummary(); scheduleSave();
 });
 $("#materials-list").addEventListener("click", (event) => {
   const button = event.target.closest("[data-remove-material]");

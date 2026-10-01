@@ -46,11 +46,20 @@ test("agenda webprática por data ou semana ocorre uma única vez", () => {
   assert.deepEqual(lessons.map((lesson) => lesson.lessonPlan.webPractices), [[], [], []]);
 });
 
+test("guia preserva todas as webpráticas agendadas quando a IA detalha apenas uma", () => {
+  const input = normalizeCourseInput({ title: "Curso", weeks: 1, webPracticeEnabled: true, webPractices: [{ id: "p1", title: "Laboratório 1", weekNumber: 1, objective: "Objetivo 1" }, { id: "p2", title: "Laboratório 2", weekNumber: 1, objective: "Objetivo 2" }] });
+  const lesson = buildFallbackLesson(input, 0);
+  const guides = buildTeacherGuides(input, [lesson], [{ webPracticeProjects: [{ id: "p1", title: "Laboratório 1", objective: "Projeto detalhado pela IA", product: "Evidência 1", steps: [{ title: "Executar", minutes: 30, instructions: "Faça", evidence: "Arquivo" }], fallbackPlan: "Plano B" }] }]);
+  assert.deepEqual(guides[0].webPracticeProjects.map((practice) => practice.id), ["p1", "p2"]);
+  assert.equal(guides[0].webPracticeProjects[0].objective, "Projeto detalhado pela IA");
+});
+
 test("prompt do assistente exige práticas distintas, materiais alinhados e fontes sem URLs inventadas", () => {
-  const prompt = buildBriefingPrompt(normalizeCourseInput({ title: "Curso", webPracticeEnabled: true }), ["webPractices", "materials"]);
+  const prompt = buildBriefingPrompt(normalizeCourseInput({ title: "Curso", webPracticeEnabled: true, webPractices: [{ id: "p1" }, { id: "p2" }] }), ["webPractices[0].title", "webPractices[1].title", "materials"]);
   assert.match(prompt, /webpráticas.*distintas/i);
   assert.match(prompt, /cada item de webPractices pelo índice/i);
   assert.match(prompt, /mesmo item\/id/i);
+  assert.match(prompt, /retorne exatamente 2 webprática/i);
   assert.match(prompt, /títulos automáticos.*placeholders/i);
   assert.match(prompt, /materiais de apoio/i);
   assert.match(prompt, /não invente URLs/i);

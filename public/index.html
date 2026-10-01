@@ -97,6 +97,10 @@
               <section class="panel">
             <div class="panel-heading"><div><span class="step">05</span><div><h2>Webpráticas síncronas</h2><p>Aulas práticas/laboratórios com agenda própria, separadas do texto-base semanal.</p></div></div><label class="switch"><input id="practice-enabled" type="checkbox" /><span></span></label></div>
               <div id="practice-fields" class="practice-fields disabled">
+              <div class="field-grid two practice-count-controls">
+                <label class="field"><span>Quantidade de webpráticas</span><input id="practice-count" type="number" min="1" max="12" step="1" value="1" /><small>Informe quantas sessões independentes a IA deve planejar.</small></label>
+                <div class="field action-field"><span>Aplicar quantidade</span><button class="button button-secondary" type="button" id="apply-practice-count">Criar sessões</button><small>As sessões existentes serão preservadas.</small></div>
+              </div>
               <div id="practice-list" class="stacked-list"></div>
               <button class="button button-secondary add-item-button" type="button" id="add-practice">+ Adicionar outra webprática</button>
               <p class="hint">Cada webprática precisa de uma semana ou data válida. Ela não entra no texto-base nem no JSON do aluno; será planejada como projeto do professor e exportada em DOCX editável.</p>
