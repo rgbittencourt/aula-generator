@@ -3,6 +3,7 @@ import { selectResourcesWithAI } from "./ai.js";
 const text = (value) => String(value ?? "").trim();
 const positive = (value) => { const number = Number(value); return Number.isFinite(number) && number > 0 ? number : 0; };
 const cleanHtml = (value) => text(value).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+const html = (value) => cleanHtml(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 async function fetchJson(url, headers = {}) {
   const controller = new AbortController();
@@ -219,8 +220,10 @@ function resourceFromCandidate(candidate, selection) {
     durationMinutes: positive(candidate.durationMinutes),
     required: Boolean(selection.required),
     moment: selection.moment || "ponto de uso",
+    sectionNumber: text(selection.sectionNumber || selection.section || candidate.sectionNumber),
     objective: selection.use || selection.reason,
     guidingQuestion: selection.guidingQuestion,
+    bridgeParagraph: text(selection.bridgeParagraph || selection.connectionParagraph || selection.use || selection.reason),
     altText: candidate.altText,
     caption: candidate.caption,
     credit: [candidate.author, candidate.source, candidate.license].filter(Boolean).join(" · "),
@@ -307,40 +310,79 @@ function walkBlocks(blocks, callback) {
   });
 }
 
+function attachResourcesToSections(lesson, selectedResources) {
+  const sections = Array.isArray(lesson?.lessonPlan?.contentSections) ? lesson.lessonPlan.contentSections : [];
+  if (!sections.length) return lesson;
+  const all = [...selectedResources.videos, ...selectedResources.images, ...selectedResources.readings];
+  const used = new Set();
+  const nextSections = sections.map((section) => ({ ...section, resources: Array.isArray(section.resources) ? [...section.resources] : [] }));
+  all.forEach((resource, index) => {
+    const explicit = Number.parseInt(resource.sectionNumber, 10);
+    let sectionIndex = Number.isInteger(explicit) && explicit >= 1 && explicit <= nextSections.length ? explicit - 1 : -1;
+    if (sectionIndex < 0) sectionIndex = nextSections.findIndex((section) => section.resources.some((item) => item.id === resource.researchRequestId || item.id === resource.id || (resource.searchQuery && item.searchQuery === resource.searchQuery)));
+    if (sectionIndex < 0) sectionIndex = index % nextSections.length;
+    const section = nextSections[sectionIndex];
+    if (used.has(resource.id) || section.resources.some((item) => item.id === resource.id || (resource.href && item.href === resource.href))) return;
+    section.resources.push(resource);
+    used.add(resource.id);
+  });
+  return { ...lesson, lessonPlan: { ...lesson.lessonPlan, contentSections: nextSections } };
+}
+
+function removeSelectedPlaceholders(blocks, selectedResources) {
+  const selectedRequestIds = new Set([...selectedResources.videos, ...selectedResources.images, ...selectedResources.readings].map((resource) => resource.researchRequestId).filter(Boolean));
+  if (!selectedRequestIds.size) return blocks;
+  return (blocks || []).map((block) => {
+    const props = { ...(block.props || {}) };
+    if (block.type === "materiais" && Array.isArray(props.items)) props.items = props.items.filter((item) => !selectedRequestIds.has(item.resourceId));
+    if (Array.isArray(props.children)) props.children = removeSelectedPlaceholders(props.children, selectedResources);
+    return { ...block, props };
+  }).filter((block) => !(block.type === "materiais" && Array.isArray(block.props?.items) && block.props.items.length === 0));
+}
+
 function syncResourceBlocks(lesson, selectedResources) {
-  const blocks = Array.isArray(lesson.blocks) ? [...lesson.blocks] : [];
+  const blocks = removeSelectedPlaceholders(Array.isArray(lesson.blocks) ? lesson.blocks : [], selectedResources);
   const existingVideoIds = new Set();
   const existingImages = new Set();
-  let materialsBlock = null;
   walkBlocks(blocks, (block) => {
     if (block.type === "video" && block.props?.id) existingVideoIds.add(text(block.props.id));
     if (block.type === "imagem" && block.props?.src) existingImages.add(text(block.props.src));
-    if (!materialsBlock && block.type === "materiais") materialsBlock = block;
   });
-  const additions = [];
+  const sections = Array.isArray(lesson.lessonPlan?.contentSections) ? lesson.lessonPlan.contentSections : [];
+  const additionsBySection = new Map();
+  const queue = (resource, block, index) => {
+    const explicit = Number.parseInt(resource.sectionNumber, 10);
+    const sectionIndex = Number.isInteger(explicit) && explicit >= 1 && explicit <= Math.max(1, sections.length) ? explicit - 1 : index % Math.max(1, sections.length);
+    const additions = additionsBySection.get(sectionIndex) || [];
+    const bridge = resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || `Use este recurso neste ponto para relacionar ${resource.title || "o material"} ao conceito estudado na seção.`;
+    additions.push({ id: `resource-bridge-${blockKey(resource.id)}-${index}`, type: "prose", bg: "neutral-default", pad: "normal", props: { body: `<p>${html(bridge)}</p>`, dropcap: false, dropcapTone: "terracotta", resourceId: resource.id } }, block);
+    additionsBySection.set(sectionIndex, additions);
+  };
   selectedResources.videos.forEach((resource, index) => {
     const id = youtubeId(resource.href);
     if (!id || existingVideoIds.has(id)) return;
-    additions.push({ id: `resource-video-${blockKey(resource.id)}-${index}`, type: "video", bg: "neutral-default", pad: "normal", props: { id, title: resource.title, caption: resource.objective || resource.pedagogicalUse || "Vídeo selecionado para esta semana.", credit: resource.credit || resource.source || "YouTube", start: "", resourceId: resource.id } });
+    queue(resource, { id: `resource-video-${blockKey(resource.id)}-${index}`, type: "video", bg: "neutral-default", pad: "normal", props: { id, title: resource.title, caption: resource.objective || resource.pedagogicalUse || "Vídeo selecionado para esta semana.", credit: resource.credit || resource.source || "YouTube", start: "", resourceId: resource.id } }, index);
   });
   selectedResources.images.forEach((resource, index) => {
     if (!resource.href || existingImages.has(resource.href)) return;
-    additions.push({ id: `resource-image-${blockKey(resource.id)}-${index}`, type: "imagem", bg: "neutral-default", pad: "normal", props: { src: resource.href, slotId: "", caption: resource.caption || resource.title, credit: resource.credit || resource.source || "Wikimedia Commons", ratio: "16/9", resourceId: resource.id } });
+    queue(resource, { id: `resource-image-${blockKey(resource.id)}-${index}`, type: "imagem", bg: "neutral-default", pad: "normal", props: { src: resource.href, slotId: "", caption: resource.caption || resource.title, credit: resource.credit || resource.source || "Wikimedia Commons", ratio: "16/9", resourceId: resource.id } }, index);
   });
-  const readingItems = selectedResources.readings.map((resource) => ({ type: resource.type || "artigo", title: resource.title, source: [resource.author, resource.source, resource.year].filter(Boolean).join(" · "), href: resource.href, resourceId: resource.id }));
-  if (readingItems.length) {
-    if (materialsBlock) {
-      const existing = Array.isArray(materialsBlock.props?.items) ? materialsBlock.props.items : [];
-      const seen = new Set(existing.map((item) => item.href).filter(Boolean));
-      materialsBlock.props = { ...(materialsBlock.props || {}), items: [...existing, ...readingItems.filter((item) => !seen.has(item.href))] };
-    } else {
-      additions.push({ id: `resource-materials-${blockKey(lesson.meta?.weekNumber || "week")}`, type: "materiais", bg: "neutral-default", pad: "normal", props: { title: "Leituras e materiais selecionados", items: readingItems } });
-    }
-  }
+  selectedResources.readings.forEach((resource, index) => queue(resource, { id: `resource-material-${blockKey(resource.id)}-${index}`, type: "materiais", bg: "neutral-default", pad: "normal", props: { title: resource.required ? "Leitura obrigatória neste ponto" : "Leitura complementar neste ponto", items: [{ type: resource.type || "artigo", title: resource.title, source: [resource.author, resource.source, resource.year].filter(Boolean).join(" · "), href: resource.href, resourceId: resource.id, required: resource.required }], resourceId: resource.id } }, index));
+  const additions = [...additionsBySection.values()].flat();
   if (!additions.length) return blocks;
   const topic = blocks.find((block) => ["topic", "topic-collapsible", "topic-slider"].includes(block.type));
   if (topic) {
-    topic.props = { ...(topic.props || {}), children: [...(Array.isArray(topic.props?.children) ? topic.props.children : []), ...additions] };
+    const children = [...(Array.isArray(topic.props?.children) ? topic.props.children : [])];
+    const anchors = children.map((child, index) => ({ index, number: Number.parseInt(text(child.props?.text).match(/^\s*(\d+)/)?.[1], 10) })).filter((anchor) => Number.isInteger(anchor.number));
+    let offset = 0;
+    [...additionsBySection.entries()].sort(([left], [right]) => left - right).forEach(([sectionIndex, sectionAdditions]) => {
+      const anchor = anchors.find((entry) => entry.number === sectionIndex + 1);
+      const next = anchors.find((entry) => entry.number > sectionIndex + 1);
+      const insertAt = (next?.index ?? children.length) + offset;
+      children.splice(insertAt, 0, ...sectionAdditions);
+      offset += sectionAdditions.length;
+    });
+    topic.props = { ...(topic.props || {}), children };
     return blocks;
   }
   const anchor = blocks.findIndex((block) => ["quiz", "sintese", "referencias"].includes(block.type));
@@ -394,7 +436,7 @@ export async function enrichLessonsWithResources(input, lessons) {
     };
     const alternatives = flattenCandidates(research).filter((candidate) => !selectedResources.videos.concat(selectedResources.images, selectedResources.readings).some((resource) => resource.candidateId === candidate.candidateId)).slice(0, 30);
     const resourceResearch = compactResearch({ ...research, status: selectionStatus, selections: selection, selectionFallbacks, alternatives });
-    const enriched = { ...lesson, lessonPlan: { ...lesson.lessonPlan, resources, resourceResearch } };
+    const enriched = attachResourcesToSections({ ...lesson, lessonPlan: { ...lesson.lessonPlan, resources, resourceResearch } }, selectedResources);
     enriched.blocks = syncResourceBlocks(enriched, selectedResources);
     return enriched;
   }));

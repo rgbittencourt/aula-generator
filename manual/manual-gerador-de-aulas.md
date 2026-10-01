@@ -744,7 +744,7 @@ lessonPlan obrigatório:
 - learningObjectives com 4–8 objetivos observáveis, específicos desta semana, usando verbos como explicar, comparar, analisar, aplicar, avaliar ou criar;
 - prerequisites e contentDensity;
 - contentSections com pelo menos `{requiredSectionCount}` seções principais. Cada seção deve ter number, title, didacticRole, body com aproximadamente `{sectionTargetWords}` palavras (mínimo `{sectionMinimumWords}`), subsections, caseStudy quando pertinente, reflection quando pertinente, keyTerms e resources. A progressão deve ir do problema/pergunta para conceitos, exemplos ou evidências, aplicação e crítica. Não repita a mesma introdução em seções diferentes;
-- resources com videos, readingsRequired, readingsExtra, images, podcasts e datasets. Cada recurso deve conter title, source, author quando conhecido, href somente se foi fornecido no briefing ou retornado por um provedor, required, sectionNumber ou moment, objective, guidingQuestion, pedagogicalUse, durationMinutes, altText/caption/credit para imagens, searchQuery quando o link não estiver disponível, verificationStatus e requiresVerification;
+- resources com videos, readingsRequired, readingsExtra, images, podcasts e datasets. Cada recurso deve conter title, source, author quando conhecido, href somente se foi fornecido no briefing ou retornado por um provedor, required, sectionNumber, objective, guidingQuestion, bridgeParagraph, pedagogicalUse, durationMinutes, altText/caption/credit para imagens, searchQuery quando o link não estiver disponível, verificationStatus e requiresVerification. O bridgeParagraph deve explicar a ligação do recurso com o conteúdo exatamente naquele ponto;
 - webPractices: retorne sempre [] dentro de lessonPlan. Se houver prática programada para esta semana, desenvolva o projeto completo exclusivamente em teacherGuide.webPracticeProjects, com problem, context, studentRole, challenge, deliverable, prerequisites, materials, data, steps (cada uma com minutes, instructions e evidence), criteria, rubric com níveis, examples, revision, fallbackPlan, accessibility, prompts, artifacts e versões simplified/advanced;
 - diagnostic com pergunta/problema inicial, evidência esperada e feedback; formativeChecks com perguntas durante o texto, momento, evidência, feedback e ação de intervenção;
 - activities para fóruns, discussões, produção, estudo de caso ou encontro síncrono, com type, title, instructions, durationMinutes, evidence, evidenceType, feedback, criteria e required;
@@ -765,7 +765,7 @@ Regras de escrita:
 - {counterpointRule}; {comparisonRule}; {caseStudyRule};
 - conecte o tema à realidade do público ({input.audience}) e do nível ({input.level}); use os exemplos, recortes regionais e instituições fornecidos no briefing;
 - inclua pelo menos um exemplo concreto, uma situação-problema ou estudo de caso e um contraponto/limite quando forem pertinentes;
-- integre vídeos, imagens, artigos e leituras na seção em que serão usados, explicando o que o estudante deve observar ou responder; não crie uma galeria final de links;
+- integre vídeos, imagens, artigos e leituras na seção em que serão usados, precedidos ou seguidos por um parágrafo de ligação que explique o que o estudante deve observar, comparar ou responder; não crie uma galeria final de links;
 - não force diagnóstico, vídeo, leitura, webprática ou quiz quando não houver função pedagógica; webprática nunca deve aparecer no corpo do texto-base, nas contentSections, no welcome, na síntese ou nas atividades da aula semanal;
 - nunca invente URLs, DOI, durações, autores, números ou referências verificadas. Para recurso ainda não conferido, use searchQuery e verificationStatus "suggested-no-url";
 - não escreva markdown fora das strings do JSON e não inclua comentários.
@@ -805,7 +805,7 @@ Você seleciona recursos reais. Nunca crie links ou dados bibliográficos.
 [USER]
 Você é o curador final de recursos educacionais. A semana já foi escrita por um designer instrucional. Agora escolha, entre os candidatos reais abaixo, os recursos que melhor aprofundam os objetivos e os conceitos da semana.
 
-Responda somente JSON válido com estas propriedades: videos, images, readings. Cada propriedade deve ser um array de objetos com candidateId, keep, reason, use, guidingQuestion, required, moment, query, alignment, quality, currency, accessibility, durationFit, license, language, score, hasCaptions, hasTranscript, accessibilitySummary e lowBandwidthAlternative.
+Responda somente JSON válido com estas propriedades: videos, images, readings. Cada propriedade deve ser um array de objetos com candidateId, keep, reason, use, guidingQuestion, required, moment, sectionNumber, bridgeParagraph, query, alignment, quality, currency, accessibility, durationFit, license, language, score, hasCaptions, hasTranscript, accessibilitySummary e lowBandwidthAlternative.
 
 Regras obrigatórias:
 - só escolha candidateId que exista nos candidatos recebidos;
@@ -816,6 +816,7 @@ Regras obrigatórias:
 - escolha até `{resourcePlan.videosPerWeek}` vídeo(s), até 3 imagens/diagramas, `{resourcePlan.articlesPerWeek}` artigo(s) e `{max(resourcePlan.articlesPerWeek, resourcePlan.requiredReadingsPerWeek)}` leitura(s), respeitando o nível `{resourcePlan.requiredReadingLevel}` desta semana;
 - elimine duplicatas e descarte recursos que não tenham relação clara com o conteúdo;
 - explique em reason por que o recurso foi escolhido e em use como ele será usado pedagogicamente;
+- informe sectionNumber e escreva bridgeParagraph com um parágrafo específico que conecte o recurso ao conceito estudado exatamente naquele ponto; nunca use apenas “assista ao vídeo” ou “leia o artigo”;
 - marque required true somente quando o recurso for necessário para atingir um objetivo;
 - se nenhum candidato servir, retorne keep false para aquele pedido;
 - o professor fará a aprovação final: nunca marque o recurso como aprovado; apenas selecione-o como "selected-by-ai" e deixe a revisão humana pendente.
@@ -1086,6 +1087,8 @@ O sistema deve pesquisar candidatos e registrar que eles precisam de revisão. A
 
 O resultado final deve colocar o vídeo, a imagem ou o material dentro do tópico relacionado ao conceito. Isso facilita a leitura do aluno e mantém a aula editável no Aula Studio.
 
+Além do link, cada recurso deve ter `sectionNumber` e `bridgeParagraph`. O **parágrafo de ligação pedagógica** aparece imediatamente junto do vídeo, artigo, leitura ou imagem e explica por que aquele recurso foi colocado naquele ponto, o que o estudante deve observar e como ele se relaciona com o conceito recém-estudado. Se o provedor localizar um recurso depois da redação, o sistema o ancora na seção indicada e cria um bloco de ligação antes do bloco de mídia/material. Um recurso sem essa explicação fica em revisão.
+
 Os blocos principais são:
 
 - `video` para vídeos do YouTube;
@@ -1103,6 +1106,7 @@ Antes da publicação, confira:
 5. Se o texto está alinhado ao recurso.
 6. Se o recurso é obrigatório ou complementar.
 7. Se a fonte é adequada ao público e ao nível.
+8. Se o parágrafo de ligação realmente corresponde ao conteúdo da seção, e não é uma frase genérica.
 
 ---
 
@@ -1128,6 +1132,8 @@ Depois que o conteúdo é escrito, o sistema refina a estimativa com base em ite
 - avaliações;
 - webpráticas;
 - itens obrigatórios e opcionais.
+
+Na tela **Planejamento geral**, abra **Carga aberta por atividade** para separar os minutos de **texto-base**, **leituras obrigatórias**, **leituras complementares**, **vídeos obrigatórios**, **vídeos complementares**, **quiz/avaliação**, **fórum/discussão**, **síntese**, **projeto** e **webprática**. A mesma decomposição aparece na prévia da semana. A categoria obrigatória/complementar vem do campo `required` do recurso; ela não é inferida apenas pelo fato de existir um link.
 
 ### 13.1 Por que a carga calculada pode ficar abaixo da meta
 

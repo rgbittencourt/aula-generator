@@ -103,7 +103,7 @@ Ao usar **Refazer esta semana com IA**, o sistema envia somente um briefing esse
 
 O fluxo começa pelo briefing, mas o resultado não é uma lista fixa de seções. A IA escolhe o arco didático que combina com o conteúdo: descoberta conceitual, estudo de caso, oficina aplicada, análise de dados, debate orientado, revisão e síntese, ou combinação justificada. Uma semana pode ter diagnóstico, vídeo, leitura, atividade ou quiz quando isso tiver função pedagógica; não é obrigatório repetir todos esses elementos em todas as semanas.
 
-A semana produzida é uma unidade completa: abertura, conteúdo desenvolvido, seções e subseções, exemplos, reflexões, recursos no ponto de uso, síntese, avaliação, conexão com a semana seguinte e cálculo posterior da carga. Vídeos, imagens, diagramas e leituras ficam associados ao trecho ou conceito que motivou seu uso. A leitura do aluno não termina com uma galeria de links separada.
+A semana produzida é uma unidade completa: abertura, conteúdo desenvolvido, seções e subseções, exemplos, reflexões, recursos no ponto de uso, síntese, avaliação, conexão com a semana seguinte e cálculo posterior da carga. Vídeos, imagens, diagramas e leituras ficam associados ao trecho ou conceito que motivou seu uso. Cada recurso leva `sectionNumber` e um `bridgeParagraph`: um parágrafo que explica a ligação com o conceito naquele ponto, o que o estudante deve observar e por que o recurso é pertinente. A leitura do aluno não termina com uma galeria de links separada.
 
 O botão de assistência completa somente campos vazios do briefing. A geração final trabalha sobre o briefing revisado, e o backend pesquisa candidatos reais de vídeo, imagem/diagrama e leitura antes da seleção pela IA.
 
@@ -148,6 +148,8 @@ Não existe uma sequência rígida para todas as semanas. A IA escolhe um arco a
 O briefing possui um painel **Recursos e leituras por semana**. Nele, defina quantos vídeos, artigos acadêmicos e leituras obrigatórias devem ser procurados por semana, além do nível da leitura obrigatória. A tabela de distribuição permite substituir o padrão em semanas específicas: use `0` para não solicitar aquele recurso em uma semana e deixe `Padrão` para herdar a configuração geral. Artigos podem contar como leituras obrigatórias, evitando duplicação.
 
 Essas metas entram no prompt semanal, na curadoria da IA e nas solicitações ao YouTube/Crossref. A pesquisa só insere URLs retornadas por provedores ou fornecidas no briefing; quando não há candidatos suficientes, a pendência fica marcada para revisão humana. Imagens continuam sendo pesquisadas como enriquecimento contextual, e todos os recursos selecionados viram blocos editáveis na prévia e no JSON do aluno.
+
+No **Planejamento geral**, o quadro **Carga aberta por atividade** mostra, em minutos e horas, o que veio do texto-base, de artigos/leituras obrigatórios, de leituras complementares, de vídeos obrigatórios ou extras, de imagens, quiz, fórum, revisão, projeto e webprática. A mesma separação aparece ao abrir **Ver aula**. Assim, a carga não fica escondida em um único total.
 
 ## Separação aluno e professor
 

@@ -128,6 +128,7 @@ function normalizeResource(value = {}, index = 0, defaultKind = "material") {
     moment: text(resource.moment || resource.placement),
     objective: text(resource.objective || resource.purpose),
     guidingQuestion: text(resource.guidingQuestion || resource.question),
+    bridgeParagraph: text(resource.bridgeParagraph || resource.connectionParagraph || resource.bridge),
     durationMinutes: Math.max(0, number(resource.durationMinutes || resource.duration, 0)),
     pages: text(resource.pages),
     wordCount: Math.max(0, number(resource.wordCount || resource.words, 0)),
@@ -451,6 +452,7 @@ function normalizeTimePlan(value = {}) {
     unresolved: Array.isArray(plan.unresolved) ? plan.unresolved.map((entry) => object(entry)) : [],
     formulaProfile: object(plan.formulaProfile),
     workloadAdjustment: object(plan.workloadAdjustment),
+    breakdown: object(plan.breakdown),
     calculationMethod: text(plan.calculationMethod, "derived-after-content"),
     notes: text(plan.notes)
   };
@@ -693,10 +695,11 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
       return !usedResources.has(resource.id) && (!resource.sectionNumber || declared === sectionIndex + 1 || (!Number.isFinite(declared) && sectionIndex === 0));
     });
     selected.forEach((resource) => usedResources.add(resource.id));
+    const bridges = selected.map((resource, resourceIndex) => ({ id: newId("c-resource-bridge-", week, sectionIndex * 10 + resourceIndex), type: "prose", props: { body: richHtml(resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || `Use este recurso neste ponto para relacionar ${resource.title || "o material"} ao conceito estudado nesta seção.`), dropcap: false, dropcapTone: "terracotta", resourceId: resource.id } }));
     const media = selected.filter((resource) => resource.kind === "video" && youtubeId(resource.href)).slice(0, 2).map((resource, resourceIndex) => ({ id: newId("c-video-", week, sectionIndex * 10 + resourceIndex), type: "video", props: { id: youtubeId(resource.href), title: resource.title, caption: resource.pedagogicalUse || resource.objective || "Vídeo para aprofundar o conceito desta seção.", credit: resource.credit || resource.source || "", start: "" } }));
     const images = selected.filter((resource) => resource.kind === "image" && resource.href).slice(0, 2).map((resource, resourceIndex) => ({ id: newId("c-image-", week, sectionIndex * 10 + resourceIndex), type: "imagem", props: { src: resource.href, slotId: "", caption: resource.caption || resource.title, credit: resource.credit || resource.source || "", ratio: "16/9" } }));
-    const materials = selected.filter((resource) => !media.some((block) => block.props.title === resource.title) && !images.some((block) => block.props.caption === resource.title) && (resource.title || resource.href)).map((resource) => ({ type: resource.kind, title: `${resource.required ? "Leitura orientada: " : "Para aprofundar: "}${resource.title}`, source: resource.source || resource.objective || resource.pedagogicalUse, href: resource.href }));
-    return [...media, ...images, ...(materials.length ? [{ id: newId("c-materials-", week, sectionIndex), type: "materiais", props: { title: "Recurso para usar nesta seção", items: materials } }] : [])];
+    const materials = selected.filter((resource) => !media.some((block) => block.props.title === resource.title) && !images.some((block) => block.props.caption === resource.title) && (resource.title || resource.href)).map((resource) => ({ type: resource.kind, title: `${resource.required ? "Leitura orientada: " : "Para aprofundar: "}${resource.title}`, source: resource.source || resource.objective || resource.pedagogicalUse, href: resource.href, resourceId: resource.id }));
+    return [...bridges, ...media, ...images, ...(materials.length ? [{ id: newId("c-materials-", week, sectionIndex), type: "materiais", props: { title: "Recurso para usar nesta seção", items: materials } }] : [])];
   };
   plan.contentSections.forEach((section, sectionIndex) => {
     children.push({ id: newId("c-title-", week, sectionIndex + 2), type: "titulo", props: { text: `${section.number} ${section.title}`, level: "h2" } });

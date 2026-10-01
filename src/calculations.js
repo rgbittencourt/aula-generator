@@ -47,7 +47,7 @@ function estimateContentItems(lesson, profile) {
   const items = sections.map((section, index) => {
     const wordCount = countWordsInSection(section);
     const minutes = digitalContentMinutes(wordCount, profile);
-    return item({ id: `content-${index + 1}`, title: section.title || `Conteúdo didático ${index + 1}`, category: "content", minutes, basis: `${wordCount} palavras ÷ ${profile.constants.wordsPerMinute} × ${profile.constants.digitalContentFactor} minutos`, confidence: wordCount ? "high" : "low", required: true, formulaKey: "digitalContent", details: { wordCount, source: "perfil interno · conteúdo digital" } });
+    return item({ id: `content-${index + 1}`, title: section.title || `Texto-base · ${index + 1}`, category: "base-text", minutes, basis: `${wordCount} palavras ÷ ${profile.constants.wordsPerMinute} × ${profile.constants.digitalContentFactor} minutos`, confidence: wordCount ? "high" : "low", required: true, formulaKey: "digitalContent", details: { wordCount, source: "perfil interno · conteúdo digital", scope: "weekly-base-text" } });
   }).filter((entry) => entry.minutes > 0);
   return items;
 }
@@ -56,7 +56,7 @@ function resourceReadingItem(resource, index, required, profile, category) {
   const minutes = readingMinutes(resource, profile);
   const kind = /popular|blog|site|not[ií]cia/i.test(`${resource.type || resource.kind} ${resource.title}`) ? "popular" : "scientific";
   const basis = resource.pages ? `${resource.pages} páginas × ${kind === "popular" ? profile.constants.popularMinutesPerPage : profile.constants.scientificMinutesPerPage} min/página` : `${resource.wordCount || resource.words || 0} palavras ÷ ${profile.constants.wordsPerMinute} × ${kind === "popular" ? profile.constants.popularMinutesPerPage : profile.constants.scientificMinutesPerPage} min`;
-  return { entry: item({ id: `${category}-${index + 1}`, title: resource.title || `Leitura ${index + 1}`, category: "reading", minutes, basis, confidence: minutes ? (resource.pages || resource.wordCount ? "high" : "medium") : "low", required, formulaKey: kind === "popular" ? "popularReading" : "scientificReading", details: { pages: resource.pages, wordCount: resource.wordCount || resource.words || 0, kind, href: resource.href, verificationStatus: resource.verificationStatus } }), pending: minutes ? null : { type: "reading", title: resource.title || `Leitura ${index + 1}`, reason: "informe páginas ou número de palavras para calcular o tempo" } };
+  return { entry: item({ id: `${category}-${index + 1}`, title: resource.title || `Leitura ${index + 1}`, category: "reading", minutes, basis, confidence: minutes ? (resource.pages || resource.wordCount ? "high" : "medium") : "low", required, formulaKey: kind === "popular" ? "popularReading" : "scientificReading", details: { pages: resource.pages, wordCount: resource.wordCount || resource.words || 0, kind, scope: required ? "required-reading" : "extra-reading", href: resource.href, verificationStatus: resource.verificationStatus } }), pending: minutes ? null : { type: "reading", title: resource.title || `Leitura ${index + 1}`, reason: "informe páginas ou número de palavras para calcular o tempo" } };
 }
 
 function estimateResourceItems(lesson, profile) {
@@ -148,10 +148,42 @@ function derivedItems(input, lesson, profile) {
 function allocationFromItems(items) {
   const output = { contentMinutes: 0, resourcesMinutes: 0, practiceMinutes: 0, assessmentMinutes: 0, reviewMinutes: 0, communicationMinutes: 0, projectMinutes: 0, otherMinutes: 0 };
   for (const entry of items) {
-    const key = entry.category === "practice" ? "practiceMinutes" : entry.category === "assessment" ? "assessmentMinutes" : entry.category === "review" ? "reviewMinutes" : entry.category === "communication" ? "communicationMinutes" : entry.category === "project" ? "projectMinutes" : ["reading", "video", "audio", "image", "data"].includes(entry.category) ? "resourcesMinutes" : entry.category === "content" ? "contentMinutes" : "otherMinutes";
+    const key = entry.category === "practice" ? "practiceMinutes" : entry.category === "assessment" ? "assessmentMinutes" : entry.category === "review" ? "reviewMinutes" : entry.category === "communication" ? "communicationMinutes" : entry.category === "project" ? "projectMinutes" : ["reading", "video", "audio", "image", "data"].includes(entry.category) ? "resourcesMinutes" : ["content", "base-text"].includes(entry.category) ? "contentMinutes" : "otherMinutes";
     output[key] += entry.minutes;
   }
   return output;
+}
+
+function breakdownFromItems(items) {
+  const breakdown = {
+    baseTextMinutes: 0,
+    requiredReadingMinutes: 0,
+    extraReadingMinutes: 0,
+    requiredVideoMinutes: 0,
+    extraVideoMinutes: 0,
+    imageMinutes: 0,
+    audioMinutes: 0,
+    quizMinutes: 0,
+    forumMinutes: 0,
+    practiceMinutes: 0,
+    reviewMinutes: 0,
+    projectMinutes: 0,
+    otherMinutes: 0
+  };
+  for (const entry of items) {
+    if (entry.category === "base-text" || entry.category === "content") breakdown.baseTextMinutes += entry.minutes;
+    else if (entry.category === "reading") breakdown[entry.required ? "requiredReadingMinutes" : "extraReadingMinutes"] += entry.minutes;
+    else if (entry.category === "video") breakdown[entry.required ? "requiredVideoMinutes" : "extraVideoMinutes"] += entry.minutes;
+    else if (entry.category === "image") breakdown.imageMinutes += entry.minutes;
+    else if (entry.category === "audio") breakdown.audioMinutes += entry.minutes;
+    else if (entry.category === "assessment") breakdown.quizMinutes += entry.minutes;
+    else if (entry.category === "forum") breakdown.forumMinutes += entry.minutes;
+    else if (entry.category === "practice") breakdown.practiceMinutes += entry.minutes;
+    else if (entry.category === "review") breakdown.reviewMinutes += entry.minutes;
+    else if (entry.category === "project") breakdown.projectMinutes += entry.minutes;
+    else breakdown.otherMinutes += entry.minutes;
+  }
+  return Object.fromEntries(Object.entries(breakdown).map(([key, value]) => [key, decimal(value)]));
 }
 
 function workloadAdjustment(items, targetMinutes, calculatedMinutes) {
@@ -218,6 +250,7 @@ export function calculateWeekWorkload(input, formulaConfigOrIndex = input.formul
     fitStatus,
     webPracticeEnabled: input.webPractice.enabled,
     allocation: ratioAllocation(targetMinutes, formulaConfig?.ratios) || allocationFromItems(derived.items),
+    breakdown: breakdownFromItems(derived.items),
     categoryTotals: allocationFromItems(derived.items),
     items: derived.items,
     unresolved: derived.unresolved,
@@ -243,6 +276,10 @@ export function calculateCourseWorkload(input, formulaConfig = input.formulaConf
     instructionalMinutes: weeks.reduce((sum, week) => sum + week.instructionalMinutes, 0),
     formulaStatus: formulaConfig?.ratios ? "configured" : "internal-profile",
     formulaProfile: formulaProfileSummary(resolveFormulaProfile(formulaConfig)),
+    breakdown: weeks.reduce((total, week) => {
+      for (const [key, value] of Object.entries(week.breakdown || {})) total[key] = decimal((total[key] || 0) + value);
+      return total;
+    }, {}),
     weeks
   };
 }
@@ -268,8 +305,9 @@ export function buildGeneralPlan(input, workload, lessons = [], teacherGuides = 
     formulaProfile: workload.formulaProfile,
     totals: { targetLearnerMinutes: target, targetInstructionalMinutes: workload.totalTargetInstructionalMinutes || 0, calculatedLearnerMinutes: calculated, requiredMinutes: workload.requiredMinutes || 0, optionalMinutes: workload.optionalMinutes || 0, instructionalMinutes: workload.instructionalMinutes || 0, varianceMinutes: calculated - target, targetHours: target / 60, calculatedHours: calculated / 60 },
     categoryTotals,
-    weeks: (workload.weeks || []).map((week) => ({ weekNumber: week.weekNumber, targetMinutes: week.targetMinutes, calculatedMinutes: week.calculatedMinutes, requiredMinutes: week.requiredMinutes, optionalMinutes: week.optionalMinutes, varianceMinutes: week.varianceMinutes, fitStatus: week.fitStatus, items: week.items, unresolved: week.unresolved, workloadAdjustment: week.workloadAdjustment })),
+    weeks: (workload.weeks || []).map((week) => ({ weekNumber: week.weekNumber, targetMinutes: week.targetMinutes, calculatedMinutes: week.calculatedMinutes, requiredMinutes: week.requiredMinutes, optionalMinutes: week.optionalMinutes, varianceMinutes: week.varianceMinutes, fitStatus: week.fitStatus, breakdown: week.breakdown || {}, items: week.items, unresolved: week.unresolved, workloadAdjustment: week.workloadAdjustment })),
     webPractices,
+    timeBreakdown: workload.breakdown || {},
     didacticArcs: (teacherGuides || []).map((guide) => ({ weekNumber: guide.weekNumber, id: guide.didacticArc?.id, label: guide.didacticArc?.label })),
     webPracticeSchedule: webPractices.map((practice) => ({ id: practice.id, title: practice.title, weekNumber: practice.weekNumber || null, date: practice.date || "", dayOfWeek: practice.dayOfWeek || "", startTime: practice.startTime || "", endTime: practice.endTime || "", modality: practice.modality || "", durationMinutes: practice.durationMinutes || 0 })),
     teacherGuide: { available: Boolean(teacherGuides?.length), format: "pdf + docx por webprática" },
@@ -298,6 +336,7 @@ export function attachWorkloadToLessons(lessons, workload) {
           requiredMinutes: week.requiredMinutes,
           optionalMinutes: week.optionalMinutes,
           instructionalMinutes: week.instructionalMinutes,
+          breakdown: week.breakdown || {},
           items: week.items,
           unresolved: week.unresolved,
           workloadAdjustment: week.workloadAdjustment,

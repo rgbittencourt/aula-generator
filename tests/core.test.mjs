@@ -76,6 +76,8 @@ test("prompt semanal exige unidade didática completa antes do cálculo de tempo
   assert.match(prompt, /teacherGuide/i);
   assert.match(prompt, /MAPA LONGITUDINAL OBRIGATÓRIO/i);
   assert.match(prompt, /REQUISITOS DE RECURSOS DESTA SEMANA/i);
+  assert.match(prompt, /bridgeParagraph/i);
+  assert.match(prompt, /ponto exato/i);
   assert.match(prompt, /Ferramentas e Dashboards/i);
   assert.match(prompt, /Não começar por uma lista de softwares/i);
 });
@@ -201,6 +203,19 @@ test("cálculo deriva itens do conteúdo usando perfil interno versionado", () =
   const general = buildGeneralPlan(input, pending, enriched);
   assert.equal(general.totals.targetHours, 10);
   assert.ok(general.categoryTotals.contentMinutes > 0);
+});
+
+test("carga separa texto-base, leituras obrigatórias/extras, vídeo, quiz e fórum", () => {
+  const input = normalizeCourseInput({ title: "Curso", weeks: 1, hoursPerWeek: 5, objectives: ["Analisar"] });
+  const lesson = normalizeLesson({ lessonPlan: { theme: "Semana aplicada", contentSections: [{ title: "Texto-base", body: Array.from({ length: 600 }, () => "conceito").join(" ") }], resources: { videos: [{ title: "Vídeo obrigatório", durationMinutes: 20, required: true }], readingsRequired: [{ title: "Artigo obrigatório", type: "Artigo científico", pages: 10, required: true }], readingsExtra: [{ title: "Leitura complementar", type: "Texto popular", pages: 5, required: false }] }, activities: [{ type: "fórum", title: "Fórum", count: 1 }, { type: "quiz", title: "Quiz", count: 1, unitDurationMinutes: 10 }] } }, input, 0);
+  const workload = calculateWeekWorkload(input, input.formulaConfig, lesson);
+  assert.ok(workload.breakdown.baseTextMinutes > 0);
+  assert.ok(workload.breakdown.requiredReadingMinutes > 0);
+  assert.ok(workload.breakdown.extraReadingMinutes > 0);
+  assert.equal(workload.breakdown.requiredVideoMinutes, 20);
+  assert.ok(workload.breakdown.quizMinutes > 0);
+  assert.ok(workload.breakdown.forumMinutes > 0);
+  assert.equal(workload.items.find((item) => item.category === "base-text")?.details.scope, "weekly-base-text");
 });
 
 test("perfil interno calcula leitura digital, artigo científico e texto popular", () => {

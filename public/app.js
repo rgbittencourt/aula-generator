@@ -651,7 +651,8 @@ function resourcePreview(resource) {
   const sourceLink = resource.href ? `<a href="${escapeHtml(resource.href)}" target="_blank" rel="noreferrer">Abrir fonte</a>` : `<span>Busca sugerida: ${escapeHtml(resource.searchQuery || "a confirmar")}</span>`;
   const approval = resource.humanApproval === "approved" || resource.verificationStatus === "verified" ? "Conferido" : resource.href ? "Link localizado · revisão humana pendente" : "Ainda é uma sugestão";
   const detail = [resource.pedagogicalUse || resource.objective, resource.source, resource.license, approval].filter(Boolean).join(" · ");
-  return `<div class="reader-resource">${media}<div><strong>${escapeHtml(title)}</strong>${sourceLink}<small>${escapeHtml(detail || "Recurso contextualizado para esta seção.")}</small></div></div>`;
+  const bridge = resource.bridgeParagraph || resource.connectionParagraph || resource.pedagogicalUse || `Use este recurso neste ponto para relacionar ${title} ao conceito explicado na seção e registrar o que ele confirma, exemplifica ou problematiza.`;
+  return `<div class="reader-resource">${media}<div><strong>${escapeHtml(title)}</strong>${sourceLink}<p class="reader-resource-bridge">${escapeHtml(bridge)}</p><small>${escapeHtml(detail || "Recurso contextualizado para esta seção.")}</small></div></div>`;
 }
 
 function renderLessonPreview(lesson, index) {
@@ -694,10 +695,13 @@ function renderLessonPreview(lesson, index) {
   const differentiation = plan.differentiation && (plan.differentiation.support?.length || plan.differentiation.standard?.length || plan.differentiation.extension?.length) ? `<section><h3>Trilhas de estudo</h3><h4>Essencial</h4><ul>${(plan.differentiation.support || []).map((item) => `<li>${escapeHtml(item.title || item.instructions || item)}</li>`).join("")}</ul><h4>Padrão</h4><ul>${(plan.differentiation.standard || []).map((item) => `<li>${escapeHtml(item.title || item.instructions || item)}</li>`).join("")}</ul><h4>Aprofundamento</h4><ul>${(plan.differentiation.extension || []).map((item) => `<li>${escapeHtml(item.title || item.instructions || item)}</li>`).join("")}</ul></section>` : "";
   const selfAssessment = (plan.selfAssessment?.prompts || []).length ? `<section><h3>Autoavaliação</h3><ul>${plan.selfAssessment.prompts.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>` : "";
   const workload = plan.timePlan?.workloadAdjustment?.suggestions?.length ? `<section class="reader-warning"><h3>Ajustes de carga sugeridos</h3><ul>${plan.timePlan.workloadAdjustment.suggestions.map((item) => `<li>${escapeHtml(item.rationale || item.action || "Ajuste")}${item.title ? ` — ${escapeHtml(item.title)}` : ""}</li>`).join("")}</ul></section>` : "";
+  const timeItems = (plan.timePlan?.items || []).filter((item) => Number(item.minutes || item.learnerMinutes) > 0).map((item) => `<li><strong>${escapeHtml(workloadItemLabel(item))}</strong>: ${escapeHtml(item.title || "")} — ${formatLoad(item.minutes || item.learnerMinutes)}${item.required === false ? " · complementar" : " · obrigatório"}</li>`).join("");
+  const timeBreakdown = Object.entries(plan.timePlan?.breakdown || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<li><strong>${escapeHtml(breakdownLabels[key] || key)}</strong>: ${formatLoad(value)}</li>`).join("");
+  const timeMarkup = timeItems || timeBreakdown ? `<section class="time-breakdown reader-time-breakdown"><h3>Tempo desta semana</h3><p>O cálculo está separado por texto-base, leituras, mídias e atividades. “Obrigatório” indica o que entra na trilha essencial; “complementar” não é obrigatório.</p><ul>${timeItems || timeBreakdown}</ul></section>` : "";
   const alignment = (plan.alignmentMatrix || []).length ? `<section><h3>Alinhamento pedagógico</h3><ul>${plan.alignmentMatrix.map((row) => `<li><strong>${escapeHtml(row.objective || "Objetivo")}</strong>: ${escapeHtml(row.evidence || "evidência a definir")} · avaliação: ${escapeHtml((row.assessmentQuestions || []).join(", ") || "a definir")}</li>`).join("")}</ul></section>` : "";
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
-  $("#lesson-reader").innerHTML = `${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${assessment}${alignment}${workload}`;
+  $("#lesson-reader").innerHTML = `${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${assessment}${alignment}${timeMarkup}${workload}`;
 }
 
 function openLessonPreview(index) {
@@ -807,6 +811,41 @@ function formatMinutes(value) {
   return `${(minutes / 60).toFixed(1)} h`;
 }
 
+function formatLoad(value) {
+  const minutes = Math.round(Number(value) || 0);
+  return minutes ? `${minutes} min (${formatMinutes(minutes)})` : "0 min";
+}
+
+function workloadItemLabel(item = {}) {
+  if (item.category === "base-text" || item.category === "content") return "Leitura do texto-base da semana";
+  if (item.category === "reading") return item.required ? "Artigo/leitura obrigatória" : "Artigo/leitura complementar (não obrigatória)";
+  if (item.category === "video") return item.required ? "Vídeo obrigatório" : "Vídeo complementar";
+  if (item.category === "assessment") return "Quiz/avaliação";
+  if (item.category === "forum") return "Fórum/discussão";
+  if (item.category === "practice") return "Webprática síncrona";
+  if (item.category === "review") return "Síntese e revisão";
+  if (item.category === "image") return "Imagem/diagrama";
+  if (item.category === "audio") return "Áudio/podcast";
+  if (item.category === "project") return "Projeto/produção";
+  return "Outra atividade";
+}
+
+const breakdownLabels = {
+  baseTextMinutes: "Texto-base",
+  requiredReadingMinutes: "Leituras obrigatórias",
+  extraReadingMinutes: "Leituras complementares",
+  requiredVideoMinutes: "Vídeos obrigatórios",
+  extraVideoMinutes: "Vídeos complementares",
+  imageMinutes: "Imagens/diagramas",
+  audioMinutes: "Áudios/podcasts",
+  quizMinutes: "Quiz/avaliação",
+  forumMinutes: "Fórum/discussão",
+  practiceMinutes: "Webprática",
+  reviewMinutes: "Síntese/revisão",
+  projectMinutes: "Projeto/produção",
+  otherMinutes: "Outras atividades"
+};
+
 function reviewItemKey(item = {}) { return `${item.weekNumber || 0}:${item.id || slugify(item.title || item.label || "item")}`; }
 
 function reviewCheckChecked(item = {}, reviewMarks = state.reviewMarks || createReviewMarks()) {
@@ -852,7 +891,15 @@ function renderGeneralPlan(plan) {
     return `<label class="review-row ${marked ? "is-marked" : ""}"><input type="checkbox" data-review-kind="resources" data-review-key="${escapeHtml(key)}" ${marked ? "checked" : ""} /><span><strong>Semana ${escapeHtml(item.weekNumber)} · ${escapeHtml(item.title || "Recurso sem título")}</strong><small>${escapeHtml(item.status || "Conferência pendente")}${marked ? " · Conferido por você" : ""}</small></span></label>`;
   }).join("");
   const resourcesMarkup = unresolved.length ? `<details class="review-panel resource-review-panel" open><summary><strong>${unresolved.length} recurso(s) precisam de conferência</strong><small>${reviewedResources}/${unresolved.length} marcados por você. Abra cada link, confirme coerência, duração/páginas, acessibilidade e licença antes de exportar.</small></summary><div class="review-list">${resourceRows}</div></details>` : "";
-  container.innerHTML = `<p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o guia do professor são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div>${resourcesMarkup}${checklistMarkup}${progressionMarkup}${practiceMarkup}`;
+  const breakdown = plan.timeBreakdown || state.workload?.breakdown || {};
+  const breakdownSummary = Object.entries(breakdown).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<span><strong>${escapeHtml(breakdownLabels[key] || key)}</strong> ${formatLoad(value)}</span>`).join("");
+  const weeklyLoads = (state.workload?.weeks || plan.weeks || []).map((week) => {
+    const items = (week.items || []).filter((item) => Number(item.minutes || item.learnerMinutes) > 0);
+    const itemMarkup = items.map((item) => `<li><strong>${escapeHtml(workloadItemLabel(item))}</strong><span>${escapeHtml(item.title || "")}</span><em>${formatLoad(item.minutes || item.learnerMinutes)}</em></li>`).join("");
+    return `<details class="load-week"><summary><strong>Semana ${escapeHtml(week.weekNumber)}</strong><span>${formatLoad(week.calculatedMinutes)} calculados · ${formatLoad(week.targetMinutes)} de meta</span></summary><ul>${itemMarkup || "<li>Sem itens calculáveis ainda.</li>"}</ul></details>`;
+  }).join("");
+  const timeBreakdownMarkup = `<section class="time-breakdown"><p class="eyebrow">CARGA ABERTA POR ATIVIDADE</p><h3>De onde vem o tempo calculado?</h3><p>O texto-base é contado separadamente das leituras, vídeos, quiz, fórum, revisão e webpráticas. Artigos/leitura aparecem como obrigatórios ou complementares conforme a marcação do recurso.</p><div class="breakdown-summary">${breakdownSummary || "<span>A carga será calculada depois da redação.</span>"}</div><div class="load-weeks">${weeklyLoads}</div></section>`;
+  container.innerHTML = `<p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o guia do professor são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div>${timeBreakdownMarkup}${resourcesMarkup}${checklistMarkup}${progressionMarkup}${practiceMarkup}`;
   container.querySelectorAll("[data-review-kind]").forEach((checkbox) => checkbox.addEventListener("change", () => toggleReviewMark(checkbox.dataset.reviewKind, checkbox.dataset.reviewKey, checkbox.checked)));
   container.querySelectorAll(".webpractice-download").forEach((button) => button.addEventListener("click", () => downloadWebPractice(button.dataset.practiceId)));
   container.classList.remove("hidden");

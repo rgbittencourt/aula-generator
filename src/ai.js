@@ -281,7 +281,7 @@ export async function selectResourcesWithAI(input, research) {
   };
   const prompt = `Você é o curador final de recursos educacionais. A semana já foi escrita por um designer instrucional. Agora escolha, entre os candidatos reais abaixo, os recursos que melhor aprofundam os objetivos e os conceitos da semana.
 
-Responda somente JSON válido com estas propriedades: videos, images, readings. Cada propriedade deve ser um array de objetos com candidateId, keep, reason, use, guidingQuestion, required, moment, query, alignment, quality, currency, accessibility, durationFit, license, language, score, hasCaptions, hasTranscript, accessibilitySummary e lowBandwidthAlternative.
+Responda somente JSON válido com estas propriedades: videos, images, readings. Cada propriedade deve ser um array de objetos com candidateId, keep, reason, use, guidingQuestion, required, moment, sectionNumber, bridgeParagraph, query, alignment, quality, currency, accessibility, durationFit, license, language, score, hasCaptions, hasTranscript, accessibilitySummary e lowBandwidthAlternative.
 
 Regras obrigatórias:
 - só escolha candidateId que exista nos candidatos recebidos;
@@ -292,6 +292,7 @@ Regras obrigatórias:
 - escolha até ${resourceTargets.videosPerWeek} vídeo(s), até 3 imagens/diagramas, ${resourceTargets.articlesPerWeek} artigo(s) e ${Math.max(resourceTargets.articlesPerWeek, resourceTargets.requiredReadingsPerWeek)} leitura(s) por semana, respeitando as metas desta semana; o nível de leitura obrigatória é ${resourceTargets.requiredReadingLevel};
 - elimine duplicatas e descarte recursos que não tenham relação clara com o conteúdo;
 - explique em reason por que o recurso foi escolhido e em use como ele será usado pedagogicamente;
+- informe sectionNumber e escreva bridgeParagraph com um parágrafo específico que conecte o recurso ao conceito estudado exatamente naquele ponto; nunca use apenas “assista ao vídeo” ou “leia o artigo”;
 - marque required true somente quando o recurso for necessário para atingir um objetivo;
 - se nenhum candidato servir, retorne keep false para aquele pedido.
 - o professor fará a aprovação final: nunca marque o recurso como aprovado; apenas selecione-o como "selected-by-ai" e deixe a revisão humana pendente.
@@ -373,7 +374,7 @@ lessonPlan obrigatório:
 - learningObjectives com 4–8 objetivos observáveis, específicos desta semana, usando verbos como explicar, comparar, analisar, aplicar, avaliar ou criar;
 - prerequisites e contentDensity;
 - contentSections com pelo menos ${textBudget.requiredSectionCount} seções principais. Cada seção deve ter number, title, didacticRole, body com aproximadamente ${textBudget.sectionTargetWords} palavras (mínimo ${textBudget.sectionMinimumWords}, máximo ${textBudget.sectionMaximumWords}), subsections, caseStudy quando pertinente, reflection quando pertinente, keyTerms e resources. A progressão deve ir do problema/pergunta para conceitos, exemplos ou evidências, aplicação e crítica. Não repita a mesma introdução em seções diferentes;
-- resources com videos, readingsRequired, readingsExtra, images, podcasts e datasets. Cada recurso deve conter title, source, author quando conhecido, href somente se foi fornecido no briefing ou retornado por um provedor, required, sectionNumber ou moment, objective, guidingQuestion, pedagogicalUse, durationMinutes, altText/caption/credit para imagens, searchQuery quando o link não estiver disponível, verificationStatus e requiresVerification;
+- resources com videos, readingsRequired, readingsExtra, images, podcasts e datasets. Cada vídeo, artigo, leitura ou imagem deve estar dentro da seção em que será usado e conter title, source, author quando conhecido, href somente se foi fornecido no briefing ou retornado por um provedor, required, sectionNumber, objective, guidingQuestion, bridgeParagraph e pedagogicalUse, durationMinutes, altText/caption/credit para imagens, searchQuery quando o link não estiver disponível, verificationStatus e requiresVerification. O bridgeParagraph deve ser um parágrafo de ligação escrito para o ponto exato da seção;
 - webPractices: retorne sempre [] dentro de lessonPlan. Se houver prática programada para esta semana, desenvolva o projeto completo exclusivamente em teacherGuide.webPracticeProjects, com problem, context, studentRole, challenge, deliverable, prerequisites, materials, data, steps (cada uma com minutes, instructions e evidence), criteria, rubric com níveis, examples, revision, fallbackPlan, accessibility, prompts, artifacts e versões simplified/advanced;
 - diagnostic com pergunta/problema inicial, evidência esperada e feedback; formativeChecks com perguntas durante o texto, momento, evidência, feedback e ação de intervenção;
 - activities para fóruns, discussões, produção, estudo de caso ou encontro síncrono, com type, title, instructions, durationMinutes, evidence, evidenceType, feedback, criteria e required;
@@ -394,7 +395,7 @@ Regras de escrita:
 - ${profile.requireCounterarguments ? "inclua pelo menos um contraponto, controvérsia ou limite" : "inclua contraponto apenas quando pertinente"}; ${profile.requireConceptComparison ? "compare conceitos próximos ou abordagens alternativas quando pertinente" : "não force comparação se ela não for pertinente"}; ${profile.requireCaseStudy ? "inclua estudo de caso ou exemplo contextualizado" : "use exemplo contextualizado quando ajudar"};
 - conecte o tema à realidade do público (${input.audience}) e do nível (${input.level}); use os exemplos, recortes regionais e instituições fornecidos no briefing;
 - inclua pelo menos um exemplo concreto, uma situação-problema ou estudo de caso e um contraponto/limite quando forem pertinentes;
-- integre vídeos, imagens, artigos e leituras na seção em que serão usados, explicando o que o estudante deve observar ou responder; não crie uma galeria final de links;
+- integre vídeos, imagens, artigos e leituras na seção em que serão usados, precedidos ou seguidos por um parágrafo de ligação que explique o que o estudante deve observar, comparar ou responder; não crie uma galeria final de links;
 - não force diagnóstico, vídeo, leitura, webprática ou quiz quando não houver função pedagógica; webprática nunca deve aparecer no corpo do texto-base, nas contentSections, no welcome, na síntese ou nas atividades da aula semanal;
 - nunca invente URLs, DOI, durações, autores, números ou referências verificadas. Para recurso ainda não conferido, use searchQuery e verificationStatus "suggested-no-url";
 - não escreva markdown fora das strings do JSON e não inclua comentários.
