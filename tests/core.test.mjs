@@ -104,6 +104,25 @@ test("qualidade detecta repetição de tema ou objetivo entre semanas", () => {
   assert.match(quality.issues.join(" "), /repetição longitudinal/i);
 });
 
+test("aula longa fica em revisão, não insuficiente, quando faltam metadados acadêmicos", () => {
+  const input = normalizeCourseInput({ title: "Curso", weeks: 1, academicProfile: { targetWords: 2800, minimumReferences: 4, primarySourcesRequired: 1 } });
+  const body = Array.from({ length: 420 }, (_, index) => `explicação didática ${index + 1}`).join(" ");
+  const lesson = normalizeLesson({
+    theme: "Análise aplicada do tema",
+    welcome: Array.from({ length: 100 }, () => "contexto").join(" "),
+    learningObjectives: ["Explicar conceitos", "Comparar perspectivas", "Aplicar critérios", "Avaliar evidências"],
+    contentSections: Array.from({ length: 7 }, (_, index) => ({ number: String(index + 1), title: `Seção desenvolvida ${index + 1}`, body })),
+    synthesis: Array.from({ length: 110 }, () => "síntese").join(" "),
+    nextWeekConnection: Array.from({ length: 70 }, () => "continuidade").join(" "),
+    activities: [{ id: "activity-1", title: "Aplicação", instructions: "Produza uma análise.", evidence: "Análise escrita" }],
+    formativeChecks: [{ prompt: "Explique o conceito.", feedback: "Revise a seção." }],
+    assessment: { questions: Array.from({ length: 4 }, (_, index) => ({ q: `Questão ${index + 1}`, options: ["A", "B"], answer: 0, explanation: "Feedback" })) }
+  }, input, 0);
+  assert.equal(lesson.lessonPlan.contentSections.length, 7);
+  assert.ok(lesson.contentQuality.wordCount >= 2800);
+  assert.notEqual(lesson.contentQuality.status, "insufficient");
+});
+
 test("normaliza aula rica sem perder recursos, avaliação e metadados", () => {
   const input = normalizeCourseInput({ title: "Dados educacionais", weeks: 1, hoursPerWeek: 10, objectives: ["Analisar indicadores"] });
   const lesson = normalizeLesson({

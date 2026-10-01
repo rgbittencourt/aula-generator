@@ -109,7 +109,7 @@ O botão de assistência completa somente campos vazios do briefing. A geração
 
 ### Controle de qualidade textual
 
-Antes de considerar uma semana pronta, o gerador verifica título específico, abertura, pelo menos quatro objetivos, seções desenvolvidas, síntese, avaliação, blocos compatíveis com o Aula Studio e alinhamento entre objetivo, atividade, evidência e avaliação. A meta configurada no Perfil acadêmico é tratada como **piso de palavras úteis**: uma meta de 3.000 exige pelo menos 3.000 palavras na medição da aula. O prompt distribui esse volume por seções e a tela mostra palavras, seções, objetivos, nota estrutural e pendências.
+Antes de considerar uma semana pronta, o gerador verifica título específico, abertura, pelo menos quatro objetivos, seções desenvolvidas, síntese, avaliação, blocos compatíveis com o Aula Studio e alinhamento entre objetivo, atividade, evidência e avaliação. A meta configurada no Perfil acadêmico é tratada como **piso de palavras úteis**: uma meta de 3.000 exige pelo menos 3.000 palavras na medição da aula. O prompt distribui esse volume por seções e a tela mostra palavras, seções, objetivos, nota estrutural e pendências. **Conteúdo insuficiente** fica reservado para texto realmente curto ou estrutura didática ausente; pendências de referências, recursos ou revisão pedagógica aparecem como **revisão recomendada**, não como se a aula tivesse poucas palavras.
 
 O resultado também traz um checklist pedagógico: diagnóstico, checagens formativas, avaliação somativa com feedback, webprática completa quando houver, diferenciação, acessibilidade, recursos contextualizados e autoavaliação. Uma semana bloqueada deve ser refeita antes do uso no Aula Studio.
 

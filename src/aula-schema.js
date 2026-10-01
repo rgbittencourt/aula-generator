@@ -722,7 +722,8 @@ export function normalizeLesson(raw, input, index) {
   const source = raw && typeof raw === "object" ? raw : {};
   const seen = new Set();
   const sourceBlocks = integrateRootResources(Array.isArray(source.blocks) ? source.blocks.map((block, i) => sanitizeBlock(block, index + 1, `block-${i}`, seen)).filter(Boolean) : [], index + 1);
-  const lessonPlan = normalizeLessonPlan(source.lessonPlan || source.plan || {}, input, index);
+  const directPlan = source.contentSections || source.sections || source.theme || source.welcome || source.learningObjectives ? source : {};
+  const lessonPlan = normalizeLessonPlan(source.lessonPlan || source.plan || directPlan, input, index);
   const hasHero = sourceBlocks.some((block) => block.type === "hero" && text(block.props?.title));
   const hasTopic = sourceBlocks.some((block) => ["topic", "topic-collapsible", "topic-slider"].includes(block.type) && Array.isArray(block.props?.children) && block.props.children.length > 0);
   const hasObjectives = sourceBlocks.some((block) => block.type === "destaque" && text(block.props?.title).toLowerCase().includes("objetiv"));

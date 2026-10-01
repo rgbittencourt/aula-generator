@@ -108,8 +108,20 @@ async function callJson(messages, options = {}) {
     });
     const payload = await response.json().catch(() => ({}));
     if (response.ok) {
-      const content = payload?.choices?.[0]?.message?.content;
+      const choice = payload?.choices?.[0];
+      const content = choice?.message?.content;
       if (!content) throw new Error("A API de IA retornou uma resposta vazia.");
+      if (choice?.finish_reason === "length") {
+        if (attempt < maxAttempts - 1) {
+          formatRetry = true;
+          await wait(250);
+          continue;
+        }
+        const truncatedError = new Error("A resposta da IA atingiu o limite de saída antes de concluir a aula.");
+        truncatedError.code = "AI_OUTPUT_TRUNCATED";
+        truncatedError.retryable = true;
+        throw truncatedError;
+      }
       try {
         const parsed = parseJson(content);
         formatRetry = false;
@@ -330,7 +342,7 @@ REQUISITOS DE RECURSOS DESTA SEMANA — cumpra estas quantidades sem inventar li
 Semanas já geradas (use somente para continuidade; não copie seus títulos, objetivos ou seções):
 ${JSON.stringify(previousSummaries, null, 2)}
 
-Retorne somente este objeto de alto nível: { meta, lessonPlan, teacherGuide }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. O lessonPlan é a prioridade: cumpra primeiro o orçamento textual do aluno e mantenha teacherGuide conciso, sem repetir o conteúdo da aula.
+Retorne somente este objeto de alto nível: { "lessonPlan": { ... }, "teacherGuide": { "webPracticeProjects": [...] } }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. O lessonPlan é a prioridade absoluta. teacherGuide deve conter somente projetos de webprática quando houver sessão agendada; não repita objetivos, matriz, diagnóstico, avaliação ou o conteúdo da aula no guia.
 
 lessonPlan obrigatório:
 - weekNumber, theme (título específico e informativo, nunca "Conteúdo da semana"), welcome (80–160 palavras, contextualizada e ligada ao percurso), didacticArc com sequence, phasePlan e omissionReasons. A phasePlan pode omitir etapas, mas deve justificar a omissão;
@@ -363,7 +375,7 @@ Regras de escrita:
 - nunca invente URLs, DOI, durações, autores, números ou referências verificadas. Para recurso ainda não conferido, use searchQuery e verificationStatus "suggested-no-url";
 - não escreva markdown fora das strings do JSON e não inclua comentários.
 
-teacherGuide deve trazer purpose, didacticArc, alignmentMatrix, diagnostic, formativeChecks, mediationQuestions, commonMisconceptions, interventions, differentiation, accessibility, assessmentNotes, selfAssessment, spiralReview, resourceNotes, qualityReview e workloadAdvice em formato conciso, sem copiar a aula. Se houver webprática programada, inclua em webPracticeProjects a preparação do professor e do aluno, agenda, roteiro com minutos, falas/prompts, produto, critérios, rubrica, plano B, acessibilidade e artefatos. Esse projeto será exportado em DOCX separado e é a única exceção que pode ser detalhada fora do texto do aluno.
+teacherGuide é opcional quando não houver webprática. Se houver webprática programada, inclua somente em webPracticeProjects a preparação do professor e do aluno, agenda, roteiro com minutos, falas/prompts, produto, critérios, rubrica, plano B, acessibilidade e artefatos. Esse projeto será exportado em DOCX separado e é a única exceção que pode ser detalhada fora do texto do aluno.
 
 Perfil acadêmico desta trilha:
 ${JSON.stringify(profile, null, 2)}
@@ -436,7 +448,18 @@ async function planWeekWithAI(input, index, progression = null) {
   }
 }
 
+function coerceLessonEnvelope(value) {
+  const source = value && typeof value === "object" ? value : {};
+  if (source.lessonPlan && typeof source.lessonPlan === "object") return source;
+  if (source.plan && typeof source.plan === "object") return { ...source, lessonPlan: source.plan };
+  if (source.week?.lessonPlan && typeof source.week.lessonPlan === "object") return { ...source, lessonPlan: source.week.lessonPlan, teacherGuide: source.teacherGuide || source.week.teacherGuide };
+  if (source.week && typeof source.week === "object" && (source.week.contentSections || source.week.sections || source.week.theme || source.week.welcome)) return { ...source, lessonPlan: source.week, teacherGuide: source.teacherGuide || source.week.teacherGuide };
+  if (source.contentSections || source.sections || source.theme || source.welcome || source.learningObjectives) return { ...source, lessonPlan: source };
+  return source;
+}
+
 function enforceWeekFocus(raw, weekFocus, weekNumber) {
+  raw = coerceLessonEnvelope(raw);
   if (!raw?.lessonPlan || typeof raw.lessonPlan !== "object") return raw;
   raw.lessonPlan.theme = weekFocus.theme;
   raw.lessonPlan.weekNumber = weekNumber;
@@ -472,10 +495,13 @@ export async function generateOneWeek(input, index, options = {}) {
         sectionSequence: weekFocus.sectionSequence.map((title, sectionIndex) => ({ number: String(sectionIndex + 1), title, purpose: "Desenvolver a progressão específica da semana." })),
         controversies: [weekFocus.doNotRepeat]
       }, input, index);
-  let raw = await callJson([
+  let raw = coerceLessonEnvelope(await callJson([
     { role: "system", content: ACADEMIC_SYSTEM_PROMPT },
     { role: "user", content: buildWeekGenerationPrompt(input, index, academicPlan, progression, options.previousWeeks) }
-  ], { temperature: 0.42 });
+  ], {
+    temperature: 0.42,
+    formatRetryInstruction: "A resposta anterior foi truncada ou inválida. Retorne somente { \"lessonPlan\": { ... }, \"teacherGuide\": { \"webPracticeProjects\": [] } }, com o texto didático completo, as seções desenvolvidas e o piso de palavras solicitado. Não gere blocks, não repita o conteúdo no teacherGuide e responda somente JSON válido."
+  }));
   let academicReview = { status: "not-run", issues: [], strengths: [], unsupportedClaims: [], rewriteRequired: false };
   if (!singlePass && useAcademicPipeline && process.env.AULA_ACADEMIC_REVIEW !== "false") {
     try { academicReview = await reviewWeekWithAI(input, index, academicPlan, raw); } catch { academicReview = { status: "needs-human-review", issues: [{ severity: "high", type: "review-unavailable", description: "A revisão acadêmica automática não pôde ser concluída.", suggestedRepair: "Faça a conferência humana antes da exportação." }], strengths: [], unsupportedClaims: [], rewriteRequired: true }; }
@@ -486,7 +512,7 @@ export async function generateOneWeek(input, index, options = {}) {
   const repairableIssues = initialQuality.issues.some((issue) => /conteúdo curto|poucas seções|seções ainda|boas-vindas|síntese|avaliação|objetivos insuficientes|título principal|tópico de conteúdo|bloco hero|bloco visível|matriz/i.test(issue));
   if (!singlePass && process.env.AULA_AUTO_REPAIR !== "false" && (repairableIssues || academicReview.rewriteRequired)) {
     try {
-      const repaired = await repairWeekWithAI(input, index, raw, initialQuality, academicPlan, academicReview);
+      const repaired = coerceLessonEnvelope(await repairWeekWithAI(input, index, raw, initialQuality, academicPlan, academicReview));
       const repairedLesson = normalizeLesson(repaired, input, index);
       const repairedQuality = measureLessonQuality(repairedLesson, input, { peerLessons: options.previousWeeks || [] });
       const requiredGain = Math.max(250, Math.round(qualityTargets(input).targetWords * 0.10));
@@ -504,13 +530,13 @@ export async function generateOneWeek(input, index, options = {}) {
   }
   if (singlePass && process.env.AULA_AUTO_REPAIR !== "false" && (repairableIssues || initialQuality.status === "insufficient")) {
     try {
-      const repaired = await regenerateWeekWithAI(
+      const repaired = coerceLessonEnvelope(await regenerateWeekWithAI(
         input,
         index,
         initialLesson,
         `A análise automática encontrou estes problemas: ${initialQuality.issues.join("; ")}. Não devolva a semana ainda incompleta. Amplie substancialmente o texto até cumprir o piso de ${initialQuality.minimumWords} palavras e a meta de ${initialQuality.targetWords}, sem repetir outras semanas. Preserve o foco "${weekFocus.theme}", desenvolva as seções da sequência ${weekFocus.sectionSequence.join("; ")}, inclua um caso ou aplicação verificável, contraponto, síntese, conexão com a próxima semana e avaliação alinhada.`,
         { maxTokens: regenerationTokenBudget(input), retryMaxTokens: regenerationTokenBudget(input), progression }
-      );
+      ));
       enforceWeekFocus(repaired, weekFocus, weekNumber);
       const repairedLesson = normalizeLesson(repaired, input, index);
       const repairedQuality = measureLessonQuality(repairedLesson, input, { peerLessons: options.previousWeeks || [] });
@@ -520,6 +546,30 @@ export async function generateOneWeek(input, index, options = {}) {
       if (reachesMinimum || (substantialRepair && repairedQuality.score >= initialQuality.score)) raw = mergeRepairedResponse(raw, repaired);
     } catch {
       // Preserva a primeira versão com a pendência de qualidade visível ao professor.
+    }
+  }
+  let finalLesson = normalizeLesson(raw, input, index);
+  let finalQuality = measureLessonQuality(finalLesson, input, { peerLessons: options.previousWeeks || [] });
+  if (singlePass && process.env.AULA_AUTO_REPAIR !== "false" && finalQuality.wordCount < finalQuality.minimumWords * 0.25) {
+    try {
+      const rescue = coerceLessonEnvelope(await regenerateWeekWithAI(
+        input,
+        index,
+        finalLesson,
+        `RESGATE DE SAÍDA INACEITAVELMENTE CURTA: a versão atual contém apenas ${finalQuality.wordCount} palavras didáticas. Gere a semana novamente do zero, sem resumir, sem teacherGuide e sem blocks. Entregue pelo menos ${finalQuality.minimumWords} palavras úteis, ${qualityTargets(input).requiredSectionCount} seções desenvolvidas, abertura, síntese, conexão com a próxima semana, avaliação e objetivos observáveis.`,
+        { maxTokens: Math.min(14000, Math.max(regenerationTokenBudget(input), 12000)), retryMaxTokens: Math.min(14000, Math.max(regenerationTokenBudget(input), 12000)), progression }
+      ));
+      enforceWeekFocus(rescue, weekFocus, weekNumber);
+      const rescueLesson = normalizeLesson(rescue, input, index);
+      const rescueQuality = measureLessonQuality(rescueLesson, input, { peerLessons: options.previousWeeks || [] });
+      const rescueReachedUsefulSize = rescueQuality.wordCount >= rescueQuality.minimumWords * 0.5 || rescueQuality.wordCount - finalQuality.wordCount >= 300 || rescueQuality.status !== "insufficient";
+      if (rescueReachedUsefulSize) {
+        raw = mergeRepairedResponse(raw, rescue);
+        finalLesson = rescueLesson;
+        finalQuality = rescueQuality;
+      }
+    } catch {
+      // Mantém a versão atual e deixa a pendência explícita para a revisão humana.
     }
   }
   enforceWeekFocus(raw, weekFocus, weekNumber);

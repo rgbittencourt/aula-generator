@@ -113,6 +113,64 @@ test("geração repara automaticamente uma semana em needs-review por ficar abai
   }
 });
 
+test("geração preserva lessonPlan devolvido diretamente sem envelope", async () => {
+  const previousFetch = global.fetch;
+  const previous = { key: process.env.OPENAI_API_KEY, singlePass: process.env.AULA_SINGLE_PASS, repair: process.env.AULA_AUTO_REPAIR, retries: process.env.OPENAI_MAX_RETRIES };
+  process.env.OPENAI_API_KEY = "test-key";
+  process.env.AULA_SINGLE_PASS = "true";
+  process.env.AULA_AUTO_REPAIR = "true";
+  process.env.OPENAI_MAX_RETRIES = "1";
+  let calls = 0;
+  const directPlan = qualityFixture(500).lessonPlan;
+  global.fetch = async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(directPlan) } }] }), { status: 200 });
+  };
+  try {
+    const input = normalizeCourseInput({ title: "Curso direto", weeks: 1, hoursPerWeek: 4, objectives: ["Explicar"], academicProfile: { targetWords: 2800, minimumReferences: 0, primarySourcesRequired: 0, requireCounterarguments: false } });
+    const result = await generateOneWeek(input, 0);
+    assert.equal(calls, 1);
+    assert.equal(result.lessonPlan.contentSections.length, 6);
+    assert.ok(result.lessonPlan.contentSections[0].body.includes("Explicação conceitual contextualizada"));
+  } finally {
+    global.fetch = previousFetch;
+    for (const [key, value] of Object.entries(previous)) {
+      const envKey = { key: "OPENAI_API_KEY", singlePass: "AULA_SINGLE_PASS", repair: "AULA_AUTO_REPAIR", retries: "OPENAI_MAX_RETRIES" }[key];
+      if (value === undefined) delete process.env[envKey];
+      else process.env[envKey] = value;
+    }
+  }
+});
+
+test("resgata uma resposta inaceitavelmente curta após o primeiro reparo", async () => {
+  const previousFetch = global.fetch;
+  const previous = { key: process.env.OPENAI_API_KEY, singlePass: process.env.AULA_SINGLE_PASS, repair: process.env.AULA_AUTO_REPAIR, retries: process.env.OPENAI_MAX_RETRIES };
+  process.env.OPENAI_API_KEY = "test-key";
+  process.env.AULA_SINGLE_PASS = "true";
+  process.env.AULA_AUTO_REPAIR = "true";
+  process.env.OPENAI_MAX_RETRIES = "1";
+  let calls = 0;
+  global.fetch = async () => {
+    calls += 1;
+    const content = calls < 3 ? { lessonPlan: { theme: "Semana curta" } } : qualityFixture(500);
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }), { status: 200 });
+  };
+  try {
+    const input = normalizeCourseInput({ title: "Curso resgate", weeks: 1, hoursPerWeek: 4, objectives: ["Explicar"], academicProfile: { targetWords: 2800, minimumReferences: 0, primarySourcesRequired: 0, requireCounterarguments: false } });
+    const result = await generateOneWeek(input, 0);
+    assert.equal(calls, 3);
+    assert.equal(result.lessonPlan.contentSections.length, 6);
+    assert.ok(result.lessonPlan.contentSections[0].body.includes("Explicação conceitual contextualizada"));
+  } finally {
+    global.fetch = previousFetch;
+    for (const [key, value] of Object.entries(previous)) {
+      const envKey = { key: "OPENAI_API_KEY", singlePass: "AULA_SINGLE_PASS", repair: "AULA_AUTO_REPAIR", retries: "OPENAI_MAX_RETRIES" }[key];
+      if (value === undefined) delete process.env[envKey];
+      else process.env[envKey] = value;
+    }
+  }
+});
+
 test("reparo marginal não é aceito como melhoria textual", async () => {
   const previousFetch = global.fetch;
   const previous = { key: process.env.OPENAI_API_KEY, singlePass: process.env.AULA_SINGLE_PASS, repair: process.env.AULA_AUTO_REPAIR, retries: process.env.OPENAI_MAX_RETRIES };

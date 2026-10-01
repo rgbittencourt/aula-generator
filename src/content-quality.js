@@ -26,6 +26,10 @@ function sectionWords(section = {}) {
   ].filter(Boolean).join(" "));
 }
 
+function blocksContain(blocks, predicate) {
+  return (Array.isArray(blocks) ? blocks : []).some((block) => predicate(block) || blocksContain(block?.props?.children, predicate));
+}
+
 export function qualityTargets(input = {}) {
   const profile = normalizeAcademicProfile(input.academicProfile, input);
   const targetWords = profile.targetWords;
@@ -83,12 +87,12 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   const hasSynthesis = wordCount(plan.synthesis) >= 100;
   const hasNextWeekConnection = wordCount(plan.nextWeekConnection) >= 60;
   const hasAssessment = Array.isArray(plan.assessment?.questions) && plan.assessment.questions.length >= 4;
-  const hasHero = (lesson?.blocks || []).some((block) => block?.type === "hero" && text(block?.props?.title));
-  const hasObjectiveBlock = (lesson?.blocks || []).some((block) => {
+  const hasHero = blocksContain(lesson?.blocks, (block) => block?.type === "hero" && text(block?.props?.title));
+  const hasObjectiveBlock = blocksContain(lesson?.blocks, (block) => {
     const titleValue = text(block?.props?.title).toLowerCase();
     return block?.type === "destaque" && titleValue.includes("objetiv");
   });
-  const hasTopic = (lesson?.blocks || []).some((block) => ["topic", "topic-collapsible", "topic-slider"].includes(block?.type) && Array.isArray(block?.props?.children) && block.props.children.length > 0);
+  const hasTopic = blocksContain(lesson?.blocks, (block) => ["topic", "topic-collapsible", "topic-slider"].includes(block?.type) && Array.isArray(block?.props?.children) && block.props.children.length > 0);
   const pedagogicalReview = plan.pedagogicalReview || {};
   const hasPedagogicalAlignment = pedagogicalReview.status === "ready" || (Array.isArray(plan.alignmentMatrix) && plan.alignmentMatrix.length >= objectives.length && plan.alignmentMatrix.every((item) => Array.isArray(item.contentSections) && item.contentSections.length && item.evidence && Array.isArray(item.assessmentQuestions) && item.assessmentQuestions.length));
   const target = qualityTargets(input);
@@ -116,7 +120,7 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   const issues = [];
   if (!hasSpecificTitle) issues.push("título principal ausente ou genérico");
   if (!hasDetailedObjectives) issues.push(`objetivos insuficientes: ${objectives.length}/${target.minimumObjectives}`);
-  if (!hasSections) issues.push(`poucas seções: ${sections.length}/${target.minimumSections}`);
+  if (!hasSections) issues.push(`poucas seções: ${sections.length}/${target.requiredSectionCount}`);
   if (!hasDevelopedSections) issues.push("o texto das seções ainda não está desenvolvido");
   if (!hasWelcome) issues.push("boas-vindas ausentes ou curtas");
   if (words < target.minimumWords) issues.push(`conteúdo curto: ${words} palavras; piso ${target.minimumWords}`);
@@ -133,9 +137,10 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   if (!hasHero) issues.push("bloco hero/título ausente no JSON");
   if (!hasObjectiveBlock) issues.push("bloco visível de objetivos ausente no JSON");
   if (!hasTopic) issues.push("tópico de conteúdo ausente ou vazio no JSON");
-  const structural = hasSpecificTitle && hasDetailedObjectives && hasSections && hasDevelopedSections && hasWelcome && hasSynthesis && hasNextWeekConnection && hasHero && hasObjectiveBlock && hasTopic && hasPedagogicalAlignment && hasMinimumReferences && hasPrimarySources && hasEvidenceMap && (!target.requireCounterarguments || hasCounterpoint) && !repetitionDetected;
+  const contentComplete = hasSpecificTitle && hasDetailedObjectives && hasSections && hasDevelopedSections && hasWelcome && hasSynthesis && hasNextWeekConnection && words >= target.minimumWords;
+  const structural = contentComplete && hasHero && hasObjectiveBlock && hasTopic && hasPedagogicalAlignment && hasMinimumReferences && hasPrimarySources && hasEvidenceMap && (!target.requireCounterarguments || hasCounterpoint) && !repetitionDetected;
   return {
-    status: structural && words >= target.minimumWords && hasSynthesis && hasAssessment ? "complete" : structural ? "needs-review" : "insufficient",
+    status: !contentComplete ? "insufficient" : structural && hasAssessment ? "complete" : "needs-review",
     score,
     wordCount: words,
     metadataWordCount,
@@ -146,7 +151,7 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
     sectionWordCounts,
     passedHardChecks,
     totalHardChecks: hardChecks.length,
-    checks: { hasSpecificTitle, hasObjectives, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasNextWeekConnection, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, hasCounterpoint, repetitionFree: !repetitionDetected },
+    checks: { hasSpecificTitle, hasObjectives, hasDetailedObjectives, hasSections, hasDevelopedSections, hasWelcome, hasSynthesis, hasNextWeekConnection, hasAssessment, hasHero, hasObjectiveBlock, hasTopic, hasPedagogicalAlignment, hasMinimumReferences, hasPrimarySources, hasEvidenceMap, hasCounterpoint, repetitionFree: !repetitionDetected, contentComplete },
     repetition: { detected: repetitionDetected, repeatedTheme, themeOverlap: Number(themeOverlap.toFixed(2)), objectiveOverlap: Number(objectiveOverlap.toFixed(2)), comparedWeeks: peerLessons.length },
     academic: { minimumReferences: target.minimumReferences, referenceCount: references.length, verifiedReferenceCount: verifiedReferences.length, primarySourceCount: primaryReferences.length, claimCount: claimEvidence.length, unsupportedClaimCount: unsupportedClaims.length },
     issues
