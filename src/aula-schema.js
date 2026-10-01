@@ -1,6 +1,7 @@
-import { normalizeDidacticArc, fallbackDidacticArc, buildAlignmentMatrix, buildProgression, pedagogicalReview } from "./pedagogy.js";
+import { normalizeDidacticArc, buildAlignmentMatrix, buildProgression, pedagogicalReview } from "./pedagogy.js";
 import { measureLessonQuality } from "./content-quality.js";
 import { normalizeAcademicProfile } from "./academic.js";
+import { progressionForWeek } from "./curriculum.js";
 
 export const DEFAULT_LICENSE = "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br";
 
@@ -601,21 +602,23 @@ function richHtml(value) {
 function youtubeId(value) { const match = text(value).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&#/]+)/i); return match ? match[1] : ""; }
 
 function fallbackLessonPlan(input, index) {
-  const scheduledInput = { ...input, webPractices: (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index)) };
+  const weekFocus = progressionForWeek(input, index);
   const videos = input.videoLinks.map((href, i) => normalizeResource({ id: `video-${i + 1}`, type: "video", title: `Vídeo fornecido ${i + 1}`, href, required: false, verificationStatus: "provided-needs-review" }, i, "video"));
   const suggestions = input.videoSearchSuggestions.map((searchQuery, i) => normalizeResource({ id: `video-search-${i + 1}`, type: "video", title: `Busca de vídeo ${i + 1}`, searchQuery, verificationStatus: "suggested-no-url", requiresVerification: true }, i, "video"));
   const imageLinks = input.imageLinks.map((href, i) => normalizeResource({ id: `image-${i + 1}`, type: "image", title: `Imagem fornecida ${i + 1}`, href, required: false, verificationStatus: "provided-needs-review", requiresVerification: true }, i, "image"));
   const suppliedMaterials = input.materials.map((material) => ({ ...material, required: Boolean(material.required) }));
   return normalizeLessonPlan({
     weekNumber: index + 1,
-    theme: `${input.title} — Semana ${index + 1}`,
-    welcome: `Nesta semana, você vai relacionar ${input.title} a situações concretas e construir uma compreensão progressiva do tema.`,
-    learningObjectives: input.objectives,
-    contentSections: [{ number: "1", title: "Conteúdo da semana", body: input.content || `Estude os conceitos centrais de ${input.title} e relacione-os a exemplos práticos.`, subsections: [], reflection: { question: "Que problema real do seu contexto pode ser melhor compreendido com este tema?" }, resources: [] }],
+    theme: weekFocus.theme,
+    welcome: `Nesta semana, você vai avançar no percurso de ${input.title}. A pergunta central é: ${weekFocus.centralQuestion}`,
+    learningObjectives: weekFocus.objectives,
+    contentSections: weekFocus.sectionSequence.slice(0, 7).map((title, sectionIndex) => ({ number: String(sectionIndex + 1), title, body: sectionIndex === 0 && input.content ? input.content : `Esta seção desenvolve ${weekFocus.newConcepts[sectionIndex % Math.max(1, weekFocus.newConcepts.length)] || weekFocus.theme} por meio de uma explicação, um exemplo e uma pergunta de aplicação.`, subsections: [], reflection: { question: "Que problema real do seu contexto pode ser melhor compreendido com este tema?" }, resources: [] })),
     resources: { videos: [...videos, ...suggestions], readingsRequired: [], readingsExtra: suppliedMaterials.map((item) => normalizeResource(item, 0, "reading-extra")), images: imageLinks, podcasts: [], datasets: [] },
     webPractices: [],
-    didacticArc: fallbackDidacticArc(scheduledInput, index),
+    didacticArc: { id: weekFocus.arc, rationale: "Exemplo local seguindo o mapa longitudinal do curso." },
     synthesis: "Retome os conceitos centrais, conecte-os aos exemplos e registre uma aplicação possível no seu contexto.",
+    nextWeekConnection: weekFocus.bridgeToNext,
+    glossary: weekFocus.newConcepts.map((term) => ({ term, definition: `Conceito central da etapa: ${term}.` })),
     references: input.references,
     assessment: { title: "Atividade avaliativa", format: "Questões para revisão", questions: [] },
     timePlan: { calculationMethod: "derived-after-content" }
