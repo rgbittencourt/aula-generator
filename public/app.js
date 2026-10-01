@@ -664,7 +664,7 @@ function renderLessonPreview(lesson, index) {
   const academicReview = guide.academicReview || {};
   const claimEvidence = Array.isArray(guide.claimEvidence || plan.claimEvidence) ? (guide.claimEvidence || plan.claimEvidence) : [];
   const manuallyApproved = Boolean(state.weekApprovals?.[index]);
-  const academicLabel = { approved: "revisão acadêmica aprovada", "approved-with-review": "revisão acadêmica com pendências", "needs-revision": "revisão acadêmica exige reescrita" }[academicReview.status] || "revisão acadêmica pendente";
+  const academicLabel = manuallyApproved ? "revisão acadêmica conferida manualmente" : ({ approved: "revisão acadêmica aprovada", "approved-with-review": "revisão acadêmica com pendências", "needs-revision": "revisão acadêmica exige reescrita" }[academicReview.status] || "revisão acadêmica pendente");
   const displayQualityStatus = manuallyApproved ? "complete" : quality.status;
   const statusLabel = manuallyApproved ? "conferida e liberada por você" : ({ complete: "conteúdo completo", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[quality.status] || "qualidade não medida");
   const strip = document.querySelector("#lesson-quality-strip");
@@ -675,7 +675,7 @@ function renderLessonPreview(lesson, index) {
     : quality.status === "needs-review"
       ? `<div class="reader-warning"><strong>Revisão recomendada:</strong> ${escapeHtml(issueText)}</div>`
       : `<div class="reader-warning"><strong>Atenção antes de liberar:</strong> ${escapeHtml(issueText)}</div>` : "";
-  const academicIssue = Array.isArray(academicReview.issues) && academicReview.issues.length ? `<div class="reader-warning"><strong>Revisão acadêmica:</strong><ul>${academicReview.issues.slice(0, 8).map((item) => `<li><strong>${escapeHtml(item.severity || "revisão")}</strong> ${escapeHtml(item.description || "Pendência")}${item.suggestedRepair ? ` — ${escapeHtml(item.suggestedRepair)}` : ""}</li>`).join("")}</ul></div>` : "";
+  const academicIssue = Array.isArray(academicReview.issues) && academicReview.issues.length ? `<div class="${manuallyApproved ? "reader-callout" : "reader-warning"}"><strong>${manuallyApproved ? "Observações acadêmicas automáticas (já conferidas por você):" : "Revisão acadêmica:"}</strong><ul>${academicReview.issues.slice(0, 8).map((item) => `<li><strong>${escapeHtml(item.severity || "revisão")}</strong> ${escapeHtml(item.description || "Pendência")}${item.suggestedRepair ? ` — ${escapeHtml(item.suggestedRepair)}` : ""}</li>`).join("")}</ul></div>` : "";
   const sectionsMarkup = sections.map((section) => {
     const subs = (section.subsections || []).map((sub) => `<h4>${escapeHtml(`${sub.number || ""} ${sub.title || ""}`.trim())}</h4>${paragraphsMarkup(sub.body)}`).join("");
     const caseMarkup = section.caseStudy ? `<div class="reader-callout"><strong>${escapeHtml(section.caseStudy.title || "Estudo de caso")}</strong>${paragraphsMarkup(section.caseStudy.context || section.caseStudy.data || "")}${(section.caseStudy.questions || []).length ? `<ul>${section.caseStudy.questions.map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul>` : ""}</div>` : "";
