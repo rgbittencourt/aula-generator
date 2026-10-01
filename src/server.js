@@ -4,13 +4,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "./calculations.js";
 import { buildFallbackLesson, normalizeCourseInput, normalizeLesson, normalizeWeeklyOutput, slugify, validateLesson } from "./aula-schema.js";
-import { assistBriefing, generateWithAI, regenerateWeekWithAI } from "./ai.js";
+import { assistBriefing, generateOneWeek, generateWithAI, regenerateWeekWithAI } from "./ai.js";
 import { enrichLessonsWithResources } from "./research.js";
 import { createWeeksZip } from "./zip.js";
 import { accessRequired, hasValidAccess } from "./access.js";
 import { buildTeacherGuides } from "./teacher-guide.js";
 import { createTeacherGuidePdf } from "./pdf.js";
 import { validateCourse } from "./validation.js";
+import { assembleCourse } from "./course-assembly.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "..", "public");
@@ -32,12 +33,46 @@ app.get("/api/health", (_req, res) => {
       autoRepair: process.env.AULA_AUTO_REPAIR !== "false",
       academicPipeline: process.env.AULA_ACADEMIC_PIPELINE !== "false",
       academicReview: process.env.AULA_ACADEMIC_REVIEW !== "false",
+      distributedGeneration: true,
+      singlePass: process.env.AULA_SINGLE_PASS !== "false",
+      researchTimeoutMs: Math.max(3000, Number(process.env.AULA_RESEARCH_TIMEOUT_MS || 8000)),
       reviewBeforeExport: true,
       maxTokens: Number(process.env.OPENAI_MAX_TOKENS || 16000),
       maxRetries: Number(process.env.OPENAI_MAX_RETRIES || 3),
       aiBatchSize: Math.min(3, Math.max(1, Number(process.env.AULA_AI_BATCH_SIZE) || 1)),
       output: ".aula.json por semana + ZIP + revisão/regeneração individual"
   });
+});
+
+app.post("/api/generate-week", async (req, res) => {
+  if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
+  try {
+    const input = normalizeCourseInput(req.body?.input || req.body || {});
+    const index = Math.max(0, Math.min(input.weeks - 1, Number.parseInt(req.body?.weekIndex, 10) || 0));
+    const raw = await generateOneWeek(input, index);
+    const normalized = normalizeLesson(raw, input, index);
+    const researched = process.env.AULA_RESOURCE_RESEARCH === "false" ? normalized : (await enrichLessonsWithResources(input, [normalized]))[0];
+    const teacherGuide = buildTeacherGuides(input, [researched], [raw.teacherGuide || {}])[0];
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, provider: "ai-week", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", weekIndex: index, completed: index + 1, total: input.weeks, week: researched, teacherGuide });
+  } catch (error) {
+    console.error("generate-week failed", error);
+    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
+    res.status(status).json({ ok: false, error: error.message || "Não foi possível gerar esta semana.", code: error.code || "GENERATION_ERROR", retryable: Boolean(error.retryable) });
+  }
+});
+
+app.post("/api/assemble-course", (req, res) => {
+  if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
+  try {
+    const input = normalizeCourseInput(req.body?.input || {});
+    const result = assembleCourse(input, req.body?.weeks || [], req.body?.teacherGuides || []);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, provider: "ai-distributed", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", ...result });
+  } catch (error) {
+    console.error("assemble-course failed", error);
+    res.status(400).json({ ok: false, error: error.message || "Não foi possível consolidar o curso.", code: error.code || "ASSEMBLY_ERROR" });
+  }
 });
 
 app.post("/api/generate", async (req, res) => {

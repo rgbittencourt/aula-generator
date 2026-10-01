@@ -57,6 +57,8 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 | `OPENAI_MODEL` | `gpt-4o-mini` | Production, Preview e Development |
 | `OPENAI_CONTENT_MODEL` | opcional; modelo mais capaz para texto longo | Production, Preview e Development |
 | `OPENAI_MAX_TOKENS` | `16000` | Production, Preview e Development |
+| `AULA_SINGLE_PASS` | `true` | Production, Preview e Development |
+| `AULA_RESEARCH_TIMEOUT_MS` | `8000` | Production, Preview e Development |
 | `OPENAI_MAX_RETRIES` | `3` | Production, Preview e Development |
 | `AULA_AI_BATCH_SIZE` | `1` | Production, Preview e Development |
 | `AULA_ACADEMIC_PIPELINE` | `true` | Production, Preview e Development |
@@ -68,7 +70,7 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 7. Clique em **Deploy**.
 8. Abra a URL fornecida pela Vercel e confira o indicador no cabeçalho.
 9. Se `AULA_ACCESS_CODE` estiver configurado, informe esse código no campo de acesso da interface. Ele não é a chave da OpenAI.
-10. Preencha o briefing, use **Preencher vazios com IA** se quiser assistência e depois clique em **Gerar com IA**.
+10. Preencha o briefing, use **Preencher vazios com IA** se quiser assistência e depois clique em **Gerar com IA**. A aplicação gera uma semana por requisição e consolida o curso ao final, evitando que uma geração longa seja interrompida pela hospedagem.
 11. Abra cada card em **Ver aula**. Leia título, objetivos, conteúdo, atividades, recursos, síntese e avaliação antes de exportar.
 12. Se uma semana estiver fraca ou precisar de outro foco, escreva a solicitação no final da prévia e clique em **Refazer esta semana com IA**. Somente a semana aberta será reescrita.
 
@@ -107,13 +109,17 @@ O resultado também traz um checklist pedagógico: diagnóstico, checagens forma
 
 O briefing possui um **Perfil acadêmico do conteúdo** com meta de palavras, mínimo de seções, referências, fontes acadêmicas/oficiais, escopo histórico, autores, quadros teóricos, tópicos a evitar e regras de contraponto, comparação e estudo de caso. Tema/área, público, nível da turma e profundidade são herdados automaticamente da **Identidade do curso**, sem preenchimento duplicado. Esses dados entram nos prompts e no checklist; não são apenas campos decorativos.
 
-Para evitar a geração superficial, a IA trabalha em três fases:
+Para evitar a geração superficial, a IA possui um pipeline acadêmico completo:
 
 1. **Planejamento acadêmico:** define conceitos, pergunta central, sequência argumentativa, afirmações que exigem evidência, exemplos, controvérsias e plano de avaliação.
 2. **Redação:** escreve a semana completa para o aluno e o guia separado do professor, incluindo `claimEvidence` e referências estruturadas.
 3. **Revisão crítica:** procura superficialidade, desalinhamento, repetição, fonte inventada, afirmação sem suporte, falta de contraponto e problemas de acessibilidade. Se necessário, executa um reparo e revisa novamente.
 
-O manual contém os prompts efetivos e o contrato JSON de cada fase. As variáveis `AULA_ACADEMIC_PIPELINE`, `AULA_ACADEMIC_REVIEW` e `AULA_AUTO_REPAIR` controlam esse comportamento; o padrão das três é ativado.
+O manual contém os prompts efetivos e o contrato JSON de cada fase. A produção usa por padrão `AULA_SINGLE_PASS=true`: o prompt acadêmico completo é executado uma semana por vez, e a validação humana/estrutural ocorre antes da exportação. O pipeline de planejamento, revisão e reparo adicionais pode ser ativado com `AULA_SINGLE_PASS=false`, quando houver margem de duração na hospedagem.
+
+### Por que a geração agora é dividida por semana
+
+Uma turma com várias semanas e revisão acadêmica pode gerar um volume grande de texto e chamar vários provedores externos. Fazer tudo em uma única função serverless aumenta o risco de a Vercel encerrar a requisição e o navegador receber apenas o texto genérico `An error occurred with this application.`. Por isso, **Gerar com IA** chama `POST /api/generate-week` para cada semana e, somente depois, chama `POST /api/assemble-course` para calcular os totais e montar o Planejamento Geral.
 
 ### Como a ordem funciona
 
@@ -166,6 +172,8 @@ Sem `YOUTUBE_API_KEY`, o gerador continua pesquisando imagens/diagramas e leitur
 | `GET /api/health` | informa o estado das chaves e do modelo |
 | `POST /api/assist-briefing` | preenche campos vazios do briefing |
 | `POST /api/generate` | gera semanas do aluno, guias do professor e Planejamento Geral |
+| `POST /api/generate-week` | gera uma semana isolada, com pesquisa de recursos e guia correspondente |
+| `POST /api/assemble-course` | consolida semanas já geradas e calcula o Planejamento Geral |
 | `POST /api/regenerate-week` | refaz somente uma semana com instrução do professor e recalcula o curso |
 | `POST /api/teacher-pdf` | devolve somente o PDF do guia do professor |
 | `POST /api/zip` | devolve o pacote completo, incluindo PDF e webpráticas |
@@ -189,6 +197,8 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_CONTENT_MODEL=
 OPENAI_MAX_TOKENS=16000
+AULA_SINGLE_PASS=true
+AULA_RESEARCH_TIMEOUT_MS=8000
 OPENAI_MAX_RETRIES=3
 AULA_AI_BATCH_SIZE=1
 AULA_ACADEMIC_PIPELINE=true

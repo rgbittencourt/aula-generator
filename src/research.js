@@ -6,7 +6,8 @@ const cleanHtml = (value) => text(value).replace(/<[^>]*>/g, " ").replace(/\s+/g
 
 async function fetchJson(url, headers = {}) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  const timeoutMs = Math.max(3000, Number(process.env.AULA_RESEARCH_TIMEOUT_MS || 8000));
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, { headers, signal: controller.signal });
     const payload = await response.json().catch(() => ({}));

@@ -392,6 +392,20 @@ function showError(message) {
   $("#results-section").classList.remove("hidden");
 }
 
+async function readApiResponse(response, fallbackMessage = "O servidor não conseguiu concluir a solicitação.") {
+  const raw = await response.text();
+  let data = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch {
+    const detail = raw.replace(/\s+/g, " ").trim().slice(0, 360);
+    const timeoutHint = /an error occurred|function timed out|timed out|504/i.test(detail)
+      ? " A função demorou além do limite da hospedagem; a geração distribuída por semana será usada nas próximas tentativas."
+      : "";
+    throw new Error(`${fallbackMessage} (HTTP ${response.status}). ${detail || response.statusText || "Resposta vazia."}${timeoutHint}`);
+  }
+  if (!response.ok || !data?.ok) throw new Error(data?.error || `${fallbackMessage} (HTTP ${response.status}).`);
+  return data;
+}
+
 function showAssistantMessage(message, error = false) {
   const note = $("#assistant-note");
   note.textContent = message;
@@ -430,8 +444,7 @@ async function assistBriefing() {
     const headers = { "Content-Type": "application/json" };
     if (accessCode) headers["x-aula-access-code"] = accessCode;
     const response = await fetch("/api/assist-briefing", { method: "POST", headers, body: JSON.stringify({ input, missingFields }) });
-    const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error(data.error || "Não foi possível preencher o briefing.");
+    const data = await readApiResponse(response, "Não foi possível preencher o briefing.");
     const briefing = data.briefing || {};
     const filled = [];
     if (!$("#audience").value.trim() && briefing.audience) { $("#audience").value = briefing.audience; filled.push("público"); }
@@ -541,8 +554,7 @@ async function regenerateSelectedWeek() {
     const headers = { "Content-Type": "application/json" };
     if (accessCode) headers["x-aula-access-code"] = accessCode;
     const response = await fetch("/api/regenerate-week", { method: "POST", headers, body: JSON.stringify({ input, weekIndex: index, instruction, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
-    const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error(data.error || "Não foi possível refazer a semana.");
+    const data = await readApiResponse(response, "Não foi possível refazer a semana.");
     renderWeeks(data);
     $("#regenerate-note").textContent = "Semana atualizada. Confira a nova versão abaixo antes de exportar.";
     openLessonPreview(index);
@@ -675,6 +687,41 @@ function downloadWeek(index) {
   downloadBlob(new Blob([JSON.stringify(lesson, null, 2)], { type: "application/json" }), `semana-${number}-${slugify(lesson.meta?.title)}.aula.json`);
 }
 
+async function generateDistributed(input, accessCode, button) {
+  const weeks = [];
+  const teacherGuides = [];
+  const headers = { "Content-Type": "application/json" };
+  if (accessCode) headers["x-aula-access-code"] = accessCode;
+
+  for (let index = 0; index < input.weeks; index += 1) {
+    button.querySelector("span:first-child").textContent = `Gerando semana ${index + 1}/${input.weeks}…`;
+    const response = await fetch("/api/generate-week", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ input, weekIndex: index })
+    });
+    const data = await readApiResponse(response, `Não foi possível gerar a semana ${index + 1}.`);
+    weeks[index] = data.week;
+    teacherGuides[index] = data.teacherGuide;
+    state.input = input;
+    state.weeks = weeks.filter(Boolean);
+    state.teacherGuides = teacherGuides.filter(Boolean);
+    saveDraft("resultado-parcial");
+    const alert = $("#result-alert");
+    alert.className = "result-alert";
+    alert.textContent = `Semana ${index + 1} de ${input.weeks} gerada. A consolidação acontece ao final.`;
+    alert.classList.remove("hidden");
+  }
+
+  button.querySelector("span:first-child").textContent = "Consolidando curso…";
+  const response = await fetch("/api/assemble-course", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ input, weeks, teacherGuides })
+  });
+  return readApiResponse(response, "Não foi possível consolidar o curso.");
+}
+
 async function generate(fallback = false) {
   const input = formInput();
   const accessCode = input.accessCode;
@@ -691,11 +738,7 @@ async function generate(fallback = false) {
       renderWeeks(staticDemo(input));
       return;
     }
-    const headers = { "Content-Type": "application/json" };
-    if (accessCode) headers["x-aula-access-code"] = accessCode;
-    const response = await fetch("/api/generate", { method: "POST", headers, body: JSON.stringify({ input, fallback }) });
-    const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error(data.error || "Não foi possível gerar o curso.");
+    const data = fallback ? staticDemo(input) : await generateDistributed(input, accessCode, button);
     renderWeeks(data);
   } catch (error) { showError(error.message); }
   finally { setBusy(button, false, ""); }

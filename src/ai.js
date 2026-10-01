@@ -297,20 +297,32 @@ async function planWeekWithAI(input, index) {
   }
 }
 
-async function generateOneWeek(input, index) {
+export async function generateOneWeek(input, index, options = {}) {
   const useAcademicPipeline = process.env.AULA_ACADEMIC_PIPELINE !== "false";
-  const academicPlan = useAcademicPipeline ? await planWeekWithAI(input, index) : normalizeAcademicPlan({ weekNumber: index + 1, theme: `${input.title} — Semana ${index + 1}` }, input, index);
+  // A Vercel Hobby encerra funções longas. O modo de uma etapa mantém o prompt
+  // acadêmico completo, mas evita as chamadas extras de planejamento/revisão na
+  // mesma requisição. O pipeline completo continua disponível com false.
+  const singlePass = options.singlePass ?? process.env.AULA_SINGLE_PASS !== "false";
+  const academicPlan = !singlePass && useAcademicPipeline
+    ? await planWeekWithAI(input, index)
+    : normalizeAcademicPlan({
+        weekNumber: index + 1,
+        theme: `${input.title} — Semana ${index + 1}`,
+        objectives: input.objectives,
+        centralConcepts: input.objectives,
+        sectionSequence: []
+      }, input, index);
   let raw = await callJson([
     { role: "system", content: ACADEMIC_SYSTEM_PROMPT },
     { role: "user", content: buildWeekGenerationPrompt(input, index, academicPlan) }
   ], { temperature: 0.42 });
   let academicReview = { status: "not-run", issues: [], strengths: [], unsupportedClaims: [], rewriteRequired: false };
-  if (useAcademicPipeline && process.env.AULA_ACADEMIC_REVIEW !== "false") {
+  if (!singlePass && useAcademicPipeline && process.env.AULA_ACADEMIC_REVIEW !== "false") {
     try { academicReview = await reviewWeekWithAI(input, index, academicPlan, raw); } catch { academicReview = { status: "needs-human-review", issues: [{ severity: "high", type: "review-unavailable", description: "A revisão acadêmica automática não pôde ser concluída.", suggestedRepair: "Faça a conferência humana antes da exportação." }], strengths: [], unsupportedClaims: [], rewriteRequired: true }; }
   }
   const initialLesson = normalizeLesson(raw, input, index);
   const initialQuality = measureLessonQuality(initialLesson, input);
-  if (process.env.AULA_AUTO_REPAIR !== "false" && (initialQuality.status !== "complete" || academicReview.rewriteRequired)) {
+  if (!singlePass && process.env.AULA_AUTO_REPAIR !== "false" && (initialQuality.status !== "complete" || academicReview.rewriteRequired)) {
     try {
       const repaired = await repairWeekWithAI(input, index, raw, initialQuality, academicPlan, academicReview);
       const repairedLesson = normalizeLesson(repaired, input, index);
