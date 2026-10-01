@@ -1,7 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
 const createReviewMarks = () => ({ resources: {}, checks: {} });
-const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks() };
+const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {} };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
 const DRAFT_MAX_AGE_DAYS = 30;
@@ -85,6 +85,7 @@ function currentSnapshot() {
       teacherGuides: state.teacherGuides,
       validation: state.validation,
       reviewMarks: state.reviewMarks,
+      weekApprovals: state.weekApprovals,
       weeks: state.weeks
     } : null
   };
@@ -220,6 +221,7 @@ function restoreSnapshot(snapshot) {
   if (!snapshot?.form) return;
   applyInputToForm(snapshot.form);
   state.reviewMarks = snapshot.results?.reviewMarks || snapshot.reviewMarks || createReviewMarks();
+  state.weekApprovals = snapshot.results?.weekApprovals || snapshot.weekApprovals || {};
   hideDraftRecovery();
   if (snapshot.results?.weeks?.length) {
     renderWeeks({ ...snapshot.results, input: snapshot.results.input || snapshot.form });
@@ -661,11 +663,18 @@ function renderLessonPreview(lesson, index) {
   const guide = state.teacherGuides[index] || {};
   const academicReview = guide.academicReview || {};
   const claimEvidence = Array.isArray(guide.claimEvidence || plan.claimEvidence) ? (guide.claimEvidence || plan.claimEvidence) : [];
+  const manuallyApproved = Boolean(state.weekApprovals?.[index]);
   const academicLabel = { approved: "revisão acadêmica aprovada", "approved-with-review": "revisão acadêmica com pendências", "needs-revision": "revisão acadêmica exige reescrita" }[academicReview.status] || "revisão acadêmica pendente";
-  const statusLabel = { complete: "conteúdo completo", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[quality.status] || "qualidade não medida";
+  const displayQualityStatus = manuallyApproved ? "complete" : quality.status;
+  const statusLabel = manuallyApproved ? "conferida e liberada por você" : ({ complete: "conteúdo completo", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[quality.status] || "qualidade não medida");
   const strip = document.querySelector("#lesson-quality-strip");
-  strip.innerHTML = `<span class="quality-badge ${escapeHtml(quality.status || "needs-review")}">${escapeHtml(statusLabel)}</span><span>${Number(quality.wordCount || 0).toLocaleString("pt-BR")} palavras</span><span>${sections.length} seções</span><span>${objectives.length} objetivos</span><span>nota estrutural ${Number(quality.score || 0)}/100</span><span class="academic-review-badge">${escapeHtml(academicLabel)}</span><span>${claimEvidence.length} evidências mapeadas</span>`;
-  const issue = Array.isArray(quality.issues) && quality.issues.length ? `<div class="reader-warning"><strong>Antes de exportar:</strong> ${escapeHtml(quality.issues.join(" · "))}</div>` : "";
+  strip.innerHTML = `<span class="quality-badge ${escapeHtml(displayQualityStatus || "needs-review")}">${escapeHtml(statusLabel)}</span><span>${Number(quality.wordCount || 0).toLocaleString("pt-BR")} palavras</span><span>${sections.length} seções</span><span>${objectives.length} objetivos</span><span>nota estrutural ${Number(quality.score || 0)}/100</span><span class="academic-review-badge">${escapeHtml(academicLabel)}</span><span>${claimEvidence.length} evidências mapeadas</span>`;
+  const issueText = Array.isArray(quality.issues) ? quality.issues.join(" · ") : "";
+  const issue = issueText ? manuallyApproved
+    ? `<div class="reader-callout"><strong>Semana conferida e liberada por você.</strong> As observações automáticas abaixo permanecem informativas: ${escapeHtml(issueText)}</div>`
+    : quality.status === "needs-review"
+      ? `<div class="reader-warning"><strong>Revisão recomendada:</strong> ${escapeHtml(issueText)}</div>`
+      : `<div class="reader-warning"><strong>Atenção antes de liberar:</strong> ${escapeHtml(issueText)}</div>` : "";
   const academicIssue = Array.isArray(academicReview.issues) && academicReview.issues.length ? `<div class="reader-warning"><strong>Revisão acadêmica:</strong><ul>${academicReview.issues.slice(0, 8).map((item) => `<li><strong>${escapeHtml(item.severity || "revisão")}</strong> ${escapeHtml(item.description || "Pendência")}${item.suggestedRepair ? ` — ${escapeHtml(item.suggestedRepair)}` : ""}</li>`).join("")}</ul></div>` : "";
   const sectionsMarkup = sections.map((section) => {
     const subs = (section.subsections || []).map((sub) => `<h4>${escapeHtml(`${sub.number || ""} ${sub.title || ""}`.trim())}</h4>${paragraphsMarkup(sub.body)}`).join("");
@@ -835,7 +844,7 @@ function renderGeneralPlan(plan) {
   const checklistMarkup = checklist.length ? `<details class="review-panel" open><summary><strong>Checklist pedagógico: ${passed}/${checklist.length} itens atendidos automaticamente</strong><small>${checkedChecks}/${checklist.length} atualmente marcados. Os itens aprovados pela IA começam marcados; desmarque qualquer item que queira refazer ou revisar novamente.</small></summary><div class="review-list">${checklistRows}</div></details>` : "";
   const progressionMarkup = Array.isArray(plan.progression) && plan.progression.length ? `<div class="general-warning"><strong>Progressão curricular</strong><ul>${plan.progression.map((item) => `<li>Semana ${item.weekNumber}: ${escapeHtml(item.theme || "")} ${item.projectMilestone ? `— ${escapeHtml(item.projectMilestone)}` : ""}</li>`).join("")}</ul></div>` : "";
   const practices = Array.isArray(plan.webPracticeSchedule) ? plan.webPracticeSchedule : [];
-  const practiceMarkup = practices.length ? `<section class="webpractice-schedule"><div class="schedule-heading"><div><p class="eyebrow">SESSÕES PRÁTICAS INDEPENDENTES</p><h3>Webpráticas programadas</h3><p>Estas sessões não entram no texto-base nem no JSON do aluno. Cada uma é exportada como roteiro DOCX para o professor.</p></div></div><div class="schedule-list">${practices.map((practice, index) => `<article class="schedule-item"><div><strong>${escapeHtml(practice.title || `Webprática ${index + 1}`)}</strong><span>${escapeHtml([practice.weekNumber ? `Semana ${practice.weekNumber}` : "", practice.date ? formatDate(practice.date) : "", practice.dayOfWeek, [practice.startTime, practice.endTime].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "Agenda a confirmar")}</span><small>${escapeHtml([practice.modality, practice.tool, practice.platform].filter(Boolean).join(" · ") || "Sessão síncrona / laboratório prático")}</small></div><button class="button button-secondary webpractice-download" data-practice-id="${escapeHtml(practice.id || "")}" type="button">Baixar DOCX <span>↓</span></button></article>`).join("")}</div></section>` : "";
+  const practiceMarkup = practices.length ? `<section class="webpractice-schedule"><div class="schedule-heading"><div><p class="eyebrow">SESSÕES PRÁTICAS INDEPENDENTES</p><h3>Webpráticas programadas</h3><p>Estas sessões não entram no texto-base nem no JSON do aluno. Cada uma é exportada como roteiro DOCX para o professor.</p></div></div><div class="schedule-list">${practices.map((practice, index) => `<article class="schedule-item"><div><strong>${escapeHtml(practice.title || `Webprática ${index + 1}`)}</strong><span>${escapeHtml([practice.weekNumber ? `Semana ${practice.weekNumber}` : "", practice.date ? formatDate(practice.date) : "", practice.dayOfWeek, [practice.startTime, practice.endTime].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "Agenda a confirmar")}</span><small>${escapeHtml([practice.modality, practice.tool, practice.platform].filter(Boolean).join(" · ") || "Sessão síncrona / laboratório prático")}</small></div><button class="button button-secondary webpractice-download" data-practice-id="${escapeHtml(practice.id || practice.title || "")}" type="button">Baixar DOCX <span>↓</span></button></article>`).join("")}</div></section>` : "";
   const reviewedResources = unresolved.filter((item) => reviewMarks.resources?.[reviewItemKey(item)]).length;
   const resourceRows = unresolved.map((item) => {
     const key = reviewItemKey(item);
@@ -868,12 +877,15 @@ function renderWeeks(data) {
     const guide = state.teacherGuides[index];
     const arc = guide?.didacticArc?.label || lesson.lessonPlan?.didacticArc?.label || "Arco variável";
     const quality = lesson.contentQuality || {};
-    const qualityLabel = { complete: "conteúdo completo", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[quality.status] || "qualidade não medida";
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div><h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div><span class="quality-badge ${escapeHtml(quality.status || "needs-review")}">${escapeHtml(qualityLabel)}</span><div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="week-download" data-index="${index}" type="button">Baixar JSON <span>↓</span></button></div></article>`;
+    const manuallyApproved = Boolean(state.weekApprovals?.[index]);
+    const qualityLabel = manuallyApproved ? "conferida e liberada por você" : ({ complete: "conteúdo completo", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[quality.status] || "qualidade não medida");
+    const approvalButton = quality.status !== "complete" ? `<button class="week-approve ${manuallyApproved ? "is-approved" : ""}" data-index="${index}" type="button">${manuallyApproved ? "Desfazer liberação" : "Liberar após conferência"}</button>` : "";
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div><h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div><span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(quality.status || "needs-review")}">${escapeHtml(qualityLabel)}</span><div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="week-download" data-index="${index}" type="button">Baixar JSON <span>↓</span></button>${approvalButton}</div></article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
   $("#week-grid").querySelectorAll(".week-preview").forEach((button) => button.addEventListener("click", () => openLessonPreview(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-download").forEach((button) => button.addEventListener("click", () => downloadWeek(Number(button.dataset.index))));
+  $("#week-grid").querySelectorAll(".week-approve").forEach((button) => button.addEventListener("click", () => toggleWeekApproval(Number(button.dataset.index))));
   renderGeneralPlan(data.generalPlan);
   renderWorkload(data.workload);
   saveDraft("resultado");
@@ -887,19 +899,33 @@ function downloadWeek(index) {
   downloadBlob(new Blob([JSON.stringify(lesson, null, 2)], { type: "application/json" }), `semana-${number}-${slugify(lesson.meta?.title)}.aula.json`);
 }
 
+function apiHeaders() {
+  const headers = { "Content-Type": "application/json" };
+  const accessCode = $("#access-code")?.value.trim();
+  if (accessCode) headers["x-aula-access-code"] = accessCode;
+  return headers;
+}
+
 async function downloadWebPractice(practiceId) {
   if (!practiceId || !state.weeks.length) return;
   if (isGitHubPages) { showError("O DOCX das webpráticas é gerado na versão Vercel com backend."); return; }
   const button = document.querySelector(`.webpractice-download[data-practice-id="${CSS.escape(practiceId)}"]`);
   if (button) { button.disabled = true; button.classList.add("is-loading"); }
   try {
-    const response = await fetch("/api/webpractice-docx", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides, practiceId }) });
+    const response = await fetch("/api/webpractice-docx", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides, practiceId }) });
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível criar o DOCX da webprática."); }
     const disposition = response.headers.get("Content-Disposition") || "";
     const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `${slugify(practiceId)}-roteiro.docx`;
     downloadBlob(await response.blob(), filename);
   } catch (error) { showError(error.message); }
   finally { if (button) { button.disabled = false; button.classList.remove("is-loading"); } }
+}
+
+function toggleWeekApproval(index) {
+  state.weekApprovals = state.weekApprovals || {};
+  state.weekApprovals[index] = !state.weekApprovals[index];
+  saveDraft("liberação manual");
+  renderWeeks({ input: state.input, weeks: state.weeks, workload: state.workload, generalPlan: state.generalPlan, teacherGuides: state.teacherGuides, provider: state.provider, validation: state.validation });
 }
 
 async function generateDistributed(input, accessCode, button) {
@@ -960,6 +986,7 @@ async function generate(fallback = false) {
     if (incomplete) { showError("Cada webprática precisa de um título e de uma semana ou data de ocorrência. Ela não será alocada automaticamente."); return; }
   }
   state.reviewMarks = createReviewMarks();
+  state.weekApprovals = {};
   const button = fallback ? $("#fallback-button") : $("#generate-button");
   button.dataset.label = fallback ? "Gerar exemplo local" : "Gerar com IA";
   setBusy(button, true, fallback ? "Montando exemplo…" : "Gerando material…");
@@ -990,7 +1017,7 @@ async function downloadZip() {
       downloadBlob(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), `${slugify(state.input.title)}-semanas.zip`);
       return;
     }
-    const response = await fetch("/api/zip", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
+    const response = await fetch("/api/zip", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível montar o ZIP."); }
     downloadBlob(await response.blob(), `${slugify(state.input.title)}-semanas.zip`);
   } catch (error) { showError(error.message); }
@@ -1003,7 +1030,7 @@ async function downloadTeacherPdf() {
   const button = $("#teacher-pdf-button");
   button.disabled = true; button.classList.add("is-loading");
   try {
-    const response = await fetch("/api/teacher-pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
+    const response = await fetch("/api/teacher-pdf", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível criar o PDF do professor."); }
     downloadBlob(await response.blob(), `${slugify(state.input.title)}-guia-do-professor.pdf`);
   } catch (error) { showError(error.message); }
@@ -1015,10 +1042,7 @@ async function recalculateQuality() {
   const button = $("#recalculate-button");
   button.disabled = true; button.classList.add("is-loading");
   try {
-    const headers = { "Content-Type": "application/json" };
-    const accessCode = $("#access-code")?.value.trim();
-    if (accessCode) headers["x-aula-access-code"] = accessCode;
-    const response = await fetch("/api/assemble-course", { method: "POST", headers, body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
+    const response = await fetch("/api/assemble-course", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
     const data = await readApiResponse(response, "Não foi possível recalcular a qualidade do curso.");
     renderWeeks({ ...data, input: state.input });
     $("#result-alert").className = "result-alert";

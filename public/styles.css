@@ -75,3 +75,7 @@
 .action-field{justify-content:flex-end}
 .action-field .button{height:42px;width:max-content}
 @media(max-width:620px){.practice-count-controls .action-field .button{width:100%}}
+
+.week-approve{display:flex;justify-content:center;width:100%;border:1px solid #e9c77f;border-radius:8px;background:#fff7e5;padding:10px;color:#76530d;font-weight:700;font-size:11px;cursor:pointer}
+.week-approve:hover{background:#ffefc7}
+.week-approve.is-approved{border-color:#bfe4df;background:#edf8f6;color:#275d58}

@@ -626,6 +626,10 @@ Depois da geração, abra **Planejamento geral**. O painel apresenta duas listas
 
 As marcações são salvas no navegador e entram no **Baixar backup**. Elas não alteram artificialmente o resultado automático: se um item estiver pendente, é necessário corrigir a aula ou o recurso e gerar/revisar novamente.
 
+Se uma aula gerada anteriormente ainda mostrar a classificação antiga, clique em **Recalcular qualidade**. O recálculo usa as semanas já armazenadas e não consome uma nova chamada da IA. Após conferir integralmente uma semana, clique em **Liberar após conferência** no cartão correspondente. A prévia será atualizada para “conferida e liberada por você”, sem apagar as observações automáticas.
+
+O botão **Baixar DOCX** envia automaticamente o código de acesso preenchido no briefing. Se a aplicação indicar que o código é necessário, informe-o novamente no campo **Código de acesso da IA publicada** e tente o download outra vez.
+
 #### 10.1.4 Prompt de preenchimento assistido do briefing
 
 O botão **Preencher vazios com IA** faz uma chamada com este sistema e este prompt de usuário:

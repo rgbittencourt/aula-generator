@@ -113,6 +113,8 @@ Antes de considerar uma semana pronta, o gerador verifica título específico, a
 
 Na seção **Webpráticas síncronas**, informe a quantidade desejada e clique em **Criar sessões**. Os cartões existentes são preservados; depois, use **Preencher vazios com IA** para completar cada item individualmente. A IA recebe a quantidade exata e não pode reduzir uma lista de duas ou mais práticas a apenas uma. No Planejamento geral, os recursos pendentes e os itens do checklist possuem caixas de seleção de **conferência manual**. Os itens que a IA já aprovou aparecem marcados inicialmente; desmarque um item aprovado quando quiser refazê-lo ou revisá-lo novamente. A marcação fica no salvamento local/backup e não substitui a correção de uma pendência pedagógica.
 
+Se um resultado antigo ainda exibir a classificação anterior, use **Recalcular qualidade** na área de resultados. Essa operação apenas reconsolida as semanas e não chama a IA. Depois de conferir uma semana, use **Liberar após conferência** no cartão; a prévia passa a indicar que ela foi liberada manualmente, enquanto as observações automáticas permanecem visíveis como informação.
+
 O resultado também traz um checklist pedagógico: diagnóstico, checagens formativas, avaliação somativa com feedback, webprática completa quando houver, diferenciação, acessibilidade, recursos contextualizados e autoavaliação. Uma semana bloqueada deve ser refeita antes do uso no Aula Studio.
 
 ### Progressão longitudinal
