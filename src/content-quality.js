@@ -137,9 +137,8 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   if (!hasHero) issues.push("bloco hero/título ausente no JSON");
   if (!hasObjectiveBlock) issues.push("bloco visível de objetivos ausente no JSON");
   if (!hasTopic) issues.push("tópico de conteúdo ausente ou vazio no JSON");
-  const coreSectionCount = Math.min(target.requiredSectionCount, 4);
-  const hasCoreSections = sections.length >= coreSectionCount && sections.filter((section) => text(section.body).length >= 120).length >= Math.min(coreSectionCount, 3);
-  const coreContentPresent = hasSpecificTitle && objectives.length > 0 && hasCoreSections && words >= Math.round(target.minimumWords * 0.75);
+  const hasDevelopedCoreText = sections.some((section, index) => sectionWordCounts[index] >= Math.min(target.minimumSectionWords, 180)) || words >= Math.round(target.minimumWords * 0.75);
+  const coreContentPresent = hasDevelopedCoreText && words >= Math.round(target.minimumWords * 0.75);
   const contentComplete = hasSpecificTitle && hasDetailedObjectives && hasSections && hasDevelopedSections && hasWelcome && hasSynthesis && hasNextWeekConnection && words >= target.minimumWords;
   const structural = contentComplete && hasHero && hasObjectiveBlock && hasTopic && hasPedagogicalAlignment && hasMinimumReferences && hasPrimarySources && hasEvidenceMap && (!target.requireCounterarguments || hasCounterpoint) && !repetitionDetected;
   return {
