@@ -907,13 +907,16 @@ function renderGeneralPlan(plan) {
 
 function renderWeeks(data) {
   state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider; state.validation = data.validation || data.generalPlan?.validation || null; state.reviewMarks = data.reviewMarks || state.reviewMarks || createReviewMarks();
-  $("#results-title").textContent = `${data.weeks.length} semanas prontas para revisão`;
+  const approvedWeeks = data.weeks.filter((_, index) => Boolean(state.weekApprovals?.[index])).length;
+  const pendingWeeks = data.weeks.length - approvedWeeks;
+  $("#results-title").textContent = approvedWeeks ? `${approvedWeeks} liberada(s) · ${pendingWeeks} para revisão` : `${data.weeks.length} semanas prontas para revisão`;
   $("#results-subtitle").textContent = data.provider === "static-demo" ? "Modo público GitHub Pages: exemplo gerado no navegador, sem API." : data.provider === "fallback" ? "Exemplo local gerado sem API; use-o para validar o fluxo." : `Gerado por IA com ${data.model || "o provedor configurado"}. Revise antes de publicar.`;
   $("#results-section").classList.remove("hidden");
   $("#empty-state").classList.add("hidden");
   const alert = $("#result-alert");
   alert.className = "result-alert";
-  alert.textContent = data.provider === "static-demo" ? "Esta versão pública gera exemplos diretamente no navegador. A IA será conectada em uma hospedagem com backend protegido quando você escolher essa opção." : data.provider === "fallback" ? "Este é um exemplo estrutural. A geração por IA será ativada quando OPENAI_API_KEY estiver configurada." : state.validation?.readyForExport ? "A geração terminou. Faça a revisão humana de cada semana e, depois, baixe os arquivos." : `A geração terminou, mas há ${state.validation?.summary?.blockedWeeks || 0} semana(s) bloqueada(s) e ${state.validation?.summary?.reviewWeeks || 0} em revisão. Abra cada semana antes de exportar.`;
+  const automaticSummary = state.validation?.summary ? `Diagnóstico automático: ${state.validation.summary.blockedWeeks || 0} bloqueada(s) e ${state.validation.summary.reviewWeeks || 0} em revisão.` : "";
+  alert.textContent = data.provider === "static-demo" ? "Esta versão pública gera exemplos diretamente no navegador. A IA será conectada em uma hospedagem com backend protegido quando você escolher essa opção." : data.provider === "fallback" ? "Este é um exemplo estrutural. A geração por IA será ativada quando OPENAI_API_KEY estiver configurada." : approvedWeeks ? `${approvedWeeks} semana(s) liberada(s) por você; ${pendingWeeks} ainda aguardam sua revisão. ${automaticSummary}` : state.validation?.readyForExport ? "A geração terminou. Faça a revisão humana de cada semana e, depois, baixe os arquivos." : `A geração terminou. ${pendingWeeks} semana(s) ainda aguardam sua revisão. ${automaticSummary}`;
   const cards = data.weeks.map((lesson, index) => {
     const meta = lesson.meta || {};
     const workload = data.workload?.weeks?.[index];
