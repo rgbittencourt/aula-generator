@@ -35,3 +35,28 @@ test("pesquisa simulada seleciona imagem/leitura e gera blocos Aula Studio", asy
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = previousKey;
   }
 });
+
+test("fallback da curadoria insere recurso real quando a IA retorna seleção vazia", async () => {
+  const input = normalizeCourseInput({ title: "Teste visual", weeks: 1, content: "Fluxo de indicadores educacionais.", objectives: ["Analisar indicadores"] });
+  const lesson = buildFallbackLesson(input, 0);
+  const previousFetch = globalThis.fetch;
+  const previousKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key";
+  globalThis.fetch = async (url) => {
+    const value = String(url);
+    if (value.includes("commons.wikimedia.org")) return new Response(JSON.stringify({ query: { pages: { "1": { title: "File:Diagrama.png", imageinfo: [{ thumburl: "https://commons.wikimedia.org/thumb/diagrama.png", descriptionurl: "https://commons.wikimedia.org/wiki/File:Diagrama.png", extmetadata: { ImageDescription: { value: "Diagrama de indicadores" }, LicenseShortName: { value: "CC BY-SA" } } }] } } } }), { status: 200 });
+    if (value.includes("api.crossref.org")) return new Response(JSON.stringify({ message: { items: [] } }), { status: 200 });
+    if (value.includes("/chat/completions")) return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ videos: [], images: [], readings: [] }) } }] }), { status: 200 });
+    return new Response("{}", { status: 200 });
+  };
+  try {
+    const [result] = await enrichLessonsWithResources(input, [lesson]);
+    const topic = result.blocks.find((block) => block.type === "topic");
+    const image = topic?.props?.children?.find((block) => block.type === "imagem");
+    assert.equal(result.lessonPlan.resourceResearch.status, "ai-selected-with-provider-fallback");
+    assert.equal(image?.props?.src, "https://commons.wikimedia.org/thumb/diagrama.png");
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = previousKey;
+  }
+});

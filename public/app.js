@@ -499,11 +499,24 @@ async function assistBriefing() {
   finally { setBusy(button, false, ""); }
 }
 
+function resourceYoutubeId(value) {
+  return String(value || "").match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&#/]+)/i)?.[1] || "";
+}
+
 function resourcePreview(resource) {
   const title = resource.title || resource.kind || "Recurso";
-  const href = resource.href ? `<a href="${escapeHtml(resource.href)}" target="_blank" rel="noreferrer">${escapeHtml(resource.href)}</a>` : `<span>Busca sugerida: ${escapeHtml(resource.searchQuery || "a confirmar")}</span>`;
-  const detail = [resource.pedagogicalUse || resource.objective, resource.source, resource.license].filter(Boolean).join(" · ");
-  return `<div class="reader-resource"><div><strong>${escapeHtml(title)}</strong>${href}<small>${escapeHtml(detail || "Recurso contextualizado para esta seção.")}</small></div></div>`;
+  const kind = resource.kind || resource.type || "";
+  const videoId = kind === "video" ? resourceYoutubeId(resource.href) : "";
+  const isImage = kind === "image" && Boolean(resource.href);
+  const media = videoId
+    ? `<div class="reader-resource-media"><iframe src="https://www.youtube.com/embed/${encodeURIComponent(videoId)}" title="${escapeHtml(title)}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>`
+    : isImage
+      ? `<div class="reader-resource-media"><img src="${escapeHtml(resource.href)}" alt="${escapeHtml(resource.altText || resource.caption || title)}" loading="lazy" /></div>`
+      : "";
+  const sourceLink = resource.href ? `<a href="${escapeHtml(resource.href)}" target="_blank" rel="noreferrer">Abrir fonte</a>` : `<span>Busca sugerida: ${escapeHtml(resource.searchQuery || "a confirmar")}</span>`;
+  const approval = resource.humanApproval === "approved" || resource.verificationStatus === "verified" ? "Conferido" : resource.href ? "Link localizado · revisão humana pendente" : "Ainda é uma sugestão";
+  const detail = [resource.pedagogicalUse || resource.objective, resource.source, resource.license, approval].filter(Boolean).join(" · ");
+  return `<div class="reader-resource">${media}<div><strong>${escapeHtml(title)}</strong>${sourceLink}<small>${escapeHtml(detail || "Recurso contextualizado para esta seção.")}</small></div></div>`;
 }
 
 function renderLessonPreview(lesson, index) {

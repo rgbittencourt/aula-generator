@@ -5,10 +5,68 @@ import { ACADEMIC_SYSTEM_PROMPT, buildAcademicPlanPrompt, buildAcademicReviewPro
 
 const providerBase = () => (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
 
+function extractJsonValue(content) {
+  const source = String(content || "").replace(/^\uFEFF/, "").trim().replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  const starts = [source.indexOf("{"), source.indexOf("[")].filter((index) => index >= 0);
+  if (!starts.length) return source;
+  const start = Math.min(...starts);
+  let depth = 0;
+  let quoted = false;
+  let escaped = false;
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index];
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') quoted = false;
+      continue;
+    }
+    if (char === '"') { quoted = true; continue; }
+    if (char === "{" || char === "[") depth += 1;
+    if (char === "}" || char === "]") {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  return source.slice(start);
+}
+
+function removeTrailingCommas(value) {
+  let output = "";
+  let quoted = false;
+  let escaped = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if (quoted) {
+      output += char;
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') quoted = false;
+      continue;
+    }
+    if (char === '"') { quoted = true; output += char; continue; }
+    if (char === ",") {
+      let next = index + 1;
+      while (/\s/.test(value[next] || "")) next += 1;
+      if (value[next] === "}" || value[next] === "]") continue;
+    }
+    output += char;
+  }
+  return output;
+}
+
 function parseJson(content) {
   if (content && typeof content === "object") return content;
-  const text = String(content || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
-  return JSON.parse(text);
+  const candidate = extractJsonValue(content);
+  try {
+    return JSON.parse(candidate);
+  } catch (firstError) {
+    try {
+      return JSON.parse(removeTrailingCommas(candidate));
+    } catch {
+      throw firstError;
+    }
+  }
 }
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -30,7 +88,11 @@ async function callJson(messages, options = {}) {
     throw error;
   }
   const maxAttempts = Math.max(1, Number(process.env.OPENAI_MAX_RETRIES || 3));
+  let formatRetry = false;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const requestMessages = formatRetry
+      ? [...messages, { role: "user", content: "A resposta anterior veio em formato JSON inválido. Gere novamente exatamente o mesmo objeto, sem markdown, comentários ou texto fora do JSON; use aspas duplas em todas as propriedades e não deixe vírgula antes de } ou ]." }]
+      : messages;
     const response = await fetch(`${providerBase()}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
@@ -39,14 +101,28 @@ async function callJson(messages, options = {}) {
         temperature: options.temperature ?? 0.45,
         max_tokens: Math.max(256, Number(options.maxTokens || process.env.OPENAI_MAX_TOKENS || 16000)),
         response_format: { type: "json_object" },
-        messages
+        messages: requestMessages
       })
     });
     const payload = await response.json().catch(() => ({}));
     if (response.ok) {
       const content = payload?.choices?.[0]?.message?.content;
       if (!content) throw new Error("A API de IA retornou uma resposta vazia.");
-      return parseJson(content);
+      try {
+        const parsed = parseJson(content);
+        formatRetry = false;
+        return parsed;
+      } catch (error) {
+        if (attempt < maxAttempts - 1) {
+          formatRetry = true;
+          await wait(250);
+          continue;
+        }
+        const parseError = new Error(`A IA retornou uma resposta em JSON inválido após ${maxAttempts} tentativa(s). Tente refazer a semana novamente; a aula atual foi preservada. Detalhe técnico: ${error.message}`);
+        parseError.code = "AI_INVALID_JSON";
+        parseError.retryable = true;
+        throw parseError;
+      }
     }
     const detail = payload?.error?.message || `HTTP ${response.status}`;
     const retryable = response.status === 429 || response.status === 503;

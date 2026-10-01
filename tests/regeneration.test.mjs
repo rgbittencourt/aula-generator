@@ -64,3 +64,30 @@ test("regeneração single-pass usa contexto compacto e orçamento próprio", as
     }
   }
 });
+
+test("regeneração corrige JSON inválido e repete a chamada", async () => {
+  const previousFetch = global.fetch;
+  const previousKey = process.env.OPENAI_API_KEY;
+  const previousRetries = process.env.OPENAI_MAX_RETRIES;
+  process.env.OPENAI_API_KEY = "test-key";
+  process.env.OPENAI_MAX_RETRIES = "2";
+  let calls = 0;
+  global.fetch = async (_url, options) => {
+    calls += 1;
+    if (calls === 1) {
+      const malformed = '{"lessonPlan":{"theme":"Semana corrigida"},"teacherGuide":{oops:1}}';
+      return new Response(JSON.stringify({ choices: [{ message: { content: malformed } }] }), { status: 200 });
+    }
+    const content = JSON.stringify({ lessonPlan: { theme: "Semana corrigida" }, teacherGuide: {} });
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
+  };
+  try {
+    const result = await regenerateWeekWithAI({ title: "Curso", weeks: 1, objectives: ["Aplicar"], content: "Conteúdo", webPractices: [] }, 0, { lessonPlan: { theme: "Semana atual" } }, "Corrija o exemplo.");
+    assert.equal(calls, 2);
+    assert.equal(result.lessonPlan.theme, "Semana corrigida");
+  } finally {
+    global.fetch = previousFetch;
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = previousKey;
+    if (previousRetries === undefined) delete process.env.OPENAI_MAX_RETRIES; else process.env.OPENAI_MAX_RETRIES = previousRetries;
+  }
+});

@@ -171,6 +171,7 @@ function compactResearch(research) {
     providers: research.providers,
     queries: research.queries,
     selections: research.selections,
+    selectionFallbacks: research.selectionFallbacks || [],
     alternatives: research.alternatives
   };
 }
@@ -256,6 +257,20 @@ function fallbackSelection(results) {
   });
 }
 
+function ensureSelectionCoverage(selection, type, results, limit) {
+  const raw = Array.isArray(selection?.[type]) ? selection[type] : null;
+  const candidateIds = new Set(results.flatMap((result) => result.candidates || []).map((candidate) => candidate.candidateId));
+  const hasCandidates = candidateIds.size > 0;
+  const hasInvalidPositiveSelection = Array.isArray(raw) && raw.some((item) => item?.keep !== false && !candidateIds.has(item?.candidateId));
+  // Uma resposta vazia ou com IDs inexistentes é falha de formato, não uma
+  // decisão pedagógica. Usa-se o primeiro candidato apenas como fallback
+  // rastreável e ainda pendente de aprovação humana.
+  if (hasCandidates && (raw === null || raw.length === 0 || hasInvalidPositiveSelection)) {
+    return { items: fallbackSelection(results).slice(0, limit), fallback: `${type}: resposta da curadoria sem seleção utilizável; primeiro candidato inserido para revisão humana.` };
+  }
+  return { items: raw || [], fallback: "" };
+}
+
 function blockKey(value) { return text(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 70) || "recurso"; }
 function youtubeId(value) { return text(value).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&#/]+)/i)?.[1] || ""; }
 
@@ -326,6 +341,12 @@ export async function enrichLessonsWithResources(input, lessons) {
       selectionStatus = "fallback-ranking";
       selection = { videos: fallbackSelection(videos), images: fallbackSelection(images), readings: fallbackSelection(readings), error: error.message };
     }
+    const videoSelection = ensureSelectionCoverage(selection, "videos", videos, 2);
+    const imageSelection = ensureSelectionCoverage(selection, "images", images, 3);
+    const readingSelection = ensureSelectionCoverage(selection, "readings", readings, 3);
+    const selectionFallbacks = [videoSelection.fallback, imageSelection.fallback, readingSelection.fallback].filter(Boolean);
+    if (selectionFallbacks.length && selectionStatus === "ai-selected") selectionStatus = "ai-selected-with-provider-fallback";
+    selection = { ...selection, videos: videoSelection.items, images: imageSelection.items, readings: readingSelection.items, fallbacks: selectionFallbacks };
     const chosenVideos = selectedEntries("videos", selection, videos);
     const chosenImages = selectedEntries("images", selection, images);
     const chosenReadings = selectedEntries("readings", selection, readings);
@@ -341,7 +362,7 @@ export async function enrichLessonsWithResources(input, lessons) {
       readingsExtra: [...withoutPlaceholders(existingResources.readingsExtra), ...selectedResources.readings]
     };
     const alternatives = flattenCandidates(research).filter((candidate) => !selectedResources.videos.concat(selectedResources.images, selectedResources.readings).some((resource) => resource.candidateId === candidate.candidateId)).slice(0, 30);
-    const resourceResearch = compactResearch({ ...research, status: selectionStatus, selections: selection, alternatives });
+    const resourceResearch = compactResearch({ ...research, status: selectionStatus, selections: selection, selectionFallbacks, alternatives });
     const enriched = { ...lesson, lessonPlan: { ...lesson.lessonPlan, resources, resourceResearch } };
     enriched.blocks = syncResourceBlocks(enriched, selectedResources);
     return enriched;

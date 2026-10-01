@@ -29,7 +29,7 @@ export default async function handler(request, response) {
     response.setHeader("Cache-Control", "no-store");
     return response.status(200).json({ ok: true, provider: "ai-regenerate", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", weekIndex: index, instruction, input, workload, generalPlan: { ...generalPlan, validation }, validation, week: enrichedWeeks[index], weeks: enrichedWeeks, teacherGuides });
   } catch (error) {
-    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : 400;
+    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_INVALID_JSON" ? 502 : 400;
     return response.status(status).json({ ok: false, error: error.message || "Não foi possível refazer a semana." });
   }
 }
