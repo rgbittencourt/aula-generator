@@ -1,4 +1,4 @@
-import { KNOWN_BLOCK_TYPES, normalizeLesson, normalizeWeeklyOutput } from "./aula-schema.js";
+import { KNOWN_BLOCK_TYPES, normalizeLesson, normalizeWeeklyOutput, practiceScheduledForWeek } from "./aula-schema.js";
 import { measureLessonQuality, qualityPromptGuidance } from "./content-quality.js";
 import { buildTeacherGuide } from "./teacher-guide.js";
 import { ACADEMIC_SYSTEM_PROMPT, buildAcademicPlanPrompt, buildAcademicReviewPrompt, normalizeAcademicPlan, normalizeAcademicReview, normalizeAcademicProfile } from "./academic.js";
@@ -73,8 +73,9 @@ Regras:
 - produza objetivos observáveis, progressivos e adequados ao público e ao nível;
 - organize o conteúdo em uma sequência didática coerente com o número de semanas e a carga horária;
 - respeite o academicProfile recebido, especialmente profundidade, quantidade de seções, referências e exigência de contrapontos;
-- se webpráticas estiverem ativadas, gere no mínimo uma e, quando pedagogicamente justificável, várias práticas distintas. Cada objeto deve conter title, type, moments, objective, preparation, materials, instructions, steps, product, criteria, assessment, continuation, fallbackPlan, resources e durationMinutes;
-- alinhe cada webprática a objetivos e conteúdos específicos, distribuindo-as em momentos coerentes do calendário;
+- se webpráticas estiverem ativadas, gere no mínimo uma e, quando pedagogicamente justificável, várias práticas distintas. Cada objeto deve conter title, type, modality, weekNumber/date quando disponível, startTime/endTime quando disponíveis, platform/tool, context, problem, objective, preparation, teacherPreparation, studentPreparation, materials, instructions, steps, product, criteria, rubric, assessment, continuation, fallbackPlan, prompts, artifacts, resources, roteiro com blocos cronometrados e durationMinutes;
+- trate cada webprática como aula síncrona ou laboratório independente, com roteiro operacional próprio; nunca a transforme em leitura, seção, atividade ou bloco do texto-base semanal;
+- alinhe cada webprática a objetivos e conteúdos específicos, distribuindo-as em semanas e datas coerentes do calendário;
 - gere materiais de apoio como objetos com type, title, link, moment, required, objective, alignment, use, pages, durationMinutes e notes. Eles devem servir aos objetivos e conteúdos, indicar por que serão usados, em que momento entram e como o estudante trabalhará com eles;
 - para referências e artigos, sugira obras, autores, documentos ou fontes que o professor deve conferir; não invente URLs, DOI, páginas ou dados bibliográficos específicos;
 - para vídeos e imagens, gere termos de busca e intenção pedagógica; use links somente quando já tiverem sido fornecidos pelo usuário;
@@ -95,8 +96,16 @@ function normalizeBriefingPractice(practice, index) {
   return {
     id: text(practice?.id) || `webpractice-${index + 1}`,
     title: text(practice?.title) || `Webprática ${index + 1}`,
-    type: text(practice?.type) || "Pesquisa orientada",
-    modality: text(practice?.modality || practice?.format),
+    type: text(practice?.type) || "Laboratório prático",
+    modality: text(practice?.modality || practice?.format) || "Aula síncrona / laboratório prático",
+    weekNumber: Math.max(0, safeNumber(practice?.weekNumber || practice?.week, 0)),
+    date: text(practice?.date || practice?.sessionDate),
+    dayOfWeek: text(practice?.dayOfWeek || practice?.day),
+    startTime: text(practice?.startTime || practice?.start),
+    endTime: text(practice?.endTime || practice?.end),
+    platform: text(practice?.platform || practice?.environment),
+    tool: text(practice?.tool || practice?.tools),
+    sessionTitle: text(practice?.sessionTitle || practice?.sessionName),
     moments: stringList(practice?.moments || practice?.moment),
     objective: text(practice?.objective),
     preparation: text(practice?.preparation),
@@ -193,11 +202,12 @@ export function buildWeekGenerationPrompt(input, weekIndex = 0, academicPlan = n
   const weekNumber = weekIndex + 1;
   const previous = weekNumber > 1 ? `A semana anterior foi a ${weekNumber - 1}; retome um conceito dela e mostre como esta semana avança.` : "Esta é a abertura do curso; construa a base conceitual e anuncie o percurso.";
   const profile = normalizeAcademicProfile(input.academicProfile, input);
+  const scheduledPractices = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, weekIndex));
   return `Gere UMA semana de material didático: uma unidade didática semanal completa em JSON para o curso abaixo. Esta é a semana ${weekNumber} de ${input.weeks}. ${previous}
 
 ${qualityPromptGuidance(input)}
 
-O texto é o produto principal. Não entregue resumo, tópicos telegráficos, frases soltas, uma lista de links ou apenas instruções para o professor. Escreva para o estudante ler e aprender. O padrão de referência é uma aula em DOCX com abertura, objetivos, explicação conceitual, exemplos, casos, contrapontos críticos, síntese, glossário, referências e avaliação. Varie o arco didático conforme o tema; webprática só aparece se estiver programada para esta semana.
+O texto é o produto principal. Não entregue resumo, tópicos telegráficos, frases soltas, uma lista de links ou apenas instruções para o professor. Escreva para o estudante ler e aprender. O padrão de referência é uma aula em DOCX com abertura, objetivos, explicação conceitual, exemplos, casos, contrapontos críticos, síntese, glossário, referências e avaliação. Varie o arco didático conforme o tema. Webpráticas são aulas síncronas/laboratórios separados: nunca descreva, anuncie, instrua ou transforme a webprática em conteúdo-base desta semana.
 
 Retorne somente este objeto de alto nível: { meta, lessonPlan, teacherGuide }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. teacherGuide é exclusivo do professor e nunca deve ser repetido no conteúdo do aluno.
 
@@ -207,7 +217,7 @@ lessonPlan obrigatório:
 - prerequisites e contentDensity;
 - contentSections com 6–12 seções/subseções quando a complexidade pedir. Cada seção deve ter number, title, didacticRole, body com 180–450 palavras substanciais, subsections, caseStudy quando pertinente, reflection quando pertinente, keyTerms e resources. A progressão deve ir do problema/pergunta para conceitos, exemplos ou evidências, aplicação e crítica. Não repita a mesma introdução em seções diferentes;
 - resources com videos, readingsRequired, readingsExtra, images, podcasts e datasets. Cada recurso deve conter title, source, author quando conhecido, href somente se foi fornecido no briefing ou retornado por um provedor, required, sectionNumber ou moment, objective, guidingQuestion, pedagogicalUse, durationMinutes, altText/caption/credit para imagens, searchQuery quando o link não estiver disponível, verificationStatus e requiresVerification;
-- webPractices: preserve somente as práticas fornecidas e programadas para esta semana; se não houver prática programada, retorne []. Uma prática deve ser um projeto independente com problem, context, studentRole, challenge, deliverable, prerequisites, materials, data, steps (cada uma com minutes, instructions e evidence), criteria, rubric com níveis, examples, revision, fallbackPlan, accessibility e versões simplified/advanced. Desenvolva o projeto completo no teacherGuide; no JSON do aluno deixe somente a orientação necessária no ponto da atividade;
+- webPractices: retorne sempre [] dentro de lessonPlan. Se houver prática programada para esta semana, desenvolva o projeto completo exclusivamente em teacherGuide.webPracticeProjects, com problem, context, studentRole, challenge, deliverable, prerequisites, materials, data, steps (cada uma com minutes, instructions e evidence), criteria, rubric com níveis, examples, revision, fallbackPlan, accessibility, prompts, artifacts e versões simplified/advanced;
 - diagnostic com pergunta/problema inicial, evidência esperada e feedback; formativeChecks com perguntas durante o texto, momento, evidência, feedback e ação de intervenção;
 - activities para fóruns, discussões, produção, estudo de caso ou encontro síncrono, com type, title, instructions, durationMinutes, evidence, evidenceType, feedback, criteria e required;
 - alignmentMatrix: uma linha por objetivo, ligando contentSections, activities, evidence e assessmentQuestions. Não deixe objetivo sem atividade, evidência e avaliação;
@@ -228,11 +238,11 @@ Regras de escrita:
 - conecte o tema à realidade do público (${input.audience}) e do nível (${input.level}); use os exemplos, recortes regionais e instituições fornecidos no briefing;
 - inclua pelo menos um exemplo concreto, uma situação-problema ou estudo de caso e um contraponto/limite quando forem pertinentes;
 - integre vídeos, imagens, artigos e leituras na seção em que serão usados, explicando o que o estudante deve observar ou responder; não crie uma galeria final de links;
-- não force diagnóstico, vídeo, leitura, webprática ou quiz quando não houver função pedagógica;
+- não force diagnóstico, vídeo, leitura, webprática ou quiz quando não houver função pedagógica; webprática nunca deve aparecer no corpo do texto-base, nas contentSections, no welcome, na síntese ou nas atividades da aula semanal;
 - nunca invente URLs, DOI, durações, autores, números ou referências verificadas. Para recurso ainda não conferido, use searchQuery e verificationStatus "suggested-no-url";
 - não escreva markdown fora das strings do JSON e não inclua comentários.
 
-teacherGuide deve trazer purpose, didacticArc, alignmentMatrix, diagnostic, formativeChecks, mediationQuestions, commonMisconceptions, interventions, differentiation, accessibility, assessmentNotes, selfAssessment, spiralReview, resourceNotes, qualityReview e workloadAdvice. Se houver webprática programada, inclua preparação, roteiro com minutos, prompts, produto, critérios, plano B e artefatos.
+teacherGuide deve trazer purpose, didacticArc, alignmentMatrix, diagnostic, formativeChecks, mediationQuestions, commonMisconceptions, interventions, differentiation, accessibility, assessmentNotes, selfAssessment, spiralReview, resourceNotes, qualityReview e workloadAdvice. Se houver webprática programada, inclua em webPracticeProjects a preparação do professor e do aluno, agenda, roteiro com minutos, falas/prompts, produto, critérios, rubrica, plano B, acessibilidade e artefatos. Esse projeto será exportado em DOCX separado.
 
 Perfil acadêmico desta trilha:
 ${JSON.stringify(profile, null, 2)}
@@ -240,18 +250,22 @@ ${JSON.stringify(profile, null, 2)}
 Planejamento acadêmico prévio desta semana:
 ${JSON.stringify(academicPlan || { status: "não disponível; construa um plano interno antes de escrever" }, null, 2)}
 
-Briefing estruturado:
-${JSON.stringify({ ...input, weekToGenerate: weekNumber }, null, 2)}
+Briefing estruturado da aula-base:
+${JSON.stringify({ ...input, webPractices: [], weekToGenerate: weekNumber }, null, 2)}
+
+Sessões práticas independentes agendadas para esta semana (não inserir no texto-base; desenvolver somente em teacherGuide.webPracticeProjects e no DOCX separado):
+${JSON.stringify(scheduledPractices, null, 2)}
 
 Retorne JSON completo, sem omitir propriedades obrigatórias.`;
 }
 
 export function buildGenerationPrompt(input) {
-  return `Gere ${input.weeks} semanas, uma por objeto, seguindo o contrato de buildWeekGenerationPrompt e o academicProfile recebido. O processo esperado é planejamento acadêmico, redação completa, revisão crítica e reescrita condicional. Varie o arco didático conforme o conteúdo; não inclua webprática em semanas não programadas; misture recursos no ponto de uso; mantenha teacherGuide separado e produza blocks exclusivamente para o aluno no Aula Studio. A carga horária será calculada depois do conteúdo.\n\n${JSON.stringify(input, null, 2)}`;
+  return `Gere ${input.weeks} semanas, uma por objeto, seguindo o contrato de buildWeekGenerationPrompt e o academicProfile recebido. O processo esperado é planejamento acadêmico, redação completa, revisão crítica e reescrita condicional. Varie o arco didático conforme o conteúdo; lessonPlan.webPractices deve ser sempre []; não inclua webprática no texto-base ou em semanas não programadas; desenvolva sessões agendadas somente em teacherGuide.webPracticeProjects; misture recursos no ponto de uso; mantenha teacherGuide separado e produza blocks exclusivamente para o aluno no Aula Studio. A carga horária será calculada depois do conteúdo.\n\n${JSON.stringify(input, null, 2)}`;
 }
 
 async function repairWeekWithAI(input, index, raw, quality, academicPlan = {}, academicReview = {}) {
   const weekNumber = index + 1;
+  const scheduledPractices = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index));
   const prompt = `A semana ${weekNumber} abaixo foi rejeitada por insuficiência textual. Reescreva a unidade inteira, não faça um resumo e não remova conteúdo que já esteja bom.
 
 ${qualityPromptGuidance(input)}
@@ -259,13 +273,13 @@ ${qualityPromptGuidance(input)}
 Problemas estruturais detectados: ${quality.issues.join("; ") || "conteúdo abaixo do padrão"}.
 Problemas acadêmicos detectados: ${(academicReview.issues || []).map((issue) => issue.description).join("; ") || "nenhum relatório disponível"}.
 
-Entregue somente { lessonPlan, teacherGuide }. lessonPlan precisa ter título específico, welcome, 4–8 objetivos observáveis, contentSections conforme o academicProfile, exemplos/caso/contraponto, synthesis, nextWeekConnection, glossary, references estruturadas, claimEvidence, assessment com 6 questões e timePlan. Não gere blocks. Não invente URLs ou referências verificadas; use searchQuery para recursos sem link. Preserve o mapa de evidências e marque toda pendência como needs-human-review.
+Entregue somente { lessonPlan, teacherGuide }. lessonPlan precisa ter título específico, welcome, 4–8 objetivos observáveis, contentSections conforme o academicProfile, exemplos/caso/contraponto, synthesis, nextWeekConnection, glossary, references estruturadas, claimEvidence, assessment com 6 questões e timePlan. lessonPlan.webPractices deve ser sempre []; não mencione a sessão prática no texto-base. Se houver prática agendada, mantenha o projeto completo somente em teacherGuide.webPracticeProjects. Não gere blocks. Não invente URLs ou referências verificadas; use searchQuery para recursos sem link. Preserve o mapa de evidências e marque toda pendência como needs-human-review.
 
 Semana a revisar:
 ${JSON.stringify(raw?.lessonPlan || raw, null, 2)}
 
 Briefing do curso:
-${JSON.stringify({ ...input, weekToGenerate: weekNumber }, null, 2)}
+${JSON.stringify({ ...input, webPractices: [], scheduledWebPractices: scheduledPractices, weekToGenerate: weekNumber }, null, 2)}
 
 Planejamento acadêmico:
 ${JSON.stringify(academicPlan, null, 2)}
@@ -362,7 +376,7 @@ export async function regenerateWeekWithAI(input, index, currentWeek, instructio
     academicProfile: normalizeAcademicProfile(input.academicProfile, input),
     references: (input.references || []).slice(0, 12),
     materials: (input.materials || []).slice(0, 12).map((item) => ({ title: item.title, type: item.type, link: item.link, moment: item.moment, objective: item.objective, alignment: item.alignment, use: item.use, pages: item.pages, durationMinutes: item.durationMinutes })),
-    webPractices: (input.webPractices || []).slice(0, 6).map((item) => ({ title: item.title, moments: item.moments, objective: item.objective, instructions: item.instructions, product: item.product, durationMinutes: item.durationMinutes })),
+    webPractices: [],
     weekToGenerate: weekNumber
   };
   const compactWeek = {
@@ -399,7 +413,7 @@ export async function regenerateWeekWithAI(input, index, currentWeek, instructio
 Preserve o que estiver bom, mas cumpra a solicitação de forma visível. A semana deve continuar sendo uma unidade didática completa, não um resumo. ${qualityPromptGuidance(input)}
 Faça uma revisão acadêmica explícita: corrija afirmações sem suporte, diferencie fato e interpretação, acrescente contraponto quando exigido, preserve o mapa de evidências e não invente fontes. ${normalizeAcademicProfile(input.academicProfile, input).sourcePolicy}
 
-Retorne apenas { lessonPlan, teacherGuide }. Não gere blocks; o servidor os monta para o Aula Studio. lessonPlan deve manter título específico, welcome, objetivos observáveis, seções conforme o perfil, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. Não invente URLs ou fontes verificadas.
+Retorne apenas { lessonPlan, teacherGuide }. Não gere blocks; o servidor os monta para o Aula Studio. lessonPlan deve manter título específico, welcome, objetivos observáveis, seções conforme o perfil, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. lessonPlan.webPractices deve ser sempre []; não inclua qualquer descrição ou instrução da sessão prática no texto-base. Preserve um eventual projeto prático apenas em teacherGuide.webPracticeProjects. Não invente URLs ou fontes verificadas.
 
 Briefing essencial do curso:
 ${JSON.stringify(compactInput, null, 2)}
@@ -436,6 +450,9 @@ export async function generateWithAI(input) {
     weeks.push(...batch);
   }
   const normalizedWeeks = normalizeWeeklyOutput({ weeks }, input);
-  const teacherGuides = normalizedWeeks.map((lesson, index) => buildTeacherGuide(input, lesson, { ...(weeks[index]?.teacherGuide || {}), webPractices: weeks[index]?.teacherGuide?.webPractices || weeks[index]?.lessonPlan?.webPractices || input.webPractices }, index));
+  const teacherGuides = normalizedWeeks.map((lesson, index) => {
+    const scopedInput = { ...input, webPractices: (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index)) };
+    return buildTeacherGuide(scopedInput, lesson, { ...(weeks[index]?.teacherGuide || {}), webPracticeProjects: weeks[index]?.teacherGuide?.webPracticeProjects || weeks[index]?.teacherGuide?.webPractices || [] }, index);
+  });
   return { weeks: normalizedWeeks, teacherGuides };
 }

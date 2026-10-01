@@ -21,7 +21,7 @@ O Aula Studio mantém sua identidade complementar em `assets/aula-mark.svg`, `as
 ## Situação atual
 
 - **GitHub Pages:** versão pública estática em <https://rgbittencourt.github.io/aula-generator/>. Gera exemplos e ZIP diretamente no navegador, sem IA.
-- **Vercel:** implantação recomendada para ativar IA, pesquisa de recursos, PDF do professor e ZIP completo. O mesmo repositório executa o frontend e as funções serverless.
+- **Vercel:** implantação recomendada para ativar IA, pesquisa de recursos, PDF do professor, DOCX individual e ZIP completo. O mesmo repositório executa o frontend e as funções serverless.
 - **Segurança:** as chaves da OpenAI e do YouTube devem ser cadastradas somente como variáveis secretas da Vercel. Elas nunca devem entrar no GitHub, no arquivo `.env` versionado ou nesta conversa.
 
 ## Salvamento e recuperação contra queda de energia
@@ -137,16 +137,17 @@ Não existe uma sequência rígida para todas as semanas. A IA escolhe um arco a
 
 A aplicação produz duas camadas diferentes:
 
-- **Aula do aluno:** cada semana é um `.aula.json` compatível com o botão **Abrir** do Aula Studio. Ele contém apenas a experiência de aprendizagem do aluno: texto, objetivos, recursos contextualizados, atividades, avaliação, síntese e metadados de carga.
+- **Aula do aluno:** cada semana é um `.aula.json` compatível com o botão **Abrir** do Aula Studio. Ele contém apenas a experiência de aprendizagem do aluno: texto, objetivos, recursos contextualizados, atividades, avaliação, síntese e metadados de carga. `lessonPlan.webPractices` é sempre `[]`.
 - **Guia do professor:** é mantido fora do JSON do aluno e exportado em PDF. Reúne intenção pedagógica, arco didático, matriz de alinhamento, diagnóstico, perguntas de mediação, equívocos comuns, intervenções, diferenciação, acessibilidade, avaliação, revisão espiral e checklist.
+- **Roteiro de webprática:** cada sessão prática agendada é mantida em `teacherGuide.webPracticeProjects` e exportada como DOCX editável próprio, sem ser inserida no texto-base semanal.
 
-Na tela de resultados, **Baixar JSON do aluno** baixa somente a semana selecionada. **Guia do professor PDF** baixa o documento de mediação. **Pacote completo ZIP** reúne os JSONs, o Planejamento Geral, o PDF do professor e os projetos de webprática.
+Na tela de resultados, **Baixar JSON do aluno** baixa somente a semana selecionada. O painel separado **Webpráticas programadas** mostra a agenda e oferece **Baixar DOCX** para cada sessão. **Guia do professor PDF** baixa o documento de mediação. **Pacote completo ZIP** reúne os JSONs, o Planejamento Geral, o PDF do professor e os projetos de webprática em Markdown, JSON, arquivos auxiliares e DOCX.
 
 ## Webpráticas como projetos independentes
 
-Webprática não é obrigatória em toda semana. No formulário, ela é cadastrada como um projeto independente, com tema, momento, objetivo, preparação, materiais, etapas, produto, evidências, rubrica, prompts, arquivos-exemplo, acessibilidade e plano B. A IA só associa uma prática às semanas em que ela estiver programada ou fizer sentido segundo o briefing; não inventa uma webprática para completar a estrutura.
+Webprática não é obrigatória em toda semana. Ela é uma **aula síncrona ou laboratório prático independente**, em que os estudantes usam uma ferramenta, constroem um artefato, testam uma hipótese ou resolvem uma situação-problema. No formulário, cada sessão precisa de título e de **semana ou data**; também pode receber dia, horário, plataforma, ferramenta, objetivo, contexto, preparação, materiais, etapas, produto, evidências, rubrica, prompts, acessibilidade e plano B. A IA só desenvolve o projeto na semana em que ele está agendado; não inventa uma webprática para completar a estrutura.
 
-A aula do aluno recebe apenas uma orientação curta de participação quando a prática estiver ativa. O projeto completo vai para `webpraticas/` no ZIP e também é descrito no guia do professor.
+Nada da webprática entra na aula-base do aluno: não entra no texto, nos blocos, nas atividades ou no `.aula.json`. O projeto completo fica em `teacherGuide.webPracticeProjects`, é descrito no PDF do professor e vai para `webpraticas/` no ZIP como `roteiro-webpratica.docx`, Markdown, JSON e arquivos auxiliares.
 
 ## Cálculos isolados da aplicação
 
@@ -184,7 +185,8 @@ Sem `YOUTUBE_API_KEY`, o gerador continua pesquisando imagens/diagramas e leitur
 | `POST /api/assemble-course` | consolida semanas já geradas e calcula o Planejamento Geral |
 | `POST /api/regenerate-week` | refaz somente uma semana com instrução do professor e recalcula o curso |
 | `POST /api/teacher-pdf` | devolve somente o PDF do guia do professor |
-| `POST /api/zip` | devolve o pacote completo, incluindo PDF e webpráticas |
+| `POST /api/webpractice-docx` | devolve o DOCX editável de uma webprática por `practiceId` ou índice |
+| `POST /api/zip` | devolve o pacote completo, incluindo PDF, DOCX e webpráticas |
 
 ## Uso local com IA
 
@@ -230,6 +232,7 @@ planejamento-geral.json
 professor/guia-do-professor.pdf
 webpraticas/01-tema/guia-e-roteiro.md
 webpraticas/01-tema/pacote.json
+webpraticas/01-tema/roteiro-webpratica.docx
 webpraticas/01-tema/arquivos/*
 ```
 

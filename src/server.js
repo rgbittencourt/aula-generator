@@ -8,8 +8,9 @@ import { assistBriefing, generateOneWeek, generateWithAI, regenerateWeekWithAI }
 import { enrichLessonsWithResources } from "./research.js";
 import { createWeeksZip } from "./zip.js";
 import { accessRequired, hasValidAccess } from "./access.js";
-import { buildTeacherGuides } from "./teacher-guide.js";
+import { buildTeacherGuides, collectWebPracticeProjects } from "./teacher-guide.js";
 import { createTeacherGuidePdf } from "./pdf.js";
+import { createWebPracticeDocx } from "./webpractice.js";
 import { validateCourse } from "./validation.js";
 import { assembleCourse } from "./course-assembly.js";
 
@@ -183,6 +184,28 @@ app.post("/api/teacher-pdf", async (req, res) => {
     res.send(buffer);
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message || "Não foi possível criar o PDF do professor." });
+  }
+});
+
+app.post("/api/webpractice-docx", async (req, res) => {
+  if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
+  try {
+    const input = normalizeCourseInput(req.body?.input || {});
+    const weeks = normalizeWeeklyOutput({ weeks: req.body?.weeks || [] }, input);
+    const guides = buildTeacherGuides(input, weeks, req.body?.teacherGuides || []);
+    const projects = collectWebPracticeProjects(input, guides);
+    const requestedId = String(req.body?.practiceId || "").trim();
+    const requestedIndex = Number.parseInt(req.body?.practiceIndex, 10);
+    const practice = requestedId ? projects.find((item) => String(item.id || "").trim() === requestedId || String(item.title || "").trim() === requestedId) : projects[Number.isInteger(requestedIndex) ? requestedIndex : 0];
+    if (!practice) return res.status(404).json({ ok: false, error: "Webprática não encontrada no planejamento." });
+    const index = projects.indexOf(practice);
+    const buffer = await createWebPracticeDocx(input, practice, Math.max(0, index));
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", `attachment; filename="${slugify(practice.title || `webpratica-${index + 1}`, `webpratica-${index + 1}`)}-roteiro.docx"`);
+    res.setHeader("Cache-Control", "no-store");
+    res.send(buffer);
+  } catch (error) {
+    res.status(400).json({ ok: false, error: error.message || "Não foi possível criar o DOCX da webprática." });
   }
 });
 

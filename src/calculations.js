@@ -9,6 +9,7 @@ import {
   synchronousCommunicationMinutes,
   formulaProfileSummary
 } from "./formula-profile.js";
+import { practiceScheduledForWeek } from "./aula-schema.js";
 
 const round = (value) => Math.max(0, Math.round(Number(value) || 0));
 const decimal = (value) => Math.max(0, Math.round((Number(value) || 0) * 100) / 100);
@@ -86,7 +87,8 @@ function estimateResourceItems(lesson, profile) {
 }
 
 function estimatePracticeItems(lesson, input, profile) {
-  const practices = Array.isArray(lesson?.lessonPlan?.webPractices) && lesson.lessonPlan.webPractices.length ? lesson.lessonPlan.webPractices : (input.webPractices || []);
+  const weekIndex = Math.max(0, Number(lesson?.meta?.weekNumber || 1) - 1);
+  const practices = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, weekIndex));
   return practices.map((practice, index) => {
     const minutes = positive(practice.durationMinutes || practice.sessionMinutes) || (Array.isArray(practice.steps) ? practice.steps.reduce((sum, step) => sum + positive(step.minutes), 0) : 0);
     return item({ id: `webpractice-${index + 1}`, title: practice.title || `Webprática ${index + 1}`, category: "practice", minutes, basis: minutes ? "duração da sessão/etapas da webprática" : "webprática sem duração definida", confidence: minutes ? "medium" : "low", required: true, formulaKey: "webPractice", details: { type: practice.type, moments: practice.moments, artifacts: (practice.artifacts || []).length } });
@@ -253,9 +255,9 @@ export function buildGeneralPlan(input, workload, lessons = [], teacherGuides = 
     (week.unresolved || []).forEach((entry) => unresolved.push({ ...entry, weekNumber: week.weekNumber }));
   }
   const webPractices = [];
-  (teacherGuides || []).forEach((guide) => (guide.webPractices || []).forEach((practice) => { if (!webPractices.some((current) => current.id === practice.id)) webPractices.push(practice); }));
+  (teacherGuides || []).forEach((guide) => (guide.webPracticeProjects || guide.webPractices || []).forEach((practice) => { if (!webPractices.some((current) => current.id === practice.id)) webPractices.push(practice); }));
   if (!webPractices.length) (lessons || []).forEach((lesson) => (lesson.lessonPlan?.webPractices || []).forEach((practice) => { if (!webPractices.some((current) => current.id === practice.id)) webPractices.push(practice); }));
-  if (!webPractices.length) input.webPractices.forEach((practice) => { if (!webPractices.some((current) => current.id === practice.id)) webPractices.push(practice); });
+  if (!webPractices.length) input.webPractices.filter((practice) => Number(practice.weekNumber || practice.week) > 0 || text(practice.date || practice.sessionDate) || Array.isArray(practice.moments) && practice.moments.length).forEach((practice) => { if (!webPractices.some((current) => current.id === practice.id)) webPractices.push(practice); });
   const target = workload.totalTargetLearnerMinutes || workload.totalMinutes || 0;
   const calculated = workload.calculatedMinutes || workload.derivedMinutes || 0;
   const progression = lessons.map((lesson, index) => ({ weekNumber: index + 1, theme: lesson.lessonPlan?.theme, previousConceptsReviewed: lesson.lessonPlan?.spiralReview?.previousConceptsReviewed || [], newConcepts: lesson.lessonPlan?.spiralReview?.newConcepts || [], preparationForNextWeek: lesson.lessonPlan?.spiralReview?.preparationForNextWeek || [], projectMilestone: lesson.lessonPlan?.spiralReview?.projectMilestone || "" }));
@@ -269,7 +271,8 @@ export function buildGeneralPlan(input, workload, lessons = [], teacherGuides = 
     weeks: (workload.weeks || []).map((week) => ({ weekNumber: week.weekNumber, targetMinutes: week.targetMinutes, calculatedMinutes: week.calculatedMinutes, requiredMinutes: week.requiredMinutes, optionalMinutes: week.optionalMinutes, varianceMinutes: week.varianceMinutes, fitStatus: week.fitStatus, items: week.items, unresolved: week.unresolved, workloadAdjustment: week.workloadAdjustment })),
     webPractices,
     didacticArcs: (teacherGuides || []).map((guide) => ({ weekNumber: guide.weekNumber, id: guide.didacticArc?.id, label: guide.didacticArc?.label })),
-    teacherGuide: { available: Boolean(teacherGuides?.length), format: "pdf" },
+    webPracticeSchedule: webPractices.map((practice) => ({ id: practice.id, title: practice.title, weekNumber: practice.weekNumber || null, date: practice.date || "", dayOfWeek: practice.dayOfWeek || "", startTime: practice.startTime || "", endTime: practice.endTime || "", modality: practice.modality || "", durationMinutes: practice.durationMinutes || 0 })),
+    teacherGuide: { available: Boolean(teacherGuides?.length), format: "pdf + docx por webprática" },
     progression,
     pedagogicalChecks: lessons.map((lesson) => ({ weekNumber: lesson.meta?.weekNumber, review: lesson.lessonPlan?.pedagogicalReview, contentQuality: lesson.contentQuality })),
     pedagogicalChecklist: checklist,

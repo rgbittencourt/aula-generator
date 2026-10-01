@@ -196,8 +196,16 @@ function normalizePractice(value = {}, index = 0) {
   return {
     id: text(practice.id, `webpractice-${index + 1}`),
     title: text(practice.title, `Webprática ${index + 1}`),
-    type: text(practice.type, "Pesquisa orientada"),
-    modality: text(practice.modality || practice.format),
+    type: text(practice.type, "Laboratório prático"),
+    modality: text(practice.modality || practice.format, "Aula síncrona / laboratório prático"),
+    weekNumber: Math.max(0, integer(practice.weekNumber || practice.week, 0)),
+    date: validDate(practice.date || practice.sessionDate) ? text(practice.date || practice.sessionDate) : "",
+    dayOfWeek: text(practice.dayOfWeek || practice.day),
+    startTime: text(practice.startTime || practice.start),
+    endTime: text(practice.endTime || practice.end),
+    platform: text(practice.platform || practice.environment),
+    tool: text(practice.tool || practice.tools),
+    sessionTitle: text(practice.sessionTitle || practice.sessionName),
     context: text(practice.context || practice.scenario || practice.problem),
     problem: text(practice.problem || practice.context || practice.scenario),
     studentRole: text(practice.studentRole || practice.role),
@@ -432,7 +440,9 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
   const images = normalizeResources(resources.images || plan.images, "image");
   const podcasts = normalizeResources(resources.podcasts || plan.podcasts, "podcast");
   const datasets = normalizeResources(resources.datasets || plan.datasets, "dataset");
-  const practices = Array.isArray(plan.webPractices) ? plan.webPractices.map(normalizePractice) : (input.webPractices || []).map(normalizePractice);
+  // A webprática é uma sessão síncrona independente e será entregue em DOCX.
+  // Nunca a misture no texto-base nem nos blocos do aluno.
+  const practices = [];
   const activities = normalizeActivities(plan.activities);
   const normalized = {
     weekNumber: index + 1,
@@ -441,10 +451,10 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
     learningObjectives: splitLines(plan.learningObjectives || plan.objectives).length ? splitLines(plan.learningObjectives || plan.objectives) : defaultWeeklyObjectives(input, index),
     prerequisites: splitLines(plan.prerequisites),
     contentDensity: text(plan.contentDensity, "completa"),
-    didacticArc: normalizeDidacticArc(plan.didacticArc, practices.length > 0, index),
+    didacticArc: normalizeDidacticArc(plan.didacticArc, false, index),
     contentSections,
     resources: { videos, readingsRequired: requiredReadings, readingsExtra: extraReadings, images, podcasts, datasets },
-    webPractices: practices.map(studentPractice),
+    webPractices: [],
     activities,
     diagnostic: normalizeDiagnostic(plan.diagnostic || plan.initialDiagnostic),
     formativeChecks: normalizeFormativeChecks(plan.formativeChecks || plan.checkpoints),
@@ -515,6 +525,27 @@ export function weekCalendar(input, index) {
   return { weekNumber, label: `Semana ${weekNumber} · ${startDate.split("-").reverse().join("/")}`, startDate, endDate };
 }
 
+export function practiceScheduledForWeek(practice = {}, input = {}, index = 0) {
+  const weekNumber = index + 1;
+  const directWeek = Math.max(0, integer(practice.weekNumber || practice.week, 0));
+  const date = text(practice.date || practice.sessionDate);
+  const hasDate = validDate(date);
+  if (directWeek && directWeek !== weekNumber) return false;
+  if (hasDate) {
+    if (input.calendarMode !== "calendar" || !input.startDate) return false;
+    const calendar = weekCalendar(input, index);
+    return date >= calendar.startDate && date <= calendar.endDate;
+  }
+  if (directWeek) return true;
+  const moments = splitLines(practice.moments || practice.moment);
+  if (moments.some((moment) => new RegExp(`(?:semana|week)\\s*${weekNumber}\\b`, "i").test(moment) || new RegExp(`\\b${weekNumber}\\s*(?:ª|a)?\\s*semana\\b`, "i").test(moment))) return true;
+  if (moments.some((moment) => validDate(moment))) {
+    const calendar = input.calendarMode === "calendar" && input.startDate ? weekCalendar(input, index) : null;
+    return Boolean(calendar && moments.some((moment) => moment >= calendar.startDate && moment <= calendar.endDate));
+  }
+  return false;
+}
+
 function newId(prefix, weekNumber, index) { return `${prefix}${weekNumber}-${String(index + 1).padStart(3, "0")}`; }
 function safeProps(props) { return props && typeof props === "object" && !Array.isArray(props) ? { ...props } : {}; }
 
@@ -570,6 +601,7 @@ function richHtml(value) {
 function youtubeId(value) { const match = text(value).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&#/]+)/i); return match ? match[1] : ""; }
 
 function fallbackLessonPlan(input, index) {
+  const scheduledInput = { ...input, webPractices: (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index)) };
   const videos = input.videoLinks.map((href, i) => normalizeResource({ id: `video-${i + 1}`, type: "video", title: `Vídeo fornecido ${i + 1}`, href, required: false, verificationStatus: "provided-needs-review" }, i, "video"));
   const suggestions = input.videoSearchSuggestions.map((searchQuery, i) => normalizeResource({ id: `video-search-${i + 1}`, type: "video", title: `Busca de vídeo ${i + 1}`, searchQuery, verificationStatus: "suggested-no-url", requiresVerification: true }, i, "video"));
   const imageLinks = input.imageLinks.map((href, i) => normalizeResource({ id: `image-${i + 1}`, type: "image", title: `Imagem fornecida ${i + 1}`, href, required: false, verificationStatus: "provided-needs-review", requiresVerification: true }, i, "image"));
@@ -581,8 +613,8 @@ function fallbackLessonPlan(input, index) {
     learningObjectives: input.objectives,
     contentSections: [{ number: "1", title: "Conteúdo da semana", body: input.content || `Estude os conceitos centrais de ${input.title} e relacione-os a exemplos práticos.`, subsections: [], reflection: { question: "Que problema real do seu contexto pode ser melhor compreendido com este tema?" }, resources: [] }],
     resources: { videos: [...videos, ...suggestions], readingsRequired: [], readingsExtra: suppliedMaterials.map((item) => normalizeResource(item, 0, "reading-extra")), images: imageLinks, podcasts: [], datasets: [] },
-    webPractices: input.webPractices,
-    didacticArc: fallbackDidacticArc(input, index),
+    webPractices: [],
+    didacticArc: fallbackDidacticArc(scheduledInput, index),
     synthesis: "Retome os conceitos centrais, conecte-os aos exemplos e registre uma aplicação possível no seu contexto.",
     references: input.references,
     assessment: { title: "Atividade avaliativa", format: "Questões para revisão", questions: [] },
@@ -617,7 +649,6 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
     children.push(...resourceChildren([...(section.resources || []), ...allResources], sectionIndex));
   });
   blocks.push({ id: newId("b-topic-", week, 1), type: "topic", bg: "neutral-default", pad: "normal", props: { children } });
-  plan.webPractices.forEach((practice, practiceIndex) => blocks.push({ id: newId("b-practice-", week, practiceIndex), type: "destaque", bg: "neutral-default", pad: "tight", props: { title: practice.title, body: `<p>${html([practice.objective, practice.instructions, practice.product].filter(Boolean).join(" "))}</p>`, tone: "ocean", icon: "" } }));
   if (plan.synthesis) blocks.push({ id: newId("b-synthesis-", week, 0), type: "sintese", bg: "sage-deep", pad: "airy", props: { eyebrow: "Síntese", title: "A ideia que fecha a semana", body: richHtml(plan.synthesis) } });
   if (plan.references.length) blocks.push({ id: newId("b-references-", week, 0), type: "referencias", bg: "neutral-default", pad: "normal", props: { title: "Referências", items: plan.references.map((item) => ({ html: html(item.citation || item.title || item.href), href: item.href || "", credit: item.publisher || item.authors?.join(", ") || "" })) } });
   if (plan.assessment.questions.length) blocks.push({ id: newId("b-quiz-", week, 0), type: "quiz", bg: "neutral-subtle", pad: "normal", props: { title: plan.assessment.title, intro: plan.assessment.format, avaliativo: true, passMark: plan.assessment.passMark, questions: plan.assessment.questions } });

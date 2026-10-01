@@ -27,6 +27,16 @@ test("normaliza briefing com calendário real e webpráticas independentes", () 
   assert.deepEqual(weekCalendar(input, 1), { weekNumber: 2, label: "Semana 2 · 12/10/2026", startDate: "2026-10-12", endDate: "2026-10-18" });
 });
 
+test("agenda webprática por data ou semana ocorre uma única vez", () => {
+  const input = normalizeCourseInput({ title: "Curso", weeks: 3, calendarMode: "calendar", startDate: "2026-10-05", webPracticeEnabled: true, webPractices: [{ title: "Por data", date: "2026-10-13" }, { title: "Por semana", weekNumber: 3 }, { title: "Sem agenda" }] });
+  const lessons = [0, 1, 2].map((index) => buildFallbackLesson(input, index));
+  const guides = buildTeacherGuides(input, lessons, []);
+  assert.deepEqual(guides[0].webPracticeProjects, []);
+  assert.deepEqual(guides[1].webPracticeProjects.map((practice) => practice.title), ["Por data"]);
+  assert.deepEqual(guides[2].webPracticeProjects.map((practice) => practice.title), ["Por semana"]);
+  assert.deepEqual(lessons.map((lesson) => lesson.lessonPlan.webPractices), [[], [], []]);
+});
+
 test("prompt do assistente exige práticas distintas, materiais alinhados e fontes sem URLs inventadas", () => {
   const prompt = buildBriefingPrompt(normalizeCourseInput({ title: "Curso", webPracticeEnabled: true }), ["webPractices", "materials"]);
   assert.match(prompt, /webpráticas.*distintas/i);
@@ -75,18 +85,18 @@ test("fallback gera uma aula válida para cada semana", () => {
   assert.equal(validateLesson(weeks[0]), true);
   assert.ok(weeks[0].lessonPlan.contentSections.length >= 1);
   assert.ok(weeks[0].blocks.some((block) => block.type === "hero"));
-  assert.ok(weeks[0].blocks.some((block) => block.type === "destaque"));
+  assert.ok(hasBlock(weeks[0], "destaque"));
   assert.ok(hasBlock(weeks[0], "video"));
   assert.ok(weeks[0].lessonPlan.didacticArc.id);
 });
 
-test("JSON do aluno não carrega guia do professor e resume webprática separada", () => {
-  const input = normalizeCourseInput({ title: "Curso", weeks: 1, hoursPerWeek: 2, objectives: ["Aplicar"], webPracticeEnabled: true, webPractices: [{ title: "Projeto aplicado", objective: "Produzir evidência", teacherPreparation: ["Preparar dados"], artifacts: [{ filename: "modelo.md", content: "modelo" }] }] });
+test("JSON do aluno não carrega webprática e o guia preserva o projeto separado", () => {
+  const input = normalizeCourseInput({ title: "Curso", weeks: 1, hoursPerWeek: 2, objectives: ["Aplicar"], webPracticeEnabled: true, webPractices: [{ title: "Projeto aplicado", weekNumber: 1, objective: "Produzir evidência", teacherPreparation: ["Preparar dados"], artifacts: [{ filename: "modelo.md", content: "modelo" }] }] });
   const lesson = buildFallbackLesson(input, 0);
   assert.equal(Object.prototype.hasOwnProperty.call(lesson, "teacherGuide"), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(lesson.lessonPlan.webPractices[0], "artifacts"), false);
+  assert.deepEqual(lesson.lessonPlan.webPractices, []);
   const guides = buildTeacherGuides(input, [lesson], []);
-  assert.equal(guides[0].webPractices[0].artifacts.length, 1);
+  assert.equal(guides[0].webPracticeProjects[0].artifacts.length, 1);
 });
 
 test("PDF do professor é gerado separadamente", async () => {
@@ -123,8 +133,8 @@ test("perfil interno calcula leitura digital, artigo científico e texto popular
   assert.equal(Math.round(readingMinutes({ type: "Artigo científico", wordCount: 273 })), 5);
 });
 
-test("ZIP contém um JSON rico por semana em semanas/", async () => {
-  const input = normalizeCourseInput({ title: "Curso ZIP", weeks: 2, hoursPerWeek: 1, objectives: ["Conhecer"], webPracticeEnabled: true, webPractices: [{ title: "Mapa de dados", type: "Projeto aplicado", objective: "Aplicar conceitos", durationMinutes: 45, artifacts: [{ filename: "modelo.md", title: "Modelo", format: "markdown", content: "# Modelo" }] }] });
+test("ZIP contém JSON do aluno e roteiro DOCX de webprática em pasta separada", async () => {
+  const input = normalizeCourseInput({ title: "Curso ZIP", weeks: 2, hoursPerWeek: 1, objectives: ["Conhecer"], webPracticeEnabled: true, webPractices: [{ title: "Mapa de dados", weekNumber: 1, type: "Projeto aplicado", objective: "Aplicar conceitos", durationMinutes: 45, artifacts: [{ filename: "modelo.md", title: "Modelo", format: "markdown", content: "# Modelo" }] }] });
   const weeks = [buildFallbackLesson(input, 0), buildFallbackLesson(input, 1)];
   const workload = calculateCourseWorkload(input, input.formulaConfig, weeks);
   const enriched = attachWorkloadToLessons(weeks, workload);
@@ -136,6 +146,9 @@ test("ZIP contém um JSON rico por semana em semanas/", async () => {
   assert.ok(zip.files["planejamento-geral.json"]);
   assert.ok(zip.files["professor/guia-do-professor.pdf"]);
   assert.ok(Object.keys(zip.files).some((name) => name.includes("webpraticas/") && name.endsWith("guia-e-roteiro.md")));
+  const docxName = Object.keys(zip.files).find((name) => name.endsWith("roteiro-webpratica.docx"));
+  assert.ok(docxName);
+  assert.equal((await zip.files[docxName].async("nodebuffer")).subarray(0, 2).toString(), "PK");
   assert.ok(Object.keys(zip.files).some((name) => name.endsWith("modelo.md")));
   const first = JSON.parse(await zip.files[names[0]].async("string"));
   assert.ok(first.lessonPlan.contentSections.length);

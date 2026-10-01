@@ -89,7 +89,7 @@ Ele contém a experiência que será apresentada ao estudante, incluindo:
 - conexão com a próxima semana;
 - cálculo e observações de carga.
 
-O JSON do aluno **não deve conter o guia interno do professor**.
+O JSON do aluno **não deve conter o guia interno do professor nem qualquer webprática**. O campo `lessonPlan.webPractices` permanece vazio; a sessão prática é um produto separado em `teacherGuide.webPracticeProjects` e em DOCX.
 
 ### 2.2 Guia do professor em PDF
 
@@ -121,6 +121,7 @@ planejamento-geral.json
 professor/guia-do-professor.pdf
 webpraticas/01-tema/guia-e-roteiro.md
 webpraticas/01-tema/pacote.json
+webpraticas/01-tema/roteiro-webpratica.docx
 webpraticas/01-tema/arquivos/*
 ```
 
@@ -604,8 +605,9 @@ Regras:
 - produza objetivos observáveis, progressivos e adequados ao público e ao nível;
 - organize o conteúdo em uma sequência didática coerente com o número de semanas e a carga horária;
 - respeite o academicProfile recebido, especialmente profundidade, quantidade de seções, referências e exigência de contrapontos;
-- se webpráticas estiverem ativadas, gere no mínimo uma e, quando pedagogicamente justificável, várias práticas distintas. Cada objeto deve conter title, type, moments, objective, preparation, materials, instructions, steps, product, criteria, assessment, continuation, fallbackPlan, resources e durationMinutes;
-- alinhe cada webprática a objetivos e conteúdos específicos, distribuindo-as em momentos coerentes do calendário;
+- se webpráticas estiverem ativadas, gere no mínimo uma e, quando pedagogicamente justificável, várias práticas distintas. Cada objeto deve conter title, type, modality, weekNumber/date quando disponível, startTime/endTime quando disponíveis, platform/tool, context, problem, objective, preparation, teacherPreparation, studentPreparation, materials, instructions, steps, product, criteria, rubric, assessment, continuation, fallbackPlan, prompts, artifacts, resources, roteiro com blocos cronometrados e durationMinutes;
+- trate cada webprática como aula síncrona ou laboratório independente, com roteiro operacional próprio; nunca a transforme em leitura, seção, atividade ou bloco do texto-base semanal;
+- alinhe cada webprática a objetivos e conteúdos específicos, distribuindo-as em semanas e datas coerentes do calendário;
 - gere materiais de apoio como objetos com type, title, link, moment, required, objective, alignment, use, pages, durationMinutes e notes. Eles devem servir aos objetivos e conteúdos, indicar por que serão usados, em que momento entram e como o estudante trabalhará com eles;
 - para referências e artigos, sugira obras, autores, documentos ou fontes que o professor deve conferir; não invente URLs, DOI, páginas ou dados bibliográficos específicos;
 - para vídeos e imagens, gere termos de busca e intenção pedagógica; use links somente quando já tiverem sido fornecidos pelo usuário;
@@ -674,7 +676,7 @@ Gere UMA semana de material didático: uma unidade didática semanal completa em
 
 {qualityGuidance}
 
-O texto é o produto principal. Não entregue resumo, tópicos telegráficos, frases soltas, uma lista de links ou apenas instruções para o professor. Escreva para o estudante ler e aprender. O padrão de referência é uma aula em DOCX com abertura, objetivos, explicação conceitual, exemplos, casos, contrapontos críticos, síntese, glossário, referências e avaliação. Varie o arco didático conforme o tema; webprática só aparece se estiver programada para esta semana.
+O texto é o produto principal. Não entregue resumo, tópicos telegráficos, frases soltas, uma lista de links ou apenas instruções para o professor. Escreva para o estudante ler e aprender. O padrão de referência é uma aula em DOCX com abertura, objetivos, explicação conceitual, exemplos, casos, contrapontos críticos, síntese, glossário, referências e avaliação. Varie o arco didático conforme o tema. Webpráticas são aulas síncronas/laboratórios separados: nunca descreva, anuncie, instrua ou transforme a webprática em conteúdo-base desta semana.
 
 Retorne somente este objeto de alto nível: { meta, lessonPlan, teacherGuide }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. teacherGuide é exclusivo do professor e nunca deve ser repetido no conteúdo do aluno.
 
@@ -684,7 +686,7 @@ lessonPlan obrigatório:
 - prerequisites e contentDensity;
 - contentSections com 6–12 seções/subseções quando a complexidade pedir. Cada seção deve ter number, title, didacticRole, body com 180–450 palavras substanciais, subsections, caseStudy quando pertinente, reflection quando pertinente, keyTerms e resources. A progressão deve ir do problema/pergunta para conceitos, exemplos ou evidências, aplicação e crítica. Não repita a mesma introdução em seções diferentes;
 - resources com videos, readingsRequired, readingsExtra, images, podcasts e datasets. Cada recurso deve conter title, source, author quando conhecido, href somente se foi fornecido no briefing ou retornado por um provedor, required, sectionNumber ou moment, objective, guidingQuestion, pedagogicalUse, durationMinutes, altText/caption/credit para imagens, searchQuery quando o link não estiver disponível, verificationStatus e requiresVerification;
-- webPractices: preserve somente as práticas fornecidas e programadas para esta semana; se não houver prática programada, retorne []. Uma prática deve ser um projeto independente com problem, context, studentRole, challenge, deliverable, prerequisites, materials, data, steps (cada uma com minutes, instructions e evidence), criteria, rubric com níveis, examples, revision, fallbackPlan, accessibility e versões simplified/advanced. Desenvolva o projeto completo no teacherGuide; no JSON do aluno deixe somente a orientação necessária no ponto da atividade;
+- webPractices: retorne sempre [] dentro de lessonPlan. Se houver prática programada para esta semana, desenvolva o projeto completo exclusivamente em teacherGuide.webPracticeProjects, com problem, context, studentRole, challenge, deliverable, prerequisites, materials, data, steps (cada uma com minutes, instructions e evidence), criteria, rubric com níveis, examples, revision, fallbackPlan, accessibility, prompts, artifacts e versões simplified/advanced;
 - diagnostic com pergunta/problema inicial, evidência esperada e feedback; formativeChecks com perguntas durante o texto, momento, evidência, feedback e ação de intervenção;
 - activities para fóruns, discussões, produção, estudo de caso ou encontro síncrono, com type, title, instructions, durationMinutes, evidence, evidenceType, feedback, criteria e required;
 - alignmentMatrix: uma linha por objetivo, ligando contentSections, activities, evidence e assessmentQuestions. Não deixe objetivo sem atividade, evidência e avaliação;
@@ -705,11 +707,11 @@ Regras de escrita:
 - conecte o tema à realidade do público ({input.audience}) e do nível ({input.level}); use os exemplos, recortes regionais e instituições fornecidos no briefing;
 - inclua pelo menos um exemplo concreto, uma situação-problema ou estudo de caso e um contraponto/limite quando forem pertinentes;
 - integre vídeos, imagens, artigos e leituras na seção em que serão usados, explicando o que o estudante deve observar ou responder; não crie uma galeria final de links;
-- não force diagnóstico, vídeo, leitura, webprática ou quiz quando não houver função pedagógica;
+- não force diagnóstico, vídeo, leitura, webprática ou quiz quando não houver função pedagógica; webprática nunca deve aparecer no corpo do texto-base, nas contentSections, no welcome, na síntese ou nas atividades da aula semanal;
 - nunca invente URLs, DOI, durações, autores, números ou referências verificadas. Para recurso ainda não conferido, use searchQuery e verificationStatus "suggested-no-url";
 - não escreva markdown fora das strings do JSON e não inclua comentários.
 
-teacherGuide deve trazer purpose, didacticArc, alignmentMatrix, diagnostic, formativeChecks, mediationQuestions, commonMisconceptions, interventions, differentiation, accessibility, assessmentNotes, selfAssessment, spiralReview, resourceNotes, qualityReview e workloadAdvice. Se houver webprática programada, inclua preparação, roteiro com minutos, prompts, produto, critérios, plano B e artefatos.
+teacherGuide deve trazer purpose, didacticArc, alignmentMatrix, diagnostic, formativeChecks, mediationQuestions, commonMisconceptions, interventions, differentiation, accessibility, assessmentNotes, selfAssessment, spiralReview, resourceNotes, qualityReview e workloadAdvice. Se houver webprática programada, inclua em webPracticeProjects a preparação do professor e do aluno, agenda, roteiro com minutos, falas/prompts, produto, critérios, rubrica, plano B, acessibilidade e artefatos. Esse projeto será exportado em DOCX separado.
 
 Perfil acadêmico desta trilha:
 {profile em JSON indentado}
@@ -863,7 +865,7 @@ Refaça somente a semana {weekNumber} do curso abaixo. O professor pediu esta al
 Preserve o que estiver bom, mas cumpra a solicitação de forma visível. A semana deve continuar sendo uma unidade didática completa, não um resumo. {qualityGuidance}
 Faça uma revisão acadêmica explícita: corrija afirmações sem suporte, diferencie fato e interpretação, acrescente contraponto quando exigido, preserve o mapa de evidências e não invente fontes. {profile.sourcePolicy}
 
-Retorne apenas { lessonPlan, teacherGuide }. Não gere blocks; o servidor os monta para o Aula Studio. lessonPlan deve manter título específico, welcome, objetivos observáveis, seções conforme o perfil, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. Não invente URLs ou fontes verificadas.
+Retorne apenas { lessonPlan, teacherGuide }. Não gere blocks; o servidor os monta para o Aula Studio. lessonPlan deve manter título específico, welcome, objetivos observáveis, seções conforme o perfil, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. lessonPlan.webPractices deve ser sempre []; não inclua qualquer descrição ou instrução da sessão prática no texto-base. Preserve um eventual projeto prático apenas em teacherGuide.webPracticeProjects. Não invente URLs ou fontes verificadas.
 
 Briefing do curso:
 {input completo com weekToGenerate: weekNumber em JSON indentado}
@@ -911,68 +913,74 @@ Não clique repetidamente em **Gerar com IA** enquanto a solicitação anterior 
 
 ## 11. Webpráticas
 
-Webpráticas são projetos de investigação, produção ou aplicação que podem envolver a web, dados, curadoria, colaboração ou ferramentas digitais.
+Webprática é uma **aula síncrona ou prática de laboratório**, separada da aula textual semanal. Os estudantes aprendem fazendo: usam uma ferramenta, constroem um artefato, testam uma hipótese, analisam uma base ou resolvem uma situação-problema com acompanhamento do professor.
 
 ### 11.1 Quando criar uma webprática
 
-Crie uma webprática quando houver um produto ou evidência que mereça um projeto próprio. Exemplos:
+Crie uma sessão quando houver uma experiência hands-on que mereça encontro e roteiro próprios. Exemplos:
 
-- construir um painel de indicadores;
-- pesquisar fontes e produzir uma curadoria;
-- analisar uma base de dados;
-- elaborar um mapa ou diagrama;
-- produzir uma síntese multimídia;
-- realizar um debate ou seminário;
-- comparar soluções em um estudo de caso.
+- construir um protótipo navegável com uma ferramenta de IA;
+- elaborar um mapa, painel ou diagrama durante a aula;
+- analisar dados em uma planilha ou simulador;
+- testar um fluxo de criação, programação ou edição;
+- produzir e revisar um artefato em colaboração;
+- comparar versões e justificar decisões com evidências.
 
-Não crie uma webprática somente para preencher o formulário. É correto ter semanas sem webprática.
+Não crie uma webprática apenas para preencher o formulário. É correto ter semanas sem prática.
+
+> **Regra de separação:** nada da webprática entra no texto-base, nas atividades, nos blocos ou no `.aula.json` do aluno. O projeto fica em `teacherGuide.webPracticeProjects`, no PDF do professor e em um DOCX editável independente.
 
 ### 11.2 Como preencher uma prática
 
-Ative a seção **Webpráticas** e mantenha pelo menos uma prática quando a opção estiver ligada. Para cada prática, informe:
+Ative **Webpráticas síncronas**. Cada cartão representa uma sessão distinta e precisa de:
 
 | Campo | Orientação |
 |---|---|
-| Nome | Nome claro do projeto |
-| Tipo | Pesquisa, produção, estudo de caso, curadoria, debate ou projeto aplicado |
-| Momento | Ex.: `semana 3`, `após o texto-base` |
-| Duração | Tempo previsto para o estudante concluir a prática |
-| Objetivo | Aprendizagem específica da prática |
-| Instruções | O que observar, fazer, comparar ou produzir |
-| Produto/evidência | O que será entregue ou apresentado |
-| Avaliação | Critérios para julgar a evidência |
+| Título da sessão | Nome claro do laboratório ou encontro |
+| Modalidade | Aula síncrona, laboratório prático ou combinação dos dois |
+| Semana de ocorrência | Obrigatória quando o curso usa semanas numeradas |
+| Data real | Use quando o curso possui calendário; a data é mapeada para a semana correspondente |
+| Dia e horário | Opcional, mas recomendado quando o encontro já estiver marcado |
+| Plataforma | Meet, Zoom, laboratório presencial ou ambiente equivalente |
+| Ferramenta | Aplicativo, IA, editor, planilha, simulador ou conjunto de ferramentas |
+| Objetivo | O que os estudantes aprenderão fazendo |
+| Contexto/problema | Situação que dá sentido à tarefa |
+| Pré-requisitos/preparação | Contas, arquivos, leituras e preparação de professor/aluno |
+| Materiais | Links, dados, exemplos e arquivos necessários |
+| Produto/evidência | Protótipo, registro, demonstração, arquivo ou decisão justificada |
+| Plano B/acessibilidade | Alternativa para falha de ferramenta, conexão, arquivo ou necessidade de acesso |
 
 Exemplo:
 
 ```text
-Nome: Webprática: painel de indicadores
-Momento: semana 3
-Duração: 120 minutos
-Objetivo: Construir uma leitura crítica de dados acadêmicos.
-Produto: Painel comentado e breve justificativa.
-Avaliação: Clareza da análise, evidências e coerência da interpretação.
+Título: Construir um protótipo de painel com IA
+Modalidade: Laboratório prático
+Semana: 3
+Data: 2026-10-19 · segunda-feira · 19:00–20:30
+Plataforma: Google Meet
+Ferramenta: editor de código e assistente de IA
+Objetivo: construir e testar uma primeira versão navegável.
+Contexto: transformar um problema do curso em um protótipo observável.
+Produto: protótipo navegável e registro das decisões.
+Plano B: usar a versão de reserva e simular a alteração em papel.
 ```
 
 ### 11.3 O que a IA prepara
 
 O projeto completo pode incluir:
 
-- contexto;
-- pré-requisitos;
-- preparação do professor;
-- preparação do estudante;
-- materiais;
-- etapas com duração;
-- produto ou entrega;
-- rubrica;
-- prompts;
-- roteiro audiovisual;
-- plano B;
-- acessibilidade;
-- continuidade;
-- arquivos-exemplo.
+- visão geral, contexto, problema e papel do estudante;
+- pré-requisitos, preparação do professor e preparação dos estudantes;
+- ferramenta, plataforma, materiais e arquivos;
+- agenda cronometrada por blocos;
+- instruções passo a passo, ações do professor e dos estudantes;
+- prompts, comandos e evidências esperadas;
+- produto, critérios e rubrica com níveis;
+- compartilhamento, discussão e fechamento;
+- plano B, acessibilidade e continuidade;
+- arquivos-exemplo e variações simplificada/avançada.
 
-O aluno não recebe todo o guia interno do professor. Ele recebe apenas as orientações necessárias para participar da prática na semana correspondente.
+O roteiro final é criado como `roteiro-webpratica.docx`, editável no Word, LibreOffice, Pages ou equivalente. O ZIP também mantém Markdown, JSON e arquivos auxiliares para auditoria e reuso.
 
 ---
 
@@ -1164,7 +1172,7 @@ Clique em **Ver aula** no card da semana. A janela de prévia apresenta, na orde
 - seções e subseções de conteúdo;
 - vídeos, imagens, diagramas e leituras no ponto de uso;
 - atividades e evidências produzidas;
-- projeto de webprática separado, somente se houver prática naquela semana;
+- a prévia não mostra o roteiro da webprática: a sessão aparece no painel separado **Webpráticas programadas**, com agenda e botão de DOCX;
 - síntese, continuidade, trilhas de diferenciação, glossário, autoavaliação e avaliação.
 
 O topo da janela mostra palavras, seções, objetivos e nota estrutural. Leia a aula inteira antes de baixar o JSON. Se aparecer **conteúdo insuficiente**, não abra essa versão no Aula Studio ainda.
@@ -1212,7 +1220,7 @@ O botão **Guia do professor PDF** baixa um documento separado para leitura e me
 
 ### 16.3 Pacote completo ZIP
 
-O botão **Pacote completo ZIP** reúne todas as semanas, o Planejamento Geral, o PDF e as webpráticas.
+O painel **Webpráticas programadas** permite baixar o DOCX editável de cada sessão. O botão **Pacote completo ZIP** reúne todas as semanas, o Planejamento Geral, o PDF do professor e as webpráticas em DOCX, Markdown, JSON e arquivos auxiliares.
 
 Use o ZIP para arquivar a versão gerada, transferir o projeto ou manter uma cópia antes da edição no Aula Studio.
 
@@ -1527,7 +1535,9 @@ Não use o conteúdo estrutural do fallback como versão final de uma disciplina
 | Aula Studio não abre o arquivo | Arquivo errado ou JSON alterado | Baixe o JSON individual da semana e não o ZIP/PDF |
 | A carga calculada ficou baixa | Conteúdo estrutural ou poucos recursos | Desenvolva o texto, acrescente atividades e revise materiais |
 | Muitos recursos aguardando conferência | Termos de busca ainda não viraram fontes verificadas | Revise links, duração, páginas, licença e crédito |
-| Webprática aparece em semana indevida | Momento não foi preenchido claramente | Use formatos como `semana 3` ou `semana 4` |
+| Webprática não aparece no roteiro | Semana/data ausente ou inválida | Informe uma semana explícita; em calendário real, informe uma data dentro do curso |
+| Webprática apareceu no JSON do aluno | Arquivo antigo ou contrato alterado manualmente | Gere novamente e confirme `lessonPlan.webPractices: []`; o roteiro correto está no DOCX separado |
+| DOCX não baixa | Backend Vercel não está publicado ou o acesso foi recusado | Confira `/api/health`, o código de acesso e faça Redeploy; use o ZIP como alternativa |
 | ZIP não é uma aula SCORM | O ZIP do Gerador é um pacote de autoria | Abra o JSON no Aula Studio e exporte SCORM depois |
 | PDF abre, mas não no Aula Studio | PDF é o guia do professor | Use o JSON `.aula.json` para abrir no editor |
 
@@ -1591,10 +1601,12 @@ A chave da OpenAI continua protegida; o Gerador usa apenas o backend para fazer 
 ### Webpráticas
 
 - [ ] Só há webprática quando ela possui função pedagógica.
-- [ ] Cada prática tem momento definido.
+- [ ] Cada prática tem semana ou data definida.
+- [ ] Dia, horário, plataforma e ferramenta foram conferidos quando aplicáveis.
 - [ ] O produto ou evidência está claro.
 - [ ] A avaliação tem critérios.
-- [ ] O plano B está previsto no guia do professor.
+- [ ] O plano B e a acessibilidade estão previstos.
+- [ ] O DOCX foi aberto e revisado antes da sessão.
 - [ ] A prática não aparece repetida em todas as semanas.
 
 ### Recursos

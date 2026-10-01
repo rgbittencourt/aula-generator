@@ -1,4 +1,5 @@
 import { buildAlignmentMatrix, buildProgression, fallbackDidacticArc, pedagogicalReview, normalizeDidacticArc } from "./pedagogy.js";
+import { practiceScheduledForWeek } from "./aula-schema.js";
 
 const text = (value) => String(value ?? "").trim();
 const list = (value) => Array.isArray(value) ? value.map(text).filter(Boolean) : [];
@@ -15,16 +16,16 @@ function normalizeDifferentiation(value = {}) {
   };
 }
 
-function scheduledPractice(practice, index) {
-  const moments = list(practice?.moments || practice?.moment);
-  if (!moments.length) return index === 0;
-  const week = String(index + 1);
-  return moments.some((moment) => new RegExp(`(?:semana|week)\\s*${week}\\b`, "i").test(moment) || new RegExp(`\\b${week}\\b`).test(moment));
-}
-
 function normalizeGuide(source = {}, plan = {}, input = {}, index = 0) {
   const raw = object(source);
-  const practices = Array.isArray(raw.webPractices) ? raw.webPractices : (Array.isArray(input.webPractices) ? input.webPractices : (Array.isArray(plan.webPractices) ? plan.webPractices : []));
+  const inputPractices = Array.isArray(input.webPractices) ? input.webPractices : [];
+  const generatedPractices = Array.isArray(raw.webPracticeProjects) && raw.webPracticeProjects.length
+    ? raw.webPracticeProjects
+    : (Array.isArray(raw.webPractices) && raw.webPractices.length ? raw.webPractices : inputPractices);
+  const practices = generatedPractices.map((practice) => {
+    const original = inputPractices.find((item) => text(item.id) === text(practice?.id) || text(item.title) === text(practice?.title));
+    return { ...(original || {}), ...(practice || {}) };
+  }).filter((practice) => practiceScheduledForWeek(practice, input, index));
   const review = pedagogicalReview(plan);
   return {
     weekNumber: index + 1,
@@ -67,7 +68,7 @@ export function buildTeacherGuide(input, lesson, source = {}, index = 0) {
 
 export function buildTeacherGuides(input, lessons = [], provided = []) {
   return lessons.map((lesson, index) => {
-    const scopedInput = { ...input, webPractices: (input.webPractices || []).filter((practice) => scheduledPractice(practice, index)) };
+    const scopedInput = { ...input, webPractices: (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index)) };
     return buildTeacherGuide(scopedInput, lesson, provided[index] || {}, index);
   });
 }
@@ -81,6 +82,6 @@ export function collectWebPracticeProjects(input, teacherGuides = []) {
       projects.push(practice);
     }
   }
-  if (!projects.length) return input.webPractices || [];
+  if (!projects.length) return (input.webPractices || []).filter((practice) => Number(practice.weekNumber || practice.week) > 0 || text(practice.date || practice.sessionDate) || list(practice.moments || practice.moment).length);
   return projects;
 }

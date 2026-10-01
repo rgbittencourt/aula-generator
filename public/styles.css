@@ -26,3 +26,17 @@
 .inherited-note{display:block;margin:0 0 16px}
 @media(max-width:900px){.academic-inherited{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.academic-inherited{grid-template-columns:1fr 1fr;gap:8px;padding:10px}.inherited-item strong{font-size:11px}}
+
+/* Webpráticas síncronas: agenda e exportação separadas da aula-base */
+.field-grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.webpractice-schedule{margin:24px 0 4px;padding-top:20px;border-top:1px solid var(--line)}
+.webpractice-schedule h3{margin:0 0 6px;color:var(--navy);font-family:var(--serif);font-size:25px}
+.webpractice-schedule p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.schedule-list{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.schedule-item{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:13px 14px;border:1px solid #dfe4ea;border-radius:10px;background:#fbfcfd}
+.schedule-item>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.schedule-item strong{color:var(--navy);font-size:13px}
+.schedule-item span,.schedule-item small{color:var(--muted);font-size:11px}
+.schedule-item .button{height:36px;padding:0 11px;flex:0 0 auto;font-size:11px}
+@media(max-width:980px){.field-grid.four{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.field-grid.four{grid-template-columns:1fr}.schedule-item{align-items:flex-start;flex-direction:column}.schedule-item .button{width:100%}}
