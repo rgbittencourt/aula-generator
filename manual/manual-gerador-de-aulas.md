@@ -60,7 +60,7 @@ O fluxo foi pensado para separar três funções que normalmente acabam misturad
 - **Autoria da aula do aluno:** textos, blocos, vídeos, imagens, leituras, atividades, avaliação e síntese.
 - **Mediação do professor:** intencionalidade, diagnóstico, perguntas, intervenções, diferenciação, acessibilidade e observações de condução.
 
-A aplicação pode trabalhar com semanas numeradas ou com um calendário real. Também pode gerar um exemplo local sem consumir a IA, o que é útil para conhecer o formato antes de produzir um curso real.
+A aplicação pode trabalhar com semanas numeradas ou com um calendário real. A interface principal é voltada à geração com IA; o fallback estrutural continua disponível apenas para testes técnicos internos, sem um botão exposto ao usuário.
 
 > **Regra central:** a IA prepara uma primeira versão pedagógica; o professor continua responsável pela conferência das fontes, pela adequação ao público e pela publicação final.
 
@@ -239,20 +239,23 @@ O painel lateral mostra continuamente:
 - existência ou não de webpráticas;
 - estado geral do dimensionamento.
 
-Esse resumo é preliminar. O cálculo mais preciso acontece depois que o conteúdo e os recursos são gerados.
+Esse resumo é preliminar. O cálculo mais preciso acontece depois que o conteúdo e os recursos são gerados. Abaixo dele ficam as ações principais: **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade**, **Guia do professor PDF** e **Pacote completo ZIP**.
+
+O menu lateral também oferece atalhos para **Carga por atividade**, **Checklists e progressão** e **Semanas planejadas**. No celular, ele passa para o alto da página.
 
 ### 5.3 Seções numeradas
 
-A tela divide o briefing em seis áreas:
+A tela divide o briefing em sete áreas recolhíveis. Todas começam abertas para facilitar a conferência inicial:
 
 1. **Identidade do curso**
 2. **Tempo e calendário**
 3. **Recursos e leituras por semana**
-4. **Intenção pedagógica**
-5. **Webpráticas**
-6. **Materiais de apoio**
+4. **Composição da aula no Aula Studio**
+5. **Intenção pedagógica**
+6. **Webpráticas síncronas**
+7. **Materiais de apoio**
 
-Ao final ficam as referências, os links e os botões de geração.
+Clique no cabeçalho de qualquer setor para recolhê-lo ou reabri-lo. Ao final ficam o resultado, a carga aberta por atividade, os checklists e a grade de semanas, também em setores recolhíveis.
 
 ---
 
@@ -486,23 +489,17 @@ A geração pode envolver mais de uma etapa do backend. O sistema primeiro redig
 
 Por segurança, as semanas são processadas **uma por vez**. Uma unidade pode passar pelas etapas de planejamento acadêmico, redação, revisão crítica, eventual reparo, pesquisa de recursos e cálculo. Isso reduz picos de tokens por minuto, embora possa tornar a geração de um curso longo mais demorada. Em respostas temporárias 429 ou 503, o backend aguarda e tenta novamente automaticamente.
 
-### 9.1 Diferença entre exemplo local e geração com IA
+### 9.1 Geração com IA
 
-**Gerar exemplo local**:
-
-- não usa OpenAI;
-- não exige código de acesso;
-- serve para testar o fluxo e o formato;
-- gera conteúdo estrutural de demonstração;
-- não deve ser confundido com a versão final de uma aula.
-
-**Gerar com IA**:
+O comando **Gerar com IA**:
 
 - usa a API configurada;
 - exige o código de acesso quando a proteção estiver ativa;
 - redige uma unidade didática mais completa;
 - pode pesquisar e selecionar recursos;
 - produz guia do professor e Planejamento Geral.
+
+O modo de exemplo local permanece restrito a smoke tests e manutenção. Ele não aparece como ação no menu do usuário e não deve ser confundido com a versão final de uma aula.
 
 ---
 
@@ -1162,7 +1159,7 @@ Se o conteúdo gerado for curto, a carga calculada pode ficar muito abaixo das h
 - conferir vídeos e atividades;
 - reduzir a meta semanal, se ela não for realista.
 
-O modo **Gerar exemplo local** é propositalmente estrutural. Portanto, sua carga pode ser menor que a meta; ele serve para testar a estrutura, não para representar a aula final.
+O fallback estrutural usado em smoke tests é propositalmente reduzido. Portanto, sua carga pode ser menor que a meta; ele serve para testar a estrutura técnica, não para representar a aula final e não é uma ação exibida na interface.
 
 ### 13.2 Itens pendentes
 
@@ -1585,9 +1582,9 @@ PORT=4310
 
 O `.env` não deve ser enviado ao GitHub.
 
-### 21.3 Por que usar o exemplo local
+### 21.3 Como validar tecnicamente sem consumir a IA
 
-Use **Gerar exemplo local** para conferir:
+Em manutenção ou smoke tests locais, o fallback estrutural pode ser usado para conferir:
 
 - se a interface está respondendo;
 - se as semanas aparecem;

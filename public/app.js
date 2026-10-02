@@ -11,6 +11,83 @@ function splitLines(value) { return Array.isArray(value) ? value.map((item) => S
 function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char])); }
 function formatDate(value) { return value ? value.split("-").reverse().join("/") : ""; }
 function readableText(value) { return String(value ?? "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim(); }
+
+function enhanceLayout() {
+  const sidebar = document.querySelector(".summary-column");
+  const formColumn = document.querySelector(".form-column");
+  if (!sidebar || !formColumn || sidebar.dataset.enhanced === "true") return;
+  sidebar.dataset.enhanced = "true";
+  sidebar.classList.add("project-sidebar");
+
+  const panels = [...formColumn.querySelectorAll(":scope > .panel")];
+  const navItems = [];
+  panels.forEach((panel, index) => {
+    const heading = panel.querySelector(":scope > .panel-heading");
+    if (!heading) return;
+    const title = heading.querySelector("h2")?.textContent.trim() || `Setor ${String(index + 1).padStart(2, "0")}`;
+    const details = document.createElement("details");
+    details.className = `${panel.className} briefing-sector`;
+    details.id = `sector-${String(index + 1).padStart(2, "0")}`;
+    details.open = true;
+    const summary = document.createElement("summary");
+    summary.className = "sector-summary";
+    summary.innerHTML = `${heading.innerHTML}<span class="sector-chevron" aria-hidden="true">⌄</span>`;
+    const body = document.createElement("div");
+    body.className = "sector-body";
+    [...panel.children].filter((child) => child !== heading).forEach((child) => body.appendChild(child));
+    details.append(summary, body);
+    panel.replaceWith(details);
+    summary.addEventListener("click", (event) => {
+      if (event.target.closest(".switch")) event.preventDefault();
+    });
+    navItems.push({ id: details.id, title });
+  });
+
+  const summaryCard = sidebar.querySelector(".summary-card");
+  const actions = document.createElement("section");
+  actions.className = "sidebar-actions";
+  actions.innerHTML = '<p class="sidebar-label">AÇÕES DO PROJETO</p>';
+  ["assist-button", "generate-button", "recalculate-button", "teacher-pdf-button", "zip-button"].forEach((id) => {
+    const button = $("#" + id);
+    if (!button) return;
+    button.classList.add("sidebar-action");
+    if (["recalculate-button", "teacher-pdf-button", "zip-button"].includes(id)) button.disabled = true;
+    actions.appendChild(button);
+  });
+  document.querySelector(".form-actions")?.remove();
+  document.querySelector(".results-actions")?.remove();
+  summaryCard?.after(actions);
+
+  const navigation = document.createElement("nav");
+  navigation.className = "sidebar-navigation";
+  navigation.setAttribute("aria-label", "Navegação do planejamento");
+  navigation.innerHTML = '<p class="sidebar-label">NAVEGAR PELO PROJETO</p>' + navItems.map((item) => `<a href="#${item.id}" data-scroll-to="${item.id}">${escapeHtml(item.title)}<span>→</span></a>`).join("") + '<a href="#results-load" data-scroll-to="results-load">Carga por atividade<span>→</span></a><a href="#results-review" data-scroll-to="results-review">Checklists e progressão<span>→</span></a><a href="#results-weeks" data-scroll-to="results-weeks">Semanas planejadas<span>→</span></a>';
+  actions.after(navigation);
+  navigation.querySelectorAll("[data-scroll-to]").forEach((link) => link.addEventListener("click", (event) => {
+    const target = document.getElementById(link.dataset.scrollTo);
+    if (!target) return;
+    event.preventDefault();
+    if (target.tagName === "DETAILS") target.open = true;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+
+  const weekGrid = $("#week-grid");
+  if (weekGrid && !$("#results-weeks")) {
+    const parent = weekGrid.parentElement;
+    const weeksSector = document.createElement("details");
+    weeksSector.className = "results-sector weeks-sector";
+    weeksSector.id = "results-weeks";
+    weeksSector.open = true;
+    weeksSector.innerHTML = '<summary class="results-sector-summary"><strong>Semanas planejadas</strong><small id="weeks-sector-note">As semanas aparecerão aqui depois da geração.</small></summary>';
+    const body = document.createElement("div");
+    body.className = "results-sector-body";
+    weekGrid.remove();
+    body.appendChild(weekGrid);
+    weeksSector.appendChild(body);
+    parent.appendChild(weeksSector);
+  }
+}
+
 function paragraphsMarkup(value) { return String(value ?? "").split(/\n\s*\n|\r?\n/).map((part) => readableText(part)).filter(Boolean).map((part) => `<p>${escapeHtml(part)}</p>`).join(""); }
 function slugify(value) { return String(value || "curso").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "curso"; }
 function downloadBlob(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
@@ -953,6 +1030,37 @@ function toggleReviewMark(kind, key, checked) {
   });
 }
 
+function organizeResultSectors(container) {
+  if (!container) return;
+  const children = [...container.children];
+  const breakdown = container.querySelector(":scope > .time-breakdown");
+  const splitAt = breakdown ? children.indexOf(breakdown) : -1;
+  const loadNodes = splitAt >= 0 ? children.slice(0, splitAt + 1) : [];
+  const reviewNodes = splitAt >= 0 ? children.slice(splitAt + 1) : children;
+
+  const loadSector = document.createElement("details");
+  loadSector.className = "results-sector";
+  loadSector.id = "results-load";
+  loadSector.open = true;
+  loadSector.innerHTML = '<summary class="results-sector-summary"><strong>Carga por atividade</strong><small>Tempo separado por texto-base, artigos, textos informais, vídeos, interativos e atividades.</small></summary>';
+  const loadBody = document.createElement("div");
+  loadBody.className = "results-sector-body";
+  loadBody.append(...loadNodes);
+  loadSector.appendChild(loadBody);
+
+  const reviewSector = document.createElement("details");
+  reviewSector.className = "results-sector";
+  reviewSector.id = "results-review";
+  reviewSector.open = true;
+  reviewSector.innerHTML = '<summary class="results-sector-summary"><strong>Checklists e progressão curricular</strong><small>Conferências automáticas, pendências, progressão e sessões práticas independentes.</small></summary>';
+  const reviewBody = document.createElement("div");
+  reviewBody.className = "results-sector-body";
+  reviewBody.append(...reviewNodes);
+  reviewSector.appendChild(reviewBody);
+
+  container.replaceChildren(loadSector, reviewSector);
+}
+
 function renderGeneralPlan(plan) {
   const container = $("#general-plan");
   if (!container || !plan?.totals) { container?.classList.add("hidden"); return; }
@@ -992,6 +1100,7 @@ function renderGeneralPlan(plan) {
   }).join("");
   const timeBreakdownMarkup = `<section class="time-breakdown"><p class="eyebrow">CARGA ABERTA POR ATIVIDADE</p><h3>De onde vem o tempo calculado?</h3><p>O texto-base é contado separadamente das leituras, vídeos, quiz, fórum, revisão e webpráticas. Artigos/leitura aparecem como obrigatórios ou complementares conforme a marcação do recurso.</p><div class="breakdown-summary">${breakdownSummary || "<span>A carga será calculada depois da redação.</span>"}</div><div class="load-weeks">${weeklyLoads}</div></section>`;
   container.innerHTML = `<p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o guia do professor são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div>${timeBreakdownMarkup}${resourcesMarkup}${checklistMarkup}${progressionMarkup}${practiceMarkup}`;
+  organizeResultSectors(container);
   container.querySelectorAll("[data-review-kind]").forEach((checkbox) => checkbox.addEventListener("change", () => toggleReviewMark(checkbox.dataset.reviewKind, checkbox.dataset.reviewKey, checkbox.checked)));
   container.querySelectorAll(".webpractice-download").forEach((button) => button.addEventListener("click", () => downloadWebPractice(button.dataset.practiceId)));
   container.classList.remove("hidden");
@@ -999,6 +1108,7 @@ function renderGeneralPlan(plan) {
 
 function renderWeeks(data) {
   state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider; state.validation = data.validation || data.generalPlan?.validation || null; state.reviewMarks = data.reviewMarks || state.reviewMarks || createReviewMarks();
+  ["recalculate-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const button = $("#" + id); if (button) button.disabled = false; });
   const approvedWeeks = data.weeks.filter((_, index) => Boolean(state.weekApprovals?.[index])).length;
   const pendingWeeks = data.weeks.length - approvedWeeks;
   $("#results-title").textContent = approvedWeeks ? `${approvedWeeks} liberada(s) · ${pendingWeeks} para revisão` : `${data.weeks.length} semanas prontas para revisão`;
@@ -1029,6 +1139,8 @@ function renderWeeks(data) {
     return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div><h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div><span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button">Baixar JSON <span>↓</span></button>${approvalButton}</div></article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
+  const weeksNote = $("#weeks-sector-note");
+  if (weeksNote) weeksNote.textContent = `${data.weeks.length} semana(s) gerada(s); abra cada cartão para revisar o conteúdo do aluno.`;
   $("#week-grid").querySelectorAll(".week-preview").forEach((button) => button.addEventListener("click", () => openLessonPreview(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-download").forEach((button) => button.addEventListener("click", () => downloadWeek(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-approve").forEach((button) => button.addEventListener("click", () => toggleWeekApproval(Number(button.dataset.index))));
@@ -1121,7 +1233,7 @@ async function generateDistributed(input, accessCode, button) {
   return readApiResponse(response, "Não foi possível consolidar o curso.");
 }
 
-async function generate(fallback = false) {
+async function generate() {
   const input = formInput();
   const accessCode = input.accessCode;
   delete input.accessCode;
@@ -1133,17 +1245,16 @@ async function generate(fallback = false) {
   }
   state.reviewMarks = createReviewMarks();
   state.weekApprovals = {};
-  const button = fallback ? $("#fallback-button") : $("#generate-button");
-  button.dataset.label = fallback ? "Gerar exemplo local" : "Gerar com IA";
-  setBusy(button, true, fallback ? "Montando exemplo…" : "Gerando material…");
+  const button = $("#generate-button");
+  button.dataset.label = "Gerar com IA";
+  ["recalculate-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const action = $("#" + id); if (action) action.disabled = true; });
+  setBusy(button, true, "Gerando material…");
   $("#result-alert").classList.add("hidden");
   try {
     if (isGitHubPages) {
-      if (!fallback) throw new Error("A IA está desativada nesta versão pública. Use 'Gerar exemplo local' ou solicite a publicação do backend protegido.");
-      renderWeeks(staticDemo(input));
-      return;
+      throw new Error("A IA está disponível na URL Vercel, onde o backend protegido pode ser acessado. Abra o Gerador pela versão publicada com IA.");
     }
-    const data = fallback ? staticDemo(input) : await generateDistributed(input, accessCode, button);
+    const data = await generateDistributed(input, accessCode, button);
     renderWeeks(data);
   } catch (error) { showError(error.message); }
   finally { setBusy(button, false, ""); }
@@ -1240,8 +1351,7 @@ $("#materials-list").addEventListener("click", (event) => {
 });
 addPractice();
 addMaterial();
-$("#course-form").addEventListener("submit", (event) => { event.preventDefault(); generate(false); });
-$("#fallback-button").addEventListener("click", () => generate(true));
+$("#course-form").addEventListener("submit", (event) => { event.preventDefault(); generate(); });
 $("#assist-button").addEventListener("click", assistBriefing);
 $("#zip-button").addEventListener("click", downloadZip);
 $("#teacher-pdf-button").addEventListener("click", downloadTeacherPdf);
@@ -1262,6 +1372,6 @@ $("#restore-draft-button").addEventListener("click", () => restoreSnapshot(readD
 $("#discard-draft-button").addEventListener("click", () => { safeStorageRemove(); hideDraftRecovery(); setSaveStatus("Salvamento local ativo", "O próximo briefing será salvo automaticamente neste navegador."); });
 window.addEventListener("beforeunload", () => saveDraft("fechamento"));
 $("#generate-button").dataset.label = "Gerar com IA";
-$("#fallback-button").dataset.label = "Gerar exemplo local";
 $("#assist-button").dataset.label = "Preencher vazios com IA";
+enhanceLayout();
 renderResourcePlanWeeks(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
