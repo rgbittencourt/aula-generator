@@ -220,3 +220,31 @@ body.welcome-active{overflow:hidden}
 .studio-top-link img{width:23px;height:23px;object-fit:contain}
 .studio-top-link b{color:var(--teal);font-size:16px;font-weight:400;line-height:1}
 @media(max-width:620px){.header-tools{gap:8px}.studio-top-link{width:34px;padding:0;justify-content:center}.studio-top-link span{display:none}.studio-top-link b{font-size:15px}}
+
+/* Assinatura institucional inspirada na capa do AcademiaOS, com assets do próprio projeto do usuário. */
+.welcome-hero-top{position:relative;z-index:1;display:flex;flex-direction:column;gap:24px}
+.welcome-institutional-signature{display:flex;flex-wrap:wrap;align-items:center;gap:20px 26px}
+.welcome-ifsc-signature{display:flex;align-items:center;gap:10px;color:#f8f5ec}
+.welcome-ifsc-signature>img{width:40px;height:48px;object-fit:contain;filter:brightness(0) invert(1)}
+.welcome-ifsc-signature>div{line-height:1.08}
+.welcome-ifsc-signature p{margin:0;font-size:11px;font-weight:900;line-height:1.08;text-transform:uppercase;letter-spacing:-.01em}
+.welcome-ifsc-signature p+p{font-size:10px;font-weight:600;text-transform:none}
+.welcome-ifsc-signature small{display:block;margin-top:4px;color:#cbd5e4;font-size:8px;font-weight:500;letter-spacing:.02em;line-height:1.2}
+.welcome-signature-divider{width:1px;height:40px;background:rgba(211,181,110,.55)}
+.welcome-inovalab-signature{width:184px;height:56px;object-fit:contain;object-position:left;filter:brightness(0) invert(1)}
+.welcome-hero-footer{align-items:flex-start;text-transform:none;letter-spacing:normal}
+.welcome-development-credit{max-width:305px;border-left:2px solid rgba(211,181,110,.75);padding-left:16px;color:#cbd5e4;font-family:var(--sans);font-size:11px;line-height:1.4}
+.welcome-development-credit>p{margin:0;color:#d3b56e;font-size:9px;font-weight:700;letter-spacing:.2em;text-transform:uppercase}
+.welcome-development-credit>strong{display:block;margin-top:3px;color:#f8f5ec;font-family:var(--serif);font-size:14px;line-height:1.2}
+.welcome-development-credit>div{display:flex;align-items:flex-start;gap:10px;margin-top:9px}
+.welcome-development-credit>div>img{width:40px;height:40px;flex:0 0 auto;border-radius:6px;object-fit:contain}
+.welcome-development-credit>div>span{display:flex;flex-direction:column;gap:2px}
+.welcome-development-credit b{color:#f8f5ec;font-size:12px;letter-spacing:.12em;line-height:1}
+.welcome-development-credit small{color:#cbd5e4;font-size:10px;line-height:1.35}
+.welcome-development-credit>a{display:inline-flex;margin-top:9px;color:#e1c986;font-size:10px;font-weight:600;letter-spacing:.04em;text-decoration:underline;text-decoration-color:rgba(225,201,134,.45);text-underline-offset:4px}
+.welcome-development-credit em{display:block;margin-top:7px;color:#91a0b4;font-family:var(--mono);font-size:8px;font-style:normal;letter-spacing:.04em}
+.welcome-journey{max-width:270px;align-self:flex-end;color:#cbd5e4;font-size:11px;line-height:1.5}
+.welcome-journey p{margin:0;color:#d3b56e;font-weight:600;letter-spacing:.2em;text-transform:uppercase}
+.welcome-journey span{display:block;margin-top:8px}
+@media(max-width:860px){.welcome-institutional-signature{gap:15px 18px}.welcome-hero-top{gap:20px}.welcome-inovalab-signature{width:170px}}
+@media(max-width:620px){.welcome-institutional-signature{align-items:flex-start;gap:14px}.welcome-signature-divider{display:none}.welcome-inovalab-signature{width:165px;height:48px}.welcome-hero-footer{flex-direction:column;gap:20px}.welcome-journey{align-self:flex-start;max-width:290px}.welcome-development-credit{padding-left:12px}}

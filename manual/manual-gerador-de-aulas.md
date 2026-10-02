@@ -239,7 +239,7 @@ O painel lateral mostra continuamente:
 - existência ou não de webpráticas;
 - estado geral do dimensionamento.
 
-Esse resumo é preliminar. O cálculo mais preciso acontece depois que o conteúdo e os recursos são gerados. Abaixo dele ficam as ações principais: **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade**, **Guia do professor PDF** e **Pacote completo ZIP**. Depois da capa, o menu superior fixo apresenta o atalho **Abrir Aula Studio**, com a marca do editor, em uma nova aba. Os campos Nome, Instituição e Código de acesso da capa começam vazios por decisão de privacidade; preencha-os somente quando iniciar aquela sessão.
+Esse resumo é preliminar. O cálculo mais preciso acontece depois que o conteúdo e os recursos são gerados. Abaixo dele ficam as ações principais: **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade**, **Guia do professor PDF** e **Pacote completo ZIP**. Depois da capa, o menu superior fixo apresenta o atalho **Abrir Aula Studio**, com a marca do editor, em uma nova aba. Os campos Nome, Instituição e Código de acesso da capa começam vazios por decisão de privacidade; preencha-os somente quando iniciar aquela sessão. A capa usa a assinatura institucional IFSC–INOVALAB e apresenta o crédito **Desenvolvido pelo Prof. Rogério G. Bittencourt**, com link para o perfil GitHub do autor.
 
 O menu lateral também oferece atalhos para **Carga por atividade**, **Checklists e progressão** e **Semanas planejadas**. No celular, ele passa para o alto da página.
 

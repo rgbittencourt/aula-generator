@@ -15,6 +15,8 @@ Os assets de marca ficam versionados para uso no cabeçalho, favicon, capas e co
 - `public/favicon.svg` e `public/favicon-32.png`: favicons SVG e PNG;
 - `public/apple-touch-icon.png`: ícone para iPhone/iPad;
 - `public/site.webmanifest`: metadados de instalação como aplicativo.
+- `public/brand/ifsc-institutional-mark.png`: marca institucional do IFSC usada na capa;
+- `public/brand/inovalab-signature.png` e `public/brand/inovalab-symbol.png`: assinatura e símbolo do INOVALAB usados no crédito de desenvolvimento da capa.
 
 O Aula Studio mantém sua identidade complementar em `assets/aula-mark.svg`, `assets/brand/aula-studio-logo.svg`, `assets/brand/aula-studio-cover.svg` e `assets/favicon.svg`.
 
