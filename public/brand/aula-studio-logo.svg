@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 160" role="img" aria-labelledby="title desc">
+  <title>Aula Studio</title>
+  <desc>Logo do Aula Studio, construtor editorial de aulas.</desc>
+  <rect x="8" y="8" width="144" height="144" rx="34" fill="#FBF6EE"/>
+  <path d="M32 38c15-8 29-7 40 2v62c-12-8-25-9-40-2V38Z" fill="#D85C3C"/><path d="M128 38c-15-8-29-7-40 2v62c12-8 25-9 40-2V38Z" fill="#B94C32"/><path d="M80 40v62" stroke="#FBF6EE" stroke-width="5" stroke-linecap="round"/><path d="M108 18c4 9 11 12 19 15-8 2-15 6-19 15-4-9-11-13-19-15 8-3 15-6 19-15Z" fill="#FFCB47"/>
+  <text x="184" y="91" fill="#23262B" font-family="Georgia, 'Times New Roman', serif" font-size="56" font-weight="700">Aula</text>
+  <text x="363" y="91" fill="#D85C3C" font-family="Inter, Arial, sans-serif" font-size="51" font-weight="700" letter-spacing="1">Studio</text>
+  <path d="M188 116h330" stroke="#D85C3C" stroke-width="3" stroke-linecap="round" opacity=".65"/>
+</svg>

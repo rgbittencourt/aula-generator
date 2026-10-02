@@ -4,7 +4,6 @@ const createReviewMarks = () => ({ resources: {}, checks: {} });
 const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {} };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
-const IDENTITY_STORAGE_KEY = "aula-generator:identity:v1";
 const DRAFT_MAX_AGE_DAYS = 30;
 let saveTimer = null;
 
@@ -143,17 +142,6 @@ function safeStorageRemove() {
   try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch { /* armazenamento pode estar bloqueado */ }
 }
 
-function readIdentity() {
-  try {
-    const value = JSON.parse(localStorage.getItem(IDENTITY_STORAGE_KEY) || "{}");
-    return value && typeof value === "object" ? value : {};
-  } catch { return {}; }
-}
-
-function saveIdentity(author, institution) {
-  try { localStorage.setItem(IDENTITY_STORAGE_KEY, JSON.stringify({ author, institution })); } catch { /* identidade é apenas uma conveniência local */ }
-}
-
 function showRecoveryDock(showBar = true) {
   $("#recovery-dock")?.classList.remove("hidden");
   if (showBar) $("#recovery-bar")?.classList.remove("hidden");
@@ -176,14 +164,7 @@ function enterWorkspace() {
 }
 
 function initializeWelcome() {
-  const identity = readIdentity();
   const draft = readDraft();
-  const author = identity.author || draft?.form?.author || "";
-  const institution = identity.institution || draft?.form?.institution || "";
-  if ($("#welcome-author")) $("#welcome-author").value = author;
-  if ($("#welcome-institution")) $("#welcome-institution").value = institution;
-  if ($("#author")) $("#author").value = author;
-  if ($("#institution")) $("#institution").value = institution;
   if (draft) showRecoveryDock(true);
 }
 
@@ -199,7 +180,6 @@ function enterFromWelcome(event) {
   $("#author").value = author;
   $("#institution").value = institution;
   $("#access-code").value = accessCode;
-  saveIdentity(author, institution);
   enterWorkspace();
 }
 

@@ -239,13 +239,13 @@ O painel lateral mostra continuamente:
 - existência ou não de webpráticas;
 - estado geral do dimensionamento.
 
-Esse resumo é preliminar. O cálculo mais preciso acontece depois que o conteúdo e os recursos são gerados. Abaixo dele ficam as ações principais: **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade**, **Guia do professor PDF** e **Pacote completo ZIP**.
+Esse resumo é preliminar. O cálculo mais preciso acontece depois que o conteúdo e os recursos são gerados. Abaixo dele ficam as ações principais: **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade**, **Guia do professor PDF** e **Pacote completo ZIP**. Depois da capa, o menu superior fixo apresenta o atalho **Abrir Aula Studio**, com a marca do editor, em uma nova aba. Os campos Nome, Instituição e Código de acesso da capa começam vazios por decisão de privacidade; preencha-os somente quando iniciar aquela sessão.
 
 O menu lateral também oferece atalhos para **Carga por atividade**, **Checklists e progressão** e **Semanas planejadas**. No celular, ele passa para o alto da página.
 
 ### 5.3 Seções numeradas
 
-A tela divide o briefing em sete áreas recolhíveis. Todas começam abertas para facilitar a conferência inicial:
+A tela divide o briefing em sete áreas recolhíveis. Somente **Identidade do curso** começa aberta; os demais setores começam recolhidos para manter a tela compacta:
 
 1. **Identidade do curso**
 2. **Tempo e calendário**
