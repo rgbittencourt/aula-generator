@@ -3,6 +3,7 @@ import { measureLessonQuality, qualityPromptGuidance, qualityTargets } from "./c
 import { buildTeacherGuide } from "./teacher-guide.js";
 import { ACADEMIC_SYSTEM_PROMPT, buildAcademicPlanPrompt, buildAcademicReviewPrompt, normalizeAcademicPlan, normalizeAcademicReview, normalizeAcademicProfile } from "./academic.js";
 import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
+import { compositionPlanForWeek } from "./composition.js";
 
 const providerBase = () => (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
 
@@ -326,6 +327,8 @@ export function buildWeekGenerationPrompt(input, weekIndex = 0, academicPlan = n
   const textBudget = qualityTargets(input);
   const scheduledPractices = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, weekIndex));
   const resourcePlan = resourcePlanForWeek(input, weekIndex);
+  const compositionPlan = compositionPlanForWeek(input, weekIndex);
+  const compositionTargets = Object.values(compositionPlan.rows).filter((row) => row.count > 0).map((row) => `${row.count}× ${row.label} (${row.policy}, ${row.itemsPerBlock > 1 ? `${row.itemsPerBlock} itens/bloco` : "bloco único"})`);
   const previousSummaries = (previousWeeks || []).slice(-3).map((lesson, index) => ({
     weekNumber: lesson?.lessonPlan?.weekNumber || index + 1,
     theme: lesson?.lessonPlan?.theme || lesson?.meta?.title,
@@ -345,6 +348,8 @@ PADRÃO EDITORIAL DOS EXEMPLOS DE REFERÊNCIA:
 - insira vídeos, imagens, artigos e documentos no ponto exato em que ajudam a entender a seção, com pergunta-guia e finalidade; não crie uma galeria de links no final;
 - termine com síntese conceitual de pelo menos 100 palavras, conexão explícita com a próxima semana de pelo menos 60 palavras, glossário e avaliação alinhada; não finalize depois de apenas três seções;
 - antes de responder, confira internamente se cada objetivo específico aparece em pelo menos uma seção, atividade e questão de avaliação.
+- use a composição de blocos abaixo como um plano editorial, não como decoração: cada bloco deve resolver uma função pedagógica no ponto da seção indicada;
+- não crie blocos repetitivos só para cumprir número. Quando um tipo estiver com política "required", entregue a quantidade solicitada; quando estiver com "prefer", entregue se houver função pedagógica clara.
 
 MAPA LONGITUDINAL OBRIGATÓRIO — não ignore este bloco e não substitua seus objetivos por toda a lista geral do curso:
 - Tema e título desta semana: ${weekFocus.theme}
@@ -364,13 +369,20 @@ REQUISITOS DE RECURSOS DESTA SEMANA — cumpra estas quantidades sem inventar li
 - artigos podem contar como parte das leituras obrigatórias, sem duplicar artificialmente a lista. Se não houver URL verificável, use searchQuery e verificationStatus "suggested-no-url" para que a pesquisa/curadoria localize candidatos depois;
 - distribua os recursos nas seções em que serão usados. Se uma meta for 0, não force esse tipo de recurso na semana.
 
+COMPOSIÇÃO EDITORIAL DO AULA STUDIO — a saída deve conter uma propriedade separada "composition", um array de objetos de bloco; não gere "blocks":
+- metas desta semana: ${compositionTargets.length ? compositionTargets.join("; ") : "nenhum bloco adicional solicitado"};
+- cada item de "composition" deve ter "type", "sectionNumber" e conteúdo específico para esta semana. Tipos válidos: ${BLOCK_TYPES};
+- use "destaque" para uma ideia-chave, "atencao" para erro/limite, "reflexao" para pergunta aberta, "citacao" somente com citação fornecida ou claramente marcada para conferência, "imagem"/"parallax"/"textoimagem" com src apenas se houver recurso real, "cases" para comparação de situações, "feature" para sinais/ideias, "tabela" para comparação estruturada, "accordion" para perguntas e respostas, "flashcards" para recuperação ativa, "slider" para procedimento, "linhadotempo" para evolução, "columns" para contrastes, "quiz" para checagem formativa e "externalembed" somente com embed real;
+- quando um bloco exigir itens, forneça "items", "cards", "steps", "questions", "eras", "columns", "features" ou "rows" completos conforme o tipo. O conteúdo deve ser específico, não use “Item 1” ou “Pergunta 1” sem completar o conceito;
+- a quantidade solicitada é por semana e pode ser zero. Não conte títulos, parágrafos, recursos, webpráticas ou a avaliação final como composição. O servidor materializará a composição em blocos Aula Studio dentro do tópico.
+
 Semanas já geradas (use somente para continuidade; não copie seus títulos, objetivos ou seções):
 ${JSON.stringify(previousSummaries, null, 2)}
 
 Retorne somente este objeto de alto nível: { "lessonPlan": { ... }, "teacherGuide": { "webPracticeProjects": [...] } }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. O lessonPlan é a prioridade absoluta. teacherGuide deve conter somente projetos de webprática quando houver sessão agendada; não repita objetivos, matriz, diagnóstico, avaliação ou o conteúdo da aula no guia.
 
 lessonPlan obrigatório:
-- weekNumber, theme (título específico e informativo, nunca "Conteúdo da semana"), welcome (80–160 palavras, contextualizada e ligada ao percurso), didacticArc com sequence, phasePlan e omissionReasons. A phasePlan pode omitir etapas, mas deve justificar a omissão;
+- weekNumber, theme (título específico e informativo, nunca "Conteúdo da semana"), welcome (80–160 palavras, contextualizada e ligada ao percurso), didacticArc com sequence, phasePlan e omissionReasons, composition (array de blocos editoriais conforme o plano acima). A phasePlan pode omitir etapas, mas deve justificar a omissão;
 - learningObjectives com 4–8 objetivos observáveis, específicos desta semana, usando verbos como explicar, comparar, analisar, aplicar, avaliar ou criar;
 - prerequisites e contentDensity;
 - contentSections com pelo menos ${textBudget.requiredSectionCount} seções principais. Cada seção deve ter number, title, didacticRole, body com aproximadamente ${textBudget.sectionTargetWords} palavras (mínimo ${textBudget.sectionMinimumWords}, máximo ${textBudget.sectionMaximumWords}), subsections, caseStudy quando pertinente, reflection quando pertinente, keyTerms e resources. A progressão deve ir do problema/pergunta para conceitos, exemplos ou evidências, aplicação e crítica. Não repita a mesma introdução em seções diferentes;

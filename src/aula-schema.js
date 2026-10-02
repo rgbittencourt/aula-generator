@@ -2,6 +2,7 @@ import { normalizeDidacticArc, buildAlignmentMatrix, buildProgression, pedagogic
 import { measureLessonQuality } from "./content-quality.js";
 import { normalizeAcademicProfile } from "./academic.js";
 import { progressionForWeek } from "./curriculum.js";
+import { compositionPlanForWeek, materializeComposition, normalizeCompositionPlan } from "./composition.js";
 
 export const DEFAULT_LICENSE = "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br";
 
@@ -496,6 +497,8 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
   const images = normalizeResources(resources.images || plan.images, "image");
   const podcasts = normalizeResources(resources.podcasts || plan.podcasts, "podcast");
   const datasets = normalizeResources(resources.datasets || plan.datasets, "dataset");
+  const compositionRequest = compositionPlanForWeek(input, index);
+  const composition = materializeComposition({ ...plan, resources: { ...resources, images } }, compositionRequest, index + 1);
   // A webprática é uma sessão síncrona independente e será entregue em DOCX.
   // Nunca a misture no texto-base nem nos blocos do aluno.
   const practices = [];
@@ -510,6 +513,7 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
     didacticArc: normalizeDidacticArc(plan.didacticArc, false, index),
     contentSections,
     resources: { videos, readingsRequired: requiredReadings, readingsExtra: extraReadings, images, podcasts, datasets },
+    composition: { preset: compositionRequest.preset, requested: compositionRequest.rows, entries: composition.entries, blocksBySection: composition.blocksBySection },
     webPractices: [],
     activities,
     diagnostic: normalizeDiagnostic(plan.diagnostic || plan.initialDiagnostic),
@@ -566,6 +570,7 @@ export function normalizeCourseInput(raw = {}) {
     webPractices,
     webPractice: { enabled, moments: legacyMoments.length ? legacyMoments : splitLines(practice.moments || raw.practiceMoments), instructions: legacyInstructions || text(practice.instructions || raw.practiceInstructions), durationMinutes: webPractices.reduce((sum, item) => sum + item.durationMinutes, 0) },
     resourcePlan: normalizeResourcePlan(raw.resourcePlan || raw.weeklyResourcePlan, weeks),
+    compositionPlan: normalizeCompositionPlan(raw.compositionPlan || raw.blockComposition || raw.aulaStudioComposition, weeks),
     author: text(raw.author), role: text(raw.role), institution: text(raw.institution), year: text(raw.year, String(new Date().getFullYear())), language: text(raw.language, "pt-BR"),
     license: text(raw.license, DEFAULT_LICENSE),
     formulaConfig: raw.formulaConfig && typeof raw.formulaConfig === "object" ? raw.formulaConfig : null,
@@ -761,6 +766,7 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
     children.push({ id: newId("c-title-", week, sectionIndex + 2), type: "titulo", props: { text: `${section.number} ${section.title}`, level: "h2" } });
     if (section.body) children.push({ id: newId("c-prose-", week, sectionIndex + 20), type: "prose", props: { body: richHtml(section.body), dropcap: sectionIndex === 0, dropcapTone: "terracotta" } });
     children.push(...resourceChildren([...(section.resources || []), ...allResources], sectionIndex));
+    children.push(...(plan.composition?.blocksBySection?.[sectionIndex] || []));
     section.subsections.forEach((sub, subIndex) => { children.push({ id: newId("c-subtitle-", week, sectionIndex * 10 + subIndex + 1), type: "titulo", props: { text: `${sub.number} ${sub.title}`, level: "h3" } }); if (sub.body) children.push({ id: newId("c-subprose-", week, sectionIndex * 10 + subIndex + 3), type: "prose", props: { body: richHtml(sub.body), dropcap: false, dropcapTone: "terracotta" } }); });
     if (section.reflection?.question) children.push({ id: newId("c-reflection-", week, sectionIndex + 1), type: "reflexao", props: { title: "Para refletir", question: html(section.reflection.question), body: html(section.reflection.body), tone: "lavender", icon: "" } });
   });
@@ -776,13 +782,40 @@ export function buildFallbackLesson(input, index) {
   return { meta: weekMeta(input, index), lessonPlan, blocks: fallbackBlocks(input, index, lessonPlan) };
 }
 
+function injectCompositionIntoBlocks(blocks, lessonPlan) {
+  const bySection = lessonPlan?.composition?.blocksBySection || [];
+  if (!bySection.some((items) => Array.isArray(items) && items.length)) return blocks;
+  const visit = (list) => {
+    if (!Array.isArray(list)) return list;
+    let sectionIndex = -1;
+    let inserted = new Set();
+    const output = [];
+    list.forEach((block) => {
+      const copy = { ...block };
+      if (Array.isArray(copy.props?.children)) copy.props = { ...copy.props, children: visit(copy.props.children) };
+      if (copy.type === "titulo") {
+        const match = text(copy.props?.text).match(/^(\d+)(?:\.|\s)/);
+        sectionIndex = match ? Math.max(0, Number(match[1]) - 1) : sectionIndex + 1;
+        inserted = new Set();
+      }
+      output.push(copy);
+      if (copy.type === "prose" && sectionIndex >= 0 && !inserted.has(sectionIndex)) {
+        output.push(...(bySection[sectionIndex] || []));
+        inserted.add(sectionIndex);
+      }
+    });
+    return output;
+  };
+  return visit(blocks);
+}
+
 export function normalizeLesson(raw, input, index) {
   const fallback = buildFallbackLesson(input, index);
   const source = raw && typeof raw === "object" ? raw : {};
   const seen = new Set();
   const directPlan = source.contentSections || source.sections || source.theme || source.welcome || source.learningObjectives ? source : {};
   const lessonPlan = normalizeLessonPlan(source.lessonPlan || source.plan || directPlan, input, index);
-  const sourceBlocks = integrateRootResources(Array.isArray(source.blocks) ? source.blocks.map((block, i) => sanitizeBlock(block, index + 1, `block-${i}`, seen)).filter(Boolean) : [], index + 1, lessonPlan);
+  const sourceBlocks = injectCompositionIntoBlocks(integrateRootResources(Array.isArray(source.blocks) ? source.blocks.map((block, i) => sanitizeBlock(block, index + 1, `block-${i}`, seen)).filter(Boolean) : [], index + 1, lessonPlan), lessonPlan);
   const hasHero = sourceBlocks.some((block) => block.type === "hero" && text(block.props?.title));
   const hasTopic = sourceBlocks.some((block) => ["topic", "topic-collapsible", "topic-slider"].includes(block.type) && Array.isArray(block.props?.children) && block.props.children.length > 0);
   const hasObjectives = sourceBlocks.some((block) => block.type === "destaque" && text(block.props?.title).toLowerCase().includes("objetiv"));

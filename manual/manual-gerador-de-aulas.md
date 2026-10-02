@@ -1097,6 +1097,20 @@ Os blocos principais são:
 - `imagem` para imagens e diagramas;
 - `materiais` para leituras e itens complementares.
 
+### 12.3.1 Composição editorial por semana
+
+O painel **Composição da aula no Aula Studio** controla estruturas que complementam o texto-base sem substituí-lo. Informe a quantidade padrão e, quando necessário, abra uma semana para definir uma exceção. Use a política **Obrigatório** quando o bloco deve aparecer, **Preferir** quando a IA deve usá-lo se houver função pedagógica clara e **Não usar** quando o tipo não deve ser criado.
+
+Os tipos disponíveis incluem:
+
+- **Destaques:** destaque conceitual, atenção/erro comum, reflexão, citação e comentário contextual;
+- **Mídia e estruturas:** imagem com legenda, imagem parallax, texto + imagem, cards de casos, pontos-chave, tabela comparativa, filmstrip, áudio e conteúdo externo;
+- **Interativos:** acordeão/FAQ, flashcards, slider passo a passo, linha do tempo, colunas comparativas e quiz formativo.
+
+O prompt exige que cada bloco tenha conteúdo específico, `sectionNumber` e uma função pedagógica. O Gerador materializa a composição em `lessonPlan.composition` e em blocos editáveis do JSON do aluno, inserindo-a no tópico depois do texto da seção correspondente. O tempo desses interativos aparece como **Interativos Aula Studio** na carga aberta. A composição não altera a regra de separação: webpráticas continuam fora do texto-base e do JSON do aluno.
+
+No checklist, todos os itens continuam visíveis. Os aprovados automaticamente começam marcados; desmarque um item para indicar que deseja refazê-lo. A tela preserva a rolagem e o foco do item após cada marcação, portanto não é necessário voltar ao ponto em que estava.
+
 ### 12.4 Revisão dos recursos
 
 Antes da publicação, confira:

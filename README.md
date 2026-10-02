@@ -153,6 +153,14 @@ Essas metas entram no prompt semanal, na curadoria da IA e nas solicitações ao
 
 No **Planejamento geral**, o quadro **Carga aberta por atividade** mostra, em minutos e horas, o que veio do texto-base, de artigos/leituras obrigatórios, de leituras complementares, de vídeos obrigatórios ou extras, de imagens, quiz, fórum, revisão, projeto e webprática. A mesma separação aparece ao abrir **Ver aula**. Assim, a carga não fica escondida em um único total.
 
+### Composição editorial compatível com o Aula Studio
+
+O painel **Composição da aula no Aula Studio** permite definir uma quantidade padrão de blocos por semana e alterar exceções semanais. A lista inclui destaques, atenção, reflexão, citações, imagens com legenda, casos, tabelas, acordeões, flashcards, sliders, linhas do tempo, colunas comparativas, quiz formativo e conteúdo externo. A política **Obrigatório** pede o bloco; **Preferir** trata a quantidade como orientação pedagógica; **Não usar** desativa o tipo.
+
+Os blocos são contextualizados pela IA e posicionados na seção indicada, depois do texto que lhes dá sentido. O servidor materializa a propriedade `lessonPlan.composition` em blocos editáveis compatíveis com o Aula Studio; não são contados como texto-base. A prévia mostra cada bloco no ponto da seção e a carga aberta acrescenta o tempo estimado dos interativos.
+
+O checklist pedagógico exibe todos os itens, mas inicia marcados os que a análise automática aprovou. Ao desmarcar um item, ele passa a representar uma conferência/refação manual. A lista mantém a posição de rolagem e o foco após cada marcação, inclusive quando o item está distante do início.
+
 ## Separação aluno e professor
 
 A aplicação produz duas camadas diferentes:

@@ -6,6 +6,7 @@ import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload, cal
 import { digitalContentMinutes, readingMinutes } from "../src/formula-profile.js";
 import { createWeeksZip } from "../src/zip.js";
 import { buildBriefingPrompt, buildWeekGenerationPrompt } from "../src/ai.js";
+import { compositionPlanForWeek } from "../src/composition.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { createTeacherGuidePdf } from "../src/pdf.js";
 import { buildCourseProgression } from "../src/curriculum.js";
@@ -34,6 +35,20 @@ test("normaliza metas de vídeos, artigos e leituras por semana", () => {
   assert.deepEqual(resourcePlanForWeek(input, 0), { weekNumber: 1, videosPerWeek: 2, articlesPerWeek: 1, requiredReadingsPerWeek: 1, requiredReadingLevel: "essential" });
   assert.deepEqual(resourcePlanForWeek(input, 1), { weekNumber: 2, videosPerWeek: 0, articlesPerWeek: 3, requiredReadingsPerWeek: 2, requiredReadingLevel: "dense" });
   assert.equal(resourcePlanForWeek(input, 2).videosPerWeek, 2);
+});
+
+test("normaliza composição Aula Studio com padrão e exceção por semana", () => {
+  const input = normalizeCourseInput({ title: "Curso", weeks: 2, compositionPlan: { default: { rows: { citacao: { count: 1 }, accordion: { count: 1, itemsPerBlock: 4 }, flashcards: { count: 2, itemsPerBlock: 5 }, quiz: { count: 0 } } }, weeks: [{ weekNumber: 2, rows: { accordion: { count: 0 }, quiz: { count: 1, itemsPerBlock: 4 } } }] } });
+  assert.equal(compositionPlanForWeek(input, 0).rows.accordion.count, 1);
+  assert.equal(compositionPlanForWeek(input, 1).rows.accordion.count, 0);
+  assert.equal(compositionPlanForWeek(input, 1).rows.quiz.count, 1);
+  const lesson = normalizeLesson({ lessonPlan: { contentSections: [{ number: "1", title: "Conceito", body: "Texto desenvolvido." }, { number: "2", title: "Aplicação", body: "Exemplo aplicado." }], composition: [{ type: "citacao", sectionNumber: 1, quote: "Uma formulação ligada ao conceito.", author: "Autoria", source: "Fonte" }] } }, input, 0);
+  assert.equal(lesson.lessonPlan.composition.entries.length, 8);
+  assert.ok(hasBlock(lesson, "accordion"));
+  assert.ok(hasBlock(lesson, "flashcards"));
+  assert.ok(hasBlock(lesson, "citacao"));
+  assert.ok(buildWeekGenerationPrompt(input, 0).includes("COMPOSIÇÃO EDITORIAL DO AULA STUDIO"));
+  assert.ok(buildWeekGenerationPrompt(input, 0).includes('"composition"'));
 });
 
 test("agenda webprática por data ou semana ocorre uma única vez", () => {

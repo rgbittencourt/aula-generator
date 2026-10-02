@@ -129,6 +129,16 @@ function estimateReviewItems(lesson) {
   return items;
 }
 
+function estimateCompositionItems(lesson) {
+  const entries = Array.isArray(lesson?.lessonPlan?.composition?.entries) ? lesson.lessonPlan.composition.entries : [];
+  const minutesByType = { destaque: 3, atencao: 3, reflexao: 5, citacao: 4, pitaco: 3, imagem: 4, parallax: 5, textoimagem: 6, cases: 15, feature: 6, tabela: 8, filmstrip: 10, audio: 8, accordion: 8, flashcards: 10, slider: 10, linhadotempo: 12, columns: 8, quiz: 12, externalembed: 8 };
+  return entries.map((entry, index) => {
+    const type = text(entry.type || entry.kind).toLowerCase();
+    const minutes = positive(entry.durationMinutes) || minutesByType[type] || 5;
+    return item({ id: `composition-${index + 1}`, title: entry.title || entry.label || `Bloco ${type || index + 1}`, category: type === "quiz" ? "assessment" : "interactive", minutes, basis: `estimativa de interação/observação do bloco ${type || "editorial"}`, confidence: "low", required: false, formulaKey: "composition", details: { type, sectionNumber: entry.sectionNumber } });
+  });
+}
+
 function explicitItems(lesson) {
   const items = lesson?.lessonPlan?.timePlan?.items;
   if (!Array.isArray(items) || !items.some((entry) => positive(entry?.minutes || entry?.estimatedMinutes))) return [];
@@ -140,15 +150,15 @@ function derivedItems(input, lesson, profile) {
   if (explicit.length) return { items: explicit, unresolved: [] };
   const resources = estimateResourceItems(lesson, profile);
   return {
-    items: [...estimateContentItems(lesson, profile), ...resources.items, ...estimatePracticeItems(lesson, input, profile), ...estimateActivityItems(lesson, profile), ...estimateAssessmentItems(lesson, profile), ...estimateReviewItems(lesson)].filter((entry) => entry.minutes > 0),
+    items: [...estimateContentItems(lesson, profile), ...resources.items, ...estimateCompositionItems(lesson), ...estimatePracticeItems(lesson, input, profile), ...estimateActivityItems(lesson, profile), ...estimateAssessmentItems(lesson, profile), ...estimateReviewItems(lesson)].filter((entry) => entry.minutes > 0),
     unresolved: resources.unresolved
   };
 }
 
 function allocationFromItems(items) {
-  const output = { contentMinutes: 0, resourcesMinutes: 0, practiceMinutes: 0, assessmentMinutes: 0, reviewMinutes: 0, communicationMinutes: 0, projectMinutes: 0, otherMinutes: 0 };
+  const output = { contentMinutes: 0, resourcesMinutes: 0, interactiveMinutes: 0, practiceMinutes: 0, assessmentMinutes: 0, reviewMinutes: 0, communicationMinutes: 0, projectMinutes: 0, otherMinutes: 0 };
   for (const entry of items) {
-    const key = entry.category === "practice" ? "practiceMinutes" : entry.category === "assessment" ? "assessmentMinutes" : entry.category === "review" ? "reviewMinutes" : entry.category === "communication" ? "communicationMinutes" : entry.category === "project" ? "projectMinutes" : ["reading", "video", "audio", "image", "data"].includes(entry.category) ? "resourcesMinutes" : ["content", "base-text"].includes(entry.category) ? "contentMinutes" : "otherMinutes";
+    const key = entry.category === "practice" ? "practiceMinutes" : entry.category === "assessment" ? "assessmentMinutes" : entry.category === "review" ? "reviewMinutes" : entry.category === "communication" ? "communicationMinutes" : entry.category === "project" ? "projectMinutes" : entry.category === "interactive" ? "interactiveMinutes" : ["reading", "video", "audio", "image", "data"].includes(entry.category) ? "resourcesMinutes" : ["content", "base-text"].includes(entry.category) ? "contentMinutes" : "otherMinutes";
     output[key] += entry.minutes;
   }
   return output;
@@ -163,6 +173,7 @@ function breakdownFromItems(items) {
     extraVideoMinutes: 0,
     imageMinutes: 0,
     audioMinutes: 0,
+    interactiveMinutes: 0,
     quizMinutes: 0,
     forumMinutes: 0,
     practiceMinutes: 0,
@@ -176,6 +187,7 @@ function breakdownFromItems(items) {
     else if (entry.category === "video") breakdown[entry.required ? "requiredVideoMinutes" : "extraVideoMinutes"] += entry.minutes;
     else if (entry.category === "image") breakdown.imageMinutes += entry.minutes;
     else if (entry.category === "audio") breakdown.audioMinutes += entry.minutes;
+    else if (entry.category === "interactive") breakdown.interactiveMinutes += entry.minutes;
     else if (entry.category === "assessment") breakdown.quizMinutes += entry.minutes;
     else if (entry.category === "forum") breakdown.forumMinutes += entry.minutes;
     else if (entry.category === "practice") breakdown.practiceMinutes += entry.minutes;

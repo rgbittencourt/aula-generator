@@ -171,6 +171,7 @@ function applyInputToForm(input = {}) {
   if ($("#resource-default-required")) $("#resource-default-required").value = Number.isFinite(Number(resourceDefaults.requiredReadingsPerWeek)) ? resourceDefaults.requiredReadingsPerWeek : 1;
   if ($("#resource-default-level")) $("#resource-default-level").value = resourceDefaults.requiredReadingLevel || "essential";
   renderResourcePlanWeeks(resourcePlan);
+  renderCompositionPlanWeeks(input.compositionPlan || {});
   updateAcademicInheritance();
   updateSummary();
   updateProgress();
@@ -215,6 +216,56 @@ function renderResourcePlanWeeks(plan = {}) {
     const entry = byWeek.get(weekNumber) || {};
     return `<div class="resource-plan-week" data-resource-week="${weekNumber}"><div class="resource-plan-week-label">Semana ${weekNumber}</div>${field("Vídeos", "videos", entry.videosPerWeek)}${field("Artigos", "articles", entry.articlesPerWeek)}${field("Leituras obrigatórias", "required", entry.requiredReadingsPerWeek)}${field("Nível de leitura", "level", entry.requiredReadingLevel, "select")}</div>`;
   }).join("");
+}
+
+const compositionCatalog = [
+  ["destaque", "Destaque conceitual", "Destaques", 1, 1], ["atencao", "Atenção / erro comum", "Destaques", 1, 1], ["reflexao", "Reflexão", "Destaques", 1, 1], ["citacao", "Citação", "Texto", 0, 1], ["pitaco", "Comentário / pitaco", "Destaques", 0, 1],
+  ["imagem", "Imagem com legenda", "Mídia", 1, 1], ["parallax", "Imagem parallax", "Mídia", 0, 1], ["textoimagem", "Texto + imagem", "Mídia", 0, 1], ["cases", "Cards de casos", "Mídia", 0, 3], ["feature", "Destaques com ícones", "Mídia", 0, 3], ["tabela", "Tabela comparativa", "Mídia", 0, 3], ["filmstrip", "Filmstrip / carrossel", "Mídia", 0, 3], ["audio", "Áudio / podcast", "Mídia", 0, 1],
+  ["accordion", "Acordeão / FAQ", "Interativos", 1, 3], ["flashcards", "Flashcards", "Interativos", 0, 6], ["slider", "Slider / passo a passo", "Interativos", 0, 3], ["linhadotempo", "Linha do tempo", "Interativos", 0, 4], ["columns", "Colunas comparativas", "Interativos", 0, 2], ["quiz", "Quiz formativo", "Interativos", 1, 5], ["externalembed", "Conteúdo externo", "Mídia", 0, 1]
+];
+
+function compositionDefaultRows() {
+  return Object.fromEntries(compositionCatalog.map(([key, label, group, count, itemsPerBlock]) => [key, { key, label, group, count, policy: "prefer", itemsPerBlock }]));
+}
+
+function compositionRowValue(row, key, fallback = "") {
+  const value = row?.[key];
+  return value === null || value === undefined ? fallback : value;
+}
+
+function collectCompositionPlan() {
+  const rows = {};
+  compositionCatalog.forEach(([key, label, group, defaultCount, itemsPerBlock]) => {
+    rows[key] = { key, label, group, count: Math.min(12, Math.max(0, Number($(`[data-composition-default="${key}"]`)?.value) || 0)), policy: $(`[data-composition-policy="${key}"]`)?.value || "prefer", itemsPerBlock: itemsPerBlock > 1 ? Math.min(12, Math.max(1, Number($(`[data-composition-items="${key}"]`)?.value) || itemsPerBlock)) : 1 };
+  });
+  const weeks = [...document.querySelectorAll("[data-composition-week]")].map((row) => ({
+    weekNumber: Number(row.dataset.compositionWeek),
+    rows: Object.fromEntries(compositionCatalog.map(([key, label, group, defaultCount, itemsPerBlock]) => {
+      const count = row.querySelector(`[data-composition-week-count="${key}"]`)?.value ?? "";
+      const policy = row.querySelector(`[data-composition-week-policy="${key}"]`)?.value ?? "";
+      return [key, { count: count === "" ? "" : Math.min(12, Math.max(0, Number(count) || 0)), policy, itemsPerBlock: itemsPerBlock > 1 ? (Number(row.querySelector(`[data-composition-week-items="${key}"]`)?.value) || itemsPerBlock) : 1 }];
+    }))
+  }));
+  return { preset: "balanced", default: { rows }, weeks };
+}
+
+function renderCompositionPlanWeeks(plan = {}) {
+  const container = $("#composition-plan");
+  if (!container) return;
+  const weeks = Math.min(52, Math.max(1, Number($("#weeks")?.value) || 1));
+  const defaults = plan.default?.rows || {};
+  const entries = Array.isArray(plan.weeks) ? plan.weeks : [];
+  const byWeek = new Map(entries.map((entry) => [Number(entry.weekNumber || entry.week), entry.rows || entry]));
+  const defaultRows = compositionCatalog.map(([key, label, group, defaultCount, itemsPerBlock]) => {
+    const row = defaults[key] || {};
+    return `<div class="composition-row"><span class="composition-label"><strong>${escapeHtml(label)}</strong><small>${escapeHtml(group)}</small></span><input data-composition-default="${key}" type="number" min="0" max="12" step="1" value="${compositionRowValue(row, "count", defaultCount)}" aria-label="Quantidade padrão de ${escapeHtml(label)}" /><select data-composition-policy="${key}" aria-label="Política de ${escapeHtml(label)}"><option value="prefer" ${compositionRowValue(row, "policy", "prefer") === "prefer" ? "selected" : ""}>Preferir</option><option value="required" ${compositionRowValue(row, "policy", "prefer") === "required" ? "selected" : ""}>Obrigatório</option><option value="none" ${compositionRowValue(row, "policy", "prefer") === "none" ? "selected" : ""}>Não usar</option></select>${itemsPerBlock > 1 ? `<label class="composition-items">itens <input data-composition-items="${key}" type="number" min="1" max="12" value="${compositionRowValue(row, "itemsPerBlock", itemsPerBlock)}" /></label>` : ""}</div>`;
+  }).join("");
+  const weekMarkup = Array.from({ length: weeks }, (_, index) => {
+    const weekNumber = index + 1;
+    const rowPlan = byWeek.get(weekNumber) || {};
+    return `<details class="composition-week" data-composition-week="${weekNumber}"><summary>Semana ${weekNumber}<small>Deixe vazio para herdar o padrão</small></summary><div class="composition-week-grid">${compositionCatalog.map(([key, label, group, defaultCount, itemsPerBlock]) => { const row = rowPlan[key] || {}; return `<label class="composition-week-cell"><span>${escapeHtml(label)}</span><input data-composition-week-count="${key}" type="number" min="0" max="12" step="1" value="${row.count ?? ""}" placeholder="padrão" />${itemsPerBlock > 1 ? `<input data-composition-week-items="${key}" type="number" min="1" max="12" value="${row.itemsPerBlock || ""}" placeholder="${itemsPerBlock} itens" />` : ""}<select data-composition-week-policy="${key}"><option value="">padrão</option><option value="prefer" ${row.policy === "prefer" ? "selected" : ""}>preferir</option><option value="required" ${row.policy === "required" ? "selected" : ""}>obrigatório</option><option value="none" ${row.policy === "none" ? "selected" : ""}>não usar</option></select></label>`; }).join("")}</div></details>`;
+  }).join("");
+  container.innerHTML = `<div class="composition-defaults"><div class="composition-table-head"><strong>Bloco do Aula Studio</strong><span>Qtd. padrão</span><span>Política</span><span>Itens/bloco</span></div>${defaultRows}</div><div class="composition-week-heading"><strong>Exceções por semana</strong><small>Use apenas quando uma semana precisar de composição diferente.</small></div><div class="composition-week-list">${weekMarkup}</div>`;
 }
 
 function restoreSnapshot(snapshot) {
@@ -418,6 +469,7 @@ function formInput() {
     imageSearchSuggestions: splitLines($("#image-search-suggestions").value),
     materials: collectMaterials(),
     resourcePlan: collectResourcePlan(),
+    compositionPlan: collectCompositionPlan(),
     accessCode: $("#access-code")?.value || "",
     webPracticeEnabled: $("#practice-enabled").checked,
     webPractices,
@@ -442,6 +494,9 @@ function updateSummary() {
   $("#summary-calendar").textContent = calendar === "calendar" ? (formatDate($("#start-date").value) || "Data pendente") : "Por numeração";
   const resourceDefaults = collectResourcePlan().default;
   $("#summary-resources").textContent = `${resourceDefaults.videosPerWeek} vídeo(s) · ${resourceDefaults.articlesPerWeek} artigo(s) · ${resourceDefaults.requiredReadingsPerWeek} leitura(s)`;
+  const compositionRows = collectCompositionPlan().default.rows;
+  const compositionCount = Object.values(compositionRows).reduce((sum, row) => sum + (Number(row.count) || 0), 0);
+  $("#summary-composition").textContent = `${compositionCount} bloco(s)/semana`;
   const practiceCount = collectPractices().filter((practice) => practice.title || practice.objective || practice.context).length;
   $("#summary-practice").textContent = $("#practice-enabled").checked ? `Sim · ${practiceCount || 1}` : "Não";
   $("#workload-preview strong").textContent = `${hours * weeks} horas totais`;
@@ -655,6 +710,17 @@ function resourcePreview(resource) {
   return `<div class="reader-resource reader-resource-inline"><div class="reader-resource-context"><div class="reader-resource-heading"><strong>${escapeHtml(title)}</strong>${sourceLink}</div><p class="reader-resource-bridge">${escapeHtml(bridge)}</p>${media}<small>${escapeHtml(detail || "Recurso contextualizado para esta seção.")}</small></div></div>`;
 }
 
+function compositionPreview(entry = {}) {
+  const type = String(entry.type || entry.kind || "bloco").toLowerCase();
+  const labels = { destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", citacao: "Citação", imagem: "Imagem", accordion: "Acordeão", flashcards: "Flashcards", quiz: "Quiz formativo", cases: "Casos", feature: "Pontos-chave", tabela: "Tabela comparativa", slider: "Passo a passo", linhadotempo: "Linha do tempo", columns: "Colunas", externalembed: "Conteúdo externo" };
+  const title = entry.title || entry.label || labels[type] || "Bloco editorial";
+  const body = entry.body || entry.question || entry.intro || entry.description || entry.quote || "";
+  const collection = entry.items || entry.cards || entry.steps || entry.questions || entry.features || entry.eras || entry.columns || entry.rows;
+  const rows = Array.isArray(collection) ? collection.slice(0, 6).map((item) => `<li>${escapeHtml(item.title || item.front || item.q || item.label || (Array.isArray(item) ? item.join(" · ") : "Item contextualizado"))}</li>`).join("") : "";
+  const media = entry.src || entry.href ? `<img src="${escapeHtml(entry.src || entry.href)}" alt="${escapeHtml(entry.caption || title)}" loading="lazy" />` : "";
+  return `<div class="reader-composition reader-composition-${escapeHtml(type)}"><div class="reader-composition-kicker">${escapeHtml(labels[type] || "Bloco Aula Studio")}</div><strong>${escapeHtml(title)}</strong>${paragraphsMarkup(body)}${media}${rows ? `<ul>${rows}</ul>` : ""}</div>`;
+}
+
 function renderLessonPreview(lesson, index) {
   const plan = lesson?.lessonPlan || {};
   const quality = lesson?.contentQuality || {};
@@ -685,8 +751,9 @@ function renderLessonPreview(lesson, index) {
     const subs = (section.subsections || []).map((sub) => `<h4>${escapeHtml(`${sub.number || ""} ${sub.title || ""}`.trim())}</h4>${paragraphsMarkup(sub.body)}`).join("");
     const caseMarkup = section.caseStudy ? `<div class="reader-callout"><strong>${escapeHtml(section.caseStudy.title || "Estudo de caso")}</strong>${paragraphsMarkup(section.caseStudy.context || section.caseStudy.data || "")}${(section.caseStudy.questions || []).length ? `<ul>${section.caseStudy.questions.map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul>` : ""}</div>` : "";
     const reflection = section.reflection?.question ? `<div class="reader-callout"><strong>Para refletir</strong><p>${escapeHtml(section.reflection.question)}</p>${paragraphsMarkup(section.reflection.body || "")}</div>` : "";
+    const composition = (plan.composition?.entries || []).filter((entry) => Number(entry.sectionNumber) === Number(section.number) || (!entry.sectionNumber && section.number === "1")).map(compositionPreview).join("");
     const resources = [...(section.resources || [])].map(resourcePreview).join("");
-    return `<section><h3>${escapeHtml(`${section.number || ""} ${section.title || "Seção"}`.trim())}</h3>${paragraphsMarkup(section.body)}${resources}${subs}${caseMarkup}${reflection}</section>`;
+    return `<section><h3>${escapeHtml(`${section.number || ""} ${section.title || "Seção"}`.trim())}</h3>${paragraphsMarkup(section.body)}${composition}${resources}${subs}${caseMarkup}${reflection}</section>`;
   }).join("");
   const globalResources = Object.values(allResources).flat().filter((resource) => resource && !sections.some((section) => (section.resources || []).some((item) => item.id && item.id === resource.id))).slice(0, 12).map(resourcePreview).join("");
   const glossary = (plan.glossary || []).length ? `<section><h3>Glossário</h3><ul>${plan.glossary.map((item) => `<li><strong>${escapeHtml(item.term || "Termo")}</strong>: ${escapeHtml(item.definition || "")}</li>`).join("")}</ul></section>` : "";
@@ -839,6 +906,7 @@ function workloadItemLabel(item = {}) {
   if (item.category === "review") return "Síntese e revisão";
   if (item.category === "image") return "Imagem/diagrama";
   if (item.category === "audio") return "Áudio/podcast";
+  if (item.category === "interactive") return "Interativo Aula Studio";
   if (item.category === "project") return "Projeto/produção";
   return "Outra atividade";
 }
@@ -851,6 +919,7 @@ const breakdownLabels = {
   extraVideoMinutes: "Vídeos complementares",
   imageMinutes: "Imagens/diagramas",
   audioMinutes: "Áudios/podcasts",
+  interactiveMinutes: "Interativos Aula Studio",
   quizMinutes: "Quiz/avaliação",
   forumMinutes: "Fórum/discussão",
   practiceMinutes: "Webprática",
@@ -867,11 +936,21 @@ function reviewCheckChecked(item = {}, reviewMarks = state.reviewMarks || create
 }
 
 function toggleReviewMark(kind, key, checked) {
+  const pageScroll = window.scrollY;
+  const list = document.querySelector(`input[data-review-kind="${CSS.escape(kind)}"]`)?.closest(".review-panel")?.querySelector(".review-list");
+  const listScroll = list?.scrollTop || 0;
   state.reviewMarks = state.reviewMarks || createReviewMarks();
   state.reviewMarks[kind] = state.reviewMarks[kind] || {};
   state.reviewMarks[kind][key] = checked;
   saveDraft("conferência manual");
   renderGeneralPlan(state.generalPlan);
+  requestAnimationFrame(() => {
+    window.scrollTo(0, pageScroll);
+    const nextList = document.querySelector(`input[data-review-kind="${CSS.escape(kind)}"]`)?.closest(".review-panel")?.querySelector(".review-list");
+    if (nextList) nextList.scrollTop = listScroll;
+    const nextInput = document.querySelector(`input[data-review-kind="${CSS.escape(kind)}"][data-review-key="${CSS.escape(key)}"]`);
+    nextInput?.focus({ preventScroll: true });
+  });
 }
 
 function renderGeneralPlan(plan) {
@@ -1173,7 +1252,7 @@ $("#regenerate-week-button").addEventListener("click", regenerateSelectedWeek);
 $("#lesson-modal").addEventListener("click", (event) => { if (event.target.id === "lesson-modal") closeLessonPreview(); });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.previewIndex != null) closeLessonPreview(); });
 $("#calendar-mode").addEventListener("change", () => { toggleCalendar(); scheduleSave(); });
-$("#weeks").addEventListener("input", () => { renderResourcePlanWeeks(collectResourcePlan()); updateSummary(); updateProgress(); scheduleSave(); });
+$("#weeks").addEventListener("input", () => { const resourcePlan = collectResourcePlan(); const compositionPlan = collectCompositionPlan(); renderResourcePlanWeeks(resourcePlan); renderCompositionPlanWeeks(compositionPlan); updateSummary(); updateProgress(); scheduleSave(); });
 $("#practice-enabled").addEventListener("change", () => { togglePractice(); scheduleSave(); });
 $("#course-form").addEventListener("input", () => { updateAcademicInheritance(); updateSummary(); updateProgress(); scheduleSave(); });
 $("#save-backup-button").addEventListener("click", downloadBackup);
@@ -1185,4 +1264,4 @@ window.addEventListener("beforeunload", () => saveDraft("fechamento"));
 $("#generate-button").dataset.label = "Gerar com IA";
 $("#fallback-button").dataset.label = "Gerar exemplo local";
 $("#assist-button").dataset.label = "Preencher vazios com IA";
-renderResourcePlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
+renderResourcePlanWeeks(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
