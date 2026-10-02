@@ -87,3 +87,14 @@
 .week-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:16px}.week-actions .week-preview,.week-actions .week-download{flex:1;min-width:120px;height:40px;padding:0 10px;font-size:11px}.week-actions .week-download{margin-top:0}.week-actions .week-approve{flex:1 0 100%}
 
 .week-status-detail{display:block;margin-top:7px;color:#8e3724;font-size:10px;line-height:1.4}.week-card .quality-badge.blocked{background:var(--coral-soft);color:#8e3724}.week-card .quality-badge.review{background:#fff3cf;color:#76530d}
+
+/* Recurso contextual: a ponte textual e o vídeo pertencem ao mesmo ponto da aula. */
+.reader-resource-inline{margin:18px 0 24px;padding:14px 16px;border-left:3px solid #d9876f;border-radius:0 12px 12px 0;background:#fbfaf7}
+.reader-resource-context{display:flex;flex-direction:column;gap:6px}
+.reader-resource-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px}
+.reader-resource-heading strong{color:var(--navy)}
+.reader-resource-heading a{font-size:12px;width:max-content}
+.reader-resource-inline .reader-resource-bridge{margin:4px 0 8px}
+.reader-resource-inline .reader-resource-media{width:min(100%,760px);margin:2px 0 8px}
+.reader-resource-inline small{line-height:1.45;color:#65747b}
+@media (max-width:700px){.reader-resource-inline{padding:12px}.reader-resource-heading{gap:6px}}

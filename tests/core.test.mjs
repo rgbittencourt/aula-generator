@@ -189,11 +189,11 @@ test("posiciona vídeo raiz depois do texto da seção indicada", () => {
   const children = topic.props.children;
   const sectionTwo = children.findIndex((block) => block.props?.text === "2 Arquitetura");
   const sectionThree = children.findIndex((block) => block.props?.text === "3 Aplicação");
-  const video = children.findIndex((block) => block.type === "video" && block.props?.resourceId === "video-arquitetura");
-  const bridge = children.findIndex((block) => block.type === "prose" && block.props?.resourceId === "video-arquitetura");
+  const videoParagraph = children.findIndex((block) => block.type === "prose" && block.props?.inlineVideo?.resourceId === "video-arquitetura");
   assert.ok(sectionTwo >= 0 && sectionThree > sectionTwo);
-  assert.ok(bridge > sectionTwo && bridge < sectionThree);
-  assert.ok(video > bridge && video < sectionThree);
+  assert.ok(videoParagraph > sectionTwo && videoParagraph < sectionThree);
+  assert.match(children[videoParagraph].props.body, /Observe no vídeo/);
+  assert.equal(children[videoParagraph].props.inlineVideo.id, "abc123");
 });
 
 test("fallback gera uma aula válida para cada semana", () => {
@@ -204,7 +204,7 @@ test("fallback gera uma aula válida para cada semana", () => {
   assert.ok(weeks[0].lessonPlan.contentSections.length >= 1);
   assert.ok(weeks[0].blocks.some((block) => block.type === "hero"));
   assert.ok(hasBlock(weeks[0], "destaque"));
-  assert.ok(hasBlock(weeks[0], "video"));
+  assert.ok(weeks[0].blocks.some((block) => block.type === "topic" && block.props.children.some((child) => child.props?.inlineVideo?.id === "abc123")));
   assert.ok(weeks[0].lessonPlan.didacticArc.id);
 });
 

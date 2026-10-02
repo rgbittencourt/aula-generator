@@ -652,7 +652,7 @@ function resourcePreview(resource) {
   const approval = resource.humanApproval === "approved" || resource.verificationStatus === "verified" ? "Conferido" : resource.href ? "Link localizado · revisão humana pendente" : "Ainda é uma sugestão";
   const detail = [resource.pedagogicalUse || resource.objective, resource.source, resource.license, approval].filter(Boolean).join(" · ");
   const bridge = resource.bridgeParagraph || resource.connectionParagraph || resource.pedagogicalUse || `Use este recurso neste ponto para relacionar ${title} ao conceito explicado na seção e registrar o que ele confirma, exemplifica ou problematiza.`;
-  return `<div class="reader-resource">${media}<div><strong>${escapeHtml(title)}</strong>${sourceLink}<p class="reader-resource-bridge">${escapeHtml(bridge)}</p><small>${escapeHtml(detail || "Recurso contextualizado para esta seção.")}</small></div></div>`;
+  return `<div class="reader-resource reader-resource-inline"><div class="reader-resource-context"><div class="reader-resource-heading"><strong>${escapeHtml(title)}</strong>${sourceLink}</div><p class="reader-resource-bridge">${escapeHtml(bridge)}</p>${media}<small>${escapeHtml(detail || "Recurso contextualizado para esta seção.")}</small></div></div>`;
 }
 
 function renderLessonPreview(lesson, index) {
@@ -686,7 +686,7 @@ function renderLessonPreview(lesson, index) {
     const caseMarkup = section.caseStudy ? `<div class="reader-callout"><strong>${escapeHtml(section.caseStudy.title || "Estudo de caso")}</strong>${paragraphsMarkup(section.caseStudy.context || section.caseStudy.data || "")}${(section.caseStudy.questions || []).length ? `<ul>${section.caseStudy.questions.map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul>` : ""}</div>` : "";
     const reflection = section.reflection?.question ? `<div class="reader-callout"><strong>Para refletir</strong><p>${escapeHtml(section.reflection.question)}</p>${paragraphsMarkup(section.reflection.body || "")}</div>` : "";
     const resources = [...(section.resources || [])].map(resourcePreview).join("");
-    return `<section><h3>${escapeHtml(`${section.number || ""} ${section.title || "Seção"}`.trim())}</h3>${paragraphsMarkup(section.body)}${subs}${caseMarkup}${reflection}${resources}</section>`;
+    return `<section><h3>${escapeHtml(`${section.number || ""} ${section.title || "Seção"}`.trim())}</h3>${paragraphsMarkup(section.body)}${resources}${subs}${caseMarkup}${reflection}</section>`;
   }).join("");
   const globalResources = Object.values(allResources).flat().filter((resource) => resource && !sections.some((section) => (section.resources || []).some((item) => item.id && item.id === resource.id))).slice(0, 12).map(resourcePreview).join("");
   const glossary = (plan.glossary || []).length ? `<section><h3>Glossário</h3><ul>${plan.glossary.map((item) => `<li><strong>${escapeHtml(item.term || "Termo")}</strong>: ${escapeHtml(item.definition || "")}</li>`).join("")}</ul></section>` : "";

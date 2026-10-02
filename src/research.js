@@ -346,6 +346,7 @@ function syncResourceBlocks(lesson, selectedResources) {
   const existingImages = new Set();
   walkBlocks(blocks, (block) => {
     if (block.type === "video" && block.props?.id) existingVideoIds.add(text(block.props.id));
+    if (block.type === "prose" && block.props?.inlineVideo?.id) existingVideoIds.add(text(block.props.inlineVideo.id));
     if (block.type === "imagem" && block.props?.src) existingImages.add(text(block.props.src));
   });
   const sections = Array.isArray(lesson.lessonPlan?.contentSections) ? lesson.lessonPlan.contentSections : [];
@@ -355,13 +356,15 @@ function syncResourceBlocks(lesson, selectedResources) {
     const sectionIndex = Number.isInteger(explicit) && explicit >= 1 && explicit <= Math.max(1, sections.length) ? explicit - 1 : index % Math.max(1, sections.length);
     const additions = additionsBySection.get(sectionIndex) || [];
     const bridge = resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || `Use este recurso neste ponto para relacionar ${resource.title || "o material"} ao conceito estudado na seção.`;
-    additions.push({ id: `resource-bridge-${blockKey(resource.id)}-${index}`, type: "prose", bg: "neutral-default", pad: "normal", props: { body: `<p>${html(bridge)}</p>`, dropcap: false, dropcapTone: "terracotta", resourceId: resource.id } }, block);
+    if (block.type === "prose" && block.props?.inlineVideo?.id) additions.push(block);
+    else additions.push({ id: `resource-bridge-${blockKey(resource.id)}-${index}`, type: "prose", bg: "neutral-default", pad: "normal", props: { body: `<p>${html(bridge)}</p>`, dropcap: false, dropcapTone: "terracotta", resourceId: resource.id } }, block);
     additionsBySection.set(sectionIndex, additions);
   };
   selectedResources.videos.forEach((resource, index) => {
     const id = youtubeId(resource.href);
     if (!id || existingVideoIds.has(id)) return;
-    queue(resource, { id: `resource-video-${blockKey(resource.id)}-${index}`, type: "video", bg: "neutral-default", pad: "normal", props: { id, title: resource.title, caption: resource.objective || resource.pedagogicalUse || "Vídeo selecionado para esta semana.", credit: resource.credit || resource.source || "YouTube", start: "", resourceId: resource.id } }, index);
+    const bridge = resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || `Use este vídeo neste ponto para relacionar ${resource.title || "o material"} ao conceito estudado nesta seção.`;
+    queue(resource, { id: `resource-video-inline-${blockKey(resource.id)}-${index}`, type: "prose", bg: "neutral-default", pad: "normal", props: { body: `<p>${html(bridge)}</p>`, dropcap: false, dropcapTone: "terracotta", resourceId: resource.id, inlineVideo: { id, title: resource.title, caption: resource.objective || resource.pedagogicalUse || "Vídeo selecionado para esta semana.", credit: resource.credit || resource.source || "YouTube", start: "", resourceId: resource.id } } }, index);
   });
   selectedResources.images.forEach((resource, index) => {
     if (!resource.href || existingImages.has(resource.href)) return;
