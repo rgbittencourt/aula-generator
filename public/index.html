@@ -20,7 +20,32 @@
     .general-plan{margin:18px 0 24px;padding:20px;border:1px solid #dfe4ea;border-radius:14px;background:#fffdf8}.general-plan h3{margin:0 0 6px;color:#14213d}.general-plan p{margin:4px 0;color:#5e6875;font-size:13px}.general-plan-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:15px 0}.general-metric{padding:12px;border-radius:10px;background:#f4f0e8}.general-metric strong{display:block;color:#14213d;font-size:18px}.general-metric small{color:#687381}.general-category-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.general-category-list span{padding:6px 9px;border-radius:999px;background:#edf2ed;color:#43584b;font-size:11px}.general-warning{margin-top:12px;padding:10px;border-radius:9px;background:#fff3dc;color:#76530d;font-size:12px}.general-warning ul{margin:6px 0 0;padding-left:18px}.checklist-ok{background:#e3f3e7;color:#24623a}.week-metrics span strong{color:#14213d}.formula-note p{font-size:12px}.checkbox-field{display:flex;flex-direction:column;gap:8px}.checkbox-field input{width:18px;height:18px}.week-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}.week-actions button{flex:1;min-width:130px}.quality-badge{display:inline-flex;align-items:center;gap:5px;margin-top:10px;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}.quality-badge.complete{background:#e3f3e7;color:#24623a}.quality-badge.needs-review{background:#fff1d3;color:#805c16}.quality-badge.insufficient{background:#fbe5df;color:#9a3e2c}.lesson-modal{position:fixed;inset:0;z-index:30;display:flex;align-items:flex-start;justify-content:center;padding:4vh 20px;background:rgba(20,33,61,.55);overflow:auto}.lesson-modal.hidden{display:none}.lesson-dialog{width:min(1080px,100%);max-height:92vh;overflow:auto;background:#fffdf9;border-radius:18px;box-shadow:0 25px 80px rgba(20,33,61,.28)}.lesson-dialog-header{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;gap:20px;padding:22px 26px;border-bottom:1px solid #e4e0d7;background:#fffdf9}.lesson-dialog-header h2{margin:4px 0 0;color:#14213d;font-family:var(--display-font,Georgia,serif);font-size:clamp(24px,4vw,40px);line-height:1.05}.close-modal{border:0;background:#eef1f3;color:#14213d;width:34px;height:34px;border-radius:50%;font-size:22px;cursor:pointer}.lesson-quality-strip{display:flex;flex-wrap:wrap;gap:8px;padding:14px 26px;background:#f4f0e8;color:#5e6875;font-size:12px}.lesson-quality-strip span{padding:5px 8px;border-radius:999px;background:#fffdf9}.lesson-reader{padding:8px 26px 28px}.lesson-reader .reader-welcome{font-size:17px;line-height:1.7;color:#4b5663;padding:18px 0;border-bottom:1px solid #e4e0d7}.lesson-reader h3{margin:28px 0 10px;color:#14213d;font-family:var(--display-font,Georgia,serif);font-size:25px}.lesson-reader h4{margin:20px 0 6px;color:#43584b}.lesson-reader p{max-width:78ch;color:#3e4854;line-height:1.75}.lesson-reader ul{padding-left:22px;color:#3e4854;line-height:1.65}.reader-objectives{padding:16px 18px;border-left:4px solid #e76f51;background:#fff3e9;border-radius:0 10px 10px 0}.reader-callout{padding:14px 16px;background:#edf2ed;border-radius:10px;margin:12px 0;color:#43584b}.reader-resource{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid #ebe8e1}.reader-resource a{color:#456b87;word-break:break-word}.reader-resource small{display:block;color:#78838f;margin-top:4px}.reader-review{margin:0 26px 26px;padding:18px;border:1px solid #e1d6c7;border-radius:12px;background:#fff8ec}.reader-review h3{margin:0 0 8px;color:#14213d}.reader-review textarea{width:100%;min-height:110px;margin:10px 0 12px;padding:12px;border:1px solid #cfd6dc;border-radius:8px;font:inherit;resize:vertical}.reader-review-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}.reader-review-note{font-size:12px;color:#6a737c;margin:8px 0 0}.reader-warning{padding:10px 12px;border-radius:8px;background:#fbe5df;color:#8d3829;font-size:12px;margin:12px 0}@media (max-width:680px){.general-plan-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lesson-modal{padding:0}.lesson-dialog{min-height:100vh;border-radius:0}.lesson-dialog-header,.lesson-reader{padding-left:18px;padding-right:18px}.reader-review{margin-left:18px;margin-right:18px}.week-actions button{min-width:100%}}
   </style>
 </head>
-<body>
+<body class="welcome-active">
+  <section class="welcome-screen" id="welcome-screen" aria-labelledby="welcome-title">
+    <div class="welcome-shell">
+      <div class="welcome-hero">
+        <div class="welcome-brand"><img src="./brand/gerador-de-aulas-mark.svg" alt="" width="42" height="42" /><span><strong>Gerador</strong><small>de aulas</small></span></div>
+        <div class="welcome-hero-copy">
+          <p class="eyebrow">PLANEJAMENTO PEDAGÓGICO COM IA</p>
+          <h1 id="welcome-title">Do tema geral a uma trilha de aulas semanais.</h1>
+          <p>Estruture cursos consistentes, escreva semanas com profundidade e prepare materiais prontos para revisão e publicação no Aula Studio.</p>
+          <div class="welcome-signals" aria-label="Recursos do Gerador de Aulas"><span><b>01</b> currículo com progressão</span><span><b>02</b> conteúdo-base desenvolvido</span><span><b>03</b> revisão antes da exportação</span></div>
+        </div>
+        <div class="welcome-hero-footer"><span>Aula Studio</span><span>Conteúdo do aluno · guia do professor</span></div>
+      </div>
+      <div class="welcome-auth">
+        <div class="welcome-auth-heading"><p class="eyebrow">ACESSO AO GERADOR</p><h2>Entre para começar</h2><p>Por enquanto, identifique o autor e a instituição. O código é usado somente quando a versão publicada solicitar acesso à IA.</p></div>
+        <form id="welcome-form" class="welcome-form">
+          <label class="welcome-field"><span>Nome <b>*</b></span><input id="welcome-author" type="text" autocomplete="name" required placeholder="Nome do autor" /></label>
+          <label class="welcome-field"><span>Instituição</span><input id="welcome-institution" type="text" autocomplete="organization" placeholder="Nome da instituição" /></label>
+          <label class="welcome-field"><span>Código de acesso de IA</span><input id="welcome-access-code" type="password" autocomplete="current-password" placeholder="Informe se a Vercel solicitar" /><small>Este não é o segredo da OpenAI. O código nunca é salvo no backup local.</small></label>
+          <button class="button button-primary welcome-submit" type="submit"><span>Entrar no Gerador</span><span class="button-arrow">→</span></button>
+        </form>
+        <p class="welcome-auth-note"><span>✦</span> Seus dados de autoria serão usados nos arquivos gerados e no guia do professor.</p>
+        <div class="welcome-institutional" aria-label="Desenvolvimento institucional"><div class="inovalab-lockup"><span class="inovalab-symbol">✦</span><span><em>DESENVOLVIDO NO</em><strong>InovaLab</strong><small>Laboratório de Inovação e Mídias Digitais</small></span></div><span class="institutional-divider" aria-hidden="true"></span><img src="./brand/ifsc-logo.jpg" alt="Instituto Federal de Santa Catarina" /><span class="app-version">v0.1.0</span></div>
+      </div>
+    </div>
+  </section>
   <header class="site-header">
     <a class="brand" href="/" aria-label="Gerador de Aulas">
       <img src="./brand/gerador-de-aulas-mark.svg" alt="" width="38" height="38" />
@@ -37,11 +62,13 @@
       <p class="intro-copy">Descreva o curso, defina o tempo de estudo e deixe a IA construir um percurso próprio para cada semana. A aula do aluno vai para o Aula Studio; o guia pedagógico do professor fica em PDF.</p>
     </section>
 
-    <section class="recovery-bar" id="recovery-bar" aria-live="polite">
-      <div class="recovery-copy"><span class="recovery-icon">↥</span><div><strong id="save-status-title">Salvamento local ativo</strong><small id="save-status">O briefing e as aulas geradas serão salvos automaticamente neste navegador.</small></div></div>
-      <div class="recovery-actions"><button class="button button-secondary" type="button" id="save-backup-button">Baixar backup</button><button class="button button-secondary" type="button" id="restore-backup-button">Restaurar backup</button><input id="backup-file-input" type="file" accept="application/json,.json" class="hidden" /></div>
-    </section>
-    <section class="draft-recovery hidden" id="draft-recovery" aria-live="polite"><div><strong>Encontramos um planejamento salvo neste navegador.</strong><small id="draft-recovery-details"></small></div><div class="recovery-actions"><button class="button button-primary" type="button" id="restore-draft-button">Retomar planejamento</button><button class="button button-secondary" type="button" id="discard-draft-button">Descartar este rascunho</button></div></section>
+    <div class="recovery-dock hidden" id="recovery-dock">
+      <section class="recovery-bar hidden" id="recovery-bar" aria-live="polite">
+        <div class="recovery-copy"><span class="recovery-icon">↥</span><div><strong id="save-status-title">Salvamento local ativo</strong><small id="save-status">O briefing e as aulas geradas serão salvos automaticamente neste navegador.</small></div></div>
+        <div class="recovery-actions"><button class="button button-secondary" type="button" id="save-backup-button">Baixar backup</button><button class="button button-secondary" type="button" id="restore-backup-button">Restaurar backup</button><input id="backup-file-input" type="file" accept="application/json,.json" class="hidden" /></div>
+      </section>
+      <section class="draft-recovery hidden" id="draft-recovery" aria-live="polite"><div><strong>Encontramos um planejamento salvo neste navegador.</strong><small id="draft-recovery-details"></small></div><div class="recovery-actions"><button class="button button-primary" type="button" id="restore-draft-button">Retomar planejamento</button><button class="button button-secondary" type="button" id="discard-draft-button">Descartar este rascunho</button></div></section>
+    </div>
 
     <form id="course-form" novalidate>
       <div class="workspace-grid">
@@ -54,9 +81,10 @@
               <label class="field span-2"><span>Tema geral ou título do curso <b>*</b></span><input id="course-title" name="title" required placeholder="Ex.: Fundamentos de sustentabilidade urbana" /></label>
               <label class="field"><span>Público</span><input id="audience" name="audience" placeholder="Ex.: estudantes de graduação" /></label>
               <label class="field"><span>Nível da turma</span><select id="level" name="level"><option>Iniciante</option><option selected>Intermediário</option><option>Avançado</option></select></label>
-              <label class="field"><span>Autor(a)</span><input id="author" name="author" placeholder="Nome para os arquivos" /></label>
-              <label class="field"><span>Instituição</span><input id="institution" name="institution" placeholder="Opcional" /></label>
-              <label class="field span-2 vercel-access"><span>Código de acesso da IA publicada</span><input id="access-code" type="password" autocomplete="off" placeholder="Preencha somente se a versão Vercel solicitar" /><small class="hint">Esse código será configurado na Vercel e não é a sua chave da OpenAI.</small></label>
+              <input id="author" name="author" type="hidden" />
+              <input id="institution" name="institution" type="hidden" />
+              <input id="access-code" type="hidden" autocomplete="off" />
+              <p class="identity-session-note span-2"><strong>Autoria e acesso definidos na tela de entrada.</strong><span>O nome e a instituição serão aplicados aos arquivos gerados; o código de IA fica apenas nesta sessão.</span></p>
             </div>
           </section>
 

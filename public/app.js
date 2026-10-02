@@ -4,6 +4,7 @@ const createReviewMarks = () => ({ resources: {}, checks: {} });
 const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {} };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
+const IDENTITY_STORAGE_KEY = "aula-generator:identity:v1";
 const DRAFT_MAX_AGE_DAYS = 30;
 let saveTimer = null;
 
@@ -28,7 +29,7 @@ function enhanceLayout() {
     const details = document.createElement("details");
     details.className = `${panel.className} briefing-sector`;
     details.id = `sector-${String(index + 1).padStart(2, "0")}`;
-    details.open = true;
+    details.open = index === 0;
     const summary = document.createElement("summary");
     summary.className = "sector-summary";
     summary.innerHTML = `${heading.innerHTML}<span class="sector-chevron" aria-hidden="true">⌄</span>`;
@@ -120,6 +121,10 @@ function updateAcademicInheritance() {
 function setSaveStatus(title, detail, tone = "") {
   const bar = $("#recovery-bar");
   if (!bar) return;
+  if (!document.body.classList.contains("welcome-active")) {
+    $("#recovery-dock")?.classList.remove("hidden");
+    bar.classList.remove("hidden");
+  }
   $("#save-status-title").textContent = title;
   $("#save-status").textContent = detail;
   bar.classList.toggle("is-warning", tone === "warning");
@@ -136,6 +141,66 @@ function safeStorageSet(value) {
 
 function safeStorageRemove() {
   try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch { /* armazenamento pode estar bloqueado */ }
+}
+
+function readIdentity() {
+  try {
+    const value = JSON.parse(localStorage.getItem(IDENTITY_STORAGE_KEY) || "{}");
+    return value && typeof value === "object" ? value : {};
+  } catch { return {}; }
+}
+
+function saveIdentity(author, institution) {
+  try { localStorage.setItem(IDENTITY_STORAGE_KEY, JSON.stringify({ author, institution })); } catch { /* identidade é apenas uma conveniência local */ }
+}
+
+function showRecoveryDock(showBar = true) {
+  $("#recovery-dock")?.classList.remove("hidden");
+  if (showBar) $("#recovery-bar")?.classList.remove("hidden");
+}
+
+function hideRecoveryDock() {
+  $("#recovery-dock")?.classList.add("hidden");
+  $("#recovery-bar")?.classList.add("hidden");
+}
+
+function enterWorkspace() {
+  $("#welcome-screen")?.classList.add("hidden");
+  document.body.classList.remove("welcome-active");
+  const draft = readDraft();
+  if (draft) showRecoveryDock(true);
+  else hideRecoveryDock();
+  updateAcademicInheritance();
+  updateSummary();
+  updateProgress();
+}
+
+function initializeWelcome() {
+  const identity = readIdentity();
+  const draft = readDraft();
+  const author = identity.author || draft?.form?.author || "";
+  const institution = identity.institution || draft?.form?.institution || "";
+  if ($("#welcome-author")) $("#welcome-author").value = author;
+  if ($("#welcome-institution")) $("#welcome-institution").value = institution;
+  if ($("#author")) $("#author").value = author;
+  if ($("#institution")) $("#institution").value = institution;
+  if (draft) showRecoveryDock(true);
+}
+
+function enterFromWelcome(event) {
+  event.preventDefault();
+  const author = $("#welcome-author")?.value.trim() || "";
+  const institution = $("#welcome-institution")?.value.trim() || "";
+  const accessCode = $("#welcome-access-code")?.value || "";
+  if (!author) {
+    $("#welcome-author")?.focus();
+    return;
+  }
+  $("#author").value = author;
+  $("#institution").value = institution;
+  $("#access-code").value = accessCode;
+  saveIdentity(author, institution);
+  enterWorkspace();
 }
 
 function persistedInput() {
@@ -210,6 +275,7 @@ function hideDraftRecovery() { $("#draft-recovery")?.classList.add("hidden"); }
 function offerDraftRecovery() {
   const draft = readDraft();
   if (!draft) return;
+  showRecoveryDock(true);
   const hasResults = Boolean(draft.results?.weeks?.length);
   $("#draft-recovery-details").textContent = `Salvo em ${formatSavedAt(draft.savedAt)}${hasResults ? ` · ${draft.results.weeks.length} semana(s) gerada(s)` : " · briefing em andamento"}.`;
   $("#draft-recovery").classList.remove("hidden");
@@ -217,6 +283,7 @@ function offerDraftRecovery() {
 }
 
 function applyInputToForm(input = {}) {
+  const currentAccessCode = $("#access-code")?.value || "";
   const fields = { "course-title": "title", audience: "audience", level: "level", author: "author", institution: "institution", weeks: "weeks", hours: "hoursPerWeek", "calendar-mode": "calendarMode", "start-date": "startDate", objectives: "objectives", content: "content", "didactic-mode": "didacticMode", references: "references", videos: "videoLinks", "video-search-suggestions": "videoSearchSuggestions", "image-links": "imageLinks", "image-search-suggestions": "imageSearchSuggestions" };
   Object.entries(fields).forEach(([elementId, key]) => {
     const element = $("#" + elementId);
@@ -238,7 +305,9 @@ function applyInputToForm(input = {}) {
   materialSequence = 0;
   const materials = Array.isArray(input.materials) && input.materials.length ? input.materials : [{}];
   materials.forEach((material) => addMaterial(material));
-  if ($("#access-code")) $("#access-code").value = "";
+  if ($("#access-code")) $("#access-code").value = currentAccessCode;
+  if ($("#welcome-author")) $("#welcome-author").value = input.author || $("#welcome-author").value || "";
+  if ($("#welcome-institution")) $("#welcome-institution").value = input.institution || $("#welcome-institution").value || "";
   toggleCalendar();
   togglePractice();
   const resourcePlan = input.resourcePlan || {};
@@ -361,7 +430,7 @@ function restoreSnapshot(snapshot) {
 }
 
 function downloadBackup() {
-  const snapshot = currentSnapshot();
+  const snapshot = currentSnapshot() || readDraft();
   if (!snapshot) { showAssistantMessage("Preencha ao menos o título do curso antes de salvar um backup.", true); return; }
   downloadBlob(new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" }), `${slugify(snapshot.form.title || "planejamento")}-backup.json`);
   setSaveStatus("Backup baixado", "Guarde este arquivo fora do navegador para uma recuperação adicional.", "success");
@@ -376,6 +445,7 @@ function restoreBackupFile(file) {
       if (snapshot?.version !== 2 || snapshot?.app !== "aula-generator" || !snapshot.form) throw new Error("Este arquivo não é um backup válido do Gerador de Aulas.");
       safeStorageSet(JSON.stringify(snapshot));
       restoreSnapshot(snapshot);
+      enterWorkspace();
     } catch (error) { showAssistantMessage(error.message || "Não foi possível restaurar o backup.", true); }
   };
   reader.readAsText(file);
@@ -1351,6 +1421,7 @@ $("#materials-list").addEventListener("click", (event) => {
 });
 addPractice();
 addMaterial();
+$("#welcome-form").addEventListener("submit", enterFromWelcome);
 $("#course-form").addEventListener("submit", (event) => { event.preventDefault(); generate(); });
 $("#assist-button").addEventListener("click", assistBriefing);
 $("#zip-button").addEventListener("click", downloadZip);
@@ -1368,10 +1439,11 @@ $("#course-form").addEventListener("input", () => { updateAcademicInheritance();
 $("#save-backup-button").addEventListener("click", downloadBackup);
 $("#restore-backup-button").addEventListener("click", () => $("#backup-file-input").click());
 $("#backup-file-input").addEventListener("change", (event) => { restoreBackupFile(event.target.files?.[0]); event.target.value = ""; });
-$("#restore-draft-button").addEventListener("click", () => restoreSnapshot(readDraft()));
-$("#discard-draft-button").addEventListener("click", () => { safeStorageRemove(); hideDraftRecovery(); setSaveStatus("Salvamento local ativo", "O próximo briefing será salvo automaticamente neste navegador."); });
+$("#restore-draft-button").addEventListener("click", () => { const draft = readDraft(); restoreSnapshot(draft); enterWorkspace(); });
+$("#discard-draft-button").addEventListener("click", () => { safeStorageRemove(); hideDraftRecovery(); if (document.body.classList.contains("welcome-active")) hideRecoveryDock(); else setSaveStatus("Salvamento local ativo", "O próximo briefing será salvo automaticamente neste navegador."); });
 window.addEventListener("beforeunload", () => saveDraft("fechamento"));
 $("#generate-button").dataset.label = "Gerar com IA";
 $("#assist-button").dataset.label = "Preencher vazios com IA";
+initializeWelcome();
 enhanceLayout();
 renderResourcePlanWeeks(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
