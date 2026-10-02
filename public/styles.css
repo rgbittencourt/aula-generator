@@ -110,7 +110,7 @@
 /* Navegação lateral e setores recolhíveis */
 .workspace-grid{grid-template-columns:300px minmax(0,1fr)!important;align-items:start}
 .form-column{grid-column:2;grid-row:1}
-.project-sidebar{grid-column:1;grid-row:1;position:sticky;top:92px;align-self:start;display:flex;flex-direction:column;gap:12px}
+.project-sidebar{grid-column:1;grid-row:1;position:sticky;top:92px;align-self:start;display:flex;flex-direction:column;gap:12px;max-height:calc(100vh - 108px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:4px}
 .project-sidebar .sticky-card{position:static;padding:18px}
 .project-sidebar .summary-card h2{font-size:23px;margin-bottom:12px}
 .project-sidebar .summary-list div{padding:8px 0}
@@ -149,5 +149,5 @@
 .weeks-sector{margin-top:14px}
 .weeks-sector>.results-sector-body{padding:16px 0 0}
 .weeks-sector .week-grid{padding:0 0 2px}
-@media(max-width:900px){.workspace-grid{grid-template-columns:1fr!important}.form-column{grid-column:1;grid-row:2}.project-sidebar{grid-column:1;grid-row:1;position:static}.sidebar-navigation{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px}.sidebar-navigation .sidebar-label{grid-column:1/-1}.project-sidebar .summary-card{position:static}.briefing-sector>.sector-summary,.sector-body{padding-left:20px;padding-right:20px}}
+@media(max-width:900px){.workspace-grid{grid-template-columns:1fr!important}.form-column{grid-column:1;grid-row:2}.project-sidebar{grid-column:1;grid-row:1;position:static;max-height:none;overflow:visible;padding-right:0}.sidebar-navigation{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px}.sidebar-navigation .sidebar-label{grid-column:1/-1}.project-sidebar .summary-card{position:static}.briefing-sector>.sector-summary,.sector-body{padding-left:20px;padding-right:20px}}
 @media(max-width:620px){.sidebar-navigation{grid-template-columns:1fr}.briefing-sector>.sector-summary{padding-top:19px;padding-bottom:19px}.sector-body{padding-bottom:20px}.results-sector-summary{display:block}.results-sector-summary small{display:block;margin-top:4px;text-align:left}.results-sector-body{padding:0 12px 12px}.weeks-sector>.results-sector-body{padding:12px 0 0}}
