@@ -1,23 +1,10 @@
-import { selectResourcesWithAI } from "./ai.js";
+import { selectResourcesWithAI } from "./resource-curator.js";
+import { searchResources } from "./resource-providers.js";
 
 const text = (value) => String(value ?? "").trim();
 const positive = (value) => { const number = Number(value); return Number.isFinite(number) && number > 0 ? number : 0; };
 const cleanHtml = (value) => text(value).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 const html = (value) => cleanHtml(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-async function fetchJson(url, headers = {}) {
-  const controller = new AbortController();
-  const timeoutMs = Math.max(3000, Number(process.env.AULA_RESEARCH_TIMEOUT_MS || 8000));
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { headers, signal: controller.signal });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return payload;
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 function baseQuery(input, lesson) {
   const plan = lesson?.lessonPlan || {};
@@ -69,121 +56,6 @@ function isoDurationToMinutes(value) {
   return Math.round((Number(match[1] || 0) * 60) + Number(match[2] || 0) + Number(match[3] || 0) / 60);
 }
 
-async function searchYouTube(request, input) {
-  const key = process.env.YOUTUBE_API_KEY;
-  if (!key) return { request, provider: "youtube", status: "missing-api-key", candidates: [], note: "Cadastre YOUTUBE_API_KEY para pesquisar vídeos reais." };
-  try {
-    const params = new URLSearchParams({ part: "snippet", q: request.query, type: "video", maxResults: "5", order: "relevance", regionCode: input.language === "pt-BR" ? "BR" : "US", relevanceLanguage: input.language === "pt-BR" ? "pt" : "en", safeSearch: "strict", videoEmbeddable: "true", key });
-    const result = await fetchJson(`https://www.googleapis.com/youtube/v3/search?${params}`);
-    const ids = (result.items || []).map((item) => item.id?.videoId).filter(Boolean);
-    let details = {};
-    if (ids.length) {
-      const detailParams = new URLSearchParams({ part: "contentDetails,snippet,statistics", id: ids.join(","), key });
-      const detailResult = await fetchJson(`https://www.googleapis.com/youtube/v3/videos?${detailParams}`);
-      details = Object.fromEntries((detailResult.items || []).map((item) => [item.id, item]));
-    }
-    const candidates = (result.items || []).map((item, index) => {
-      const id = item.id?.videoId;
-      const detail = details[id] || {};
-      const snippet = detail.snippet || item.snippet || {};
-      return {
-        candidateId: `youtube:${request.requestId}:${index + 1}`,
-        requestId: request.requestId,
-        provider: "youtube",
-        type: "video",
-        title: text(snippet.title, `Vídeo ${index + 1}`),
-        href: `https://www.youtube.com/watch?v=${id}`,
-        source: text(snippet.channelTitle, "YouTube"),
-        author: text(snippet.channelTitle),
-        description: cleanHtml(snippet.description),
-        durationMinutes: isoDurationToMinutes(detail.contentDetails?.duration),
-        publishedAt: text(snippet.publishedAt),
-        thumbnail: text(snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url),
-        verificationStatus: "provider-retrieved-needs-ai-selection",
-        requiresVerification: true
-      };
-    });
-    return { request, provider: "youtube", status: "ok", candidates };
-  } catch (error) {
-    return { request, provider: "youtube", status: "error", candidates: [], note: error.message };
-  }
-}
-
-function extMeta(info, key) {
-  return cleanHtml(info?.extmetadata?.[key]?.value);
-}
-
-async function searchCommons(request) {
-  try {
-    const params = new URLSearchParams({ action: "query", generator: "search", gsrsearch: request.query, gsrnamespace: "6", gsrlimit: "5", prop: "imageinfo", iiprop: "url|extmetadata", iiurlwidth: "1400", format: "json", origin: "*" });
-    const payload = await fetchJson(`https://commons.wikimedia.org/w/api.php?${params}`, { "User-Agent": "AulaGenerator/1.0 (educational resource research)" });
-    const pages = Object.values(payload.query?.pages || {});
-    const candidates = pages.map((page, index) => {
-      const info = page.imageinfo?.[0] || {};
-      const author = extMeta(info, "Artist") || extMeta(info, "Credit");
-      const license = extMeta(info, "LicenseShortName") || extMeta(info, "UsageTerms");
-      return {
-        candidateId: `commons:${request.requestId}:${index + 1}`,
-        requestId: request.requestId,
-        provider: "wikimedia-commons",
-        type: "image",
-        title: text(page.title).replace(/^File:/i, ""),
-        href: text(info.thumburl || info.url),
-        sourcePage: text(info.descriptionurl || `https://commons.wikimedia.org/wiki/${encodeURIComponent(page.title)}`),
-        source: "Wikimedia Commons",
-        author,
-        license,
-        licenseUrl: extMeta(info, "LicenseUrl"),
-        caption: extMeta(info, "ImageDescription") || text(page.title).replace(/^File:/i, ""),
-        altText: extMeta(info, "ObjectName") || extMeta(info, "ImageDescription"),
-        thumbnail: text(info.thumburl || info.url),
-        verificationStatus: "provider-retrieved-needs-ai-selection",
-        requiresVerification: true
-      };
-    }).filter((candidate) => candidate.href);
-    return { request, provider: "wikimedia-commons", status: "ok", candidates };
-  } catch (error) {
-    return { request, provider: "wikimedia-commons", status: "error", candidates: [], note: error.message };
-  }
-}
-
-async function searchCrossref(request) {
-  try {
-    const params = new URLSearchParams({ "query.bibliographic": request.query, rows: "5", mailto: process.env.CROSSREF_MAILTO || "" });
-    const payload = await fetchJson(`https://api.crossref.org/works?${params}`, { "User-Agent": "AulaGenerator/1.0 (educational resource research)" });
-    const candidates = (payload.message?.items || []).map((item, index) => {
-      const title = Array.isArray(item.title) ? item.title[0] : item.title;
-      const authors = Array.isArray(item.author) ? item.author.map((author) => [author.given, author.family].filter(Boolean).join(" ")).filter(Boolean).join(", ") : "";
-      const year = item.published?.["date-parts"]?.[0]?.[0] || item.issued?.["date-parts"]?.[0]?.[0] || "";
-      return {
-        candidateId: `crossref:${request.requestId}:${index + 1}`,
-        requestId: request.requestId,
-        provider: "crossref",
-        type: "reading",
-        title: text(title, `Leitura ${index + 1}`),
-        href: text(item.URL || (item.DOI ? `https://doi.org/${item.DOI}` : "")),
-        sourcePage: text(item.URL || (item.DOI ? `https://doi.org/${item.DOI}` : "")),
-        source: Array.isArray(item["container-title"]) ? item["container-title"][0] : text(item.publisher),
-        author: authors,
-        year,
-        doi: text(item.DOI),
-        license: text(item.license?.[0]?.URL),
-        typeLabel: text(item.type),
-        verificationStatus: "provider-retrieved-needs-ai-selection",
-        requiresVerification: true
-      };
-    }).filter((candidate) => candidate.href && candidate.title);
-    return { request, provider: "crossref", status: "ok", candidates };
-  } catch (error) {
-    return { request, provider: "crossref", status: "error", candidates: [], note: error.message };
-  }
-}
-
-async function researchGroup(type, requests, input) {
-  const searcher = type === "video" ? searchYouTube : type === "image" ? searchCommons : searchCrossref;
-  return Promise.all(requests.map((request) => searcher(request, input)));
-}
-
 function compactResearch(research) {
   return {
     status: research.status,
@@ -231,6 +103,10 @@ function resourceFromCandidate(candidate, selection) {
     licenseUrl: candidate.licenseUrl,
     sourcePage: candidate.sourcePage,
     thumbnail: candidate.thumbnail,
+    embedHref: candidate.embedHref,
+    embeddable: candidate.embeddable,
+    privacyStatus: candidate.privacyStatus,
+    openAccess: candidate.openAccess,
     searchQuery: selection.query,
     provider: candidate.provider,
     candidateId: candidate.candidateId,
@@ -404,8 +280,8 @@ export async function enrichLessonsWithResources(input, lessons) {
     const videoRequests = requestsFor("video", input, lesson);
     const imageRequests = requestsFor("image", input, lesson);
     const readingRequests = requestsFor("reading", input, lesson);
-    const [videos, images, readings] = await Promise.all([researchGroup("video", videoRequests, input), researchGroup("image", imageRequests, input), researchGroup("reading", readingRequests, input)]);
-    const research = { status: "searched", searchedAt: new Date().toISOString(), targets, providers: { youtube: videos.map((result) => result.status), wikimediaCommons: images.map((result) => result.status), crossref: readings.map((result) => result.status) }, queries: { videos: videoRequests, images: imageRequests, readings: readingRequests }, videos, images, readings };
+    const [videos, images, readings] = await Promise.all([searchResources("video", videoRequests, input), searchResources("image", imageRequests, input), searchResources("reading", readingRequests, input)]);
+    const research = { status: "searched", searchedAt: new Date().toISOString(), targets, providers: { youtube: videos.map((result) => result.status), wikimediaCommons: images.map((result) => result.status), crossref: readings.map((result) => result.providers?.crossref || (result.provider === "crossref" ? result.status : "not-used")), openAlex: readings.map((result) => result.providers?.openalex || "not-used") }, queries: { videos: videoRequests, images: imageRequests, readings: readingRequests }, videos, images, readings };
     const candidateCount = flattenCandidates(research).length;
     if (!candidateCount) return { ...lesson, lessonPlan: { ...lesson.lessonPlan, resourceResearch: { ...compactResearch({ ...research, status: "no-candidates" }), note: "Não foram encontrados candidatos. Para vídeos, cadastre YOUTUBE_API_KEY na Vercel; imagens e leituras usam provedores públicos." } } };
     let selection;

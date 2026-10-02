@@ -72,6 +72,7 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 | `AULA_AUTO_REPAIR` | `true` | Production, Preview e Development |
 | `AULA_ACCESS_CODE` | uma frase/código privado seu | Production, Preview e Development |
 | `YOUTUBE_API_KEY` | chave opcional do YouTube Data API | Production e, se desejar, Preview |
+| `AULA_OPENALEX_ENABLED` | `true` por padrão; use `false` para desativar o fallback acadêmico | Production, Preview e Development |
 
 7. Clique em **Deploy**.
 8. Abra a URL fornecida pela Vercel e confira o indicador no cabeçalho.
@@ -187,7 +188,9 @@ O Planejamento Geral considera o total do curso, apresenta meta, carga calculada
 
 ## Pesquisa automática de recursos
 
-Após a geração textual, o sistema consulta **YouTube Data API v3** para vídeos, **Wikimedia Commons** para imagens e diagramas com metadados de crédito/licença e **Crossref** para referências acadêmicas. A IA recebe os candidatos retornados pelos provedores, escolhe os mais adequados e registra justificativa pedagógica, fonte, URL, duração e licença quando disponíveis. As alternativas permanecem no campo `lessonPlan.resourceResearch` para conferência.
+Após a geração textual, o sistema consulta **YouTube Data API v3** para vídeos, **Wikimedia Commons** para imagens e diagramas com metadados de crédito/licença e **Crossref** para referências acadêmicas. Quando o Crossref retorna poucos candidatos, o adaptador consulta automaticamente o **OpenAlex** como fallback público; nenhuma nova chave é necessária. A IA recebe os candidatos retornados pelos provedores, escolhe os mais adequados e registra justificativa pedagógica, fonte, URL, duração e licença quando disponíveis. As alternativas permanecem no campo `lessonPlan.resourceResearch` para conferência.
+
+A arquitetura agora separa três responsabilidades: `src/ai-client.js` faz chamadas JSON, retries e recuperação de respostas inválidas; `src/resource-curator.js` pede à IA apenas a seleção entre candidatos reais; e `src/resource-providers.js` mantém o registro extensível de provedores. Assim, adicionar outro catálogo de vídeos, imagens ou referências não exige alterar o contrato semanal nem a redação da aula.
 
 Os recursos selecionados viram blocos editáveis do Aula Studio: `video`, `imagem` ou `materiais`. Isso permite abrir a aula e **editar o texto, trocar/remover uma imagem ou vídeo, inserir outro bloco e reorganizar a leitura** sem transformar o conteúdo em HTML achatado. Cada recurso possui estado `candidate-found`, `selected-by-ai` ou `approved`, além de pendências de licença, atualidade, acessibilidade, duração e adequação ao idioma. A aprovação final continua humana.
 
@@ -203,6 +206,7 @@ Os recursos selecionados viram blocos editáveis do Aula Studio: `video`, `image
 8. Confira `/api/health`: o campo `youtubeConfigured` deve aparecer como `true`.
 
 Sem `YOUTUBE_API_KEY`, o gerador continua pesquisando imagens/diagramas e leituras; vídeos sem dados ficam pendentes e não são inventados. `AULA_RESOURCE_RESEARCH=false` desativa o enriquecimento para diagnóstico.
+O fallback OpenAlex fica ligado por padrão e aparece como `openAlexFallback: true` em `/api/health`. Ele só é acionado quando o Crossref retorna menos de três candidatos para uma busca. Para desligá-lo, cadastre `AULA_OPENALEX_ENABLED=false` e faça Redeploy.
 
 ## Rotas do backend
 

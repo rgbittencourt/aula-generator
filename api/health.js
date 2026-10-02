@@ -8,6 +8,7 @@ export default function handler(_request, response) {
     accessRequired: accessRequired(),
     resourceResearch: process.env.AULA_RESOURCE_RESEARCH !== "false",
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
+    openAlexFallback: process.env.AULA_OPENALEX_ENABLED !== "false",
     model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
     autoRepair: process.env.AULA_AUTO_REPAIR !== "false",
     academicPipeline: process.env.AULA_ACADEMIC_PIPELINE !== "false",

@@ -1459,6 +1459,7 @@ Na Vercel, em **Settings → Environment Variables**, configure:
 | `AULA_AUTO_REPAIR` | `true` |
 | `AULA_ACCESS_CODE` | código privado para acessar a IA |
 | `YOUTUBE_API_KEY` | chave opcional de pesquisa de vídeos |
+| `AULA_OPENALEX_ENABLED` | `true` por padrão; `false` desativa o fallback acadêmico |
 
 Use o tipo **Secret** para as chaves. Depois de salvar alterações, faça **Redeploy**.
 
@@ -1527,7 +1528,17 @@ Imagens e diagramas podem ser pesquisados no Wikimedia Commons. O resultado deve
 
 Referências acadêmicas podem ser localizadas por meio do Crossref. O professor deve conferir título, autores, DOI e adequação ao conteúdo antes de publicar.
 
-### 20.4 O sistema não deve inventar fontes
+### 20.4 OpenAlex como fallback acadêmico
+
+Quando uma busca do Crossref retorna menos de três candidatos, o sistema consulta automaticamente o OpenAlex, um catálogo público de produção científica. Essa etapa não exige nova chave. Os candidatos continuam com `requiresVerification: true` e não são publicados automaticamente: título, autores, DOI, acesso ao texto, atualidade e pertinência devem ser conferidos pelo professor.
+
+O estado aparece no resultado de pesquisa e no endpoint `/api/health` como `openAlexFallback: true`. Para desligar o fallback, cadastre `AULA_OPENALEX_ENABLED=false` no ambiente e faça Redeploy.
+
+### 20.5 Camada de provedores e curadoria
+
+O código separa o cliente JSON da IA (`src/ai-client.js`), a curadoria entre candidatos reais (`src/resource-curator.js`) e o registro de provedores (`src/resource-providers.js`). A IA não pesquisa uma URL inventada: recebe resultados de YouTube, Wikimedia Commons, Crossref e, quando necessário, OpenAlex, escolhe os candidatos e produz `sectionNumber`, `bridgeParagraph`, justificativa, alinhamento, acessibilidade e exigência de revisão. Isso permite acrescentar novos provedores sem alterar o JSON semanal do Aula Studio.
+
+### 20.6 O sistema não deve inventar fontes
 
 Quando não existe link conferido, o recurso deve ficar com termo de busca e indicação de revisão. O professor não deve publicar automaticamente uma referência apenas porque a IA a descreveu.
 
@@ -1881,6 +1892,7 @@ Pode escolher uma preferência, mas a aplicação trata essa escolha como orient
 | JSON | Formato estruturado usado para transportar a aula |
 | JSON do aluno | Arquivo semanal que deve ser aberto no Aula Studio |
 | Guia do professor | Documento de mediação pedagógica exportado em PDF |
+| OpenAlex | Catálogo público usado como fallback quando o Crossref retorna poucos candidatos |
 | Planejamento Geral | Resumo agregado das semanas, tempos, categorias e pendências |
 | SCORM | Pacote de conteúdo rastreável usado pelo Moodle |
 | Webprática | Projeto independente de investigação, produção ou aplicação |
