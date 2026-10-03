@@ -117,6 +117,11 @@ function enhanceLayout() {
     weeksSector.appendChild(body);
     parent.appendChild(weeksSector);
   }
+  resetWorkspaceScroll();
+}
+
+function resetWorkspaceScroll() {
+  document.querySelectorAll(".summary-column, .form-column, .navigation-column").forEach((column) => { column.scrollTop = 0; column.scrollLeft = 0; });
 }
 
 function paragraphsMarkup(value) { return String(value ?? "").split(/\n\s*\n|\r?\n/).map((part) => readableText(part)).filter(Boolean).map((part) => `<p>${escapeHtml(part)}</p>`).join(""); }
@@ -192,6 +197,7 @@ function enterWorkspace() {
   document.body.classList.add("workspace-active");
   document.documentElement.classList.add("workspace-active");
   window.scrollTo(0, 0);
+  resetWorkspaceScroll();
   const draft = readDraft();
   if (draft) showRecoveryDock(true);
   else hideRecoveryDock();
@@ -1591,6 +1597,7 @@ $("#backup-file-input").addEventListener("change", (event) => { restoreBackupFil
 $("#restore-draft-button").addEventListener("click", () => { const draft = readDraft(); restoreSnapshot(draft); enterWorkspace(); });
 $("#discard-draft-button").addEventListener("click", () => { safeStorageRemove(); hideDraftRecovery(); if (document.body.classList.contains("welcome-active")) hideRecoveryDock(); else setSaveStatus("Salvamento local ativo", "O próximo briefing será salvo automaticamente neste navegador."); });
 window.addEventListener("beforeunload", () => saveDraft("fechamento"));
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 $("#generate-button").dataset.label = "Gerar com IA";
 $("#assist-button").dataset.label = "Preencher vazios com IA";
 initializeWelcome();
