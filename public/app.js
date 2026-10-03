@@ -294,19 +294,23 @@ function resetDisciplineForm(preserveSession = true) {
 
 function startNewProject(event) {
   event?.preventDefault();
-  if (currentSnapshot() && !window.confirm("Iniciar um novo projeto de disciplina? O planejamento atual será removido do salvamento automático.")) return;
-  safeStorageRemove();
+  if (currentSnapshot() && !window.confirm("Iniciar um novo projeto de disciplina? Os formulários serão limpos, mas o planejamento salvo continuará disponível para recuperação.")) return;
+  clearTimeout(saveTimer);
+  saveTimer = null;
   resetDisciplineForm(true);
-  hideRecoveryDock();
   document.body.classList.remove("welcome-active");
   document.body.classList.add("workspace-active");
   document.documentElement.classList.add("workspace-active");
   stabilizeWorkspaceLayout();
+  if (readDraft()) offerDraftRecovery();
+  else hideRecoveryDock();
   $("#course-title")?.focus({ preventScroll: true });
 }
 
 function exitSession() {
   if (currentSnapshot() && !window.confirm("Voltar à capa e trocar o usuário, a instituição ou o código? O planejamento atual será removido deste navegador.")) return;
+  clearTimeout(saveTimer);
+  saveTimer = null;
   safeStorageRemove();
   resetDisciplineForm(false);
   $("#welcome-author").value = "";

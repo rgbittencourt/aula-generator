@@ -110,7 +110,7 @@ Na interface, a capa exige o preenchimento de **Nome**, **Instituição** e **C�
 
 Em monitores largos, o workspace amplia sua largura útil: os menus laterais ficam próximos às extremidades da área de conteúdo e a coluna central recebe o espaço restante para leitura, formulários e resultados.
 
-Durante o uso, clicar no logo **Gerador de Aulas** inicia um **novo projeto de disciplina** sem voltar à capa: limpa o briefing e os resultados, mas mantém Nome, Instituição e código na sessão atual. Para encerrar a sessão e pedir novos dados de acesso, use o botão **Trocar acesso** no cabeçalho; ele limpa o planejamento local e retorna à capa vazia.
+Durante o uso, clicar no logo **Gerador de Aulas** inicia um **novo projeto de disciplina** sem voltar à capa: limpa somente os formulários e resultados em edição, mantém Nome, Instituição e código na sessão atual e preserva o planejamento salvo, o botão **Retomar planejamento** e as opções de backup. Para encerrar a sessão e pedir novos dados de acesso, use o botão **Trocar acesso** no cabeçalho; ele limpa o planejamento local e retorna à capa vazia.
 
 A semana produzida é uma unidade completa: abertura, conteúdo desenvolvido, seções e subseções, exemplos, reflexões, recursos no ponto de uso, síntese, avaliação, conexão com a semana seguinte e cálculo posterior da carga. Vídeos, imagens, diagramas e leituras ficam associados ao trecho ou conceito que motivou seu uso. Cada recurso leva `sectionNumber` e um `bridgeParagraph`: um parágrafo que explica a ligação com o conceito naquele ponto, o que o estudante deve observar e por que o recurso é pertinente. A leitura do aluno não termina com uma galeria de links separada.
 
