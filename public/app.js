@@ -86,8 +86,8 @@ function enhanceLayout() {
     const weeksSector = document.createElement("details");
     weeksSector.className = "results-sector weeks-sector";
     weeksSector.id = "results-weeks";
-    weeksSector.open = true;
-    weeksSector.innerHTML = '<summary class="results-sector-summary"><strong>Semanas planejadas</strong><small id="weeks-sector-note">As semanas aparecerão aqui depois da geração.</small></summary>';
+    weeksSector.open = false;
+    weeksSector.innerHTML = '<summary class="results-sector-summary"><div class="results-sector-copy"><strong>Semanas planejadas</strong><small id="weeks-sector-note">As semanas aparecerão aqui depois da geração.</small></div><span class="sector-chevron results-sector-chevron" aria-hidden="true">⌄</span></summary>';
     const body = document.createElement("div");
     body.className = "results-sector-body";
     weekGrid.remove();
@@ -1129,8 +1129,8 @@ function organizeResultSectors(container, previousOpenStates = null) {
     const sector = document.createElement("details");
     sector.className = "results-sector";
     sector.id = id;
-    sector.open = openStates.get(id) ?? true;
-    sector.innerHTML = `<summary class="results-sector-summary"><strong>${title}</strong><small>${description}</small></summary>`;
+    sector.open = openStates.get(id) ?? false;
+    sector.innerHTML = `<summary class="results-sector-summary"><div class="results-sector-copy"><strong>${title}</strong><small>${description}</small></div><span class="sector-chevron results-sector-chevron" aria-hidden="true">⌄</span></summary>`;
     const body = document.createElement("div");
     body.className = "results-sector-body";
     if (node) body.appendChild(node);

@@ -255,7 +255,7 @@ A tela divide o briefing em sete áreas recolhíveis. Somente **Identidade do cu
 6. **Webpráticas síncronas**
 7. **Materiais de apoio**
 
-Clique no cabeçalho de qualquer setor para recolhê-lo ou reabri-lo. O bloco externo **RESULTADO** também é um acordeão, inicialmente expandido. Dentro dele ficam quatro setores de resultado, todos inicialmente expandidos: **Carga por atividade**, **Carga aberta por atividade**, **Checklists** e **Semanas planejadas**. O bloco externo e cada setor interno podem ser recolhidos independentemente.
+Clique no cabeçalho de qualquer setor para recolhê-lo ou reabri-lo. O bloco externo **RESULTADO** também é um acordeão e, ao apresentar uma nova geração, começa recolhido. Dentro dele ficam quatro setores de resultado — **Carga por atividade**, **Carga aberta por atividade**, **Checklists** e **Semanas planejadas** — que também começam recolhidos. O símbolo no canto superior direito de cada cabeçalho indica o estado e permite expandir ou recolher o bloco. O bloco externo e cada setor interno podem ser abertos independentemente.
 
 ---
 
