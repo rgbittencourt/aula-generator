@@ -436,3 +436,7 @@ body.welcome-active .recovery-dock{display:none!important}
 .navigation-column>.navigation-recovery-dock .recovery-bar,.navigation-column>.navigation-recovery-dock .draft-recovery{align-items:stretch;flex-direction:column;gap:10px;margin:0;padding:11px;border-radius:9px}
 .navigation-column>.navigation-recovery-dock .recovery-actions{width:100%;align-items:stretch;flex-direction:column}
 .navigation-column>.navigation-recovery-dock .recovery-actions .button{width:100%;flex:0 0 auto}
+
+
+/* O segundo menu acompanha a largura do Resumo do Projeto, não a largura total da navegação direita. */
+.navigation-column>.navigation-recovery-dock{width:min(100%,300px);align-self:flex-start}

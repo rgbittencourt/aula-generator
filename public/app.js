@@ -12,6 +12,11 @@ function syncRecoveryLayout() {
   const dock = $("#recovery-dock");
   const headerHeight = header ? Math.ceil(header.getBoundingClientRect().height) : 72;
   const dockHeight = dock && !dock.classList.contains("hidden") ? Math.ceil(dock.getBoundingClientRect().height) : 0;
+  const summaryCard = $(".project-sidebar .summary-card");
+  if (dock?.parentElement?.classList.contains("navigation-column") && summaryCard) {
+    const summaryWidth = Math.ceil(summaryCard.getBoundingClientRect().width);
+    if (summaryWidth > 0) dock.style.width = `${summaryWidth}px`;
+  }
   document.documentElement.style.setProperty("--site-header-height", `${headerHeight}px`);
   document.documentElement.style.setProperty("--recovery-dock-height", `${dockHeight}px`);
 }
