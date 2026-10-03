@@ -76,7 +76,7 @@ function enhanceLayout() {
     const target = document.getElementById(link.dataset.scrollTo);
     if (!target) return;
     event.preventDefault();
-    if (target.tagName === "DETAILS") target.open = true;
+    for (let ancestor = target; ancestor; ancestor = ancestor.parentElement) if (ancestor.tagName === "DETAILS") ancestor.open = true;
     target.scrollIntoView({ behavior: "smooth", block: "start" });
   }));
 

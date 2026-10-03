@@ -152,6 +152,12 @@
 .results-checklists{display:flex;flex-direction:column;gap:12px}
 .results-checklists .review-panel{margin-top:0}
 .plan-overview>p:not(.eyebrow){margin:4px 0;color:#5e6875;font-size:13px}
+.results-section>summary{list-style:none;cursor:pointer}
+.results-section>summary::-webkit-details-marker{display:none}
+.results-section>summary::after{content:"⌄";flex:0 0 auto;color:var(--coral);font-size:22px;line-height:1;transition:transform .18s ease}
+.results-section:not([open])>summary::after{transform:rotate(-90deg)}
+.results-sector-summary::after{content:"⌄";flex:0 0 auto;color:var(--coral);font-size:18px;line-height:1;transition:transform .18s ease}
+.results-sector:not([open])>.results-sector-summary::after{transform:rotate(-90deg)}
 .weeks-sector{margin-top:14px}
 .weeks-sector>.results-sector-body{padding:16px 0 0}
 .weeks-sector .week-grid{padding:0 0 2px}
