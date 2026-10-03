@@ -1094,11 +1094,11 @@ function reviewRowsMarkup(kind, items, reviewMarks) {
   }).join("");
 }
 
-function reviewPanelMarkup(kind, title, items, summary, emptyText = "Nenhum item registrado.") {
+function reviewPanelMarkup(kind, title, items, summary, emptyText = "Nenhum item registrado.", open = true) {
   const reviewMarks = state.reviewMarks || createReviewMarks();
   const checked = items.filter((item) => reviewMarkChecked(kind, item, reviewMarks)).length;
   const rows = items.length ? reviewRowsMarkup(kind, items, reviewMarks) : `<div class="review-empty">${escapeHtml(emptyText)}</div>`;
-  return `<details class="review-panel checklist-${escapeHtml(kind)}" open><summary><strong>${escapeHtml(title)}: ${checked}/${items.length || 0} itens atualmente marcados</strong><small>${escapeHtml(summary)}</small></summary><div class="review-list">${rows}</div></details>`;
+  return `<details class="review-panel checklist-${escapeHtml(kind)}" ${open ? "open" : ""}><summary><strong>${escapeHtml(title)}: ${checked}/${items.length || 0} itens atualmente marcados</strong><small>${escapeHtml(summary)}</small></summary><div class="review-list">${rows}</div></details>`;
 }
 
 function toggleReviewMark(kind, key, checked) {
@@ -1119,8 +1119,9 @@ function toggleReviewMark(kind, key, checked) {
   });
 }
 
-function organizeResultSectors(container) {
+function organizeResultSectors(container, previousOpenStates = null) {
   if (!container) return;
+  const openStates = previousOpenStates || new Map([...container.querySelectorAll(":scope > .results-sector")].map((sector) => [sector.id, sector.open]));
   const overview = container.querySelector(":scope > .plan-overview");
   const breakdown = container.querySelector(":scope > .time-breakdown");
   const checklists = container.querySelector(":scope > .results-checklists");
@@ -1128,7 +1129,7 @@ function organizeResultSectors(container) {
     const sector = document.createElement("details");
     sector.className = "results-sector";
     sector.id = id;
-    sector.open = true;
+    sector.open = openStates.get(id) ?? true;
     sector.innerHTML = `<summary class="results-sector-summary"><strong>${title}</strong><small>${description}</small></summary>`;
     const body = document.createElement("div");
     body.className = "results-sector-body";
@@ -1146,6 +1147,8 @@ function organizeResultSectors(container) {
 function renderGeneralPlan(plan) {
   const container = $("#general-plan");
   if (!container || !plan?.totals) { container?.classList.add("hidden"); return; }
+  const resultOpenStates = new Map([...container.querySelectorAll(":scope > .results-sector")].map((sector) => [sector.id, sector.open]));
+  const reviewOpenStates = new Map([...container.querySelectorAll(".review-panel")].flatMap((panel) => { const kind = [...panel.classList].find((name) => name.startsWith("checklist-"))?.replace("checklist-", ""); return kind ? [[kind, panel.open]] : []; }));
   const totals = plan.totals;
   const labels = { contentMinutes: "Conteúdo", resourcesMinutes: "Materiais e mídia", practiceMinutes: "Webpráticas", assessmentMinutes: "Avaliação", reviewMinutes: "Revisão", communicationMinutes: "Comunicação", projectMinutes: "Projetos", otherMinutes: "Outros" };
   const categoryMarkup = Object.entries(plan.categoryTotals || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<span>${escapeHtml(labels[key] || key)}: ${formatMinutes(value)}</span>`).join("");
@@ -1155,13 +1158,13 @@ function renderGeneralPlan(plan) {
   const passed = checklist.filter((item) => item.pass).length;
   const reviewMarks = state.reviewMarks || createReviewMarks();
   const checkedChecks = checklist.filter((item) => reviewCheckChecked(item, reviewMarks)).length;
-  const checklistMarkup = reviewPanelMarkup("checks", "Checklist pedagógico", checklist, `${passed}/${checklist.length} itens atendidos automaticamente; ${checkedChecks}/${checklist.length} atualmente marcados. Desmarque qualquer item que queira refazer ou revisar novamente.`, "Nenhum item pedagógico foi retornado.");
+  const checklistMarkup = reviewPanelMarkup("checks", "Checklist pedagógico", checklist, `${passed}/${checklist.length} itens atendidos automaticamente; ${checkedChecks}/${checklist.length} atualmente marcados. Desmarque qualquer item que queira refazer ou revisar novamente.`, "Nenhum item pedagógico foi retornado.", reviewOpenStates.get("checks") ?? true);
   const progressionMarkup = Array.isArray(plan.progression) && plan.progression.length ? `<div class="general-warning"><strong>Progressão curricular</strong><ul>${plan.progression.map((item) => `<li>Semana ${item.weekNumber}: ${escapeHtml(item.theme || "")} ${item.projectMilestone ? `— ${escapeHtml(item.projectMilestone)}` : ""}</li>`).join("")}</ul></div>` : "";
   const practices = Array.isArray(plan.webPracticeSchedule) ? plan.webPracticeSchedule : [];
   const practiceMarkup = practices.length ? `<section class="webpractice-schedule"><div class="schedule-heading"><div><p class="eyebrow">SESSÕES PRÁTICAS INDEPENDENTES</p><h3>Webpráticas programadas</h3><p>Estas sessões não entram no texto-base nem no JSON do aluno. Cada uma é exportada como roteiro DOCX para o professor.</p></div></div><div class="schedule-list">${practices.map((practice, index) => `<article class="schedule-item"><div><strong>${escapeHtml(practice.title || `Webprática ${index + 1}`)}</strong><span>${escapeHtml([practice.weekNumber ? `Semana ${practice.weekNumber}` : "", practice.date ? formatDate(practice.date) : "", practice.dayOfWeek, [practice.startTime, practice.endTime].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "Agenda a confirmar")}</span><small>${escapeHtml([practice.modality, practice.tool, practice.platform].filter(Boolean).join(" · ") || "Sessão síncrona / laboratório prático")}</small></div><button class="button button-secondary webpractice-download" data-practice-id="${escapeHtml(practice.id || practice.title || "")}" type="button">Baixar DOCX <span>↓</span></button></article>`).join("")}</div></section>` : "";
   const resourceItems = unresolved.length ? unresolved.map((item, index) => ({ ...item, id: item.id || `resource-${item.weekNumber || 0}-${index + 1}`, label: item.title || "Recurso sem título", pass: false, detail: item.status || "Conferência pendente" })) : [{ id: "resources-ok", weekNumber: 0, label: "Recursos sem pendências automáticas", pass: true, detail: "Ainda assim, confirme coerência, duração/páginas, acessibilidade e licença antes de exportar." }];
   const reviewedResources = resourceItems.filter((item) => reviewMarkChecked("resources", item, reviewMarks)).length;
-  const resourcesMarkup = reviewPanelMarkup("resources", "Checklist de recursos e acessibilidade", resourceItems, `${reviewedResources}/${resourceItems.length} itens atualmente marcados. Os recursos devem ser abertos e conferidos antes da publicação.`, "Nenhum recurso foi localizado para conferência.");
+  const resourcesMarkup = reviewPanelMarkup("resources", "Checklist de recursos e acessibilidade", resourceItems, `${reviewedResources}/${resourceItems.length} itens atualmente marcados. Os recursos devem ser abertos e conferidos antes da publicação.`, "Nenhum recurso foi localizado para conferência.", reviewOpenStates.get("resources") ?? true);
   const academicStatusLabels = { approved: "revisão acadêmica aprovada", "approved-with-review": "aprovada com pendências", "needs-revision": "exige reescrita", "needs-human-review": "aguarda revisão humana", "not-run": "ainda não executada" };
   const academicItems = (state.teacherGuides || []).flatMap((guide, index) => {
     const report = state.validation?.weeks?.[index] || {};
@@ -1172,7 +1175,7 @@ function renderGeneralPlan(plan) {
     const issueItems = issues.map((issue, issueIndex) => ({ id: `academic-issue-${index + 1}-${issueIndex + 1}`, weekNumber: index + 1, label: issue.description || "Pendência acadêmica", pass: false, detail: issue.suggestedRepair ? `Reparo sugerido: ${issue.suggestedRepair}` : String(issue.severity || "Revisão necessária") }));
     return [statusItem, ...issueItems];
   });
-  const academicMarkup = reviewPanelMarkup("academic", "Checklist acadêmico", academicItems, "Verifica rigor, evidências, coerência conceitual e pendências da revisão acadêmica automática.", "A revisão acadêmica automática não retornou relatórios.");
+  const academicMarkup = reviewPanelMarkup("academic", "Checklist acadêmico", academicItems, "Verifica rigor, evidências, coerência conceitual e pendências da revisão acadêmica automática.", "A revisão acadêmica automática não retornou relatórios.", reviewOpenStates.get("academic") ?? true);
   const qualityLabels = { ready: "pronta para revisão", complete: "conteúdo completo", blocked: "bloqueada por pendência crítica", review: "em revisão", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" };
   const qualityItems = (state.weeks || []).map((lesson, index) => {
     const report = state.validation?.weeks?.[index] || {};
@@ -1181,7 +1184,7 @@ function renderGeneralPlan(plan) {
     const reasons = validationReasons(report, quality);
     return { id: `quality-week-${index + 1}`, weekNumber: index + 1, label: "Qualidade e liberação", pass: status === "ready" || status === "complete", detail: `${qualityLabels[status] || status}${quality.score ? ` · nota ${quality.score}/100` : ""}${reasons.length ? ` · ${reasons.join("; ")}` : ""}` };
   });
-  const qualityMarkup = reviewPanelMarkup("quality", "Checklist de qualidade e liberação", qualityItems, "Resume suficiência textual, pendências críticas, revisão recomendada e situação de liberação de cada semana.", "A qualidade será calculada depois da geração.");
+  const qualityMarkup = reviewPanelMarkup("quality", "Checklist de qualidade e liberação", qualityItems, "Resume suficiência textual, pendências críticas, revisão recomendada e situação de liberação de cada semana.", "A qualidade será calculada depois da geração.", reviewOpenStates.get("quality") ?? true);
   const breakdown = plan.timeBreakdown || state.workload?.breakdown || {};
   const breakdownSummary = Object.entries(breakdown).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<span><strong>${escapeHtml(breakdownLabels[key] || key)}</strong> ${formatLoad(value)}</span>`).join("");
   const weeklyLoads = (state.workload?.weeks || plan.weeks || []).map((week) => {
@@ -1193,7 +1196,7 @@ function renderGeneralPlan(plan) {
   const overviewMarkup = `<div class="plan-overview"><p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o guia do professor são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div></div>`;
   const checklistsMarkup = `<div class="results-checklists">${resourcesMarkup}${checklistMarkup}${academicMarkup}${qualityMarkup}${progressionMarkup}${practiceMarkup}</div>`;
   container.innerHTML = `${overviewMarkup}${timeBreakdownMarkup}${checklistsMarkup}`;
-  organizeResultSectors(container);
+  organizeResultSectors(container, resultOpenStates);
   container.querySelectorAll("[data-review-kind]").forEach((checkbox) => checkbox.addEventListener("change", () => toggleReviewMark(checkbox.dataset.reviewKind, checkbox.dataset.reviewKey, checkbox.checked)));
   container.querySelectorAll(".webpractice-download").forEach((button) => button.addEventListener("click", () => downloadWebPractice(button.dataset.practiceId)));
   container.classList.remove("hidden");
