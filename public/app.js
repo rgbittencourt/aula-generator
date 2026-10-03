@@ -207,7 +207,10 @@ function enterWorkspace() {
   resetWorkspaceScroll();
   const draft = readDraft();
   if (draft) showRecoveryDock(true);
-  else hideRecoveryDock();
+  else {
+    showRecoveryDock(true);
+    setSaveStatus("Backup e recuperação", "Nenhum rascunho automático foi encontrado. Use Restaurar backup para importar um arquivo salvo.", "success");
+  }
   updateAcademicInheritance();
   updateSummary();
   updateProgress();
