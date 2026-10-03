@@ -1918,3 +1918,4 @@ Pode escolher uma preferência, mas a aplicação trata essa escolha como orient
 - Aula Studio: <https://rgbittencourt.github.io/aula-studio/>
 
 > **Última recomendação:** gere uma semana, abra-a no Aula Studio, revise o resultado e só depois gere ou publique o curso inteiro. Esse ciclo curto reduz retrabalho e permite ajustar o briefing antes de produzir todas as semanas.
+Informe primeiro o **Tema geral ou título do curso**: esse campo é o contexto mínimo necessário para a IA completar os demais vazios. Durante **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade** e **Refazer esta semana com IA**, aparece um painel fixo no topo com spinner, etapa atual e barra de progresso. O botão em execução fica temporariamente desabilitado para impedir chamadas duplicadas. Ao fim, o painel informa conclusão ou erro; mensagens de modelo incompatível, limite de uso e autenticação são exibidas com a causa retornada pelo provedor.

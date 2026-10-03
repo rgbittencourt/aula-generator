@@ -101,6 +101,18 @@ export async function callJson(messages, options = {}) {
       })
     });
     const payload = await response.json().catch(() => ({}));
+    const providerError = payload?.error?.message || (typeof payload?.error === "string" ? payload.error : "");
+    if (providerError) {
+      const retryable = response.status === 429 || response.status === 503 || /tokens per min|request too large|rate limit|temporar|timeout/i.test(providerError);
+      if (retryable && attempt < maxAttempts - 1) {
+        await wait(retryDelay(response, attempt));
+        continue;
+      }
+      const error = new Error(`A API de IA recusou a solicitação: ${providerError}`);
+      error.code = /tokens per min|request too large|rate limit/i.test(providerError) ? "AI_TPM_LIMIT" : "AI_PROVIDER_ERROR";
+      error.retryable = retryable;
+      throw error;
+    }
     if (response.ok) {
       const choice = payload?.choices?.[0];
       const content = choice?.message?.content;

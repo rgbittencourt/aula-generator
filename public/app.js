@@ -6,6 +6,10 @@ const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo
 const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
 const DRAFT_MAX_AGE_DAYS = 30;
 let saveTimer = null;
+let aiActivityHideTimer = null;
+let aiActionBusy = false;
+let aiConfigured = !isGitHubPages;
+const AI_ACTION_IDS = ["assist-button", "generate-button", "recalculate-button", "regenerate-week-button"];
 
 function syncRecoveryLayout() {
   const header = $(".site-header");
@@ -54,7 +58,8 @@ function enhanceLayout() {
     details.open = index === 0;
     const summary = document.createElement("summary");
     summary.className = "sector-summary";
-    summary.innerHTML = `${heading.innerHTML}<span class="sector-chevron" aria-hidden="true">⌄</span>`;
+    while (heading.firstChild) summary.appendChild(heading.firstChild);
+    summary.insertAdjacentHTML("beforeend", '<span class="sector-chevron" aria-hidden="true">⌄</span>');
     const body = document.createElement("div");
     body.className = "sector-body";
     [...panel.children].filter((child) => child !== heading).forEach((child) => body.appendChild(child));
@@ -808,11 +813,79 @@ function togglePractice() {
   updateSummary();
 }
 
+function buttonLabelNode(button) { return button?.querySelector(".button-label") || button?.querySelector("span:first-child"); }
+
+function setButtonLabel(button, label) {
+  const labelNode = buttonLabelNode(button);
+  if (labelNode) labelNode.textContent = label;
+}
+
 function setBusy(button, busy, label) {
+  if (!button) return;
   button.disabled = busy;
   button.classList.toggle("is-loading", busy);
-  const labelNode = button.querySelector(".button-label") || button.querySelector("span:first-child");
-  if (labelNode) labelNode.textContent = busy ? label : button.dataset.label;
+  button.setAttribute("aria-busy", busy ? "true" : "false");
+  const labelNode = buttonLabelNode(button);
+  if (labelNode) labelNode.textContent = busy ? label : (button.dataset.label || label);
+}
+
+function refreshAiButtonAvailability() {
+  if (aiActionBusy) return;
+  const assist = $("#assist-button");
+  const generateButton = $("#generate-button");
+  const recalculate = $("#recalculate-button");
+  if (assist) assist.disabled = isGitHubPages || !aiConfigured;
+  if (generateButton) generateButton.disabled = isGitHubPages || !aiConfigured;
+  if (recalculate) recalculate.disabled = isGitHubPages || !aiConfigured || !state.weeks.length;
+}
+
+function beginAiAction(button) {
+  if (aiActionBusy) return false;
+  aiActionBusy = true;
+  AI_ACTION_IDS.forEach((id) => {
+    const action = $("#" + id);
+    if (action && action !== button) {
+      action.dataset.aiLocked = "true";
+      action.disabled = true;
+    }
+  });
+  return true;
+}
+
+function endAiAction() {
+  aiActionBusy = false;
+  AI_ACTION_IDS.forEach((id) => {
+    const action = $("#" + id);
+    if (action) delete action.dataset.aiLocked;
+  });
+  refreshAiButtonAvailability();
+  const regenerate = $("#regenerate-week-button");
+  if (regenerate && !isGitHubPages) regenerate.disabled = false;
+}
+
+function hideAiActivity() {
+  clearTimeout(aiActivityHideTimer);
+  $("#ai-activity")?.classList.add("hidden");
+}
+
+function setAiActivity(title, detail, { progress = null, tone = "working" } = {}) {
+  const activity = $("#ai-activity");
+  if (!activity) return;
+  clearTimeout(aiActivityHideTimer);
+  activity.classList.remove("hidden", "is-success", "is-error", "is-indeterminate");
+  if (tone === "success") activity.classList.add("is-success");
+  if (tone === "error") activity.classList.add("is-error");
+  if (progress == null) activity.classList.add("is-indeterminate");
+  activity.setAttribute("aria-busy", tone === "working" ? "true" : "false");
+  $("#ai-activity-title").textContent = title;
+  $("#ai-activity-detail").textContent = detail;
+  const progressBar = $("#ai-activity-progress");
+  if (progressBar) progressBar.style.width = progress == null ? "36%" : `${Math.max(0, Math.min(100, progress))}%`;
+}
+
+function finishAiActivity(title, detail, tone = "success", delay = tone === "error" ? 9000 : 2600) {
+  setAiActivity(title, detail, { tone, progress: tone === "success" ? 100 : null });
+  aiActivityHideTimer = setTimeout(hideAiActivity, delay);
 }
 
 function showError(message) {
@@ -932,21 +1005,36 @@ function briefingMissingFields(input) {
 
 async function assistBriefing() {
   if (isGitHubPages) { showAssistantMessage("O preenchimento por IA fica disponível na versão Vercel protegida.", true); return; }
+  if (aiActionBusy) return;
   const input = formInput();
   const accessCode = input.accessCode;
   delete input.accessCode;
-  if (!input.title.trim()) { showAssistantMessage("Informe primeiro o tema geral ou título do curso.", true); $("#course-title").focus(); return; }
+  if (!input.title.trim()) {
+    const message = "Informe primeiro o tema geral ou título do curso para a IA saber o que completar.";
+    showAssistantMessage(message, true);
+    finishAiActivity("Preenchimento não iniciado", message, "error", 6500);
+    $("#course-title").focus();
+    return;
+  }
   const missingFields = briefingMissingFields(input);
-  if (!missingFields.length) { showAssistantMessage("Não há campos vazios prioritários. Você pode revisar o briefing ou gerar as aulas."); return; }
+  if (!missingFields.length) {
+    const message = "Não há campos vazios prioritários. Você pode revisar o briefing ou gerar as aulas.";
+    showAssistantMessage(message);
+    finishAiActivity("Nada a preencher", message, "success");
+    return;
+  }
   const button = $("#assist-button");
+  if (!beginAiAction(button)) return;
   button.dataset.label = "Preencher vazios com IA";
   setBusy(button, true, "Preenchendo…");
+  setAiActivity("Preenchendo vazios com IA", `A IA está analisando ${missingFields.length} campo(s) do briefing…`);
   showAssistantMessage("A IA está analisando o tema e preparando sugestões pedagógicas…");
   try {
     const headers = { "Content-Type": "application/json" };
     if (accessCode) headers["x-aula-access-code"] = accessCode;
     const response = await fetch("/api/assist-briefing", { method: "POST", headers, body: JSON.stringify({ input, missingFields }) });
     const data = await readApiResponse(response, "Não foi possível preencher o briefing.");
+    setAiActivity("Aplicando sugestões da IA", "Organizando objetivos, materiais e campos de webpráticas…", { progress: 82 });
     const briefing = data.briefing || {};
     const filled = [];
     if (!$("#audience").value.trim() && briefing.audience) { $("#audience").value = briefing.audience; filled.push("público"); }
@@ -969,9 +1057,16 @@ async function assistBriefing() {
     updateProgress();
     scheduleSave();
     const note = briefing.notes?.length ? ` Observações: ${briefing.notes.join(" ")}` : "";
-    showAssistantMessage(filled.length ? `Campos preenchidos: ${filled.join(", ")}. Revise as sugestões antes de gerar as aulas.${note}` : "A IA não encontrou campos vazios que pudesse completar com segurança.");
-  } catch (error) { showAssistantMessage(error.message, true); }
-  finally { setBusy(button, false, ""); }
+    const message = filled.length ? `Campos preenchidos: ${filled.join(", ")}. Revise as sugestões antes de gerar as aulas.${note}` : "A IA não encontrou campos vazios que pudesse completar com segurança.";
+    showAssistantMessage(message);
+    finishAiActivity("Preenchimento concluído", filled.length ? `${filled.length} grupo(s) de campo(s) atualizado(s). Revise antes de gerar.` : message, "success");
+  } catch (error) {
+    showAssistantMessage(error.message, true);
+    finishAiActivity("Preenchimento não concluído", error.message, "error");
+  } finally {
+    setBusy(button, false, "");
+    endAiAction();
+  }
 }
 
 function resourceYoutubeId(value) {
@@ -1083,9 +1178,12 @@ async function regenerateSelectedWeek() {
   const instruction = $("#week-revision").value.trim();
   if (index == null || !instruction) { $("#regenerate-note").textContent = "Escreva primeiro o que deseja alterar nesta semana."; return; }
   if (isGitHubPages) { $("#regenerate-note").textContent = "A regeneração por IA fica disponível na URL Vercel com backend protegido."; return; }
+  if (aiActionBusy) return;
   const button = $("#regenerate-week-button");
+  if (!beginAiAction(button)) return;
   button.dataset.label = "Refazer esta semana com IA";
   setBusy(button, true, "Refazendo…");
+  setAiActivity("Refazendo semana", `A IA está lendo a semana ${index + 1} e preparando uma nova versão…`);
   $("#regenerate-note").textContent = "A IA está reescrevendo somente esta semana e preservando o restante do curso…";
   try {
     const input = { ...state.input };
@@ -1094,11 +1192,18 @@ async function regenerateSelectedWeek() {
     if (accessCode) headers["x-aula-access-code"] = accessCode;
     const response = await fetch("/api/regenerate-week", { method: "POST", headers, body: JSON.stringify({ input, weekIndex: index, instruction, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
     const data = await readApiResponse(response, "Não foi possível refazer a semana.");
+    setAiActivity("Validando a nova semana", "Atualizando qualidade, carga e prévia sem alterar as outras semanas…", { progress: 86 });
     renderWeeks(data);
     $("#regenerate-note").textContent = "Semana atualizada. Confira a nova versão abaixo antes de exportar.";
     openLessonPreview(index);
-  } catch (error) { $("#regenerate-note").textContent = error.message; }
-  finally { setBusy(button, false, ""); }
+    finishAiActivity("Semana refeita", `A semana ${index + 1} foi atualizada. Revise a nova versão antes de exportar.`, "success");
+  } catch (error) {
+    $("#regenerate-note").textContent = error.message;
+    finishAiActivity("Semana não refeita", error.message, "error");
+  } finally {
+    setBusy(button, false, "");
+    endAiAction();
+  }
 }
 
 function weekCalendar(input, index) {
@@ -1442,7 +1547,8 @@ function renderGeneralPlan(plan) {
 function renderWeeks(data, { scrollToResults = true } = {}) {
   state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider; state.validation = data.validation || data.generalPlan?.validation || null; state.reviewMarks = data.reviewMarks || state.reviewMarks || createReviewMarks();
   state.activeReviewGuidance = null;
-  ["recalculate-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const button = $("#" + id); if (button) button.disabled = false; });
+  ["teacher-pdf-button", "zip-button"].forEach((id) => { const button = $("#" + id); if (button) button.disabled = false; });
+  refreshAiButtonAvailability();
   const approvedWeeks = data.weeks.filter((_, index) => Boolean(state.weekApprovals?.[index])).length;
   const pendingWeeks = data.weeks.length - approvedWeeks;
   $("#results-title").textContent = approvedWeeks ? `${approvedWeeks} liberada(s) · ${pendingWeeks} para revisão` : `${data.weeks.length} semanas prontas para revisão`;
@@ -1527,7 +1633,8 @@ async function generateDistributed(input, accessCode, button) {
   if (accessCode) headers["x-aula-access-code"] = accessCode;
 
   for (let index = 0; index < input.weeks; index += 1) {
-    button.querySelector("span:first-child").textContent = `Gerando semana ${index + 1}/${input.weeks}…`;
+    setButtonLabel(button, `Gerando semana ${index + 1}/${input.weeks}…`);
+    setAiActivity("Gerando material com IA", `Escrevendo a semana ${index + 1} de ${input.weeks}…`, { progress: Math.round((index / (input.weeks + 1)) * 100) });
     const response = await fetch("/api/generate-week", {
       method: "POST",
       headers,
@@ -1558,7 +1665,8 @@ async function generateDistributed(input, accessCode, button) {
     alert.classList.remove("hidden");
   }
 
-  button.querySelector("span:first-child").textContent = "Consolidando curso…";
+  setButtonLabel(button, "Consolidando curso…");
+  setAiActivity("Consolidando curso", "Recalculando carga, qualidade, checklists e materiais finais…", { progress: Math.round((input.weeks / (input.weeks + 1)) * 100) });
   const response = await fetch("/api/assemble-course", {
     method: "POST",
     headers,
@@ -1568,6 +1676,7 @@ async function generateDistributed(input, accessCode, button) {
 }
 
 async function generate() {
+  if (aiActionBusy) return;
   const input = formInput();
   const accessCode = input.accessCode;
   delete input.accessCode;
@@ -1580,9 +1689,11 @@ async function generate() {
   state.reviewMarks = createReviewMarks();
   state.weekApprovals = {};
   const button = $("#generate-button");
+  if (!beginAiAction(button)) return;
   button.dataset.label = "Gerar com IA";
   ["recalculate-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const action = $("#" + id); if (action) action.disabled = true; });
   setBusy(button, true, "Gerando material…");
+  setAiActivity("Preparando geração", `A IA vai construir ${input.weeks} semana(s), uma por vez, e depois consolidar o curso…`, { progress: 0 });
   $("#result-alert").classList.add("hidden");
   try {
     if (isGitHubPages) {
@@ -1590,8 +1701,14 @@ async function generate() {
     }
     const data = await generateDistributed(input, accessCode, button);
     renderWeeks(data);
-  } catch (error) { showError(error.message); }
-  finally { setBusy(button, false, ""); }
+    finishAiActivity("Geração concluída", `${input.weeks} semana(s) foram geradas e consolidadas. Revise o resultado antes de exportar.`, "success");
+  } catch (error) {
+    showError(error.message);
+    finishAiActivity("Geração não concluída", error.message, "error");
+  } finally {
+    setBusy(button, false, "");
+    endAiAction();
+  }
 }
 
 async function downloadZip() {
@@ -1630,8 +1747,12 @@ async function downloadTeacherPdf() {
 
 async function recalculateQuality() {
   if (!state.weeks.length || isGitHubPages) { if (isGitHubPages) showError("O recálculo do curso está disponível na versão Vercel com backend."); return; }
+  if (aiActionBusy) return;
   const button = $("#recalculate-button");
-  button.disabled = true; button.classList.add("is-loading");
+  if (!beginAiAction(button)) return;
+  button.dataset.label = "Recalcular qualidade";
+  setBusy(button, true, "Recalculando…");
+  setAiActivity("Recalculando qualidade", "A IA está conferindo conteúdo, referências, carga e checklists…");
   try {
     const response = await fetch("/api/assemble-course", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
     const data = await readApiResponse(response, "Não foi possível recalcular a qualidade do curso.");
@@ -1639,31 +1760,41 @@ async function recalculateQuality() {
     $("#result-alert").className = "result-alert";
     $("#result-alert").textContent = "Qualidade, checklist e carga recalculados sem nova chamada de IA.";
     $("#result-alert").classList.remove("hidden");
-  } catch (error) { showError(error.message); }
-  finally { button.disabled = false; button.classList.remove("is-loading"); }
+    finishAiActivity("Qualidade recalculada", "Checklists, carga e diagnóstico foram atualizados sem gerar novas semanas.", "success");
+  } catch (error) {
+    showError(error.message);
+    finishAiActivity("Recálculo não concluído", error.message, "error");
+  } finally {
+    setBusy(button, false, "");
+    endAiAction();
+  }
 }
 
 async function loadHealth() {
   const status = $("#api-status");
   if (isGitHubPages) {
+    aiConfigured = false;
     status.innerHTML = '<span class="status-dot warning"></span>modo público · sem IA';
     document.querySelectorAll(".vercel-access").forEach((item) => item.classList.add("hidden"));
-    $("#assist-button").disabled = true;
-    $("#assist-button").querySelector("span:first-child").textContent = "IA indisponível nesta URL";
-    $("#generate-button").disabled = true;
-    $("#generate-button").querySelector("span:first-child").textContent = "IA indisponível nesta URL";
+    setButtonLabel($("#assist-button"), "IA indisponível nesta URL");
+    setButtonLabel($("#generate-button"), "IA indisponível nesta URL");
+    refreshAiButtonAvailability();
     return;
   }
   try {
     const data = await (await fetch("/api/health")).json();
-    status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · acesso protegido" : "IA configurada") : "modo exemplo · chave pendente"}${data.aiConfigured && data.resourceResearch && !data.youtubeConfigured ? " · vídeos aguardando chave" : ""}`;
+    aiConfigured = Boolean(data.aiConfigured);
+    status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · acesso protegido" : "IA configurada") : "modo exemplo · chave pendente"}${data.aiConfigured && data.resourceResearch && !data.youtubeConfigured ? " · vídeos aguardando chave" : ""}`;
     if (!data.aiConfigured) {
-      $("#assist-button").disabled = true;
-      $("#assist-button").querySelector("span:first-child").textContent = "IA pendente";
-      $("#generate-button").disabled = true;
-      $("#generate-button").querySelector("span:first-child").textContent = "IA pendente";
+      setButtonLabel($("#assist-button"), "IA pendente");
+      setButtonLabel($("#generate-button"), "IA pendente");
     }
-  } catch { status.innerHTML = '<span class="status-dot offline"></span>servidor indisponível'; }
+    refreshAiButtonAvailability();
+  } catch {
+    aiConfigured = false;
+    status.innerHTML = '<span class="status-dot offline"></span>servidor indisponível';
+    refreshAiButtonAvailability();
+  }
 }
 
 $("#add-practice").addEventListener("click", () => { addPractice(); scheduleSave(); });
@@ -1697,6 +1828,7 @@ $("#close-lesson-modal").addEventListener("click", closeLessonPreview);
 $("#close-lesson-modal-secondary").addEventListener("click", closeLessonPreview);
 $("#regenerate-week-button").addEventListener("click", regenerateSelectedWeek);
 $("#lesson-modal").addEventListener("click", (event) => { if (event.target.id === "lesson-modal") closeLessonPreview(); });
+$("#ai-activity-dismiss").addEventListener("click", hideAiActivity);
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.previewIndex != null) closeLessonPreview(); });
 window.addEventListener("resize", syncRecoveryLayout);
 window.addEventListener("scroll", keepWorkspaceAtTop, { passive: true });
@@ -1713,6 +1845,7 @@ window.addEventListener("beforeunload", () => saveDraft("fechamento"));
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 $("#generate-button").dataset.label = "Gerar com IA";
 $("#assist-button").dataset.label = "Preencher vazios com IA";
+$("#recalculate-button").dataset.label = "Recalcular qualidade";
 initializeWelcome();
 enhanceLayout();
 renderResourcePlanWeeks(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();

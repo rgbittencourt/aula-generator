@@ -286,3 +286,4 @@ npm test
 ```
 
 A suíte cobre contrato do aluno, separação do guia do professor, arcos didáticos, recursos inseridos dentro do tópico, fórmulas internas, geração de PDF e conteúdo do ZIP.
+É necessário informar primeiro o **Tema geral ou título do curso**, pois ele dá contexto para as sugestões; depois, a IA também pode completar objetivos, conteúdo, webpráticas, materiais e termos de busca. Durante qualquer chamada demorada — **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade** ou **Refazer esta semana com IA** — aparece um painel visual no topo com spinner, etapa atual e barra de progresso. O botão em execução fica desabilitado para evitar chamadas duplicadas; ao terminar, o painel confirma o sucesso ou mantém uma mensagem de erro legível. Se o provedor devolver um erro de modelo, limite ou autenticação, a mensagem técnica agora é mostrada em vez de aparecer apenas como “resposta vazia”.
