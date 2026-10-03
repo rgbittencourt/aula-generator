@@ -456,7 +456,7 @@ function restoreSnapshot(snapshot) {
   state.weekApprovals = snapshot.results?.weekApprovals || snapshot.weekApprovals || {};
   hideDraftRecovery();
   if (snapshot.results?.weeks?.length) {
-    renderWeeks({ ...snapshot.results, input: snapshot.results.input || snapshot.form });
+    renderWeeks({ ...snapshot.results, input: snapshot.results.input || snapshot.form }, { scrollToResults: false });
     setSaveStatus("Planejamento retomado", `${snapshot.results.weeks.length} semana(s) recuperada(s).`, "success");
   } else {
     setSaveStatus("Briefing retomado", "Continue preenchendo; o salvamento automático está ativo.", "success");
@@ -1337,7 +1337,7 @@ function renderGeneralPlan(plan) {
   container.classList.remove("hidden");
 }
 
-function renderWeeks(data) {
+function renderWeeks(data, { scrollToResults = true } = {}) {
   state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider; state.validation = data.validation || data.generalPlan?.validation || null; state.reviewMarks = data.reviewMarks || state.reviewMarks || createReviewMarks();
   state.activeReviewGuidance = null;
   ["recalculate-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const button = $("#" + id); if (button) button.disabled = false; });
@@ -1379,7 +1379,7 @@ function renderWeeks(data) {
   renderGeneralPlan(data.generalPlan);
   renderWorkload(data.workload);
   saveDraft("resultado");
-  $("#results-section").scrollIntoView({ behavior: "smooth", block: "start" });
+  if (scrollToResults) $("#results-section").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function downloadWeek(index) {
