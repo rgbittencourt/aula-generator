@@ -34,11 +34,6 @@ function enhanceLayout() {
   const workspaceGrid = formColumn.parentElement;
   const intro = $(".intro");
   if (intro && intro.parentElement !== formColumn) formColumn.prepend(intro);
-  const recoveryDock = $("#recovery-dock");
-  if (recoveryDock && recoveryDock.parentElement !== formColumn) {
-    formColumn.insertBefore(recoveryDock, intro || formColumn.firstChild || null);
-    recoveryDock.classList.add("workspace-dock");
-  }
   const resultsSection = $("#results-section");
   if (resultsSection && resultsSection.parentElement !== formColumn) formColumn.appendChild(resultsSection);
 
@@ -89,6 +84,12 @@ function enhanceLayout() {
   navigationColumn.className = "navigation-column";
   navigationColumn.setAttribute("aria-label", "Navegação do planejamento");
   navigationColumn.appendChild(navigation);
+  const recoveryDock = $("#recovery-dock");
+  if (recoveryDock && recoveryDock.parentElement !== navigationColumn) {
+    recoveryDock.classList.remove("workspace-dock");
+    recoveryDock.classList.add("navigation-recovery-dock");
+    navigationColumn.appendChild(recoveryDock);
+  }
   workspaceGrid?.appendChild(navigationColumn);
   navigation.querySelectorAll("[data-scroll-to]").forEach((link) => link.addEventListener("click", (event) => {
     const target = document.getElementById(link.dataset.scrollTo);

@@ -408,3 +408,31 @@ body.welcome-active .recovery-dock{display:none!important}
 .session-exit-link{height:32px;padding:0 9px;border:1px solid #e3d5cd;border-radius:8px;background:#fffaf7;color:var(--coral-dark);font-size:10px;font-weight:700;white-space:nowrap;transition:background .15s,border-color .15s,transform .15s}
 .session-exit-link:hover{background:var(--coral-soft);border-color:#e8a18f;transform:translateY(-1px)}
 @media(max-width:620px){.session-exit-link{width:30px;padding:0;font-size:0}.session-exit-link::before{content:"↪";font-size:16px}}
+
+
+/* Recuperação junto da navegação direita: não ocupa mais o topo da coluna central. */
+.navigation-column>.navigation-recovery-dock{position:static;top:auto;left:auto;z-index:auto;display:flex;width:100%;max-width:none;margin:16px 0 0;padding:0;transform:none;background:transparent;pointer-events:none}
+.navigation-column>.navigation-recovery-dock>section{width:100%;max-width:none;margin:0;pointer-events:auto;box-shadow:0 4px 18px rgba(20,33,61,.05)}
+.navigation-column>.navigation-recovery-dock .recovery-bar,.navigation-column>.navigation-recovery-dock .draft-recovery{align-items:stretch;flex-direction:column;gap:12px;margin:0;padding:13px;border-radius:12px}
+.navigation-column>.navigation-recovery-dock .recovery-actions{width:100%;align-items:stretch;flex-direction:column}
+.navigation-column>.navigation-recovery-dock .recovery-actions .button{width:100%;flex:0 0 auto}
+.project-sidebar{top:calc(var(--site-header-height,72px) + 16px)}
+.briefing-sector,.results-sector,.results-section{scroll-margin-top:calc(var(--site-header-height,72px) + 16px)}
+
+
+/* A recuperação pertence ao mesmo card de NAVEGAR PELO PROJETO. */
+.sidebar-navigation>.navigation-recovery-dock{position:static;top:auto;left:auto;z-index:auto;display:flex;flex-direction:column;width:calc(100% + 30px);max-width:none;margin:12px -15px -15px;padding:13px 15px 15px;transform:none;background:transparent;border-top:1px solid var(--line);pointer-events:none}
+.sidebar-navigation>.navigation-recovery-dock>section{width:100%;max-width:none;margin:0;pointer-events:auto;box-shadow:none}
+.sidebar-navigation>.navigation-recovery-dock .recovery-bar,.sidebar-navigation>.navigation-recovery-dock .draft-recovery{align-items:stretch;flex-direction:column;gap:10px;margin:0;padding:11px;border-radius:9px}
+.sidebar-navigation>.navigation-recovery-dock .recovery-actions{width:100%;align-items:stretch;flex-direction:column}
+.sidebar-navigation>.navigation-recovery-dock .recovery-actions .button{width:100%;flex:0 0 auto}
+@media(max-width:900px){.sidebar-navigation>.navigation-recovery-dock{grid-column:1/-1}}
+
+
+/* Segundo menu solicitado: Backup e Recuperação, separado da navegação do projeto. */
+.navigation-column>.navigation-recovery-dock{position:static;top:auto;left:auto;z-index:auto;display:flex;flex-direction:column;gap:8px;width:100%;max-width:none;margin:16px 0 0;padding:13px 15px 15px;transform:none;background:#fff;border:1px solid var(--line);border-top:3px solid var(--coral);border-radius:14px;box-shadow:0 4px 18px rgba(20,33,61,.025);pointer-events:auto}
+.navigation-column>.navigation-recovery-dock>section{width:100%;max-width:none;margin:0;box-shadow:none}
+.navigation-column>.navigation-recovery-dock .recovery-menu-label{margin:0 0 2px;font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--coral-dark);font-weight:500;text-transform:uppercase}
+.navigation-column>.navigation-recovery-dock .recovery-bar,.navigation-column>.navigation-recovery-dock .draft-recovery{align-items:stretch;flex-direction:column;gap:10px;margin:0;padding:11px;border-radius:9px}
+.navigation-column>.navigation-recovery-dock .recovery-actions{width:100%;align-items:stretch;flex-direction:column}
+.navigation-column>.navigation-recovery-dock .recovery-actions .button{width:100%;flex:0 0 auto}
