@@ -625,7 +625,7 @@ Depois da geração, abra **Planejamento geral**. O resultado apresenta quatro l
 - **Checklist de recursos e acessibilidade**: abra cada link e confirme coerência com a semana, duração ou páginas, acessibilidade e licença/crédito;
 - **Checklist de qualidade e liberação**: suficiência textual, pendências críticas, revisão recomendada e situação de cada semana.
 
-Todos os itens são exibidos. Os itens aprovados automaticamente pela IA já aparecem marcados; desmarque qualquer item que queira refazer ou revisar novamente. A mensagem “Atendido automaticamente pela IA” é o resultado da análise da aplicação; “Marcado por você” e “Desmarcado por você para refazer” são suas decisões manuais.
+Todos os itens são exibidos. Os itens aprovados automaticamente pela IA já aparecem marcados; desmarque qualquer item que queira refazer ou revisar novamente. Clique no item ou em **Ver o que conferir e o prompt** para abrir um painel contextual com o que exatamente deve ser verificado, critérios de aceite e um prompt estruturado específico para aquela semana. Use **Copiar prompt** para levar o texto a outra conversa ou **Abrir refação da semana** para carregar o prompt diretamente na prévia e no botão **Refazer esta semana com IA**. A mensagem “Atendido automaticamente pela IA” é o resultado da análise da aplicação; “Marcado por você” e “Desmarcado por você para refazer” são suas decisões manuais.
 
 As marcações são salvas no navegador e entram no **Baixar backup**. Elas não alteram artificialmente o resultado automático: se um item estiver pendente, é necessário corrigir a aula ou o recurso e gerar/revisar novamente.
 

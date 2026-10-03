@@ -1,7 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
 const createReviewMarks = () => ({ resources: {}, checks: {}, academic: {}, quality: {} });
-const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {} };
+const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, activeReviewGuidance: null };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
 const DRAFT_MAX_AGE_DAYS = 30;
@@ -1083,6 +1083,51 @@ function reviewCheckChecked(item = {}, reviewMarks = state.reviewMarks || create
   return reviewMarkChecked("checks", item, reviewMarks);
 }
 
+function reviewGuidanceFor(kind, item = {}) {
+  const weekNumber = Number(item.weekNumber) || 0;
+  const lesson = weekNumber ? state.weeks?.[weekNumber - 1] : null;
+  const theme = lesson?.lessonPlan?.theme || lesson?.meta?.title || "tema da semana";
+  const courseTitle = state.input?.title || state.generalPlan?.title || "curso";
+  const target = weekNumber ? `Semana ${weekNumber} — ${theme}` : "a semana correspondente ao item";
+  const issue = item.detail || item.status || "item sinalizado para conferência";
+  const guidance = {
+    checks: {
+      title: "Como verificar a dimensão pedagógica",
+      checks: ["Confira se a semana tem título específico, abertura contextualizada e objetivos observáveis.", "Verifique se cada objetivo aparece no conteúdo, em uma atividade ou evidência e na avaliação correspondente.", "Confirme que há desenvolvimento conceitual suficiente, exemplo ou aplicação, síntese e conexão com a próxima etapa quando fizer sentido.", "Confira diferenciação, acessibilidade, autoavaliação e webprática independente quando prevista."],
+      focus: "Corrigir a unidade didática e o alinhamento entre objetivo, conteúdo, atividade, evidência e avaliação."
+    },
+    academic: {
+      title: "Como verificar o rigor acadêmico",
+      checks: ["Identifique as afirmações centrais e confirme se cada uma tem fonte adequada, atual e verificável.", "Confira precisão conceitual, autores, datas, conceitos próximos, limites, controvérsias e contrapontos.", "Verifique se exemplos e dados estão contextualizados e se não há generalizações, citações inventadas ou referências sem suporte.", "Confirme que o nível de aprofundamento é compatível com o público e que a argumentação não é apenas descritiva."],
+      focus: "Reescrever o conteúdo com rigor, evidências e análise crítica, preservando somente referências verificáveis."
+    },
+    resources: {
+      title: "Como verificar recursos e acessibilidade",
+      checks: ["Abra o link e confirme que ele funciona, corresponde ao título e é adequado ao público.", "Verifique se o recurso está inserido no ponto correto do texto e se o parágrafo de ligação explica o que observar.", "Confira duração do vídeo, páginas ou palavras da leitura, classificação obrigatória/complementar, idioma e atualidade.", "Confirme texto alternativo, legenda, transcrição, crédito, licença e acessibilidade antes de publicar."],
+      focus: "Corrigir ou substituir o recurso e reescrever a ligação pedagógica no trecho exato em que ele será usado."
+    },
+    quality: {
+      title: "Como verificar qualidade e liberação",
+      checks: ["Confira a quantidade de palavras úteis, número de seções, objetivos, síntese, avaliação e completude da unidade.", "Leia a semana integralmente e identifique trechos genéricos, repetidos, curtos, desconectados ou sem aprofundamento.", "Verifique a coerência entre conteúdo, recursos, atividades, evidências, avaliação e carga calculada.", "Só libere depois de resolver pendências críticas e confirmar que a versão pode ser usada no Aula Studio."],
+      focus: "Corrigir as pendências que impedem a liberação e devolver uma semana completa, substancial e pronta para revisão humana."
+    }
+  }[kind] || {
+    title: "Como verificar este item",
+    checks: ["Leia a semana completa e identifique o ponto exato relacionado ao item.", "Confirme coerência, completude, acessibilidade e possibilidade de revisão humana."],
+    focus: "Corrigir o item sinalizado sem alterar as demais semanas."
+  };
+  const prompt = [`Atue como um(a) professor(a) especialista em planejamento pedagógico e revisão acadêmica.`, `Curso: ${courseTitle}.`, `Alvo: ${target}.`, `Item do checklist: ${item.label || item.title || "item de revisão"}.`, `Diagnóstico atual: ${issue}.`, ``, `Objetivo da refação: ${guidance.focus}`, ``, `Faça obrigatoriamente:`, ...guidance.checks.map((check) => `- ${check}`), ``, `Critérios de aceite:`, `- Entregue uma unidade didática completa, com título, abertura, objetivos observáveis, conteúdo desenvolvido, aplicação/atividade, avaliação, síntese e ligação com o percurso.`, `- Mantenha os recursos dentro do ponto exato do texto e escreva a ligação pedagógica correspondente.`, `- Não invente autores, dados, referências, DOI ou URLs; sinalize o que depender de conferência humana.`, `- Preserve as semanas que não são o alvo e não transforme webprática em texto-base ou conteúdo do JSON do aluno.`, `- Recalcule a carga da semana depois da reescrita, separando texto-base, leituras, vídeos, interativos e atividades.`, ``, `Retorne somente a Semana ${weekNumber || "afetada"} completa, pronta para nova revisão humana.`].join("\n");
+  return { ...guidance, prompt, weekNumber };
+}
+
+function reviewGuidanceMarkup(kind, item, key, active) {
+  if (!active) return "";
+  const guidance = reviewGuidanceFor(kind, item);
+  const promptAttribute = escapeHtml(guidance.prompt);
+  const refitButton = guidance.weekNumber ? `<button class="button button-secondary review-use-prompt" type="button" data-review-week="${guidance.weekNumber}" data-review-prompt="${promptAttribute}">Abrir refação da semana</button>` : "";
+  return `<div class="review-guidance"><div class="review-guidance-header"><strong>${escapeHtml(guidance.title)}</strong><div class="review-guidance-actions"><button class="button button-secondary review-copy-prompt" type="button" data-review-prompt="${promptAttribute}">Copiar prompt</button>${refitButton}</div></div><ul>${guidance.checks.map((check) => `<li>${escapeHtml(check)}</li>`).join("")}</ul><label class="review-prompt-field"><span>Prompt estruturado para solicitar a refação</span><textarea readonly rows="10">${escapeHtml(guidance.prompt)}</textarea></label><small class="review-guidance-note">O prompt usa a semana selecionada como alvo. Revise a nova resposta antes de liberá-la para o Aula Studio.</small></div>`;
+}
+
 function reviewRowsMarkup(kind, items, reviewMarks) {
   return items.map((item) => {
     const key = reviewItemKey(item);
@@ -1090,7 +1135,9 @@ function reviewRowsMarkup(kind, items, reviewMarks) {
     const checked = reviewMarkChecked(kind, item, reviewMarks);
     const stateLabel = override === undefined ? (item.pass ? "Atendido automaticamente pela IA" : "Pendente na análise automática") : (override ? "Marcado por você" : "Desmarcado por você para refazer");
     const scope = item.weekNumber ? `Semana ${item.weekNumber}` : "Curso";
-    return `<label class="review-row ${checked ? "is-marked" : ""}"><input type="checkbox" data-review-kind="${escapeHtml(kind)}" data-review-key="${escapeHtml(key)}" ${checked ? "checked" : ""} /><span><strong>${escapeHtml(scope)} · ${escapeHtml(item.label || item.title || "Item de revisão")}</strong><small>${escapeHtml(item.detail || item.status || stateLabel)}${override !== undefined ? ` · ${stateLabel}` : ""}</small></span></label>`;
+    const active = state.activeReviewGuidance?.kind === kind && state.activeReviewGuidance.key === key;
+    const label = item.label || item.title || "Item de revisão";
+    return `<div class="review-item"><label class="review-row ${checked ? "is-marked" : ""}"><input type="checkbox" data-review-kind="${escapeHtml(kind)}" data-review-key="${escapeHtml(key)}" ${checked ? "checked" : ""} /><span><strong>${escapeHtml(scope)} · ${escapeHtml(label)}</strong><small>${escapeHtml(item.detail || item.status || stateLabel)}${override !== undefined ? ` · ${stateLabel}` : ""}</small></span></label><button class="review-guidance-toggle" type="button" data-review-guidance-kind="${escapeHtml(kind)}" data-review-guidance-key="${escapeHtml(key)}" aria-expanded="${active ? "true" : "false"}">${active ? "Ocultar orientação" : "Ver o que conferir e o prompt"}</button>${reviewGuidanceMarkup(kind, item, key, active)}</div>`;
   }).join("");
 }
 
@@ -1105,6 +1152,7 @@ function toggleReviewMark(kind, key, checked) {
   const pageScroll = window.scrollY;
   const list = document.querySelector(`input[data-review-kind="${CSS.escape(kind)}"]`)?.closest(".review-panel")?.querySelector(".review-list");
   const listScroll = list?.scrollTop || 0;
+  state.activeReviewGuidance = { kind, key };
   state.reviewMarks = state.reviewMarks || createReviewMarks();
   state.reviewMarks[kind] = state.reviewMarks[kind] || {};
   state.reviewMarks[kind][key] = checked;
@@ -1117,6 +1165,47 @@ function toggleReviewMark(kind, key, checked) {
     const nextInput = document.querySelector(`input[data-review-kind="${CSS.escape(kind)}"][data-review-key="${CSS.escape(key)}"]`);
     nextInput?.focus({ preventScroll: true });
   });
+}
+
+function toggleReviewGuidance(kind, key) {
+  const active = state.activeReviewGuidance?.kind === kind && state.activeReviewGuidance.key === key;
+  const pageScroll = window.scrollY;
+  state.activeReviewGuidance = active ? null : { kind, key };
+  renderGeneralPlan(state.generalPlan);
+  requestAnimationFrame(() => {
+    window.scrollTo(0, pageScroll);
+    document.querySelector(`[data-review-guidance-kind="${CSS.escape(kind)}"][data-review-guidance-key="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+  });
+}
+
+async function copyReviewPrompt(prompt, button) {
+  try {
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(prompt);
+    else throw new Error("clipboard unavailable");
+  } catch {
+    const helper = document.createElement("textarea");
+    helper.value = prompt;
+    helper.style.position = "fixed";
+    helper.style.opacity = "0";
+    document.body.appendChild(helper);
+    helper.select();
+    document.execCommand("copy");
+    helper.remove();
+  }
+  const original = button.textContent;
+  button.textContent = "Prompt copiado";
+  window.setTimeout(() => { button.textContent = original; }, 1800);
+}
+
+function useReviewPrompt(weekNumber, prompt) {
+  const index = Number(weekNumber) - 1;
+  if (!Number.isInteger(index) || !state.weeks?.[index]) return;
+  openLessonPreview(index);
+  const field = $("#week-revision");
+  if (field) field.value = prompt;
+  const note = $("#regenerate-note");
+  if (note) note.textContent = "Prompt estruturado carregado. Revise-o, complemente se desejar e clique em Refazer esta semana com IA.";
+  field?.focus({ preventScroll: true });
 }
 
 function organizeResultSectors(container, previousOpenStates = null) {
@@ -1198,12 +1287,16 @@ function renderGeneralPlan(plan) {
   container.innerHTML = `${overviewMarkup}${timeBreakdownMarkup}${checklistsMarkup}`;
   organizeResultSectors(container, resultOpenStates);
   container.querySelectorAll("[data-review-kind]").forEach((checkbox) => checkbox.addEventListener("change", () => toggleReviewMark(checkbox.dataset.reviewKind, checkbox.dataset.reviewKey, checkbox.checked)));
+  container.querySelectorAll("[data-review-guidance-kind]").forEach((button) => button.addEventListener("click", () => toggleReviewGuidance(button.dataset.reviewGuidanceKind, button.dataset.reviewGuidanceKey)));
+  container.querySelectorAll(".review-copy-prompt").forEach((button) => button.addEventListener("click", () => copyReviewPrompt(button.dataset.reviewPrompt || "", button)));
+  container.querySelectorAll(".review-use-prompt").forEach((button) => button.addEventListener("click", () => useReviewPrompt(button.dataset.reviewWeek, button.dataset.reviewPrompt || "")));
   container.querySelectorAll(".webpractice-download").forEach((button) => button.addEventListener("click", () => downloadWebPractice(button.dataset.practiceId)));
   container.classList.remove("hidden");
 }
 
 function renderWeeks(data) {
   state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider; state.validation = data.validation || data.generalPlan?.validation || null; state.reviewMarks = data.reviewMarks || state.reviewMarks || createReviewMarks();
+  state.activeReviewGuidance = null;
   ["recalculate-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const button = $("#" + id); if (button) button.disabled = false; });
   const approvedWeeks = data.weeks.filter((_, index) => Boolean(state.weekApprovals?.[index])).length;
   const pendingWeeks = data.weeks.length - approvedWeeks;

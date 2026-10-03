@@ -164,7 +164,7 @@ O painel **Composição da aula no Aula Studio** permite definir uma quantidade 
 
 Os blocos são contextualizados pela IA e posicionados na seção indicada, depois do texto que lhes dá sentido. O servidor materializa a propriedade `lessonPlan.composition` em blocos editáveis compatíveis com o Aula Studio; não são contados como texto-base. A prévia mostra cada bloco no ponto da seção e a carga aberta acrescenta o tempo estimado dos interativos.
 
-Os quatro checklists exibem todos os itens disponíveis e iniciam marcados os que a análise automática aprovou. Ao desmarcar um item, ele passa a representar uma conferência/refação manual. As listas mantêm a posição de rolagem e o foco após cada marcação, inclusive quando o item está distante do início; as marcações de recursos, revisão acadêmica e qualidade também entram no salvamento local e no backup.
+Os quatro checklists exibem todos os itens disponíveis e iniciam marcados os que a análise automática aprovou. Ao clicar em qualquer item — pedagógico, acadêmico, de recursos/acessibilidade ou de qualidade/liberação — abre-se um painel com **o que verificar**, critérios de aceite e um **prompt estruturado** específico para refazer a semana. O prompt pode ser copiado ou carregado diretamente na prévia da semana pelo botão **Abrir refação da semana**. Ao desmarcar um item, ele passa a representar uma conferência/refação manual. As listas mantêm a posição de rolagem e o foco após cada marcação, inclusive quando o item está distante do início; as marcações de recursos, revisão acadêmica e qualidade também entram no salvamento local e no backup.
 
 ## Separação aluno e professor
 
