@@ -56,7 +56,7 @@ const reviewStatus = (value) => ({
   "not-run": "Ainda não executada"
 }[value] || display(value) || "Não informado");
 
-export async function createTeacherGuidePdf(input, teacherGuides = [], generalPlan = null) {
+export async function createMediationMaterialPdf(input, teacherGuides = [], generalPlan = null) {
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -72,9 +72,9 @@ export async function createTeacherGuidePdf(input, teacherGuides = [], generalPl
   const drawPageChrome = () => {
     const pageNumber = pdf.getPageCount();
     page.drawRectangle({ x: 0, y: height - 5, width, height: 5, color: coral });
-    page.drawText("GERADOR DE AULAS  /  GUIA DO PROFESSOR", { x: margin, y: height - 31, size: 8, font: bold, color: muted });
+    page.drawText("GERADOR DE AULAS  /  MATERIAL DE MEDIAÇÃO", { x: margin, y: height - 31, size: 8, font: bold, color: muted });
     page.drawLine({ start: { x: margin, y: footerHeight }, end: { x: width - margin, y: footerHeight }, thickness: 0.45, color: sage });
-    page.drawText("Guia do professor · uso interno de planejamento", { x: margin, y: 21, size: 7.5, font: regular, color: lightMuted });
+    page.drawText("Material de Mediação · uso interno de planejamento", { x: margin, y: 21, size: 7.5, font: regular, color: lightMuted });
     const pageLabel = `p. ${pageNumber}`;
     page.drawText(pageLabel, { x: width - margin - regular.widthOfTextAtSize(pageLabel, 7.5), y: 21, size: 7.5, font: regular, color: lightMuted });
   };
@@ -203,6 +203,24 @@ export async function createTeacherGuidePdf(input, teacherGuides = [], generalPl
     if (practice.fallbackPlan) row("Plano B", practice.fallbackPlan);
   };
 
+  const formatMediationMessages = (messages = {}) => {
+    const channels = [
+      ["WhatsApp", messages.whatsapp],
+      ["Mensagens do Moodle", messages.moodle]
+    ];
+    channels.forEach(([label, items]) => {
+      heading(label, 3);
+      const entriesForChannel = Array.isArray(items) ? items : [];
+      if (!entriesForChannel.length) { paragraph("Mensagem ainda não detalhada.", { color: muted }); return; }
+      entriesForChannel.forEach((item) => {
+        const timing = display(item.timing || item.when || "Momento a definir");
+        const purpose = display(item.purpose);
+        const message = display(item.text || item.message || item.body);
+        callout(timing, `${purpose ? `Objetivo: ${purpose}\n` : ""}${message || "Mensagem a revisar."}`, { background: pale, border: sage, size: 8.8 });
+      });
+    });
+  };
+
   const formatChecklist = (checks = []) => {
     const items = Array.isArray(checks) ? checks : [];
     if (!items.length) { bullet("Checklist não disponível.", { color: muted, size: 8.5, lineHeight: 11, after: 0 }); return; }
@@ -215,11 +233,11 @@ export async function createTeacherGuidePdf(input, teacherGuides = [], generalPl
   // Capa e instruções de uso.
   newPage();
   y -= 22;
-  page.drawText("Guia do professor", { x: margin, y, size: 29, font: bold, color: navy });
+  page.drawText("Material de Mediação", { x: margin, y, size: 29, font: bold, color: navy });
   y -= 41;
   paragraph(input.title || "Curso sem título", { font: italic, size: 14, color: coral, after: 12 });
   paragraph(`Público: ${input.audience || "não informado"}  |  Nível: ${input.level || "não informado"}  |  ${input.weeks || teacherGuides.length} semana(s)`, { size: 9.2, color: muted, after: 14 });
-  callout("Como usar este guia", "Use este PDF para preparar, acompanhar e revisar a mediação do professor. Primeiro leia a visão geral; depois, em cada semana, confira objetivos, percurso, avaliação, diferenciação e checklist. Os arquivos .aula.json são do estudante e devem ser abertos no Aula Studio. As webpráticas têm roteiro DOCX próprio e não entram no texto-base semanal.", { background: paleCoral, border: rgb(0.95, 0.78, 0.70), titleColor: coral });
+  callout("Como usar este material", "Use este PDF para preparar, acompanhar e revisar a mediação da semana. Primeiro leia a visão geral; depois, em cada semana, confira objetivos, percurso, avaliação, diferenciação, checklist e as mensagens de acompanhamento. Os arquivos .aula.json são do estudante e devem ser abertos no Aula Studio. As webpráticas têm roteiro DOCX próprio e não entram no texto-base semanal.", { background: paleCoral, border: rgb(0.95, 0.78, 0.70), titleColor: coral });
   if (input.academicProfile) {
     heading("Perfil acadêmico configurado", 2);
     row("Área", input.academicProfile.discipline, { fallback: "a definir" });
@@ -297,6 +315,7 @@ export async function createTeacherGuidePdf(input, teacherGuides = [], generalPl
     if (guide.assessmentNotes?.length) { heading("Notas de avaliação", 2); bullets(guide.assessmentNotes); }
     if (guide.spiralReview && Object.keys(guide.spiralReview).length) { heading("Revisão espiral", 2); formatSpiralReview(guide.spiralReview); }
     if (guide.webPractices?.length) { heading("Webpráticas associadas", 2); guide.webPractices.forEach(formatPractice); }
+    if (guide.mediationMessages) { heading("Mensagens de acompanhamento aos estudantes", 2); paragraph("As duas versões têm o mesmo propósito pedagógico, mas foram escritas para os contextos próprios de WhatsApp e Moodle. Ajuste nomes, datas e links antes do envio.", { color: muted }); formatMediationMessages(guide.mediationMessages); }
     if (guide.qualityReview?.checks?.length) {
       ensure(180);
       heading("Checklist antes da publicação", 2);
@@ -307,3 +326,6 @@ export async function createTeacherGuidePdf(input, teacherGuides = [], generalPl
 
   return Buffer.from(await pdf.save());
 }
+
+// Alias técnico temporário para consumidores antigos da API interna.
+export const createTeacherGuidePdf = createMediationMaterialPdf;

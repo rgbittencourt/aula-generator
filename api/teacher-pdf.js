@@ -1,7 +1,7 @@
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "../src/calculations.js";
 import { normalizeCourseInput, normalizeWeeklyOutput, slugify } from "../src/aula-schema.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
-import { createTeacherGuidePdf } from "../src/pdf.js";
+import { createMediationMaterialPdf } from "../src/pdf.js";
 
 export default async function handler(request, response) {
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
@@ -12,12 +12,12 @@ export default async function handler(request, response) {
     const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
     const teacherGuides = buildTeacherGuides(input, enrichedWeeks, request.body?.teacherGuides || []);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
-    const buffer = await createTeacherGuidePdf(input, teacherGuides, generalPlan);
+    const buffer = await createMediationMaterialPdf(input, teacherGuides, generalPlan);
     response.setHeader("Content-Type", "application/pdf");
-    response.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-guia-do-professor.pdf"`);
+    response.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-material-de-mediacao.pdf"`);
     response.setHeader("Cache-Control", "no-store");
     return response.status(200).send(buffer);
   } catch (error) {
-    return response.status(400).json({ ok: false, error: error.message || "Não foi possível criar o PDF do professor." });
+    return response.status(400).json({ ok: false, error: error.message || "Não foi possível criar o Material de Mediação em PDF." });
   }
 }

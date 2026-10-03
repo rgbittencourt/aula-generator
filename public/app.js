@@ -5,6 +5,7 @@ const state = { input: null, weeks: [], workload: null, generalPlan: null, teach
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
 const DRAFT_MAX_AGE_DAYS = 30;
+const RIGHT_NAV_STORAGE_KEY = "aula-generator:right-navigation-collapsed:v1";
 let saveTimer = null;
 let aiActivityHideTimer = null;
 let aiActionBusy = false;
@@ -23,6 +24,28 @@ function syncRecoveryLayout() {
   }
   document.documentElement.style.setProperty("--site-header-height", `${headerHeight}px`);
   document.documentElement.style.setProperty("--recovery-dock-height", `${dockHeight}px`);
+}
+
+function readRightNavigationCollapsed() {
+  try { return localStorage.getItem(RIGHT_NAV_STORAGE_KEY) === "true"; } catch { return false; }
+}
+
+function setRightNavigationCollapsed(collapsed, persist = true) {
+  const column = $(".navigation-column");
+  const toggle = $("#right-navigation-toggle");
+  if (!column || !toggle) return;
+  column.classList.toggle("is-collapsed", collapsed);
+  column.parentElement?.classList.toggle("right-nav-collapsed", collapsed);
+  toggle.setAttribute("aria-expanded", String(!collapsed));
+  toggle.setAttribute("aria-label", collapsed ? "Expandir navegação do projeto" : "Recolher navegação do projeto");
+  toggle.title = collapsed ? "Expandir navegação do projeto" : "Recolher navegação do projeto";
+  const label = toggle.querySelector(".drawer-toggle-label");
+  const icon = toggle.querySelector(".drawer-toggle-icon");
+  if (label) label.textContent = collapsed ? "Navegar" : "Recolher";
+  if (icon) icon.textContent = collapsed ? "←" : "→";
+  if (persist) {
+    try { localStorage.setItem(RIGHT_NAV_STORAGE_KEY, String(collapsed)); } catch { /* preferência visual não é essencial */ }
+  }
 }
 
 function keepWorkspaceAtTop() {
@@ -66,7 +89,16 @@ function enhanceLayout() {
     details.append(summary, body);
     panel.replaceWith(details);
     summary.addEventListener("click", (event) => {
-      if (event.target.closest(".switch")) event.preventDefault();
+      const switchControl = event.target.closest(".switch");
+      if (!switchControl) return;
+      const input = switchControl.querySelector("input");
+      if (!input) return;
+      if (event.target === input) {
+        event.stopPropagation();
+        return;
+      }
+      event.preventDefault();
+      input.click();
     });
     navItems.push({ id: details.id, title });
   });
@@ -88,12 +120,20 @@ function enhanceLayout() {
 
   const navigation = document.createElement("nav");
   navigation.className = "sidebar-navigation";
+  navigation.id = "project-navigation";
   navigation.setAttribute("aria-label", "Navegação do planejamento");
   navigation.innerHTML = '<p class="sidebar-label">NAVEGAR PELO PROJETO</p>' + navItems.map((item) => `<a href="#${item.id}" data-scroll-to="${item.id}">${escapeHtml(item.title)}<span>→</span></a>`).join("") + '<a href="#results-load" data-scroll-to="results-load">Carga por atividade<span>→</span></a><a href="#results-breakdown" data-scroll-to="results-breakdown">Carga aberta por atividade<span>→</span></a><a href="#results-review" data-scroll-to="results-review">Checklists<span>→</span></a><a href="#results-weeks" data-scroll-to="results-weeks">Semanas planejadas<span>→</span></a>';
   const navigationColumn = document.createElement("aside");
   navigationColumn.className = "navigation-column";
   navigationColumn.setAttribute("aria-label", "Navegação do planejamento");
-  navigationColumn.appendChild(navigation);
+  const navigationToggle = document.createElement("button");
+  navigationToggle.type = "button";
+  navigationToggle.id = "right-navigation-toggle";
+  navigationToggle.className = "navigation-drawer-toggle";
+  navigationToggle.setAttribute("aria-controls", navigation.id);
+  navigationToggle.innerHTML = '<span class="drawer-toggle-label">Recolher</span><span class="drawer-toggle-icon" aria-hidden="true">→</span>';
+  navigationToggle.addEventListener("click", () => setRightNavigationCollapsed(!navigationColumn.classList.contains("is-collapsed")));
+  navigationColumn.append(navigationToggle, navigation);
   const recoveryDock = $("#recovery-dock");
   if (recoveryDock && recoveryDock.parentElement !== navigationColumn) {
     recoveryDock.classList.remove("workspace-dock");
@@ -101,6 +141,7 @@ function enhanceLayout() {
     navigationColumn.appendChild(recoveryDock);
   }
   workspaceGrid?.appendChild(navigationColumn);
+  setRightNavigationCollapsed(readRightNavigationCollapsed(), false);
   navigation.querySelectorAll("[data-scroll-to]").forEach((link) => link.addEventListener("click", (event) => {
     const target = document.getElementById(link.dataset.scrollTo);
     if (!target) return;
@@ -1101,6 +1142,27 @@ function compositionPreview(entry = {}) {
   return `<div class="reader-composition reader-composition-${escapeHtml(type)}"><div class="reader-composition-kicker">${escapeHtml(labels[type] || "Bloco Aula Studio")}</div><strong>${escapeHtml(title)}</strong>${paragraphsMarkup(body)}${media}${rows ? `<ul>${rows}</ul>` : ""}</div>`;
 }
 
+function mediationMessagesMarkup(messages = {}, theme = "a semana", weekNumber = 1) {
+  const hasMessages = (Array.isArray(messages.whatsapp) && messages.whatsapp.length) || (Array.isArray(messages.moodle) && messages.moodle.length);
+  const resolved = hasMessages ? messages : {
+    whatsapp: [
+      { timing: "Abertura", text: `Oi, pessoal! Nesta semana vamos estudar “${theme}”. Comecem pela abertura e tragam uma pergunta para a conversa.` },
+      { timing: "Acompanhamento", text: "Um pouco por dia já ajuda bastante. Anotem uma dúvida ou uma conexão com a prática; o cérebro agradece e o prazo também." },
+      { timing: "Fechamento", text: "Antes de encerrar, revisem a síntese e registrem a principal descoberta da semana." }
+    ],
+    moodle: [
+      { timing: "Abertura da semana", text: `Olá, turma! A semana ${weekNumber} organiza o estudo de “${theme}” em uma sequência de leitura, aplicação e reflexão.` },
+      { timing: "Acompanhamento", text: "Reserve um horário para o texto-base e participe do espaço de discussão com uma conexão, pergunta ou exemplo." },
+      { timing: "Fechamento", text: "Conclua a atividade prevista, revise a síntese e envie a evidência solicitada." }
+    ]
+  };
+  const channel = (label, items) => {
+    const rows = Array.isArray(items) ? items : [];
+    return `<div class="mediation-channel"><h4>${escapeHtml(label)}</h4>${rows.length ? rows.map((item) => `<article><strong>${escapeHtml(item.timing || item.when || "Momento da semana")}</strong>${item.purpose ? `<small>${escapeHtml(item.purpose)}</small>` : ""}<p>${escapeHtml(item.text || item.message || item.body || "Mensagem a revisar.")}</p></article>`).join("") : "<p>Mensagem ainda não detalhada.</p>"}</div>`;
+  };
+  return `<section class="reader-mediation"><div class="reader-mediation-label">MATERIAL DE MEDIAÇÃO · USO DO PROFESSOR</div><h3>Mensagens de acompanhamento</h3><p>Estas mensagens não entram no JSON do aluno. Revise nomes, datas, links e o tom antes de enviar.</p>${channel("WhatsApp", resolved.whatsapp)}${channel("Mensagens do Moodle", resolved.moodle)}</section>`;
+}
+
 function renderLessonPreview(lesson, index) {
   const plan = lesson?.lessonPlan || {};
   const quality = lesson?.contentQuality || {};
@@ -1150,9 +1212,10 @@ function renderLessonPreview(lesson, index) {
   const timeBreakdown = Object.entries(plan.timePlan?.breakdown || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<li><strong>${escapeHtml(breakdownLabels[key] || key)}</strong>: ${formatLoad(value)}</li>`).join("");
   const timeMarkup = timeItems || timeBreakdown ? `<section class="time-breakdown reader-time-breakdown"><h3>Tempo desta semana</h3><p>O cálculo está separado por texto-base, leituras, mídias e atividades. “Obrigatório” indica o que entra na trilha essencial; “complementar” não é obrigatório.</p><ul>${timeItems || timeBreakdown}</ul></section>` : "";
   const alignment = (plan.alignmentMatrix || []).length ? `<section><h3>Alinhamento pedagógico</h3><ul>${plan.alignmentMatrix.map((row) => `<li><strong>${escapeHtml(row.objective || "Objetivo")}</strong>: ${escapeHtml(row.evidence || "evidência a definir")} · avaliação: ${escapeHtml((row.assessmentQuestions || []).join(", ") || "a definir")}</li>`).join("")}</ul></section>` : "";
+  const mediation = mediationMessagesMarkup(guide.mediationMessages, plan.theme || lesson?.meta?.title || `a semana ${index + 1}`, index + 1);
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
-  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${assessment}${alignment}${timeMarkup}${workload}`;
+  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${assessment}${alignment}${timeMarkup}${workload}${mediation}`;
 }
 
 function openLessonPreview(index) {
@@ -1250,7 +1313,7 @@ function fallbackLesson(input, index) {
 }
 
 function staticTeacherGuides(input, weeks) {
-  return weeks.map((_, index) => ({ weekNumber: index + 1, title: `${input.title} - Semana ${index + 1}`, purpose: "Orientar a aprendizagem da semana e revisar a coerência entre objetivos, conteúdo, atividades e avaliação.", didacticArc: { id: "descoberta-conceitual", label: "Descoberta conceitual", rationale: "Arco de exemplo para o modo público.", sequence: ["contexto", "conceito", "exemplo", "reflexao", "sintese"] }, objectives: input.objectives, alignmentMatrix: [], mediationQuestions: [], commonMisconceptions: [], interventions: [], differentiation: { support: [], standard: [], extension: [] }, accessibility: [], assessmentNotes: [], qualityReview: { status: "review", checks: [{ label: "Exemplo local: revise a semana antes de usar.", pass: false }] }, webPractices: [], webPracticeProjects: [], workloadAdvice: [] }));
+  return weeks.map((_, index) => ({ weekNumber: index + 1, title: `${input.title} - Semana ${index + 1}`, purpose: "Orientar a aprendizagem da semana e revisar a coerência entre objetivos, conteúdo, atividades e avaliação.", didacticArc: { id: "descoberta-conceitual", label: "Descoberta conceitual", rationale: "Arco de exemplo para o modo público.", sequence: ["contexto", "conceito", "exemplo", "reflexao", "sintese"] }, objectives: input.objectives, alignmentMatrix: [], mediationQuestions: [], commonMisconceptions: [], interventions: [], differentiation: { support: [], standard: [], extension: [] }, accessibility: [], assessmentNotes: [], qualityReview: { status: "review", checks: [{ label: "Exemplo local: revise a semana antes de usar.", pass: false }] }, mediationMessages: { whatsapp: [{ timing: "Abertura", text: `Oi, pessoal! Nesta semana vamos estudar ${input.title}. Comecem pela abertura e tragam uma pergunta para a conversa.` }, { timing: "Acompanhamento", text: "Um pouco por dia já ajuda bastante. O texto não precisa ser encarado como uma montanha de uma vez." }, { timing: "Fechamento", text: "Antes de encerrar, revisem a síntese e registrem a principal descoberta da semana." }], moodle: [{ timing: "Abertura", text: `Olá, turma! A semana ${index + 1} organiza o estudo de ${input.title} em uma sequência de leitura, aplicação e reflexão.` }, { timing: "Acompanhamento", text: "Reserve um horário para o texto-base e participe do espaço de discussão com uma conexão ou dúvida." }, { timing: "Fechamento", text: "Conclua a atividade prevista, revise a síntese e envie a evidência solicitada." }] }, webPractices: [], webPracticeProjects: [], workloadAdvice: [] }));
 }
 
 function staticDemo(input) {
@@ -1528,7 +1591,7 @@ function renderGeneralPlan(plan) {
     return `<details class="load-week"><summary><strong>Semana ${escapeHtml(week.weekNumber)}</strong><span>${formatLoad(week.calculatedMinutes)} calculados · ${formatLoad(week.targetMinutes)} de meta</span></summary><ul>${itemMarkup || "<li>Sem itens calculáveis ainda.</li>"}</ul></details>`;
   }).join("");
   const timeBreakdownMarkup = `<section class="time-breakdown"><p class="eyebrow">CARGA ABERTA POR ATIVIDADE</p><h3>De onde vem o tempo calculado?</h3><p>O texto-base é contado separadamente das leituras, vídeos, quiz, fórum, revisão e webpráticas. Artigos/leitura aparecem como obrigatórios ou complementares conforme a marcação do recurso.</p><div class="breakdown-summary">${breakdownSummary || "<span>A carga será calculada depois da redação.</span>"}</div><div class="load-weeks">${weeklyLoads}</div></section>`;
-  const overviewMarkup = `<div class="plan-overview"><p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o guia do professor são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div></div>`;
+  const overviewMarkup = `<div class="plan-overview"><p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o Material de Mediação são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div></div>`;
   const checklistsMarkup = `<div class="results-checklists">${resourcesMarkup}${checklistMarkup}${academicMarkup}${qualityMarkup}${progressionMarkup}${practiceMarkup}</div>`;
   container.innerHTML = `${overviewMarkup}${timeBreakdownMarkup}${checklistsMarkup}`;
   organizeResultSectors(container, resultOpenStates);
@@ -1721,7 +1784,7 @@ async function downloadZip() {
       const zip = new window.JSZip();
       state.weeks.forEach((lesson, index) => { const number = String(index + 1).padStart(2, "0"); zip.file(`semanas/semana-${number}-${slugify(lesson.meta?.title)}.aula.json`, JSON.stringify(lesson, null, 2)); });
       if (state.generalPlan) zip.file("planejamento-geral.json", JSON.stringify(state.generalPlan, null, 2));
-      zip.file("professor/LEIA-ME.txt", "O PDF do professor é gerado na versão Vercel com backend. Este modo público contém apenas o exemplo do aluno.");
+      zip.file("professor/LEIA-ME.txt", "O Material de Mediação em PDF é gerado na versão Vercel com backend. Este modo público contém apenas o exemplo do aluno.");
       downloadBlob(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), `${slugify(state.input.title)}-semanas.zip`);
       return;
     }
@@ -1734,13 +1797,13 @@ async function downloadZip() {
 
 async function downloadTeacherPdf() {
   if (!state.weeks.length) return;
-  if (isGitHubPages) { showError("O PDF do professor é gerado na URL Vercel, onde o backend está protegido. Use o pacote completo na versão com IA."); return; }
+  if (isGitHubPages) { showError("O Material de Mediação em PDF é gerado na URL Vercel, onde o backend está protegido. Use o pacote completo na versão com IA."); return; }
   const button = $("#teacher-pdf-button");
   button.disabled = true; button.classList.add("is-loading");
   try {
     const response = await fetch("/api/teacher-pdf", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
-    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível criar o PDF do professor."); }
-    downloadBlob(await response.blob(), `${slugify(state.input.title)}-guia-do-professor.pdf`);
+    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível criar o Material de Mediação em PDF."); }
+    downloadBlob(await response.blob(), `${slugify(state.input.title)}-material-de-mediacao.pdf`);
   } catch (error) { showError(error.message); }
   finally { button.disabled = false; button.classList.remove("is-loading"); }
 }

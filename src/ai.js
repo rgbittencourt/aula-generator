@@ -191,7 +191,7 @@ COMPOSIÇÃO EDITORIAL DO AULA STUDIO — a saída deve conter uma propriedade s
 Semanas já geradas (use somente para continuidade; não copie seus títulos, objetivos ou seções):
 ${JSON.stringify(previousSummaries, null, 2)}
 
-Retorne somente este objeto de alto nível: { "lessonPlan": { ... }, "teacherGuide": { "webPracticeProjects": [...] } }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. O lessonPlan é a prioridade absoluta. teacherGuide deve conter somente projetos de webprática quando houver sessão agendada; não repita objetivos, matriz, diagnóstico, avaliação ou o conteúdo da aula no guia.
+Retorne somente este objeto de alto nível: { "lessonPlan": { ... }, "teacherGuide": { "webPracticeProjects": [...], "mediationMessages": { "whatsapp": [...], "moodle": [...] } } }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. O lessonPlan é a prioridade absoluta. teacherGuide não deve duplicar o texto-base do aluno; mantenha nele as orientações internas do professor, projetos de webprática quando houver sessão agendada e mensagens de acompanhamento.
 
 lessonPlan obrigatório:
 - weekNumber, theme (título específico e informativo, nunca "Conteúdo da semana"), welcome (80–160 palavras, contextualizada e ligada ao percurso), didacticArc com sequence, phasePlan e omissionReasons, composition (array de blocos editoriais conforme o plano acima). A phasePlan pode omitir etapas, mas deve justificar a omissão;
@@ -214,7 +214,7 @@ lessonPlan obrigatório:
 
 Regras de escrita:
 - escreva em ${input.language}, com linguagem humana, clara, específica, variada e pedagogicamente provocadora;
-- produza pelo menos ${textBudget.targetWords} palavras úteis no conjunto do texto do aluno. Essa é uma meta mínima operacional, não uma estimativa: conte e amplie antes de devolver o JSON. A aula do aluno tem prioridade absoluta sobre o guia do professor;
+- produza pelo menos ${textBudget.targetWords} palavras úteis no conjunto do texto do aluno. Essa é uma meta mínima operacional, não uma estimativa: conte e amplie antes de devolver o JSON. A aula do aluno tem prioridade absoluta sobre o Material de Mediação;
 - inclua pelo menos ${profile.minimumReferences} referências, sendo ${profile.primarySourcesRequired} acadêmica(s) ou oficial(is), sem inventar dados bibliográficos; use a política: ${profile.sourcePolicy};
 - ${profile.requireCounterarguments ? "inclua pelo menos um contraponto, controvérsia ou limite" : "inclua contraponto apenas quando pertinente"}; ${profile.requireConceptComparison ? "compare conceitos próximos ou abordagens alternativas quando pertinente" : "não force comparação se ela não for pertinente"}; ${profile.requireCaseStudy ? "inclua estudo de caso ou exemplo contextualizado" : "use exemplo contextualizado quando ajudar"};
 - conecte o tema à realidade do público (${input.audience}) e do nível (${input.level}); use os exemplos, recortes regionais e instituições fornecidos no briefing;
@@ -224,7 +224,7 @@ Regras de escrita:
 - nunca invente URLs, DOI, durações, autores, números ou referências verificadas. Para recurso ainda não conferido, use searchQuery e verificationStatus "suggested-no-url";
 - não escreva markdown fora das strings do JSON e não inclua comentários.
 
-teacherGuide é opcional quando não houver webprática. Se houver webprática programada, inclua somente em webPracticeProjects a preparação do professor e do aluno, agenda, roteiro com minutos, falas/prompts, produto, critérios, rubrica, plano B, acessibilidade e artefatos. Esse projeto será exportado em DOCX separado e é a única exceção que pode ser detalhada fora do texto do aluno.
+teacherGuide deve incluir mediationMessages mesmo quando não houver webprática. Gere exatamente duas listas curtas, whatsapp e moodle, normalmente com três mensagens: abertura da semana, acompanhamento durante o estudo e fechamento. O teor deve ser equivalente, mas não uma cópia: WhatsApp pode ser mais informal, próximo, humanizado e ter humor leve; Moodle deve ser mais organizado, claro e adequado a um aviso de curso. As mensagens devem estimular a leitura, a atividade, o fórum quando existir e a webprática quando estiver agendada, sem inventar agenda, link ou obrigação que não esteja no briefing. Cada item deve conter timing, purpose e text. Se houver webprática programada, inclua também em webPracticeProjects a preparação do professor e do aluno, agenda, roteiro com minutos, falas/prompts, produto, critérios, rubrica, plano B, acessibilidade e artefatos. O projeto será exportado em DOCX separado e as mensagens no Material de Mediação em PDF.
 
 Perfil acadêmico desta trilha:
 ${JSON.stringify(profile, null, 2)}
@@ -245,7 +245,7 @@ Retorne JSON completo, sem omitir propriedades obrigatórias.`;
 }
 
 export function buildGenerationPrompt(input) {
-  return `Gere ${input.weeks} semanas, uma por objeto, seguindo o contrato de buildWeekGenerationPrompt e o academicProfile recebido. O processo esperado é planejamento acadêmico, redação completa, revisão crítica e reescrita condicional. Varie o arco didático conforme o conteúdo; lessonPlan.webPractices deve ser sempre []; não inclua webprática no texto-base ou em semanas não programadas; desenvolva sessões agendadas somente em teacherGuide.webPracticeProjects; misture recursos no ponto de uso; mantenha teacherGuide separado e produza blocks exclusivamente para o aluno no Aula Studio. A carga horária será calculada depois do conteúdo.\n\n${JSON.stringify(input, null, 2)}`;
+  return `Gere ${input.weeks} semanas, uma por objeto, seguindo o contrato de buildWeekGenerationPrompt e o academicProfile recebido. O processo esperado é planejamento acadêmico, redação completa, revisão crítica e reescrita condicional. Varie o arco didático conforme o conteúdo; lessonPlan.webPractices deve ser sempre []; não inclua webprática no texto-base ou em semanas não programadas; desenvolva sessões agendadas somente em teacherGuide.webPracticeProjects; gere também mediationMessages com versões distintas para WhatsApp e Moodle; misture recursos no ponto de uso; mantenha teacherGuide separado e produza blocks exclusivamente para o aluno no Aula Studio. A carga horária será calculada depois do conteúdo.\n\n${JSON.stringify(input, null, 2)}`;
 }
 
 async function repairWeekWithAI(input, index, raw, quality, academicPlan = {}, academicReview = {}) {
@@ -349,7 +349,7 @@ export async function generateOneWeek(input, index, options = {}) {
     { role: "user", content: buildWeekGenerationPrompt(input, index, academicPlan, progression, options.previousWeeks) }
   ], {
     temperature: 0.42,
-    formatRetryInstruction: "A resposta anterior foi truncada ou inválida. Retorne somente { \"lessonPlan\": { ... }, \"teacherGuide\": { \"webPracticeProjects\": [] } }, com o texto didático completo, as seções desenvolvidas e o piso de palavras solicitado. Não gere blocks, não repita o conteúdo no teacherGuide e responda somente JSON válido."
+    formatRetryInstruction: "A resposta anterior foi truncada ou inválida. Retorne somente { \"lessonPlan\": { ... }, \"teacherGuide\": { \"webPracticeProjects\": [], \"mediationMessages\": { \"whatsapp\": [], \"moodle\": [] } } }, com o texto didático completo, as seções desenvolvidas, as mensagens de acompanhamento e o piso de palavras solicitado. Não gere blocks, não repita o conteúdo no teacherGuide e responda somente JSON válido."
   }));
   let academicReview = { status: "not-run", issues: [], strengths: [], unsupportedClaims: [], rewriteRequired: false };
   if (!singlePass && useAcademicPipeline && process.env.AULA_ACADEMIC_REVIEW !== "false") {
@@ -513,7 +513,7 @@ Preserve os fatos, referências e recursos válidos, mas cumpra a solicitação 
 Esta é uma correção de insuficiência textual. Não faça um acréscimo marginal de 20, 30 ou 50 palavras. Reescreva e amplie as seções abaixo do orçamento até atingir o piso de ${textBudget.minimumWords} palavras. Cada seção deve conter explicação conceitual, exemplo ou aplicação, consequência/limite e transição para a próxima. Se o texto atual estiver curto, substitua o corpo curto por um corpo desenvolvido; não apenas acrescente uma frase ao final.
 Faça uma revisão acadêmica explícita: corrija afirmações sem suporte, diferencie fato e interpretação, acrescente contraponto quando exigido, preserve o mapa de evidências e não invente fontes. ${normalizeAcademicProfile(input.academicProfile, input).sourcePolicy}
 
-Retorne somente { "lessonPlan": { ... } }. Não gere blocks nem teacherGuide; o servidor preservará/reconstruirá o guia do professor. O lessonPlan deve manter título específico, welcome, objetivos observáveis, pelo menos ${textBudget.requiredSectionCount} seções conforme o orçamento, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. lessonPlan.webPractices deve ser sempre []; não inclua qualquer descrição ou instrução da sessão prática no texto-base. Não invente URLs ou fontes verificadas. A prioridade desta resposta é o texto substancial do aluno; não reduza o corpo para economizar tokens.
+Retorne somente { "lessonPlan": { ... } }. Não gere blocks nem teacherGuide; o servidor preservará/reconstruirá o Material de Mediação. O lessonPlan deve manter título específico, welcome, objetivos observáveis, pelo menos ${textBudget.requiredSectionCount} seções conforme o orçamento, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. lessonPlan.webPractices deve ser sempre []; não inclua qualquer descrição ou instrução da sessão prática no texto-base. Não invente URLs ou fontes verificadas. A prioridade desta resposta é o texto substancial do aluno; não reduza o corpo para economizar tokens.
 
 Briefing essencial do curso:
 ${JSON.stringify(compactInput, null, 2)}

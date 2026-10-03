@@ -1,9 +1,53 @@
 import { buildAlignmentMatrix, buildProgression, fallbackDidacticArc, pedagogicalReview, normalizeDidacticArc } from "./pedagogy.js";
 import { practiceScheduledForWeek } from "./aula-schema.js";
 
-const text = (value) => String(value ?? "").trim();
+const text = (value, fallback = "") => String(value ?? "").trim() || fallback;
 const list = (value) => Array.isArray(value) ? value.map(text).filter(Boolean) : [];
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+
+function defaultMediationMessages(input = {}, plan = {}, practices = [], index = 0) {
+  const theme = text(plan.theme || input.title, `o tema da semana ${index + 1}`);
+  const activity = Array.isArray(plan.activities) ? text(plan.activities.find((item) => item?.title)?.title) : "";
+  const practice = practices[0];
+  const practiceLine = practice
+    ? ` Nesta semana também temos a webprática “${text(practice.title, "atividade prática")}”; confira a agenda e chegue com os materiais combinados.`
+    : "";
+  return {
+    whatsapp: [
+      { id: `whatsapp-opening-${index + 1}`, timing: "Início da semana", text: `Oi, pessoal! A nossa trilha desta semana é “${theme}”. Comecem pela abertura e pelos objetivos; a ideia é entender o assunto e já enxergar onde ele aparece na prática.${practiceLine}` },
+      { id: `whatsapp-nudge-${index + 1}`, timing: "Durante a semana", text: `Passando para lembrar: não deixem a leitura e a atividade de “${activity || theme}” para a última curva. Estudem um pouco por vez, anotem uma dúvida e tragam uma aplicação do conteúdo para a conversa. O cérebro agradece — e o prazo também.` },
+      { id: `whatsapp-closing-${index + 1}`, timing: "Encerramento da semana", text: `Antes de fechar a semana, revisem a síntese, respondam à avaliação e confiram se a produção foi enviada. Se algo ficou nebuloso, registrem a dúvida; dúvida anotada vira ponto de partida, não peso na mochila.` }
+    ],
+    moodle: [
+      { id: `moodle-opening-${index + 1}`, timing: "Abertura da semana", text: `Olá, turma! Nesta semana estudaremos “${theme}”. Leiam a apresentação, observem os objetivos e sigam a sequência proposta para relacionar os conceitos ao contexto de vocês.${practiceLine}` },
+      { id: `moodle-nudge-${index + 1}`, timing: "Acompanhamento", text: `Como está o percurso até aqui? Reserve um bloco de estudo para o texto-base e outro para a atividade${activity ? ` “${activity}”` : " prevista"}. Registre no fórum ou no espaço indicado uma conexão, pergunta ou exemplo do seu contexto.` },
+      { id: `moodle-closing-${index + 1}`, timing: "Fechamento", text: `Para concluir a semana, revise a síntese, responda à avaliação e envie a evidência solicitada. Use o espaço de mensagens para compartilhar dúvidas e avanços; a participação ajuda a transformar leitura em aprendizagem.` }
+    ]
+  };
+}
+
+function normalizeMessageList(value, channel, fallback, index) {
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  const normalized = values.map((item, messageIndex) => {
+    const source = typeof item === "string" ? { text: item } : object(item);
+    return {
+      id: text(source.id, `${channel}-${index + 1}-${messageIndex + 1}`),
+      timing: text(source.timing || source.when || source.moment, `Mensagem ${messageIndex + 1}`),
+      purpose: text(source.purpose || source.objective),
+      text: text(source.text || source.message || source.body || source.content)
+    };
+  }).filter((item) => item.text);
+  return normalized.length ? normalized : fallback;
+}
+
+function normalizeMediationMessages(value, input, plan, practices, index) {
+  const fallback = defaultMediationMessages(input, plan, practices, index);
+  const source = object(value);
+  return {
+    whatsapp: normalizeMessageList(source.whatsapp || source.whatsApp, "whatsapp", fallback.whatsapp, index),
+    moodle: normalizeMessageList(source.moodle || source.moodleMessages, "moodle", fallback.moodle, index)
+  };
+}
 
 function normalizeDifferentiation(value = {}) {
   const source = object(value);
@@ -34,6 +78,7 @@ function normalizeGuide(source = {}, plan = {}, input = {}, index = 0) {
   });
   const practices = mergedPractices.filter((practice) => practiceScheduledForWeek(practice, input, index));
   const review = pedagogicalReview(plan);
+  const mediationMessages = normalizeMediationMessages(raw.mediationMessages || raw.studentMessages || raw.communicationMessages || raw.messages, input, plan, practices, index);
   return {
     weekNumber: index + 1,
     title: text(raw.title || plan.theme || `${input.title} - Semana ${index + 1}`),
@@ -60,6 +105,7 @@ function normalizeGuide(source = {}, plan = {}, input = {}, index = 0) {
     qualityReview: raw.qualityReview && typeof raw.qualityReview === "object" ? raw.qualityReview : review,
     webPractices: practices,
     webPracticeProjects: practices,
+    mediationMessages,
     learnerEvidence: list(raw.learnerEvidence || raw.evidence),
     workloadAdvice: list(raw.workloadAdvice || raw.timeAdjustmentSuggestions),
     notes: list(raw.notes)

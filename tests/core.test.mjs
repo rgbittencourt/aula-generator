@@ -232,13 +232,23 @@ test("JSON do aluno não carrega webprática e o guia preserva o projeto separad
   assert.equal(guides[0].webPracticeProjects[0].artifacts.length, 1);
 });
 
-test("PDF do professor é gerado separadamente", async () => {
+test("Material de Mediação em PDF é gerado separadamente", async () => {
   const input = normalizeCourseInput({ title: "Curso PDF", weeks: 1, hoursPerWeek: 2, objectives: ["Analisar"] });
   const lesson = buildFallbackLesson(input, 0);
   const guides = buildTeacherGuides(input, [lesson], []);
   const pdf = await createTeacherGuidePdf(input, guides, buildGeneralPlan(input, calculateCourseWorkload(input, input.formulaConfig, [lesson]), [lesson], guides));
   assert.ok(Buffer.isBuffer(pdf));
   assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
+});
+
+test("Material de Mediação inclui mensagens distintas para WhatsApp e Moodle", () => {
+  const input = normalizeCourseInput({ title: "Curso de mediação", weeks: 1, objectives: ["Aplicar"] });
+  const lesson = buildFallbackLesson(input, 0);
+  const [guide] = buildTeacherGuides(input, [lesson], [{}]);
+  assert.equal(guide.mediationMessages.whatsapp.length, 3);
+  assert.equal(guide.mediationMessages.moodle.length, 3);
+  assert.notEqual(guide.mediationMessages.whatsapp[0].text, guide.mediationMessages.moodle[0].text);
+  assert.match(guide.mediationMessages.whatsapp[0].text, /Curso de mediação/);
 });
 
 test("cálculo deriva itens do conteúdo usando perfil interno versionado", () => {
@@ -290,7 +300,7 @@ test("ZIP contém JSON do aluno e roteiro DOCX de webprática em pasta separada"
   assert.equal(names.length, 2);
   assert.ok(names.every((name) => name.startsWith("semanas/semana-")));
   assert.ok(zip.files["planejamento-geral.json"]);
-  assert.ok(zip.files["professor/guia-do-professor.pdf"]);
+  assert.ok(zip.files["professor/material-de-mediacao.pdf"]);
   assert.ok(Object.keys(zip.files).some((name) => name.includes("webpraticas/") && name.endsWith("guia-e-roteiro.md")));
   const docxName = Object.keys(zip.files).find((name) => name.endsWith("roteiro-webpratica.docx"));
   assert.ok(docxName);

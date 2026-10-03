@@ -23,12 +23,12 @@ O Aula Studio mantém sua identidade complementar em `assets/aula-mark.svg`, `as
 ## Situação atual
 
 - **GitHub Pages:** versão pública estática em <https://rgbittencourt.github.io/aula-generator/>. Gera exemplos e ZIP diretamente no navegador, sem IA.
-- **Vercel:** implantação recomendada para ativar IA, pesquisa de recursos, PDF do professor, DOCX individual e ZIP completo. O mesmo repositório executa o frontend e as funções serverless.
+- **Vercel:** implantação recomendada para ativar IA, pesquisa de recursos, Material de Mediação em PDF, DOCX individual e ZIP completo. O mesmo repositório executa o frontend e as funções serverless.
 - **Segurança:** as chaves da OpenAI e do YouTube devem ser cadastradas somente como variáveis secretas da Vercel. Elas nunca devem entrar no GitHub, no arquivo `.env` versionado ou nesta conversa.
 
 ## Salvamento e recuperação contra queda de energia
 
-O navegador salva automaticamente o briefing e, depois da geração, as semanas, o Planejamento Geral, o guia do professor e o estado de validação em `localStorage`. Ao reabrir a aplicação no mesmo navegador e dispositivo, aparecerá a opção **Retomar planejamento**.
+O navegador salva automaticamente o briefing e, depois da geração, as semanas, o Planejamento Geral, o Material de Mediação e o estado de validação em `localStorage`. Ao reabrir a aplicação no mesmo navegador e dispositivo, aparecerá a opção **Retomar planejamento**.
 
 Para uma proteção adicional, use **Baixar backup** antes de fechar o navegador ou depois de uma geração importante. O arquivo JSON baixado pode ser recuperado com **Restaurar backup**. Por segurança, o código de acesso da IA nunca é salvo no autosave nem no backup.
 
@@ -106,7 +106,7 @@ Ao usar **Refazer esta semana com IA**, o sistema envia somente um briefing esse
 
 O fluxo começa pelo briefing, mas o resultado não é uma lista fixa de seções. A IA escolhe o arco didático que combina com o conteúdo: descoberta conceitual, estudo de caso, oficina aplicada, análise de dados, debate orientado, revisão e síntese, ou combinação justificada. Uma semana pode ter diagnóstico, vídeo, leitura, atividade ou quiz quando isso tiver função pedagógica; não é obrigatório repetir todos esses elementos em todas as semanas.
 
-Na interface, a capa exige o preenchimento de **Nome**, **Instituição** e **Código de acesso de IA** antes de entrar no workspace. Em telas amplas, o workspace fica dividido em três colunas: **resumo e ações** à esquerda, **formulário e RESULTADO** no centro e **navegação do projeto** à direita. A introdução “Do tema geral...” também fica no alto da coluna central. Logo abaixo de **NAVEGAR PELO PROJETO** existe um segundo menu separado, **BACKUP E RECUPERAÇÃO**, com **Retomar planejamento**, **Baixar backup** e **Restaurar backup** quando aplicável. A rolagem global é bloqueada no desktop: o centro concentra a leitura e cada coluna só rola se o próprio conteúdo ultrapassar sua altura. Em tablets e telas menores, as áreas passam para uma disposição vertical e cada uma mantém sua própria rolagem quando necessário, sem arrastar as demais junto. O resumo compacto traz os comandos **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade**, **Guia do professor PDF** e **Pacote completo ZIP**. O menu superior fixo, que aparece somente depois da entrada pela capa, traz o atalho branded **Abrir Aula Studio** em nova aba. Apenas **Identidade do curso** começa expandida; os demais setores do briefing começam recolhidos. Ao apresentar uma geração, o bloco externo **RESULTADO** e as quatro seções internas — **Carga por atividade**, **Carga aberta por atividade**, **Checklists** e **Semanas planejadas** — começam recolhidos. Cada cabeçalho tem um símbolo no canto superior direito para expandir ou recolher. A navegação lateral leva diretamente aos setores dentro da coluna central.
+Na interface, a capa exige o preenchimento de **Nome**, **Instituição** e **Código de acesso de IA** antes de entrar no workspace. Em telas amplas, o workspace fica dividido em três colunas: **resumo e ações** à esquerda, **formulário e RESULTADO** no centro e **navegação do projeto** à direita. A introdução “Do tema geral...” também fica no alto da coluna central. Logo abaixo de **NAVEGAR PELO PROJETO** existe um segundo menu separado, **BACKUP E RECUPERAÇÃO**, com **Retomar planejamento**, **Baixar backup** e **Restaurar backup** quando aplicável. A navegação direita pode ser recolhida pelo controle **Recolher**; nesse estado, a coluna vira somente uma aba coral vertical. Clique na aba para expandir novamente. Ao recolher, a área central recebe todo o espaço liberado. A preferência fica salva neste navegador. A rolagem global é bloqueada no desktop: o centro concentra a leitura e cada coluna só rola se o próprio conteúdo ultrapassar sua altura. Em tablets e telas menores, as áreas passam para uma disposição vertical e cada uma mantém sua própria rolagem quando necessário, sem arrastar as demais junto. O resumo compacto traz os comandos **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade**, **Material de Mediação PDF** e **Pacote completo ZIP**. O menu superior fixo, que aparece somente depois da entrada pela capa, traz o atalho branded **Abrir Aula Studio** em nova aba. Apenas **Identidade do curso** começa expandida; os demais setores do briefing começam recolhidos. Ao apresentar uma geração, o bloco externo **RESULTADO** e as quatro seções internas — **Carga por atividade**, **Carga aberta por atividade**, **Checklists** e **Semanas planejadas** — começam recolhidos. Cada cabeçalho tem um símbolo no canto superior direito para expandir ou recolher. A navegação lateral leva diretamente aos setores dentro da coluna central.
 
 Em monitores largos, o workspace amplia sua largura útil: os menus laterais permanecem com largura fixa e a coluna central recebe todo o espaço restante para leitura, formulários e resultados. Em tablets e telas menores, o layout passa para a disposição vertical responsiva.
 
@@ -132,7 +132,7 @@ O resultado agora organiza as conferências em quatro listas: **Checklist pedag�
 
 As semanas não são mais geradas apenas contra a lista geral de objetivos do curso. O backend constrói um mapa longitudinal com tema, pergunta central, conceitos novos, objetivos específicos, sequência editorial, ponte entre semanas, marco de evidência e arco didático preferencial. Para o percurso de **Tecnologias para Gestão Educacional**, por exemplo, a sequência é: fundamentos; Governo Digital; SIGE; dados e Learning Analytics; dashboards; Vibe Coding e governança.
 
-Cada nova chamada recebe um resumo das semanas anteriores e uma regra explícita do que não deve ser repetido. A validação também compara títulos e objetivos entre semanas. Se uma semana ficar curta, o modo `AULA_SINGLE_PASS=true` faz uma única reescrita textual: o reparo devolve somente `lessonPlan`, sem duplicar o guia do professor, usa quotas por seção e só aceita a versão se ela atingir o piso ou apresentar ganho substancial. Um acréscimo de 25, 45 ou 50 palavras não é tratado como correção; a semana permanece sinalizada para revisão em vez de gastar novas chamadas em melhorias marginais.
+Cada nova chamada recebe um resumo das semanas anteriores e uma regra explícita do que não deve ser repetido. A validação também compara títulos e objetivos entre semanas. Se uma semana ficar curta, o modo `AULA_SINGLE_PASS=true` faz uma única reescrita textual: o reparo devolve somente `lessonPlan`, sem duplicar o Material de Mediação, usa quotas por seção e só aceita a versão se ela atingir o piso ou apresentar ganho substancial. Um acréscimo de 25, 45 ou 50 palavras não é tratado como correção; a semana permanece sinalizada para revisão em vez de gastar novas chamadas em melhorias marginais.
 
 ### Perfil acadêmico e pipeline de texto
 
@@ -144,7 +144,7 @@ Para evitar a geração superficial, a IA possui um pipeline acadêmico completo
 2. **Redação:** escreve a semana completa para o aluno e o guia separado do professor, incluindo `claimEvidence` e referências estruturadas.
 3. **Revisão crítica:** procura superficialidade, desalinhamento, repetição, fonte inventada, afirmação sem suporte, falta de contraponto e problemas de acessibilidade. Se necessário, executa um reparo e revisa novamente.
 
-O manual contém os prompts efetivos e o contrato JSON de cada fase. A produção usa por padrão `AULA_SINGLE_PASS=true`: o prompt acadêmico completo é executado uma semana por vez, com mapa longitudinal e continuidade das semanas anteriores. Se o resultado for insuficiente, uma única regeneração compacta tenta ampliar a unidade sem duplicar o guia do professor. O pipeline de planejamento, revisão e reparo acadêmico adicionais pode ser ativado com `AULA_SINGLE_PASS=false`, quando houver margem de duração na hospedagem.
+O manual contém os prompts efetivos e o contrato JSON de cada fase. A produção usa por padrão `AULA_SINGLE_PASS=true`: o prompt acadêmico completo é executado uma semana por vez, com mapa longitudinal e continuidade das semanas anteriores. Se o resultado for insuficiente, uma única regeneração compacta tenta ampliar a unidade sem duplicar o Material de Mediação. O pipeline de planejamento, revisão e reparo acadêmico adicionais pode ser ativado com `AULA_SINGLE_PASS=false`, quando houver margem de duração na hospedagem.
 
 ### Por que a geração agora é dividida por semana
 
@@ -175,16 +175,16 @@ Os quatro checklists exibem todos os itens disponíveis e iniciam marcados os qu
 A aplicação produz duas camadas diferentes:
 
 - **Aula do aluno:** cada semana é um `.aula.json` compatível com o botão **Abrir** do Aula Studio. Ele contém apenas a experiência de aprendizagem do aluno: texto, objetivos, recursos contextualizados, atividades, avaliação, síntese e metadados de carga. `lessonPlan.webPractices` é sempre `[]`.
-- **Guia do professor:** é mantido fora do JSON do aluno e exportado em PDF. Reúne intenção pedagógica, arco didático, matriz de alinhamento, diagnóstico, perguntas de mediação, equívocos comuns, intervenções, diferenciação, acessibilidade, avaliação, revisão espiral e checklist.
+- **Material de Mediação:** é mantido fora do JSON do aluno e exportado em PDF. Reúne intenção pedagógica, arco didático, matriz de alinhamento, diagnóstico, perguntas de mediação, equívocos comuns, intervenções, diferenciação, acessibilidade, avaliação, revisão espiral, checklist, carga detalhada e mensagens semanais para WhatsApp e Moodle. As mensagens têm o mesmo propósito, mas são redigidas de modo diferente: WhatsApp mais próximo e informal; Moodle mais organizado para o ambiente do curso.
 - **Roteiro de webprática:** cada sessão prática agendada é mantida em `teacherGuide.webPracticeProjects` e exportada como DOCX editável próprio, sem ser inserida no texto-base semanal.
 
-Na tela de resultados, **Baixar JSON do aluno** baixa somente a semana selecionada. O painel separado **Webpráticas programadas** mostra a agenda e oferece **Baixar DOCX** para cada sessão. **Guia do professor PDF** baixa o documento de mediação. **Pacote completo ZIP** reúne os JSONs, o Planejamento Geral, o PDF do professor e os projetos de webprática em Markdown, JSON, arquivos auxiliares e DOCX.
+Na tela de resultados, **Baixar JSON do aluno** baixa somente a semana selecionada. O painel separado **Webpráticas programadas** mostra a agenda e oferece **Baixar DOCX** para cada sessão. **Material de Mediação PDF** baixa o documento de mediação. **Pacote completo ZIP** reúne os JSONs, o Planejamento Geral, o Material de Mediação em PDF e os projetos de webprática em Markdown, JSON, arquivos auxiliares e DOCX.
 
 ## Webpráticas como projetos independentes
 
 Webprática não é obrigatória em toda semana. Ela é uma **aula síncrona ou laboratório prático independente**, em que os estudantes usam uma ferramenta, constroem um artefato, testam uma hipótese ou resolvem uma situação-problema. No formulário, cada sessão precisa de título e de **semana ou data**; também pode receber dia, horário, plataforma, ferramenta, objetivo, contexto, preparação, materiais, etapas, produto, evidências, rubrica, prompts, acessibilidade e plano B. A IA só desenvolve o projeto na semana em que ele está agendado; não inventa uma webprática para completar a estrutura.
 
-Nada da webprática entra na aula-base do aluno: não entra no texto, nos blocos, nas atividades ou no `.aula.json`. O projeto completo fica em `teacherGuide.webPracticeProjects`, é descrito no PDF do professor e vai para `webpraticas/` no ZIP como `roteiro-webpratica.docx`, Markdown, JSON e arquivos auxiliares.
+Nada da webprática entra na aula-base do aluno: não entra no texto, nos blocos, nas atividades ou no `.aula.json`. O projeto completo fica em `teacherGuide.webPracticeProjects`, é descrito no Material de Mediação em PDF e vai para `webpraticas/` no ZIP como `roteiro-webpratica.docx`, Markdown, JSON e arquivos auxiliares.
 
 ## Cálculos isolados da aplicação
 
@@ -224,7 +224,7 @@ O fallback OpenAlex fica ligado por padrão e aparece como `openAlexFallback: tr
 | `POST /api/generate-week` | gera uma semana isolada, com pesquisa de recursos e guia correspondente |
 | `POST /api/assemble-course` | consolida semanas já geradas e calcula o Planejamento Geral |
 | `POST /api/regenerate-week` | refaz somente uma semana com instrução do professor e recalcula o curso |
-| `POST /api/teacher-pdf` | devolve somente o PDF do guia do professor |
+| `POST /api/teacher-pdf` | devolve somente o PDF do Material de Mediação |
 | `POST /api/webpractice-docx` | devolve o DOCX editável de uma webprática por `practiceId` ou índice |
 | `POST /api/zip` | devolve o pacote completo, incluindo PDF, DOCX e webpráticas |
 
@@ -269,7 +269,7 @@ A chave é usada apenas pelo backend e nunca é enviada ao navegador.
 semanas/semana-01-titulo.aula.json
 semanas/semana-02-titulo.aula.json
 planejamento-geral.json
-professor/guia-do-professor.pdf
+professor/material-de-mediacao.pdf
 webpraticas/01-tema/guia-e-roteiro.md
 webpraticas/01-tema/pacote.json
 webpraticas/01-tema/roteiro-webpratica.docx
@@ -285,5 +285,5 @@ npm install
 npm test
 ```
 
-A suíte cobre contrato do aluno, separação do guia do professor, arcos didáticos, recursos inseridos dentro do tópico, fórmulas internas, geração de PDF e conteúdo do ZIP.
+A suíte cobre contrato do aluno, separação do Material de Mediação, arcos didáticos, recursos inseridos dentro do tópico, fórmulas internas, geração de PDF e conteúdo do ZIP.
 É necessário informar primeiro o **Tema geral ou título do curso**, pois ele dá contexto para as sugestões; depois, a IA também pode completar objetivos, conteúdo, webpráticas, materiais e termos de busca. Durante qualquer chamada demorada — **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade** ou **Refazer esta semana com IA** — aparece um painel visual no topo com spinner, etapa atual e barra de progresso. O botão em execução fica desabilitado para evitar chamadas duplicadas; ao terminar, o painel confirma o sucesso ou mantém uma mensagem de erro legível. Se o provedor devolver um erro de modelo, limite ou autenticação, a mensagem técnica agora é mostrada em vez de aparecer apenas como “resposta vazia”.

@@ -9,7 +9,7 @@ import { enrichLessonsWithResources } from "./research.js";
 import { createWeeksZip } from "./zip.js";
 import { accessRequired, hasValidAccess } from "./access.js";
 import { buildTeacherGuides, collectWebPracticeProjects } from "./teacher-guide.js";
-import { createTeacherGuidePdf } from "./pdf.js";
+import { createMediationMaterialPdf } from "./pdf.js";
 import { createWebPracticeDocx } from "./webpractice.js";
 import { validateCourse } from "./validation.js";
 import { assembleCourse } from "./course-assembly.js";
@@ -178,13 +178,13 @@ app.post("/api/teacher-pdf", async (req, res) => {
     const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
     const teacherGuides = buildTeacherGuides(input, enrichedWeeks, req.body?.teacherGuides || []);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
-    const buffer = await createTeacherGuidePdf(input, teacherGuides, generalPlan);
+    const buffer = await createMediationMaterialPdf(input, teacherGuides, generalPlan);
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-guia-do-professor.pdf"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-material-de-mediacao.pdf"`);
     res.setHeader("Cache-Control", "no-store");
     res.send(buffer);
   } catch (error) {
-    res.status(400).json({ ok: false, error: error.message || "Não foi possível criar o PDF do professor." });
+    res.status(400).json({ ok: false, error: error.message || "Não foi possível criar o Material de Mediação em PDF." });
   }
 });
 

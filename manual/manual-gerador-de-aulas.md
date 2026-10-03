@@ -1,6 +1,6 @@
 # Manual completo do Gerador de Aulas
 
-## Da ideia inicial ao JSON semanal, guia do professor e publicação no Moodle
+## Da ideia inicial ao JSON semanal, Material de Mediação e publicação no Moodle
 
 **Versão do manual:** 1.5
 **Data:** 30 de setembro de 2026  
@@ -91,7 +91,7 @@ Ele contém a experiência que será apresentada ao estudante, incluindo:
 
 O JSON do aluno **não deve conter o guia interno do professor nem qualquer webprática**. O campo `lessonPlan.webPractices` permanece vazio; a sessão prática é um produto separado em `teacherGuide.webPracticeProjects` e em DOCX.
 
-### 2.2 Guia do professor em PDF
+### 2.2 Material de Mediação em PDF
 
 O PDF é separado da aula do aluno. Ele foi pensado para leitura na tela e inclui, quando disponível:
 
@@ -108,7 +108,8 @@ O PDF é separado da aula do aluno. Ele foi pensado para leitura na tela e inclu
 - observações de avaliação;
 - revisão espiral;
 - conferência dos recursos;
-- recomendações de carga e qualidade.
+- recomendações de carga e qualidade;
+- mensagens semanais para WhatsApp, em tom próximo e informal, e para Mensagens do Moodle, em linguagem organizada e adequada ao ambiente do curso.
 
 ### 2.3 Pacote completo ZIP do Gerador
 
@@ -118,7 +119,7 @@ O pacote reúne o curso inteiro em uma única estrutura:
 semanas/semana-01-titulo.aula.json
 semanas/semana-02-titulo.aula.json
 planejamento-geral.json
-professor/guia-do-professor.pdf
+professor/material-de-mediacao.pdf
 webpraticas/01-tema/guia-e-roteiro.md
 webpraticas/01-tema/pacote.json
 webpraticas/01-tema/roteiro-webpratica.docx
@@ -239,9 +240,9 @@ O painel lateral mostra continuamente:
 - existência ou não de webpráticas;
 - estado geral do dimensionamento.
 
-Esse resumo é preliminar. O cálculo mais preciso acontece depois que o conteúdo e os recursos são gerados. Abaixo dele ficam as ações principais: **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade**, **Guia do professor PDF** e **Pacote completo ZIP**. Em telas amplas, ele ocupa a coluna esquerda; o formulário e o **RESULTADO** ficam na coluna central; e a navegação do projeto fica na coluna direita. A introdução “Do tema geral...” fica no alto da coluna central. Logo abaixo de **NAVEGAR PELO PROJETO** existe um segundo menu independente, **BACKUP E RECUPERAÇÃO**, com **Retomar planejamento**, **Baixar backup** e **Restaurar backup** quando aplicável. O cabeçalho permanece fixo e a rolagem global é bloqueada no desktop: cada coluna tem sua própria rolagem quando o conteúdo não cabe. Em tablets e telas menores, as colunas passam para uma disposição vertical, mas cada área continua podendo rolar de forma independente. Depois da capa, o menu superior permanece fixo desde a entrada no workspace e apresenta o atalho **Abrir Aula Studio**, com a marca do editor, em uma nova aba. Os campos Nome, Instituição e Código de acesso da capa começam vazios por decisão de privacidade, mas os três precisam ser preenchidos para entrar no workspace. A capa usa a assinatura institucional IFSC–INOVALAB e apresenta o crédito **Desenvolvido pelo Prof. Rogério G. Bittencourt**, com link para o perfil GitHub do autor.
+Esse resumo é preliminar. O cálculo mais preciso acontece depois que o conteúdo e os recursos são gerados. Abaixo dele ficam as ações principais: **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade**, **Material de Mediação PDF** e **Pacote completo ZIP**. Em telas amplas, ele ocupa a coluna esquerda; o formulário e o **RESULTADO** ficam na coluna central; e a navegação do projeto fica na coluna direita. A introdução “Do tema geral...” fica no alto da coluna central. Logo abaixo de **NAVEGAR PELO PROJETO** existe um segundo menu independente, **BACKUP E RECUPERAÇÃO**, com **Retomar planejamento**, **Baixar backup** e **Restaurar backup** quando aplicável. O cabeçalho permanece fixo e a rolagem global é bloqueada no desktop: cada coluna tem sua própria rolagem quando o conteúdo não cabe. Em tablets e telas menores, as colunas passam para uma disposição vertical, mas cada área continua podendo rolar de forma independente. Depois da capa, o menu superior permanece fixo desde a entrada no workspace e apresenta o atalho **Abrir Aula Studio**, com a marca do editor, em uma nova aba. Os campos Nome, Instituição e Código de acesso da capa começam vazios por decisão de privacidade, mas os três precisam ser preenchidos para entrar no workspace. A capa usa a assinatura institucional IFSC–INOVALAB e apresenta o crédito **Desenvolvido pelo Prof. Rogério G. Bittencourt**, com link para o perfil GitHub do autor.
 
-O menu de navegação da coluna direita oferece atalhos para os sete setores do briefing e para **Carga por atividade**, **Carga aberta por atividade**, **Checklists** e **Semanas planejadas**. Os atalhos calculam a posição dentro da coluna central, sem deslocar a página inteira. No celular, a navegação passa para uma área própria abaixo do conteúdo.
+O menu de navegação da coluna direita oferece atalhos para os sete setores do briefing e para **Carga por atividade**, **Carga aberta por atividade**, **Checklists** e **Semanas planejadas**. Os atalhos calculam a posição dentro da coluna central, sem deslocar a página inteira. O controle **Recolher** transforma essa coluna em uma aba coral vertical, liberando espaço para o centro; clique na aba para expandir. A escolha fica registrada no navegador. No celular, a navegação passa para uma área própria abaixo do conteúdo e o mesmo controle pode ocultá-la temporariamente.
 
 Em monitores largos, a área útil do workspace é ampliada: o resumo e as ações ficam próximos da margem esquerda, a navegação se aproxima da margem direita, ambas as laterais mantêm largura fixa e a coluna central recebe todo o espaço restante para leitura e edição. Em tablets e telas menores, o layout passa para a disposição vertical responsiva.
 
@@ -294,7 +295,7 @@ Sistema calcula a carga da semana e do curso
         ↓
 Professor revisa Planejamento Geral e semanas
         ↓
-Baixa JSON, PDF do professor ou ZIP
+Baixa JSON, Material de Mediação em PDF ou ZIP
         ↓
 Abre o JSON no Aula Studio
         ↓
@@ -501,7 +502,7 @@ O comando **Gerar com IA**:
 - exige o código de acesso quando a proteção estiver ativa;
 - redige uma unidade didática mais completa;
 - pode pesquisar e selecionar recursos;
-- produz guia do professor e Planejamento Geral.
+- produz Material de Mediação e Planejamento Geral.
 
 O modo de exemplo local permanece restrito a smoke tests e manutenção. Ele não aparece como ação no menu do usuário e não deve ser confundido com a versão final de uma aula.
 
@@ -610,7 +611,7 @@ PADRÃO ACADÊMICO CONFIGURADO: perfil {profile.level}, profundidade {profile.de
 
 O piso de palavras corresponde à própria meta configurada, nunca menos que 1.400 palavras. Assim, uma meta de 3.000 palavras exige pelo menos 3.000 antes de a semana ser considerada completa. A medição considera o texto didático do aluno — abertura, seções, exemplos, síntese, conexão e orientações de aprendizagem — e não pode ser inflada apenas com referências, alternativas de prova ou outros metadados. Para orientar a redação, o sistema calcula uma quantidade de seções e uma faixa de palavras por seção. A meta, o número mínimo de seções e o número mínimo de referências são ajustados automaticamente a partir do nível herdado da Identidade do curso e das escolhas específicas do Perfil acadêmico.
 
-O gerador também constrói um **mapa longitudinal** antes de redigir as semanas. Esse mapa distribui tema, pergunta central, conceitos novos, objetivos específicos, sequência editorial, ponte entre semanas, marco de evidência e arco didático. As chamadas seguintes recebem resumos das semanas já geradas e uma regra do que não repetir. Se uma resposta em `AULA_SINGLE_PASS=true` ficar curta, uma regeneração textual é tentada: ela retorna apenas `lessonPlan`, sem duplicar o guia do professor, e só é aceita se alcançar o piso ou crescer substancialmente. Se a resposta vier absurdamente curta — por exemplo, uma aula de algumas dezenas de palavras — o sistema faz um único **resgate de saída** com orçamento ampliado. Uma correção que acrescente apenas poucas palavras não é aceita como solução.
+O gerador também constrói um **mapa longitudinal** antes de redigir as semanas. Esse mapa distribui tema, pergunta central, conceitos novos, objetivos específicos, sequência editorial, ponte entre semanas, marco de evidência e arco didático. As chamadas seguintes recebem resumos das semanas já geradas e uma regra do que não repetir. Se uma resposta em `AULA_SINGLE_PASS=true` ficar curta, uma regeneração textual é tentada: ela retorna apenas `lessonPlan`, sem duplicar o Material de Mediação, e só é aceita se alcançar o piso ou crescer substancialmente. Se a resposta vier absurdamente curta — por exemplo, uma aula de algumas dezenas de palavras — o sistema faz um único **resgate de saída** com orçamento ampliado. Uma correção que acrescente apenas poucas palavras não é aceita como solução.
 
 Na classificação, **insuficiente** fica reservado para texto criticamente curto — abaixo de aproximadamente 75% do piso — ou para uma unidade sem núcleo mínimo de conteúdo desenvolvido. Uma aula com texto desenvolvido, ainda que esteja abaixo do piso completo ou pendente de título específico, referências, recursos, avaliação ou revisão pedagógica, fica em **revisão recomendada**; essas pendências não reduzem artificialmente a contagem de palavras. A aplicação continua tentando reparar automaticamente o déficit textual antes de devolver a semana.
 
@@ -767,7 +768,7 @@ lessonPlan obrigatório:
 
 Regras de escrita:
 - escreva em {input.language}, com linguagem humana, clara, específica, variada e pedagogicamente provocadora;
-- produza pelo menos `{targetWords}` palavras úteis no conjunto do texto do aluno. Essa é uma meta mínima operacional, não uma estimativa; conte e amplie antes de devolver o JSON. A aula do aluno tem prioridade absoluta sobre o guia do professor;
+- produza pelo menos `{targetWords}` palavras úteis no conjunto do texto do aluno. Essa é uma meta mínima operacional, não uma estimativa; conte e amplie antes de devolver o JSON. A aula do aluno tem prioridade absoluta sobre o Material de Mediação;
 - inclua pelo menos {profile.minimumReferences} referências, sendo {profile.primarySourcesRequired} acadêmica(s) ou oficial(is), sem inventar dados bibliográficos; use a política: {profile.sourcePolicy};
 - {counterpointRule}; {comparisonRule}; {caseStudyRule};
 - conecte o tema à realidade do público ({input.audience}) e do nível ({input.level}); use os exemplos, recortes regionais e instituições fornecidos no briefing;
@@ -900,7 +901,7 @@ A semana {weekNumber} abaixo foi rejeitada por insuficiência textual. Reescreva
 Problemas estruturais detectados: {quality.issues separados por "; " ou "conteúdo abaixo do padrão"}.
 Problemas acadêmicos detectados: {academicReview.issues.description separados por "; " ou "nenhum relatório disponível"}.
 
-Entregue somente { "lessonPlan": { ... } }. Não gere blocks nem teacherGuide; o servidor preservará ou reconstruirá o guia do professor. O lessonPlan precisa ter título específico, welcome, 4–8 objetivos observáveis, pelo menos {requiredSectionCount} seções com aproximadamente {sectionTargetWords} palavras cada, exemplos/caso/contraponto, synthesis, nextWeekConnection, glossary, references estruturadas, claimEvidence, assessment com 6 questões e timePlan. A meta mínima é {minimumWords} palavras úteis. Não invente URLs ou referências verificadas; use searchQuery para recursos sem link. Preserve o mapa de evidências e marque toda pendência como needs-human-review.
+Entregue somente { "lessonPlan": { ... } }. Não gere blocks nem teacherGuide; o servidor preservará ou reconstruirá o Material de Mediação. O lessonPlan precisa ter título específico, welcome, 4–8 objetivos observáveis, pelo menos {requiredSectionCount} seções com aproximadamente {sectionTargetWords} palavras cada, exemplos/caso/contraponto, synthesis, nextWeekConnection, glossary, references estruturadas, claimEvidence, assessment com 6 questões e timePlan. A meta mínima é {minimumWords} palavras úteis. Não invente URLs ou referências verificadas; use searchQuery para recursos sem link. Preserve o mapa de evidências e marque toda pendência como needs-human-review.
 
 Semana a revisar:
 {raw.lessonPlan ou raw completo em JSON indentado}
@@ -995,7 +996,7 @@ Crie uma sessão quando houver uma experiência hands-on que mereça encontro e 
 
 Não crie uma webprática apenas para preencher o formulário. É correto ter semanas sem prática.
 
-> **Regra de separação:** nada da webprática entra no texto-base, nas atividades, nos blocos ou no `.aula.json` do aluno. O projeto fica em `teacherGuide.webPracticeProjects`, no PDF do professor e em um DOCX editável independente.
+> **Regra de separação:** nada da webprática entra no texto-base, nas atividades, nos blocos ou no `.aula.json` do aluno. O projeto fica em `teacherGuide.webPracticeProjects`, no Material de Mediação em PDF e em um DOCX editável independente.
 
 ### 11.2 Como preencher uma prática
 
@@ -1300,13 +1301,13 @@ Use essa opção quando quiser:
 - fazer uma correção manual;
 - testar um conteúdo antes de exportar o curso inteiro.
 
-### 16.2 Guia do professor PDF
+### 16.2 Material de Mediação PDF
 
-O botão **Guia do professor PDF** baixa um documento separado para leitura e mediação. Ele não deve ser aberto como aula no Aula Studio.
+O botão **Material de Mediação PDF** baixa um documento separado para leitura e mediação. Ele não deve ser aberto como aula no Aula Studio. Em cada semana, o material apresenta duas versões das mensagens aos estudantes: uma para WhatsApp e outra para Mensagens do Moodle. O teor pedagógico é equivalente, mas a redação, o tamanho e o grau de informalidade são próprios de cada canal. Antes do envio, confira nomes, datas, links, horários e o que de fato foi configurado no curso.
 
 ### 16.3 Pacote completo ZIP
 
-O painel **Webpráticas programadas** permite baixar o DOCX editável de cada sessão. O botão **Pacote completo ZIP** reúne todas as semanas, o Planejamento Geral, o PDF do professor e as webpráticas em DOCX, Markdown, JSON e arquivos auxiliares.
+O painel **Webpráticas programadas** permite baixar o DOCX editável de cada sessão. O botão **Pacote completo ZIP** reúne todas as semanas, o Planejamento Geral, o Material de Mediação em PDF e as webpráticas em DOCX, Markdown, JSON e arquivos auxiliares.
 
 Use o ZIP para arquivar a versão gerada, transferir o projeto ou manter uma cópia antes da edição no Aula Studio.
 
@@ -1352,7 +1353,7 @@ semana-01-gestao-educacional.aula.json
 
 Não selecione:
 
-- o PDF do professor;
+- o Material de Mediação em PDF;
 - o ZIP inteiro;
 - `planejamento-geral.json`;
 - `pacote.json` de uma webprática;
@@ -1636,7 +1637,7 @@ Não use o conteúdo estrutural do fallback como versão final de uma disciplina
 | Webprática apareceu no JSON do aluno | Arquivo antigo ou contrato alterado manualmente | Gere novamente e confirme `lessonPlan.webPractices: []`; o roteiro correto está no DOCX separado |
 | DOCX não baixa | Backend Vercel não está publicado ou o acesso foi recusado | Confira `/api/health`, o código de acesso e faça Redeploy; use o ZIP como alternativa |
 | ZIP não é uma aula SCORM | O ZIP do Gerador é um pacote de autoria | Abra o JSON no Aula Studio e exporte SCORM depois |
-| PDF abre, mas não no Aula Studio | PDF é o guia do professor | Use o JSON `.aula.json` para abrir no editor |
+| PDF abre, mas não no Aula Studio | PDF é o Material de Mediação | Use o JSON `.aula.json` para abrir no editor |
 
 ### 22.1 Erro 404 ao rodar localmente
 
@@ -1729,7 +1730,7 @@ A chave da OpenAI continua protegida; o Gerador usa apenas o backend para fazer 
 
 ### Professor e publicação
 
-- [ ] O PDF do professor foi lido.
+- [ ] O Material de Mediação em PDF foi lido.
 - [ ] O JSON foi aberto no Aula Studio.
 - [ ] A aula foi revisada visualmente.
 - [ ] O SCORM foi exportado pelo Aula Studio.
@@ -1899,7 +1900,7 @@ Pode escolher uma preferência, mas a aplicação trata essa escolha como orient
 | Crossref | Serviço de metadados bibliográficos usado para pesquisa de referências |
 | JSON | Formato estruturado usado para transportar a aula |
 | JSON do aluno | Arquivo semanal que deve ser aberto no Aula Studio |
-| Guia do professor | Documento de mediação pedagógica exportado em PDF |
+| Material de Mediação | Documento de mediação pedagógica exportado em PDF |
 | OpenAlex | Catálogo público usado como fallback quando o Crossref retorna poucos candidatos |
 | Planejamento Geral | Resumo agregado das semanas, tempos, categorias e pendências |
 | SCORM | Pacote de conteúdo rastreável usado pelo Moodle |
