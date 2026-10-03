@@ -243,8 +243,20 @@ body.welcome-active{overflow:hidden}
 .welcome-development-credit small{color:#cbd5e4;font-size:10px;line-height:1.35}
 .welcome-development-credit>a{display:inline-flex;margin-top:9px;color:#e1c986;font-size:10px;font-weight:600;letter-spacing:.04em;text-decoration:underline;text-decoration-color:rgba(225,201,134,.45);text-underline-offset:4px}
 .welcome-development-credit em{display:block;margin-top:7px;color:#91a0b4;font-family:var(--mono);font-size:8px;font-style:normal;letter-spacing:.04em}
-.welcome-journey{max-width:270px;align-self:flex-end;color:#cbd5e4;font-size:11px;line-height:1.5}
-.welcome-journey p{margin:0;color:#d3b56e;font-weight:600;letter-spacing:.2em;text-transform:uppercase}
-.welcome-journey span{display:block;margin-top:8px}
 @media(max-width:860px){.welcome-institutional-signature{gap:15px 18px}.welcome-hero-top{gap:20px}.welcome-inovalab-signature{width:170px}}
-@media(max-width:620px){.welcome-institutional-signature{align-items:flex-start;gap:14px}.welcome-signature-divider{display:none}.welcome-inovalab-signature{width:165px;height:48px}.welcome-hero-footer{flex-direction:column;gap:20px}.welcome-journey{align-self:flex-start;max-width:290px}.welcome-development-credit{padding-left:12px}}
+@media(max-width:620px){.welcome-institutional-signature{align-items:flex-start;gap:14px}.welcome-signature-divider{display:none}.welcome-inovalab-signature{width:165px;height:48px}}
+
+
+/* Capa: recuperação e cabeçalho pertencem ao workspace, não à tela de entrada. */
+body.welcome-active .site-header,
+body.welcome-active .recovery-dock{visibility:hidden;pointer-events:none}
+body.welcome-active .recovery-dock{display:none!important}
+
+/* Capa: recursos à esquerda e autoria à direita, divididos por uma linha dourada. */
+.welcome-hero-footer{display:block}
+.welcome-footer-grid{display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);align-items:start;gap:clamp(20px,3vw,34px);width:100%}
+.welcome-footer-grid .welcome-signals{margin:0;align-self:start}
+.welcome-footer-divider{display:block;width:1px;min-height:142px;background:rgba(211,181,110,.78)}
+.welcome-footer-grid .welcome-development-credit{max-width:none;border-left:0;padding-left:0;align-self:start}
+@media(max-width:860px){.welcome-footer-grid{gap:22px}}
+@media(max-width:620px){.welcome-footer-grid{grid-template-columns:1fr;gap:22px}.welcome-footer-divider{width:100%;height:1px;min-height:0}.welcome-footer-grid .welcome-development-credit{padding-top:0}}

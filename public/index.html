@@ -36,25 +36,27 @@
           <p class="eyebrow">PLANEJAMENTO PEDAGÓGICO COM IA</p>
           <h1 id="welcome-title">Do tema geral a uma trilha de aulas semanais.</h1>
           <p>Estruture cursos consistentes, escreva semanas com profundidade e prepare materiais prontos para revisão e publicação no Aula Studio.</p>
-          <div class="welcome-signals" aria-label="Recursos do Gerador de Aulas"><span><b>01</b> currículo com progressão</span><span><b>02</b> conteúdo-base desenvolvido</span><span><b>03</b> revisão antes da exportação</span></div>
         </div>
         <div class="welcome-hero-footer">
-          <aside class="welcome-development-credit" aria-label="Créditos de desenvolvimento">
-            <p>Desenvolvido pelo</p>
-            <strong>Prof. Rogério G. Bittencourt</strong>
-            <div><img src="./brand/inovalab-symbol.png" alt="Logotipo do INOVALAB" /><span><b>INOVALAB</b><small>Laboratório de Inteligência Artificial, Inovação e Criatividade</small></span></div>
-            <a href="https://github.com/rgbittencourt" target="_blank" rel="noreferrer">github.com/rgbittencourt</a>
-            <em>v0.1.0</em>
-          </aside>
-          <div class="welcome-journey"><p>Uma trilha, um percurso</p><span>Identidade, conteúdo-base, recursos e publicação em um fluxo conectado.</span></div>
+          <div class="welcome-footer-grid">
+            <div class="welcome-signals" aria-label="Recursos do Gerador de Aulas"><span><b>01</b> currículo com progressão</span><span><b>02</b> conteúdo-base desenvolvido</span><span><b>03</b> revisão antes da exportação</span></div>
+            <span class="welcome-footer-divider" aria-hidden="true"></span>
+            <aside class="welcome-development-credit" aria-label="Créditos de desenvolvimento">
+              <p>Desenvolvido pelo</p>
+              <strong>Prof. Rogério G. Bittencourt</strong>
+              <div><img src="./brand/inovalab-symbol.png" alt="Logotipo do INOVALAB" /><span><b>INOVALAB</b><small>Laboratório de Inteligência Artificial, Inovação e Criatividade</small></span></div>
+              <a href="https://github.com/rgbittencourt" target="_blank" rel="noreferrer">github.com/rgbittencourt</a>
+              <em>v0.1.0</em>
+            </aside>
+          </div>
         </div>
       </div>
       <div class="welcome-auth">
-        <div class="welcome-auth-heading"><p class="eyebrow">ACESSO AO GERADOR</p><h2>Entre para começar</h2><p>Por enquanto, identifique o autor e a instituição. O código é usado somente quando a versão publicada solicitar acesso à IA.</p></div>
+        <div class="welcome-auth-heading"><p class="eyebrow">ACESSO AO GERADOR</p><h2>Entre para começar</h2><p>Preencha os três campos para identificar a autoria, a instituição e liberar o uso da IA nesta versão.</p></div>
         <form id="welcome-form" class="welcome-form">
           <label class="welcome-field"><span>Nome <b>*</b></span><input id="welcome-author" type="text" autocomplete="name" required placeholder="Nome do autor" /></label>
-          <label class="welcome-field"><span>Instituição</span><input id="welcome-institution" type="text" autocomplete="organization" placeholder="Nome da instituição" /></label>
-          <label class="welcome-field"><span>Código de acesso de IA</span><input id="welcome-access-code" type="password" autocomplete="current-password" placeholder="Informe se a Vercel solicitar" /><small>Este não é o segredo da OpenAI. O código nunca é salvo no backup local.</small></label>
+          <label class="welcome-field"><span>Instituição <b>*</b></span><input id="welcome-institution" type="text" autocomplete="organization" required placeholder="Nome da instituição" /></label>
+          <label class="welcome-field"><span>Código de acesso de IA <b>*</b></span><input id="welcome-access-code" type="password" autocomplete="current-password" required placeholder="Código definido para esta versão" /><small>Este não é o segredo da OpenAI. O código nunca é salvo no backup local.</small></label>
           <button class="button button-primary welcome-submit" type="submit"><span>Entrar no Gerador</span><span class="button-arrow">→</span></button>
         </form>
         <p class="welcome-auth-note"><span>✦</span> Seus dados de autoria serão usados nos arquivos gerados e no guia do professor.</p>

@@ -164,8 +164,9 @@ function enterWorkspace() {
 }
 
 function initializeWelcome() {
-  const draft = readDraft();
-  if (draft) showRecoveryDock(true);
+  // A capa é uma entrada limpa. O dock de recuperação só aparece depois que
+  // o usuário conclui o cadastro inicial e entra no workspace.
+  hideRecoveryDock();
 }
 
 function enterFromWelcome(event) {
@@ -173,8 +174,10 @@ function enterFromWelcome(event) {
   const author = $("#welcome-author")?.value.trim() || "";
   const institution = $("#welcome-institution")?.value.trim() || "";
   const accessCode = $("#welcome-access-code")?.value || "";
-  if (!author) {
-    $("#welcome-author")?.focus();
+  const requiredFields = [[author, "#welcome-author"], [institution, "#welcome-institution"], [accessCode.trim(), "#welcome-access-code"]];
+  const missingField = requiredFields.find(([value]) => !value);
+  if (missingField) {
+    $(missingField[1])?.focus();
     return;
   }
   $("#author").value = author;
