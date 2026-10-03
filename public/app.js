@@ -27,6 +27,11 @@ function enhanceLayout() {
   if (!sidebar || !formColumn || sidebar.dataset.enhanced === "true") return;
   sidebar.dataset.enhanced = "true";
   sidebar.classList.add("project-sidebar");
+  const workspaceGrid = formColumn.parentElement;
+  const intro = $(".intro");
+  if (intro && intro.parentElement !== formColumn) formColumn.prepend(intro);
+  const resultsSection = $("#results-section");
+  if (resultsSection && resultsSection.parentElement !== formColumn) formColumn.appendChild(resultsSection);
 
   const panels = [...formColumn.querySelectorAll(":scope > .panel")];
   const navItems = [];
@@ -71,13 +76,21 @@ function enhanceLayout() {
   navigation.className = "sidebar-navigation";
   navigation.setAttribute("aria-label", "Navegação do planejamento");
   navigation.innerHTML = '<p class="sidebar-label">NAVEGAR PELO PROJETO</p>' + navItems.map((item) => `<a href="#${item.id}" data-scroll-to="${item.id}">${escapeHtml(item.title)}<span>→</span></a>`).join("") + '<a href="#results-load" data-scroll-to="results-load">Carga por atividade<span>→</span></a><a href="#results-breakdown" data-scroll-to="results-breakdown">Carga aberta por atividade<span>→</span></a><a href="#results-review" data-scroll-to="results-review">Checklists<span>→</span></a><a href="#results-weeks" data-scroll-to="results-weeks">Semanas planejadas<span>→</span></a>';
-  actions.after(navigation);
+  const navigationColumn = document.createElement("aside");
+  navigationColumn.className = "navigation-column";
+  navigationColumn.setAttribute("aria-label", "Navegação do planejamento");
+  navigationColumn.appendChild(navigation);
+  workspaceGrid?.appendChild(navigationColumn);
   navigation.querySelectorAll("[data-scroll-to]").forEach((link) => link.addEventListener("click", (event) => {
     const target = document.getElementById(link.dataset.scrollTo);
     if (!target) return;
     event.preventDefault();
     for (let ancestor = target; ancestor; ancestor = ancestor.parentElement) if (ancestor.tagName === "DETAILS") ancestor.open = true;
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    const scrollContainer = target.closest(".form-column");
+    if (scrollContainer) {
+      const top = scrollContainer.scrollTop + target.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top - 12;
+      scrollContainer.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    } else target.scrollIntoView({ behavior: "smooth", block: "start" });
   }));
 
   const weekGrid = $("#week-grid");
@@ -167,6 +180,8 @@ function hideRecoveryDock() {
 function enterWorkspace() {
   $("#welcome-screen")?.classList.add("hidden");
   document.body.classList.remove("welcome-active");
+  document.body.classList.add("workspace-active");
+  document.documentElement.classList.add("workspace-active");
   const draft = readDraft();
   if (draft) showRecoveryDock(true);
   else hideRecoveryDock();
@@ -1137,7 +1152,7 @@ function reviewRowsMarkup(kind, items, reviewMarks) {
     const scope = item.weekNumber ? `Semana ${item.weekNumber}` : "Curso";
     const active = state.activeReviewGuidance?.kind === kind && state.activeReviewGuidance.key === key;
     const label = item.label || item.title || "Item de revisão";
-    return `<div class="review-item"><label class="review-row ${checked ? "is-marked" : ""}"><input type="checkbox" data-review-kind="${escapeHtml(kind)}" data-review-key="${escapeHtml(key)}" ${checked ? "checked" : ""} /><span><strong>${escapeHtml(scope)} · ${escapeHtml(label)}</strong><small>${escapeHtml(item.detail || item.status || stateLabel)}${override !== undefined ? ` · ${stateLabel}` : ""}</small></span></label><button class="review-guidance-toggle" type="button" data-review-guidance-kind="${escapeHtml(kind)}" data-review-guidance-key="${escapeHtml(key)}" aria-expanded="${active ? "true" : "false"}">${active ? "Ocultar orientação" : "Ver o que conferir e o prompt"}</button>${reviewGuidanceMarkup(kind, item, key, active)}</div>`;
+    return `<div class="review-item"><label class="review-row ${checked ? "is-marked" : ""}"><input type="checkbox" data-review-kind="${escapeHtml(kind)}" data-review-key="${escapeHtml(key)}" ${checked ? "checked" : ""} /><span class="review-row-copy" role="button" tabindex="0" data-review-guidance-kind="${escapeHtml(kind)}" data-review-guidance-key="${escapeHtml(key)}" aria-expanded="${active ? "true" : "false"}"><strong>${escapeHtml(scope)} · ${escapeHtml(label)}</strong><small>${escapeHtml(item.detail || item.status || stateLabel)}${override !== undefined ? ` · ${stateLabel}` : ""}</small></span></label>${reviewGuidanceMarkup(kind, item, key, active)}</div>`;
   }).join("");
 }
 
@@ -1152,7 +1167,6 @@ function toggleReviewMark(kind, key, checked) {
   const pageScroll = window.scrollY;
   const list = document.querySelector(`input[data-review-kind="${CSS.escape(kind)}"]`)?.closest(".review-panel")?.querySelector(".review-list");
   const listScroll = list?.scrollTop || 0;
-  state.activeReviewGuidance = { kind, key };
   state.reviewMarks = state.reviewMarks || createReviewMarks();
   state.reviewMarks[kind] = state.reviewMarks[kind] || {};
   state.reviewMarks[kind][key] = checked;
@@ -1287,7 +1301,11 @@ function renderGeneralPlan(plan) {
   container.innerHTML = `${overviewMarkup}${timeBreakdownMarkup}${checklistsMarkup}`;
   organizeResultSectors(container, resultOpenStates);
   container.querySelectorAll("[data-review-kind]").forEach((checkbox) => checkbox.addEventListener("change", () => toggleReviewMark(checkbox.dataset.reviewKind, checkbox.dataset.reviewKey, checkbox.checked)));
-  container.querySelectorAll("[data-review-guidance-kind]").forEach((button) => button.addEventListener("click", () => toggleReviewGuidance(button.dataset.reviewGuidanceKind, button.dataset.reviewGuidanceKey)));
+  container.querySelectorAll("[data-review-guidance-kind]").forEach((copy) => {
+    const openGuidance = (event) => { event.preventDefault(); event.stopPropagation(); toggleReviewGuidance(copy.dataset.reviewGuidanceKind, copy.dataset.reviewGuidanceKey); };
+    copy.addEventListener("click", openGuidance);
+    copy.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") openGuidance(event); });
+  });
   container.querySelectorAll(".review-copy-prompt").forEach((button) => button.addEventListener("click", () => copyReviewPrompt(button.dataset.reviewPrompt || "", button)));
   container.querySelectorAll(".review-use-prompt").forEach((button) => button.addEventListener("click", () => useReviewPrompt(button.dataset.reviewWeek, button.dataset.reviewPrompt || "")));
   container.querySelectorAll(".webpractice-download").forEach((button) => button.addEventListener("click", () => downloadWebPractice(button.dataset.practiceId)));
