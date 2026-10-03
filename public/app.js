@@ -8,9 +8,9 @@ const DRAFT_MAX_AGE_DAYS = 30;
 let saveTimer = null;
 
 function syncRecoveryLayout() {
-  const dock = $("#recovery-dock");
-  const height = dock && !dock.classList.contains("hidden") ? Math.ceil(dock.getBoundingClientRect().height) : 0;
-  document.documentElement.style.setProperty("--recovery-stack-height", `${height}px`);
+  const header = $(".site-header");
+  const height = header ? Math.ceil(header.getBoundingClientRect().height) : 72;
+  document.documentElement.style.setProperty("--site-header-height", `${height}px`);
 }
 
 function splitLines(value) { return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : String(value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
