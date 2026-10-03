@@ -302,8 +302,12 @@ function startNewProject(event) {
   document.body.classList.add("workspace-active");
   document.documentElement.classList.add("workspace-active");
   stabilizeWorkspaceLayout();
-  if (readDraft()) offerDraftRecovery();
-  else hideRecoveryDock();
+  if (readDraft()) {
+    offerDraftRecovery();
+  } else {
+    showRecoveryDock(true);
+    setSaveStatus("Novo projeto iniciado", "Nenhum rascunho automático foi encontrado nesta sessão. Use Restaurar backup para importar um arquivo salvo.", "success");
+  }
   $("#course-title")?.focus({ preventScroll: true });
 }
 
