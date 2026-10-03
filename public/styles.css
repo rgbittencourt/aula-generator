@@ -398,3 +398,7 @@ body.welcome-active .recovery-dock{display:none!important}
   .page-shell{max-width:1600px}
   .workspace-grid{grid-template-columns:clamp(250px,20vw,300px) minmax(560px,1fr) clamp(230px,18vw,280px);gap:24px}
 }
+
+
+/* Mesmo acabamento coral nos três painéis laterais. */
+.project-sidebar>.summary-card{border-top:3px solid var(--coral)}
