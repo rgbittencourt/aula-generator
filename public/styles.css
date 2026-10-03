@@ -480,6 +480,11 @@ body.welcome-active .recovery-dock{display:none!important}
   .navigation-column.is-collapsed .drawer-toggle-label{writing-mode:initial;transform:none}
 }
 
+/* O workspace retomado não deve ficar colado à linha inferior do cabeçalho fixo. */
+@media(min-width:901px){
+  body.workspace-active .workspace-grid{margin-top:16px}
+}
+
 /* Bloco interno da prévia: mensagens de mediação não fazem parte do JSON do aluno. */
 .reader-mediation{margin:26px 0;padding:18px;border:1px solid #e8c7b9;border-left:3px solid var(--coral);border-radius:12px;background:#fff8f5}
 .reader-mediation-label{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--coral-dark);font-weight:500}
