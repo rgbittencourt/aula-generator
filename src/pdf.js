@@ -56,7 +56,7 @@ const reviewStatus = (value) => ({
   "not-run": "Ainda não executada"
 }[value] || display(value) || "Não informado");
 
-export async function createMediationMaterialPdf(input, teacherGuides = [], generalPlan = null) {
+export async function createMediationMaterialPdf(input, teacherGuides = [], generalPlan = null, options = {}) {
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -233,14 +233,19 @@ export async function createMediationMaterialPdf(input, teacherGuides = [], gene
     }
   };
 
+  const explicitScope = Boolean(options.explicitScope);
+  const releasedWeekIndexes = Array.isArray(options.releasedWeekIndexes) ? options.releasedWeekIndexes : teacherGuides.map((_, index) => index);
+  const releasedCount = explicitScope ? releasedWeekIndexes.length : teacherGuides.length;
+
   // Capa e instruções de uso.
   newPage();
   y -= 22;
   page.drawText("Material de Mediação", { x: margin, y, size: 29, font: bold, color: navy });
   y -= 41;
   paragraph(input.title || "Curso sem título", { font: italic, size: 14, color: coral, after: 12 });
-  paragraph(`Público: ${input.audience || "não informado"}  |  Nível: ${input.level || "não informado"}  |  ${input.weeks || teacherGuides.length} semana(s)`, { size: 9.2, color: muted, after: 14 });
-  callout("Como usar este material", "Use este PDF para preparar, acompanhar e revisar a mediação da semana. Primeiro leia a visão geral; depois, em cada semana, confira objetivos, percurso, avaliação, diferenciação, checklist e as mensagens de acompanhamento. Os arquivos .aula.json são do estudante e devem ser abertos no Aula Studio. As webpráticas têm roteiro DOCX próprio e não entram no texto-base semanal.", { background: paleCoral, border: rgb(0.95, 0.78, 0.70), titleColor: coral });
+  paragraph(`Público: ${input.audience || "não informado"}  |  Nível: ${input.level || "não informado"}  |  ${input.weeks || teacherGuides.length} semana(s) no curso  |  ${releasedCount} semana(s) liberada(s) neste material`, { size: 9.2, color: muted, after: 14 });
+  callout("Como usar este material", `${explicitScope ? `Este arquivo é um retrato atualizado do planejamento: contém a visão inicial do curso e somente as ${releasedCount} semana(s) liberada(s) manualmente. Ao liberar outra semana, gere novamente o Material de Mediação para complementar o documento.` : "Use este PDF para preparar, acompanhar e revisar a mediação do curso. A versão legada da chamada ainda inclui todas as semanas recebidas."} Primeiro leia a visão geral; depois, em cada semana liberada, confira objetivos, percurso, recursos, avaliação, diferenciação, checklist, carga e mensagens de acompanhamento. Os arquivos .aula.json são do estudante e devem ser abertos no Aula Studio. As webpráticas têm roteiro DOCX próprio e não entram no texto-base semanal.`, { background: paleCoral, border: rgb(0.95, 0.78, 0.70), titleColor: coral });
+  if (explicitScope && !releasedCount) callout("Nenhuma semana liberada ainda", "O Material de Mediação inicial foi criado somente com a identificação, os objetivos e a visão geral do curso. Libere uma semana após a conferência para acrescentar suas orientações, recursos, carga e mensagens.", { background: paleGold, border: rgb(0.90, 0.78, 0.42), titleColor: coral });
   if (input.academicProfile) {
     heading("Perfil acadêmico configurado", 2);
     row("Área", input.academicProfile.discipline, { fallback: "a definir" });

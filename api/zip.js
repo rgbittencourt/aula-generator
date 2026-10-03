@@ -3,6 +3,7 @@ import { createWeeksZip } from "../src/zip.js";
 import { normalizeCourseInput, normalizeWeeklyOutput, slugify, validateLesson } from "../src/aula-schema.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { validateCourse } from "../src/validation.js";
+import { scopeGeneralPlan, scopeMediationMaterial } from "../src/mediation-scope.js";
 
 export default async function handler(request, response) {
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
@@ -15,7 +16,12 @@ export default async function handler(request, response) {
     const teacherGuides = buildTeacherGuides(input, enrichedWeeks, request.body?.teacherGuides || []);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
     const validation = validateCourse(input, enrichedWeeks, workload, teacherGuides);
-    const buffer = await createWeeksZip(input, enrichedWeeks, { ...generalPlan, validation }, teacherGuides);
+    const scoped = scopeMediationMaterial(enrichedWeeks, teacherGuides, request.body?.weekApprovals);
+    const scopedPlan = scopeGeneralPlan({ ...generalPlan, validation }, scoped.releasedIndexes, scoped.explicit);
+    const buffer = await createWeeksZip(input, enrichedWeeks, scopedPlan, scoped.releasedGuides, {
+      explicitScope: scoped.explicit,
+      releasedWeekIndexes: scoped.releasedIndexes
+    });
     response.setHeader("Content-Type", "application/zip");
     response.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-semanas.zip"`);
     response.setHeader("Cache-Control", "no-store");

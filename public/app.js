@@ -196,6 +196,20 @@ function formatSavedAt(value) {
   return date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+function releasedWeekCount() {
+  return Object.values(state.weekApprovals || {}).filter(Boolean).length;
+}
+
+function updateMediationExportHint() {
+  const button = $("#teacher-pdf-button");
+  if (!button) return;
+  const count = releasedWeekCount();
+  button.title = count
+    ? `Baixar Material de Mediação atualizado com ${count} semana(s) liberada(s)`
+    : "Baixar Material de Mediação inicial; nenhuma semana foi liberada ainda";
+  button.dataset.releasedWeeks = String(count);
+}
+
 function depthFromCourseLevel(value) {
   const level = String(value || "").toLowerCase();
   if (level.includes("avanç") || level.includes("avanc")) return "avançado";
@@ -1260,6 +1274,25 @@ function renderLessonPreview(lesson, index) {
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
   $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${assessment}${alignment}${timeMarkup}${workload}${mediation}`;
   $("#lesson-reader").querySelectorAll(".mediation-regenerate").forEach((button) => button.addEventListener("click", () => regenerateMediationMessage(button)));
+  $("#lesson-reader").querySelectorAll(".mediation-message-card").forEach((card) => {
+    const channel = card.dataset.messageChannel;
+    const messageIndex = Number(card.dataset.messageIndex);
+    const currentGuide = state.teacherGuides[index] || (state.teacherGuides[index] = {});
+    const guideMessages = currentGuide.mediationMessages || (currentGuide.mediationMessages = { whatsapp: [], moodle: [] });
+    guideMessages[channel] ||= [];
+    const message = guideMessages[channel][messageIndex] || (guideMessages[channel][messageIndex] = {
+      timing: card.querySelector(".mediation-message-heading strong")?.textContent || `Momento ${messageIndex + 1}`,
+      relatedType: card.querySelector(".mediation-message-heading span")?.textContent || "mediação",
+      tone: card.querySelector(".mediation-message-tone")?.value || "",
+      instructions: card.querySelector(".mediation-message-instructions")?.value || "",
+      text: card.querySelector(".mediation-message-text")?.value || ""
+    });
+    if (!message) return;
+    [[".mediation-message-tone", "tone"], [".mediation-message-instructions", "instructions"], [".mediation-message-text", "text"]].forEach(([selector, key]) => card.querySelector(selector)?.addEventListener("input", (event) => {
+      message[key] = event.target.value;
+      scheduleSave();
+    }));
+  });
 }
 
 function openLessonPreview(index) {
@@ -1655,6 +1688,7 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider; state.validation = data.validation || data.generalPlan?.validation || null; state.reviewMarks = data.reviewMarks || state.reviewMarks || createReviewMarks();
   state.activeReviewGuidance = null;
   ["teacher-pdf-button", "zip-button"].forEach((id) => { const button = $("#" + id); if (button) button.disabled = false; });
+  updateMediationExportHint();
   refreshAiButtonAvailability();
   const approvedWeeks = data.weeks.filter((_, index) => Boolean(state.weekApprovals?.[index])).length;
   const pendingWeeks = data.weeks.length - approvedWeeks;
@@ -1730,6 +1764,7 @@ function toggleWeekApproval(index) {
   state.weekApprovals = state.weekApprovals || {};
   state.weekApprovals[index] = !state.weekApprovals[index];
   saveDraft("liberação manual");
+  updateMediationExportHint();
   renderWeeks({ input: state.input, weeks: state.weeks, workload: state.workload, generalPlan: state.generalPlan, teacherGuides: state.teacherGuides, provider: state.provider, validation: state.validation });
 }
 
@@ -1823,18 +1858,19 @@ async function downloadZip() {
   const button = $("#zip-button");
   button.disabled = true; button.classList.add("is-loading");
   try {
+    const currentInput = formInput();
     if (isGitHubPages) {
       if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
       const zip = new window.JSZip();
       state.weeks.forEach((lesson, index) => { const number = String(index + 1).padStart(2, "0"); zip.file(`semanas/semana-${number}-${slugify(lesson.meta?.title)}.aula.json`, JSON.stringify(toStudentLesson(lesson), null, 2)); });
       if (state.generalPlan) zip.file("planejamento-geral.json", JSON.stringify(state.generalPlan, null, 2));
       zip.file("professor/LEIA-ME.txt", "O Material de Mediação em PDF é gerado na versão Vercel com backend. Este modo público contém apenas o exemplo do aluno.");
-      downloadBlob(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), `${slugify(state.input.title)}-semanas.zip`);
+      downloadBlob(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), `${slugify(currentInput.title)}-semanas.zip`);
       return;
     }
-    const response = await fetch("/api/zip", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
+    const response = await fetch("/api/zip", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: currentInput, weeks: state.weeks, teacherGuides: state.teacherGuides, weekApprovals: state.weekApprovals }) });
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível montar o ZIP."); }
-    downloadBlob(await response.blob(), `${slugify(state.input.title)}-semanas.zip`);
+    downloadBlob(await response.blob(), `${slugify(currentInput.title)}-semanas.zip`);
   } catch (error) { showError(error.message); }
   finally { button.disabled = false; button.classList.remove("is-loading"); }
 }
@@ -1845,9 +1881,10 @@ async function downloadTeacherPdf() {
   const button = $("#teacher-pdf-button");
   button.disabled = true; button.classList.add("is-loading");
   try {
-    const response = await fetch("/api/teacher-pdf", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
+    const currentInput = formInput();
+    const response = await fetch("/api/teacher-pdf", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: currentInput, weeks: state.weeks, teacherGuides: state.teacherGuides, weekApprovals: state.weekApprovals }) });
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível criar o Material de Mediação em PDF."); }
-    downloadBlob(await response.blob(), `${slugify(state.input.title)}-material-de-mediacao.pdf`);
+    downloadBlob(await response.blob(), `${slugify(currentInput.title)}-material-de-mediacao.pdf`);
   } catch (error) { showError(error.message); }
   finally { button.disabled = false; button.classList.remove("is-loading"); }
 }

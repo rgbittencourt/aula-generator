@@ -638,6 +638,8 @@ As marcações são salvas no navegador e entram no **Baixar backup**. Elas não
 
 Se uma aula gerada anteriormente ainda mostrar a classificação antiga, clique em **Recalcular qualidade**. O recálculo usa as semanas já armazenadas e não consome uma nova chamada da IA. Após conferir integralmente uma semana, clique em **Liberar após conferência** no cartão correspondente. A prévia será atualizada para “conferida e liberada por você”, sem apagar as observações automáticas.
 
+O **Material de Mediação** acompanha esse estado salvo. Qualquer alteração no briefing, na aula, nos recursos, na carga, nas marcações ou nas mensagens é preservada no rascunho e aparece na próxima geração do PDF/ZIP. O material inicial contém a visão geral do curso; as seções semanais entram somente quando a semana correspondente for liberada. Se uma semana liberada for refeita ou editada, gere novamente o Material de Mediação para substituir a versão anterior pela versão atualizada. Semanas ainda pendentes permanecem fora do material docente exportado.
+
 O botão **Baixar DOCX** envia automaticamente o código de acesso preenchido no briefing. Se a aplicação indicar que o código é necessário, informe-o novamente no campo **Código de acesso da IA publicada** e tente o download outra vez.
 
 #### 10.1.4 Prompt de preenchimento assistido do briefing
@@ -1310,6 +1312,10 @@ Use essa opção quando quiser:
 ### 16.2 Material de Mediação PDF
 
 O botão **Material de Mediação PDF** baixa um documento separado para leitura e mediação. Ele não deve ser aberto como aula no Aula Studio. Em cada semana, o material apresenta duas versões das mensagens aos estudantes: uma para WhatsApp e outra para Mensagens do Moodle. O teor pedagógico é equivalente, mas a redação, o tamanho e o grau de informalidade são próprios de cada canal. Antes do envio, confira nomes, datas, links, horários e o que de fato foi configurado no curso.
+
+O PDF é gerado com a visão inicial atual e apenas as semanas liberadas manualmente. Se nenhuma semana estiver liberada, ele ainda pode ser baixado como material inicial, sem seções semanais. Depois de liberar ou modificar uma semana, baixe o PDF novamente; não reutilize uma cópia anterior como se ela estivesse atualizada.
+
+O download lê novamente os campos atuais do formulário no momento do clique. Portanto, se você corrigir o título, público, calendário, carga, recursos ou qualquer outra informação antes de baixar, a nova versão do Material de Mediação refletirá essa alteração junto com as semanas e mensagens já liberadas.
 
 ### 16.3 Pacote completo ZIP
 

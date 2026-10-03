@@ -13,6 +13,7 @@ import { createMediationMaterialPdf } from "./pdf.js";
 import { createWebPracticeDocx } from "./webpractice.js";
 import { validateCourse } from "./validation.js";
 import { assembleCourse } from "./course-assembly.js";
+import { scopeGeneralPlan, scopeMediationMaterial } from "./mediation-scope.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "..", "public");
@@ -175,7 +176,12 @@ app.post("/api/zip", async (req, res) => {
     const teacherGuides = buildTeacherGuides(input, enrichedWeeks, req.body?.teacherGuides || []);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
     const validation = validateCourse(input, enrichedWeeks, workload, teacherGuides);
-    const buffer = await createWeeksZip(input, enrichedWeeks, { ...generalPlan, validation }, teacherGuides);
+    const scoped = scopeMediationMaterial(enrichedWeeks, teacherGuides, req.body?.weekApprovals);
+    const scopedPlan = scopeGeneralPlan({ ...generalPlan, validation }, scoped.releasedIndexes, scoped.explicit);
+    const buffer = await createWeeksZip(input, enrichedWeeks, scopedPlan, scoped.releasedGuides, {
+      explicitScope: scoped.explicit,
+      releasedWeekIndexes: scoped.releasedIndexes
+    });
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-semanas.zip"`);
     res.send(buffer);
@@ -192,7 +198,11 @@ app.post("/api/teacher-pdf", async (req, res) => {
     const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
     const teacherGuides = buildTeacherGuides(input, enrichedWeeks, req.body?.teacherGuides || []);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
-    const buffer = await createMediationMaterialPdf(input, teacherGuides, generalPlan);
+    const scoped = scopeMediationMaterial(enrichedWeeks, teacherGuides, req.body?.weekApprovals);
+    const buffer = await createMediationMaterialPdf(input, scoped.releasedGuides, generalPlan, {
+      explicitScope: scoped.explicit,
+      releasedWeekIndexes: scoped.releasedIndexes
+    });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-material-de-mediacao.pdf"`);
     res.setHeader("Cache-Control", "no-store");

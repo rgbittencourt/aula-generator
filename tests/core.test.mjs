@@ -12,11 +12,27 @@ import { createTeacherGuidePdf } from "../src/pdf.js";
 import { toStudentLesson } from "../src/student-export.js";
 import { buildCourseProgression } from "../src/curriculum.js";
 import { measureLessonQuality, qualityTargets } from "../src/content-quality.js";
+import { scopeGeneralPlan, scopeMediationMaterial } from "../src/mediation-scope.js";
 
 function hasBlock(lesson, type) {
   const visit = (blocks) => (blocks || []).some((block) => block.type === type || visit(block.props?.children));
   return visit(lesson.blocks);
 }
+
+test("Material de Mediação inicial não expõe semanas pendentes e cresce ao liberar semanas", () => {
+  const weeks = [{ meta: { weekNumber: 1 } }, { meta: { weekNumber: 2 } }, { meta: { weekNumber: 3 } }];
+  const guides = [{ weekNumber: 1 }, { weekNumber: 2 }, { weekNumber: 3 }];
+  const initial = scopeMediationMaterial(weeks, guides, {});
+  assert.deepEqual(initial.releasedIndexes, []);
+  assert.equal(initial.releasedGuides.length, 0);
+  const released = scopeMediationMaterial(weeks, guides, { 1: true });
+  assert.deepEqual(released.releasedIndexes, [1]);
+  assert.equal(released.releasedGuides[0].weekNumber, 2);
+  const plan = scopeGeneralPlan({ course: { weeks: 3 }, weeks: [{ weekNumber: 1 }, { weekNumber: 2 }, { weekNumber: 3 }], progression: [{ weekNumber: 1 }, { weekNumber: 2 }, { weekNumber: 3 }] }, released.releasedIndexes, released.explicit);
+  assert.deepEqual(plan.weeks.map((item) => item.weekNumber), [2]);
+  assert.deepEqual(plan.progression.map((item) => item.weekNumber), [2]);
+  assert.deepEqual(plan.mediationScope.releasedWeeks, [2]);
+});
 
 test("normaliza briefing com calendário real e webpráticas independentes", () => {
   const input = normalizeCourseInput({ title: "Cidades sustentáveis", weeks: "3", hoursPerWeek: "2.5", calendarMode: "calendar", startDate: "2026-10-05", objectives: "Analisar\nAplicar", imageLinks: "https://example.org/mapa.png", webPracticeEnabled: true, webPractices: [{ title: "Mapa do bairro", type: "Pesquisa orientada", moments: "Semana 2", objective: "Analisar" }, { title: "Debate", type: "Debate ou seminário", moments: "Semana 3", objective: "Avaliar" }], materials: [{ title: "Texto-base", type: "Texto-base", objective: "Preparar a análise", alignment: "Mobilidade urbana" }] });

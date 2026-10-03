@@ -5,7 +5,7 @@ import { createMediationMaterialPdf } from "./pdf.js";
 import { collectWebPracticeProjects } from "./teacher-guide.js";
 import { toStudentLesson } from "./student-export.js";
 
-export async function createWeeksZip(input, weeks, generalPlan = null, teacherGuides = []) {
+export async function createWeeksZip(input, weeks, generalPlan = null, teacherGuides = [], options = {}) {
   const zip = new JSZip();
   const folder = zip.folder("semanas");
   for (const [index, lesson] of weeks.entries()) {
@@ -14,7 +14,7 @@ export async function createWeeksZip(input, weeks, generalPlan = null, teacherGu
     folder.file(`semana-${number}-${slug}.aula.json`, JSON.stringify(toStudentLesson(lesson), null, 2));
   }
   if (generalPlan) zip.file("planejamento-geral.json", JSON.stringify(generalPlan, null, 2));
-  const pdf = await createMediationMaterialPdf(input, teacherGuides, generalPlan);
+  const pdf = await createMediationMaterialPdf(input, teacherGuides, generalPlan, options);
   zip.file("professor/material-de-mediacao.pdf", pdf);
   const practices = collectWebPracticeProjects(input, teacherGuides);
   createWebPracticeFiles(input, practices).forEach(({ path, content }) => zip.file(path, content));
