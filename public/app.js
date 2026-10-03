@@ -178,6 +178,17 @@ function resetWorkspaceScroll() {
   document.querySelectorAll(".summary-column, .form-column, .navigation-column").forEach((column) => { column.scrollTop = 0; column.scrollLeft = 0; });
 }
 
+function scrollFormTo(selector, behavior = "smooth") {
+  const target = typeof selector === "string" ? $(selector) : selector;
+  const container = target?.closest(".form-column");
+  if (!target || !container) {
+    target?.scrollIntoView({ behavior, block: "start" });
+    return;
+  }
+  const top = container.scrollTop + target.getBoundingClientRect().top - container.getBoundingClientRect().top - 12;
+  container.scrollTo({ top: Math.max(0, top), behavior });
+}
+
 function stabilizeWorkspaceLayout() {
   const apply = () => { document.activeElement?.blur?.(); window.scrollTo(0, 0); resetWorkspaceScroll(); syncRecoveryLayout(); };
   apply();
@@ -273,7 +284,10 @@ function enterWorkspace() {
   window.scrollTo(0, 0);
   resetWorkspaceScroll();
   const draft = readDraft();
-  if (draft) showRecoveryDock(true);
+  if (draft) {
+    showRecoveryDock(true);
+    updateDraftRecoveryCard(draft);
+  }
   else {
     showRecoveryDock(true);
     setSaveStatus("Backup e recuperação", "Nenhum rascunho automático foi encontrado. Use Restaurar backup para importar um arquivo salvo.", "success");
@@ -438,6 +452,7 @@ function saveDraft(reason = "") {
       setSaveStatus("Salvamento automático limitado", "O navegador não tem espaço disponível. Baixe um backup manual.", "warning");
       return;
     }
+    if (document.body.classList.contains("workspace-active")) updateDraftRecoveryCard(snapshot);
     const resultText = snapshot.results ? ` · ${snapshot.results.weeks.length} semana(s) preservada(s)` : "";
     setSaveStatus("Salvamento local ativo", `Último salvamento: ${formatSavedAt(snapshot.savedAt)}${resultText}`, "success");
   } catch {
@@ -469,14 +484,27 @@ function readDraft() {
 
 function hideDraftRecovery() { $("#draft-recovery")?.classList.add("hidden"); syncRecoveryLayout(); }
 
+function updateDraftRecoveryCard(draft = readDraft()) {
+  const section = $("#draft-recovery");
+  if (!section) return;
+  if (!draft) {
+    section.classList.add("hidden");
+    syncRecoveryLayout();
+    return;
+  }
+  const hasResults = Boolean(draft.results?.weeks?.length);
+  const title = section.querySelector("strong");
+  if (title) title.textContent = document.body.classList.contains("workspace-active") ? "Rascunho disponível neste navegador." : "Encontramos um planejamento salvo neste navegador.";
+  $("#draft-recovery-details").textContent = `Salvo em ${formatSavedAt(draft.savedAt)}${hasResults ? ` · ${draft.results.weeks.length} semana(s) gerada(s)` : " · briefing em andamento"}.`;
+  section.classList.remove("hidden");
+  syncRecoveryLayout();
+}
+
 function offerDraftRecovery() {
   const draft = readDraft();
   if (!draft) return;
   showRecoveryDock(true);
-  const hasResults = Boolean(draft.results?.weeks?.length);
-  $("#draft-recovery-details").textContent = `Salvo em ${formatSavedAt(draft.savedAt)}${hasResults ? ` · ${draft.results.weeks.length} semana(s) gerada(s)` : " · briefing em andamento"}.`;
-  $("#draft-recovery").classList.remove("hidden");
-  syncRecoveryLayout();
+  updateDraftRecoveryCard(draft);
   setSaveStatus("Planejamento recuperável encontrado", "Escolha Retomar planejamento ou descarte este rascunho.", "success");
 }
 
@@ -1728,7 +1756,7 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   renderGeneralPlan(data.generalPlan);
   renderWorkload(data.workload);
   saveDraft("resultado");
-  if (scrollToResults) $("#results-section").scrollIntoView({ behavior: "smooth", block: "start" });
+  if (scrollToResults) scrollFormTo("#results-section");
 }
 
 function downloadWeek(index) {
@@ -1765,7 +1793,7 @@ function toggleWeekApproval(index) {
   state.weekApprovals[index] = !state.weekApprovals[index];
   saveDraft("liberação manual");
   updateMediationExportHint();
-  renderWeeks({ input: state.input, weeks: state.weeks, workload: state.workload, generalPlan: state.generalPlan, teacherGuides: state.teacherGuides, provider: state.provider, validation: state.validation });
+  renderWeeks({ input: state.input, weeks: state.weeks, workload: state.workload, generalPlan: state.generalPlan, teacherGuides: state.teacherGuides, provider: state.provider, validation: state.validation }, { scrollToResults: false });
 }
 
 async function generateDistributed(input, accessCode, button) {
@@ -1900,7 +1928,7 @@ async function recalculateQuality() {
   try {
     const response = await fetch("/api/assemble-course", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
     const data = await readApiResponse(response, "Não foi possível recalcular a qualidade do curso.");
-    renderWeeks({ ...data, input: state.input });
+    renderWeeks({ ...data, input: state.input }, { scrollToResults: false });
     $("#result-alert").className = "result-alert";
     $("#result-alert").textContent = "Qualidade, checklist e carga recalculados sem nova chamada de IA.";
     $("#result-alert").classList.remove("hidden");
