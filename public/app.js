@@ -16,6 +16,10 @@ function syncRecoveryLayout() {
   document.documentElement.style.setProperty("--recovery-dock-height", `${dockHeight}px`);
 }
 
+function keepWorkspaceAtTop() {
+  if (document.body.classList.contains("workspace-active") && window.innerWidth >= 901 && window.scrollY) window.scrollTo(0, 0);
+}
+
 function splitLines(value) { return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : String(value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
 function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char])); }
 function formatDate(value) { return value ? value.split("-").reverse().join("/") : ""; }
@@ -187,6 +191,7 @@ function enterWorkspace() {
   document.body.classList.remove("welcome-active");
   document.body.classList.add("workspace-active");
   document.documentElement.classList.add("workspace-active");
+  window.scrollTo(0, 0);
   const draft = readDraft();
   if (draft) showRecoveryDock(true);
   else hideRecoveryDock();
@@ -1575,6 +1580,7 @@ $("#regenerate-week-button").addEventListener("click", regenerateSelectedWeek);
 $("#lesson-modal").addEventListener("click", (event) => { if (event.target.id === "lesson-modal") closeLessonPreview(); });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.previewIndex != null) closeLessonPreview(); });
 window.addEventListener("resize", syncRecoveryLayout);
+window.addEventListener("scroll", keepWorkspaceAtTop, { passive: true });
 $("#calendar-mode").addEventListener("change", () => { toggleCalendar(); scheduleSave(); });
 $("#weeks").addEventListener("input", () => { const resourcePlan = collectResourcePlan(); const compositionPlan = collectCompositionPlan(); renderResourcePlanWeeks(resourcePlan); renderCompositionPlanWeeks(compositionPlan); updateSummary(); updateProgress(); scheduleSave(); });
 $("#practice-enabled").addEventListener("change", () => { togglePractice(); scheduleSave(); });

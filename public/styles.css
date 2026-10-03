@@ -384,3 +384,10 @@ body.welcome-active .recovery-dock{display:none!important}
 @media(max-width:900px){
   .workspace-dock{position:relative;top:auto;margin:0 0 16px;padding:0 0 4px}
 }
+
+
+/* Fallback contra rolagem global residual: o workspace desktop fica preso à viewport. */
+@media(min-width:901px){
+  html:has(body:not(.welcome-active)),html:has(body:not(.welcome-active)) body{overflow:hidden}
+  html:has(body:not(.welcome-active)) .page-shell{height:100vh;overflow:hidden}
+}
