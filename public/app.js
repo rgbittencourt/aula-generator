@@ -124,6 +124,12 @@ function resetWorkspaceScroll() {
   document.querySelectorAll(".summary-column, .form-column, .navigation-column").forEach((column) => { column.scrollTop = 0; column.scrollLeft = 0; });
 }
 
+function stabilizeWorkspaceLayout() {
+  const apply = () => { document.activeElement?.blur?.(); window.scrollTo(0, 0); resetWorkspaceScroll(); syncRecoveryLayout(); };
+  apply();
+  requestAnimationFrame(apply);
+}
+
 function paragraphsMarkup(value) { return String(value ?? "").split(/\n\s*\n|\r?\n/).map((part) => readableText(part)).filter(Boolean).map((part) => `<p>${escapeHtml(part)}</p>`).join(""); }
 function slugify(value) { return String(value || "curso").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "curso"; }
 function downloadBlob(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
@@ -204,6 +210,7 @@ function enterWorkspace() {
   updateAcademicInheritance();
   updateSummary();
   updateProgress();
+  stabilizeWorkspaceLayout();
 }
 
 function initializeWelcome() {
@@ -443,6 +450,7 @@ function renderCompositionPlanWeeks(plan = {}) {
 
 function restoreSnapshot(snapshot) {
   if (!snapshot?.form) return;
+  document.activeElement?.blur?.();
   applyInputToForm(snapshot.form);
   state.reviewMarks = snapshot.results?.reviewMarks || snapshot.reviewMarks || createReviewMarks();
   state.weekApprovals = snapshot.results?.weekApprovals || snapshot.weekApprovals || {};
@@ -454,6 +462,7 @@ function restoreSnapshot(snapshot) {
     setSaveStatus("Briefing retomado", "Continue preenchendo; o salvamento automático está ativo.", "success");
   }
   showAssistantMessage("Planejamento recuperado. Confira o briefing e continue de onde parou.");
+  stabilizeWorkspaceLayout();
 }
 
 function downloadBackup() {
