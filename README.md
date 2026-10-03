@@ -106,7 +106,7 @@ Ao usar **Refazer esta semana com IA**, o sistema envia somente um briefing esse
 
 O fluxo começa pelo briefing, mas o resultado não é uma lista fixa de seções. A IA escolhe o arco didático que combina com o conteúdo: descoberta conceitual, estudo de caso, oficina aplicada, análise de dados, debate orientado, revisão e síntese, ou combinação justificada. Uma semana pode ter diagnóstico, vídeo, leitura, atividade ou quiz quando isso tiver função pedagógica; não é obrigatório repetir todos esses elementos em todas as semanas.
 
-Na interface, a capa exige o preenchimento de **Nome**, **Instituição** e **Código de acesso de IA** antes de entrar no workspace. O resumo compacto do projeto permanece no **menu lateral**, junto dos comandos **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade**, **Guia do professor PDF** e **Pacote completo ZIP**. O menu superior fixo, que aparece somente depois da entrada pela capa, traz o atalho branded **Abrir Aula Studio** em nova aba. Apenas **Identidade do curso** começa expandida; os demais setores do briefing e os setores do resultado começam recolhidos e podem ser abertos individualmente. A navegação lateral leva diretamente a **Carga por atividade**, **Checklists e progressão** e **Semanas planejadas**.
+Na interface, a capa exige o preenchimento de **Nome**, **Instituição** e **Código de acesso de IA** antes de entrar no workspace. O resumo compacto do projeto permanece no **menu lateral**, junto dos comandos **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade**, **Guia do professor PDF** e **Pacote completo ZIP**. O menu superior fixo, que aparece somente depois da entrada pela capa, traz o atalho branded **Abrir Aula Studio** em nova aba. Apenas **Identidade do curso** começa expandida; os demais setores do briefing começam recolhidos. Os quatro setores do resultado começam expandidos e podem ser recolhidos individualmente. A navegação lateral leva diretamente a **Carga por atividade**, **Carga aberta por atividade**, **Checklists** e **Semanas planejadas**. O cabeçalho permanece fixo no topo durante a rolagem e o painel de recuperação fica logo abaixo dele.
 
 A semana produzida é uma unidade completa: abertura, conteúdo desenvolvido, seções e subseções, exemplos, reflexões, recursos no ponto de uso, síntese, avaliação, conexão com a semana seguinte e cálculo posterior da carga. Vídeos, imagens, diagramas e leituras ficam associados ao trecho ou conceito que motivou seu uso. Cada recurso leva `sectionNumber` e um `bridgeParagraph`: um parágrafo que explica a ligação com o conceito naquele ponto, o que o estudante deve observar e por que o recurso é pertinente. A leitura do aluno não termina com uma galeria de links separada.
 
@@ -122,7 +122,7 @@ O checklist automático também verifica se cada vídeo, imagem ou leitura usado
 
 Se um resultado antigo ainda exibir a classificação anterior, use **Recalcular qualidade** na área de resultados. Essa operação apenas reconsolida as semanas e não chama a IA. Depois de conferir uma semana, use **Liberar após conferência** no cartão; a prévia passa a indicar que ela foi liberada manualmente, enquanto as observações automáticas permanecem visíveis como informação.
 
-O resultado também traz um checklist pedagógico: diagnóstico, checagens formativas, avaliação somativa com feedback, webprática completa quando houver, diferenciação, acessibilidade, recursos contextualizados e autoavaliação. Uma semana bloqueada deve ser refeita antes do uso no Aula Studio.
+O resultado agora organiza as conferências em quatro listas: **Checklist pedagógico** (diagnóstico, checagens formativas, avaliação somativa, webprática quando houver, diferenciação, acessibilidade, recursos contextualizados e autoavaliação), **Checklist acadêmico** (rigor, evidências, coerência conceitual e revisão crítica), **Checklist de recursos e acessibilidade** (links, duração/páginas, coerência, acessibilidade e licença) e **Checklist de qualidade e liberação** (suficiência textual, pendências críticas e situação de cada semana). Uma semana bloqueada deve ser refeita antes do uso no Aula Studio.
 
 ### Progressão longitudinal
 
@@ -156,7 +156,7 @@ O briefing possui um painel **Recursos e leituras por semana**. Nele, defina qua
 
 Essas metas entram no prompt semanal, na curadoria da IA e nas solicitações ao YouTube/Crossref. A pesquisa só insere URLs retornadas por provedores ou fornecidas no briefing; quando não há candidatos suficientes, a pendência fica marcada para revisão humana. Imagens continuam sendo pesquisadas como enriquecimento contextual, e todos os recursos selecionados viram blocos editáveis na prévia e no JSON do aluno.
 
-No **Planejamento geral**, o quadro **Carga aberta por atividade** mostra, em minutos e horas, o que veio do texto-base, de artigos/leituras obrigatórios, de leituras complementares, de vídeos obrigatórios ou extras, de imagens, quiz, fórum, revisão, projeto e webprática. A mesma separação aparece ao abrir **Ver aula**. Assim, a carga não fica escondida em um único total.
+No **Planejamento geral**, **Carga por atividade** resume as metas, o cálculo total, as categorias e o arco didático; já **Carga aberta por atividade** mostra, em minutos e horas, o que veio do texto-base, de artigos/leituras obrigatórios, de leituras complementares, de vídeos obrigatórios ou extras, de imagens, quiz, fórum, revisão, projeto e webprática. A mesma separação aparece ao abrir **Ver aula**. Assim, a carga não fica escondida em um único total.
 
 ### Composição editorial compatível com o Aula Studio
 
@@ -164,7 +164,7 @@ O painel **Composição da aula no Aula Studio** permite definir uma quantidade 
 
 Os blocos são contextualizados pela IA e posicionados na seção indicada, depois do texto que lhes dá sentido. O servidor materializa a propriedade `lessonPlan.composition` em blocos editáveis compatíveis com o Aula Studio; não são contados como texto-base. A prévia mostra cada bloco no ponto da seção e a carga aberta acrescenta o tempo estimado dos interativos.
 
-O checklist pedagógico exibe todos os itens, mas inicia marcados os que a análise automática aprovou. Ao desmarcar um item, ele passa a representar uma conferência/refação manual. A lista mantém a posição de rolagem e o foco após cada marcação, inclusive quando o item está distante do início.
+Os quatro checklists exibem todos os itens disponíveis e iniciam marcados os que a análise automática aprovou. Ao desmarcar um item, ele passa a representar uma conferência/refação manual. As listas mantêm a posição de rolagem e o foco após cada marcação, inclusive quando o item está distante do início; as marcações de recursos, revisão acadêmica e qualidade também entram no salvamento local e no backup.
 
 ## Separação aluno e professor
 

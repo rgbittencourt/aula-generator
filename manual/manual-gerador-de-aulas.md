@@ -239,9 +239,9 @@ O painel lateral mostra continuamente:
 - existência ou não de webpráticas;
 - estado geral do dimensionamento.
 
-Esse resumo é preliminar. O cálculo mais preciso acontece depois que o conteúdo e os recursos são gerados. Abaixo dele ficam as ações principais: **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade**, **Guia do professor PDF** e **Pacote completo ZIP**. Depois da capa, o menu superior fixo apresenta o atalho **Abrir Aula Studio**, com a marca do editor, em uma nova aba. Os campos Nome, Instituição e Código de acesso da capa começam vazios por decisão de privacidade, mas os três precisam ser preenchidos para entrar no workspace. A capa usa a assinatura institucional IFSC–INOVALAB e apresenta o crédito **Desenvolvido pelo Prof. Rogério G. Bittencourt**, com link para o perfil GitHub do autor.
+Esse resumo é preliminar. O cálculo mais preciso acontece depois que o conteúdo e os recursos são gerados. Abaixo dele ficam as ações principais: **Preencher vazios com IA**, **Gerar com IA**, **Recalcular qualidade**, **Guia do professor PDF** e **Pacote completo ZIP**. Depois da capa, o menu superior permanece fixo desde a entrada no workspace e apresenta o atalho **Abrir Aula Studio**, com a marca do editor, em uma nova aba. O painel de recuperação fica logo abaixo do cabeçalho e não permite que o conteúdo role por trás dele. Os campos Nome, Instituição e Código de acesso da capa começam vazios por decisão de privacidade, mas os três precisam ser preenchidos para entrar no workspace. A capa usa a assinatura institucional IFSC–INOVALAB e apresenta o crédito **Desenvolvido pelo Prof. Rogério G. Bittencourt**, com link para o perfil GitHub do autor.
 
-O menu lateral também oferece atalhos para **Carga por atividade**, **Checklists e progressão** e **Semanas planejadas**. No celular, ele passa para o alto da página.
+O menu lateral também oferece atalhos para **Carga por atividade**, **Carga aberta por atividade**, **Checklists** e **Semanas planejadas**. No celular, ele passa para o alto da página.
 
 ### 5.3 Seções numeradas
 
@@ -255,7 +255,7 @@ A tela divide o briefing em sete áreas recolhíveis. Somente **Identidade do cu
 6. **Webpráticas síncronas**
 7. **Materiais de apoio**
 
-Clique no cabeçalho de qualquer setor para recolhê-lo ou reabri-lo. Ao final ficam o resultado, a carga aberta por atividade, os checklists e a grade de semanas, também em setores recolhíveis.
+Clique no cabeçalho de qualquer setor para recolhê-lo ou reabri-lo. Ao final ficam quatro setores de resultado, todos inicialmente expandidos: **Carga por atividade**, **Carga aberta por atividade**, **Checklists** e **Semanas planejadas**. Cada um pode ser recolhido independentemente.
 
 ---
 
@@ -618,10 +618,14 @@ No painel **Webpráticas síncronas**, ative o recurso, informe a quantidade de 
 
 ### Como marcar o que já foi conferido
 
-Depois da geração, abra **Planejamento geral**. O painel apresenta duas listas:
+Depois da geração, abra **Planejamento geral**. O resultado apresenta quatro listas de conferência dentro do setor **Checklists**:
 
-- **Recursos que precisam de conferência**: marque a caixa depois de abrir o link, confirmar coerência com a semana, duração ou páginas, acessibilidade e licença/crédito;
-- **Checklist pedagógico**: todos os itens são exibidos. Os itens aprovados automaticamente pela IA já aparecem marcados; desmarque qualquer item que queira refazer ou revisar novamente. A mensagem “Atendido automaticamente pela IA” é o resultado da análise da aplicação; “Marcado por você” e “Desmarcado por você para refazer” são suas decisões manuais.
+- **Checklist pedagógico**: diagnóstico, checagens formativas, avaliação, diferenciação, acessibilidade, recursos contextualizados e autoavaliação;
+- **Checklist acadêmico**: rigor, evidências, coerência conceitual, fontes e pendências da revisão crítica;
+- **Checklist de recursos e acessibilidade**: abra cada link e confirme coerência com a semana, duração ou páginas, acessibilidade e licença/crédito;
+- **Checklist de qualidade e liberação**: suficiência textual, pendências críticas, revisão recomendada e situação de cada semana.
+
+Todos os itens são exibidos. Os itens aprovados automaticamente pela IA já aparecem marcados; desmarque qualquer item que queira refazer ou revisar novamente. A mensagem “Atendido automaticamente pela IA” é o resultado da análise da aplicação; “Marcado por você” e “Desmarcado por você para refazer” são suas decisões manuais.
 
 As marcações são salvas no navegador e entram no **Baixar backup**. Elas não alteram artificialmente o resultado automático: se um item estiver pendente, é necessário corrigir a aula ou o recurso e gerar/revisar novamente.
 

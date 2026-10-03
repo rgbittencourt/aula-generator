@@ -149,6 +149,9 @@
 .results-sector-body{padding:0 17px 17px}
 .results-sector-body>.time-breakdown{margin-top:0}
 .results-sector-body>.review-panel:first-child{margin-top:0}
+.results-checklists{display:flex;flex-direction:column;gap:12px}
+.results-checklists .review-panel{margin-top:0}
+.plan-overview>p:not(.eyebrow){margin:4px 0;color:#5e6875;font-size:13px}
 .weeks-sector{margin-top:14px}
 .weeks-sector>.results-sector-body{padding:16px 0 0}
 .weeks-sector .week-grid{padding:0 0 2px}
@@ -302,11 +305,15 @@ body.welcome-active .recovery-dock{display:none!important}
 .welcome-footer-separator{color:#d3b56e;font-size:9px;line-height:1}
 @media(max-width:620px){.welcome-footer-grid .welcome-development-credit{align-items:flex-start;text-align:left}.welcome-footer-meta{column-gap:6px}.welcome-footer-description{font-size:7px}}
 
-/* Cabeçalho primeiro; o painel de recuperação fica fixo logo abaixo dele. */
-:root{--site-header-height:72px}
-.recovery-dock{position:sticky;top:var(--site-header-height,72px);left:auto;z-index:9;display:flex;flex-direction:column;gap:8px;width:100%;max-width:none;padding:16px max(20px,calc((100vw - 1440px)/2)) 8px;transform:none;background:var(--paper);pointer-events:none}
+/* Cabeçalho fixo desde o início; o painel de recuperação fica logo abaixo dele. */
+:root{--site-header-height:72px;--recovery-dock-height:0px}
+.site-header{position:fixed;top:0;left:0;right:0;z-index:20}
+.recovery-dock{position:sticky;top:var(--site-header-height,72px);left:auto;z-index:19;display:flex;flex-direction:column;gap:8px;width:100%;max-width:none;margin-top:var(--site-header-height,72px);padding:16px max(20px,calc((100vw - 1440px)/2)) 8px;transform:none;background:var(--paper);pointer-events:none}
 .recovery-dock.hidden{display:none!important}
 .recovery-dock>section{width:100%;max-width:1440px;margin:0 auto;pointer-events:auto;box-shadow:0 10px 30px rgba(20,33,61,.1)}
 .recovery-dock .recovery-bar,.recovery-dock .draft-recovery{border-radius:12px}
-.site-header{top:0;z-index:10}
 @media(max-width:620px){.recovery-dock{top:var(--site-header-height,72px);width:100%;padding:10px 10px 6px}.recovery-dock .recovery-bar,.recovery-dock .draft-recovery{max-height:calc(100vh - 20px);overflow:auto}}
+
+/* Elementos aderentes não podem atravessar o cabeçalho nem o dock durante a rolagem. */
+.project-sidebar{top:calc(var(--site-header-height,72px) + var(--recovery-dock-height,0px) + 16px)}
+.briefing-sector,.results-sector,.results-section{scroll-margin-top:calc(var(--site-header-height,72px) + var(--recovery-dock-height,0px) + 16px)}
