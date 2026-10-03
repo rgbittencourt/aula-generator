@@ -1925,20 +1925,31 @@ async function loadHealth() {
     refreshAiButtonAvailability();
     return;
   }
-  try {
-    const data = await (await fetch("/api/health")).json();
-    aiConfigured = Boolean(data.aiConfigured);
-    status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · acesso protegido" : "IA configurada") : "modo exemplo · chave pendente"}${data.aiConfigured && data.resourceResearch && !data.youtubeConfigured ? " · vídeos aguardando chave" : ""}`;
-    if (!data.aiConfigured) {
-      setButtonLabel($("#assist-button"), "IA pendente");
-      setButtonLabel($("#generate-button"), "IA pendente");
+  status.innerHTML = '<span class="status-dot warning"></span>verificando servidor…';
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(`/api/health?check=${Date.now()}`, { cache: "no-store" });
+      if (!response.ok) throw new Error(`health HTTP ${response.status}`);
+      const data = await response.json();
+      if (!data || data.ok === false) throw new Error("health inválido");
+      aiConfigured = Boolean(data.aiConfigured);
+      status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · acesso protegido" : "IA configurada") : "modo exemplo · chave pendente"}${data.aiConfigured && data.resourceResearch && !data.youtubeConfigured ? " · vídeos aguardando chave" : ""}`;
+      if (!data.aiConfigured) {
+        setButtonLabel($("#assist-button"), "IA pendente");
+        setButtonLabel($("#generate-button"), "IA pendente");
+      }
+      refreshAiButtonAvailability();
+      return;
+    } catch {
+      if (attempt < 2) {
+        status.innerHTML = '<span class="status-dot warning"></span>reconectando ao servidor…';
+        await new Promise((resolve) => setTimeout(resolve, 700 * (attempt + 1)));
+      }
     }
-    refreshAiButtonAvailability();
-  } catch {
-    aiConfigured = false;
-    status.innerHTML = '<span class="status-dot offline"></span>servidor indisponível';
-    refreshAiButtonAvailability();
   }
+  aiConfigured = false;
+  status.innerHTML = '<span class="status-dot offline"></span>servidor indisponível · tente recarregar';
+  refreshAiButtonAvailability();
 }
 
 $("#add-practice").addEventListener("click", () => { addPractice(); scheduleSave(); });
