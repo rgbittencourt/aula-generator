@@ -2,6 +2,7 @@ import { accessRequired, hasValidAccess } from "../src/access.js";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "../src/calculations.js";
 import { normalizeCourseInput, normalizeLesson, normalizeWeeklyOutput } from "../src/aula-schema.js";
 import { regenerateWeekWithAI } from "../src/ai.js";
+import { applyCompositionInstruction } from "../src/composition.js";
 import { enrichLessonsWithResources } from "../src/research.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { validateCourse } from "../src/validation.js";
@@ -10,10 +11,11 @@ export default async function handler(request, response) {
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
   if (accessRequired() && !hasValidAccess(request)) return response.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
-    const input = normalizeCourseInput(request.body?.input || {});
-    const index = Math.max(0, Math.min(input.weeks - 1, Number.parseInt(request.body?.weekIndex, 10) || 0));
+    const baseInput = normalizeCourseInput(request.body?.input || {});
+    const index = Math.max(0, Math.min(baseInput.weeks - 1, Number.parseInt(request.body?.weekIndex, 10) || 0));
     const instruction = String(request.body?.instruction || "").trim().slice(0, 4000);
     if (!instruction) return response.status(400).json({ ok: false, error: "Descreva o que deve mudar nesta semana." });
+    const input = applyCompositionInstruction(baseInput, index, instruction);
     const currentWeeks = normalizeWeeklyOutput({ weeks: Array.isArray(request.body?.weeks) ? request.body.weeks : [] }, input);
     const raw = await regenerateWeekWithAI(input, index, currentWeeks[index], instruction);
     const normalized = normalizeLesson(raw, input, index);

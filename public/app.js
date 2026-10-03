@@ -1354,8 +1354,10 @@ async function regenerateSelectedWeek() {
   setAiActivity("Refazendo semana", `A IA está lendo a semana ${index + 1} e preparando uma nova versão…`);
   $("#regenerate-note").textContent = "A IA está reescrevendo somente esta semana e preservando o restante do curso…";
   try {
-    const input = { ...state.input };
-    const accessCode = $("#access-code")?.value || "";
+    const input = formInput();
+    const accessCode = input.accessCode || $("#access-code")?.value || "";
+    delete input.accessCode;
+    state.input = input;
     const headers = { "Content-Type": "application/json" };
     if (accessCode) headers["x-aula-access-code"] = accessCode;
     const response = await fetch("/api/regenerate-week", { method: "POST", headers, body: JSON.stringify({ input, weekIndex: index, instruction, weeks: state.weeks, teacherGuides: state.teacherGuides }) });

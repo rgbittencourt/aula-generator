@@ -107,6 +107,86 @@ export function compositionPlanForWeek(input = {}, index = 0) {
   return { weekNumber: index + 1, preset: plan.preset || "balanced", rows };
 }
 
+const COMPOSITION_REQUESTS = Object.freeze({
+  destaque: /destaque(?:s)?|ideia[- ]chave/i,
+  atencao: /atenção|atencao|erro comum|alerta/i,
+  reflexao: /reflexão|reflexao|pergunta aberta/i,
+  citacao: /citação|citacao/i,
+  pitaco: /pitaco|comentário profissional|comentario profissional/i,
+  imagem: /imagem(?: com legenda)?/i,
+  parallax: /parallax/i,
+  textoimagem: /texto\s*\+\s*imagem|texto e imagem/i,
+  cases: /casos?|cards? de casos/i,
+  feature: /features?|destaques? com ícones|destaques? com icones/i,
+  tabela: /tabela(?: comparativa)?/i,
+  filmstrip: /filmstrip|carrossel/i,
+  audio: /áudio|audio|podcast/i,
+  accordion: /acordeão|acordiao|accordion|faq/i,
+  flashcards: /flashcards?|cartões? de memória|cartoes? de memoria/i,
+  slider: /slider|passo a passo/i,
+  linhadotempo: /linha do tempo|timeline/i,
+  columns: /colunas? comparativas?|comparação em colunas|comparacao em colunas/i,
+  quiz: /quiz|questionário|questionario/i,
+  externalembed: /conteúdo externo|conteudo externo|embed/i
+});
+
+const ADDITION_WORDS = /acrescent|adicion|inclu|insir|crie|ger[ae]|coloque|prepare|adicione/i;
+const REMOVAL_WORDS = /remov|retir|exclu|elimin/i;
+const NUMBER_WORDS = Object.freeze({ um: 1, uma: 1, dois: 2, duas: 2, três: 3, tres: 3, quatro: 4, cinco: 5 });
+
+function clone(value) {
+  return value && typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value));
+}
+
+function requestedCount(fragment) {
+  const numeric = fragment.match(/\b(\d{1,2})\b/);
+  if (numeric) return clampCount(numeric[1], 1) || 1;
+  const written = fragment.match(/\b(um|uma|dois|duas|tr[eê]s|quatro|cinco)\b/i)?.[1]?.toLowerCase();
+  return NUMBER_WORDS[written] || 1;
+}
+
+/**
+ * Converte um pedido explícito do campo de refação em uma exceção semanal de composição.
+ * Menções isoladas a “quiz” não alteram o plano; é necessário haver um verbo de ação.
+ */
+export function applyCompositionInstruction(input = {}, index = 0, instruction = "") {
+  const source = text(instruction).toLowerCase();
+  if (!source) return input;
+  const changes = [];
+  COMPOSITION_CATALOG.forEach((definition) => {
+    const componentPattern = `(?:${COMPOSITION_REQUESTS[definition.key].source})`;
+    const requestPattern = new RegExp(`(?:${ADDITION_WORDS.source}|${REMOVAL_WORDS.source})[^\\n.;]{0,70}${componentPattern}|${componentPattern}[^\\n.;]{0,70}(?:${ADDITION_WORDS.source}|${REMOVAL_WORDS.source})`, "i");
+    const match = source.match(requestPattern);
+    if (!match) return;
+    const fragment = match[0];
+    const removal = REMOVAL_WORDS.test(fragment) && !/não\s+(?:remova|retire|exclua|elimine)/i.test(fragment);
+    changes.push({ definition, count: removal ? 0 : requestedCount(fragment), removal });
+  });
+  if (!changes.length) return input;
+
+  const next = clone(input || {});
+  const plan = clone(next.compositionPlan || normalizeCompositionPlan({}, next.weeks || index + 1));
+  const weekNumber = index + 1;
+  const current = compositionPlanForWeek(next, index);
+  let entry = Array.isArray(plan.weeks) ? plan.weeks.find((item) => Number(item.weekNumber) === weekNumber) : null;
+  if (!entry) {
+    entry = { weekNumber, rows: {} };
+    plan.weeks = [...(plan.weeks || []), entry];
+  }
+  entry.rows = { ...(entry.rows || {}) };
+  changes.forEach(({ definition, count, removal }) => {
+    const existing = current.rows[definition.key] || defaultRow(definition);
+    const additive = !removal && /\bmais\b/i.test(source);
+    entry.rows[definition.key] = {
+      ...existing,
+      count: clampCount(additive ? existing.count + count : count, count),
+      policy: removal ? "none" : (existing.policy === "none" ? "prefer" : existing.policy)
+    };
+  });
+  next.compositionPlan = plan;
+  return next;
+}
+
 function html(value) {
   return text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

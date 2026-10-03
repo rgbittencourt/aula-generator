@@ -14,6 +14,7 @@ import { createWebPracticeDocx } from "./webpractice.js";
 import { validateCourse } from "./validation.js";
 import { assembleCourse } from "./course-assembly.js";
 import { scopeGeneralPlan, scopeMediationMaterial } from "./mediation-scope.js";
+import { applyCompositionInstruction } from "./composition.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "..", "public");
@@ -115,10 +116,11 @@ app.post("/api/generate", async (req, res) => {
 app.post("/api/regenerate-week", async (req, res) => {
   if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
-    const input = normalizeCourseInput(req.body?.input || {});
-    const index = Math.max(0, Math.min(input.weeks - 1, Number.parseInt(req.body?.weekIndex, 10) || 0));
+    const baseInput = normalizeCourseInput(req.body?.input || {});
+    const index = Math.max(0, Math.min(baseInput.weeks - 1, Number.parseInt(req.body?.weekIndex, 10) || 0));
     const instruction = String(req.body?.instruction || "").trim().slice(0, 4000);
     if (!instruction) return res.status(400).json({ ok: false, error: "Descreva o que deve mudar nesta semana." });
+    const input = applyCompositionInstruction(baseInput, index, instruction);
     const currentWeeks = normalizeWeeklyOutput({ weeks: Array.isArray(req.body?.weeks) ? req.body.weeks : [] }, input);
     const raw = await regenerateWeekWithAI(input, index, currentWeeks[index], instruction);
     const normalized = normalizeLesson(raw, input, index);

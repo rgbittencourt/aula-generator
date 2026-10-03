@@ -1117,7 +1117,7 @@ Os tipos disponíveis incluem:
 - **Mídia e estruturas:** imagem com legenda, imagem parallax, texto + imagem, cards de casos, pontos-chave, tabela comparativa, filmstrip, áudio e conteúdo externo;
 - **Interativos:** acordeão/FAQ, flashcards, slider passo a passo, linha do tempo, colunas comparativas e quiz formativo.
 
-O prompt exige que cada bloco tenha conteúdo específico, `sectionNumber` e uma função pedagógica. O Gerador materializa a composição em `lessonPlan.composition` e em blocos editáveis do JSON do aluno, inserindo-a no tópico depois do texto da seção correspondente. O tempo desses interativos aparece como **Interativos Aula Studio** na carga aberta. A composição não altera a regra de separação: webpráticas continuam fora do texto-base e do JSON do aluno.
+O prompt exige que cada bloco tenha conteúdo específico, `sectionNumber` e uma função pedagógica. O Gerador materializa a composição em `lessonPlan.composition` e em blocos editáveis do JSON do aluno, inserindo-a no tópico depois do texto da seção correspondente. O tempo desses interativos aparece como **Interativos Aula Studio** na carga aberta. Ao refazer uma semana, também é possível escrever um pedido explícito como **“acrescente 1 quiz formativo”**; a exceção semanal é atualizada e o bloco aparece no card e no JSON da semana refeita. A composição não altera a regra de separação: webpráticas continuam fora do texto-base e do JSON do aluno.
 
 No checklist, todos os itens continuam visíveis. Os aprovados automaticamente começam marcados; desmarque um item para indicar que deseja refazê-lo. A tela preserva a rolagem e o foco do item após cada marcação, portanto não é necessário voltar ao ponto em que estava.
 
@@ -1280,7 +1280,7 @@ No final da prévia há o campo **Quer refazer esta semana?**. Escreva uma solic
 Amplie a seção sobre o estudo de caso com um exemplo brasileiro, acrescente uma pergunta formativa durante o texto, retire o segundo vídeo e transforme a avaliação em uma decisão aplicada.
 ```
 
-Clique em **Refazer esta semana com IA**. O sistema envia o briefing, a semana atual e a solicitação, reescreve apenas a semana aberta, pesquisa novamente os recursos dessa semana, recalcula sua carga e atualiza o Planejamento Geral. As outras semanas permanecem intactas.
+Clique em **Refazer esta semana com IA**. O sistema envia o briefing atual, a semana aberta e a solicitação, reescreve apenas essa semana, pesquisa novamente seus recursos, aplica pedidos explícitos de composição (por exemplo, **“acrescente 1 quiz”**), recalcula a carga e atualiza o Planejamento Geral. As outras semanas permanecem intactas.
 
 Use pedidos que indiquem **o que mudar**, **onde mudar** e **por quê**. Depois da resposta, leia novamente a semana e compare a carga, os objetivos, a evidência e a avaliação.
 

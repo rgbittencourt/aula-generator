@@ -66,14 +66,17 @@ test("regeneração single-pass usa contexto compacto e orçamento próprio", as
       references: ["Referência"],
       materials: [],
       webPractices: [],
+      compositionPlan: { default: { rows: { quiz: { count: 0, policy: "none" } } } },
       academicProfile: { targetWords: 2800 }
     };
     const currentWeek = { lessonPlan: { theme: "Semana atual", contentSections: [{ title: "Seção", body: "Texto ".repeat(5000) }] } };
-    const result = await regenerateWeekWithAI(input, 0, currentWeek, "Amplie o exemplo aplicado.");
+    const result = await regenerateWeekWithAI(input, 0, currentWeek, "Acrescente 1 quiz formativo e amplie o exemplo aplicado.");
     assert.equal(calls, 1);
     assert.equal(requestBody.max_tokens, 10000);
     const promptChars = requestBody.messages.reduce((sum, message) => sum + String(message.content).length, 0);
     assert.ok(promptChars < 100000, `contexto compacto esperado; recebeu ${promptChars} caracteres`);
+    assert.match(requestBody.messages.at(-1).content, /COMPOSIÇÃO OBRIGATÓRIA DA SEMANA/);
+    assert.match(requestBody.messages.at(-1).content, /1× Quiz formativo/);
     assert.equal(result.lessonPlan.theme, "Semana revisada");
   } finally {
     global.fetch = previousFetch;

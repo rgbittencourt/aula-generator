@@ -6,7 +6,7 @@ import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload, cal
 import { digitalContentMinutes, readingMinutes } from "../src/formula-profile.js";
 import { createWeeksZip } from "../src/zip.js";
 import { buildBriefingPrompt, buildWeekGenerationPrompt } from "../src/ai.js";
-import { compositionPlanForWeek } from "../src/composition.js";
+import { applyCompositionInstruction, compositionPlanForWeek } from "../src/composition.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { createTeacherGuidePdf } from "../src/pdf.js";
 import { toStudentLesson } from "../src/student-export.js";
@@ -66,6 +66,14 @@ test("normaliza composição Aula Studio com padrão e exceção por semana", ()
   assert.ok(hasBlock(lesson, "citacao"));
   assert.ok(buildWeekGenerationPrompt(input, 0).includes("COMPOSIÇÃO EDITORIAL DO AULA STUDIO"));
   assert.ok(buildWeekGenerationPrompt(input, 0).includes('"composition"'));
+});
+
+test("refação aplica pedido explícito de quiz à semana e ao bloco Aula Studio", () => {
+  const input = normalizeCourseInput({ title: "Curso com quiz", weeks: 1, compositionPlan: { default: { rows: { quiz: { count: 0, policy: "none" } } } } });
+  const requested = applyCompositionInstruction(input, 0, "Acrescente 1 quiz formativo ao final da semana.");
+  assert.equal(compositionPlanForWeek(requested, 0).rows.quiz.count, 1);
+  const lesson = normalizeLesson({ lessonPlan: { contentSections: [{ number: "1", title: "Conceitos", body: "Texto desenvolvido." }] } }, requested, 0);
+  assert.ok(hasBlock(lesson, "quiz"));
 });
 
 test("agenda webprática por data ou semana ocorre uma única vez", () => {

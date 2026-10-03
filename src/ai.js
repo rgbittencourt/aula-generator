@@ -3,7 +3,7 @@ import { measureLessonQuality, qualityPromptGuidance, qualityTargets } from "./c
 import { buildTeacherGuide } from "./teacher-guide.js";
 import { ACADEMIC_SYSTEM_PROMPT, buildAcademicPlanPrompt, buildAcademicReviewPrompt, normalizeAcademicPlan, normalizeAcademicReview, normalizeAcademicProfile } from "./academic.js";
 import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
-import { compositionPlanForWeek } from "./composition.js";
+import { applyCompositionInstruction, compositionPlanForWeek } from "./composition.js";
 import { callJson } from "./ai-client.js";
 import { selectResourcesWithAI } from "./resource-curator.js";
 export { selectResourcesWithAI };
@@ -465,11 +465,14 @@ function mergeRepairedResponse(original, repaired) {
 }
 
 export async function regenerateWeekWithAI(input, index, currentWeek, instruction, options = {}) {
+  input = applyCompositionInstruction(input, index, instruction);
   const weekNumber = index + 1;
   const singlePass = process.env.AULA_SINGLE_PASS !== "false";
   const progression = options.progression || buildCourseProgression(input);
   const weekFocus = progressionForWeek(input, index, progression);
   const currentPlan = currentWeek?.lessonPlan || currentWeek || {};
+  const compositionPlan = compositionPlanForWeek(input, index);
+  const compositionTargets = Object.values(compositionPlan.rows).filter((row) => row.count > 0).map((row) => `${row.count}× ${row.label} (${row.policy}, ${row.itemsPerBlock > 1 ? `${row.itemsPerBlock} itens/bloco` : "bloco único"})`);
   const academicPlan = singlePass
     ? normalizeAcademicPlan({ weekNumber, theme: currentPlan.theme || `${input.title} — Semana ${weekNumber}`, objectives: input.objectives }, input, index)
     : await planWeekWithAI(input, index);
@@ -486,7 +489,8 @@ export async function regenerateWeekWithAI(input, index, currentWeek, instructio
     materials: (input.materials || []).slice(0, 12).map((item) => ({ title: item.title, type: item.type, link: item.link, moment: item.moment, objective: item.objective, alignment: item.alignment, use: item.use, pages: item.pages, durationMinutes: item.durationMinutes })),
     resourcePlan: resourcePlanForWeek(input, index),
     webPractices: [],
-    weekToGenerate: weekNumber
+    weekToGenerate: weekNumber,
+    compositionTargets
   };
   const compactWeek = {
     theme: currentPlan.theme,
@@ -502,7 +506,8 @@ export async function regenerateWeekWithAI(input, index, currentWeek, instructio
     claimEvidence: (currentPlan.claimEvidence || []).slice(0, 12).map((item) => ({ id: item.id, claim: clip(item.claim, 700), sourceIds: item.sourceIds, verificationStatus: item.verificationStatus, note: clip(item.note, 400) })),
     assessment: { title: currentPlan.assessment?.title, format: currentPlan.assessment?.format, questions: (currentPlan.assessment?.questions || []).map((question) => ({ id: question.id, q: clip(question.q, 1000), options: (question.options || []).slice(0, 6).map((option) => clip(option, 350)), answer: question.answer, explanation: clip(question.explanation, 900) })).slice(0, 8) },
     timePlan: { targetMinutes: currentPlan.timePlan?.targetMinutes },
-    didacticArc: { id: currentPlan.didacticArc?.id, label: currentPlan.didacticArc?.label, sequence: currentPlan.didacticArc?.sequence }
+    didacticArc: { id: currentPlan.didacticArc?.id, label: currentPlan.didacticArc?.label, sequence: currentPlan.didacticArc?.sequence },
+    composition: (currentPlan.composition?.entries || currentPlan.composition || []).slice(0, 24)
   };
   const textBudget = qualityTargets(input);
   const prompt = `Refaça somente a semana ${weekNumber} do curso abaixo. O professor pediu esta alteração:
@@ -513,7 +518,8 @@ Preserve os fatos, referências e recursos válidos, mas cumpra a solicitação 
 Esta é uma correção de insuficiência textual. Não faça um acréscimo marginal de 20, 30 ou 50 palavras. Reescreva e amplie as seções abaixo do orçamento até atingir o piso de ${textBudget.minimumWords} palavras. Cada seção deve conter explicação conceitual, exemplo ou aplicação, consequência/limite e transição para a próxima. Se o texto atual estiver curto, substitua o corpo curto por um corpo desenvolvido; não apenas acrescente uma frase ao final.
 Faça uma revisão acadêmica explícita: corrija afirmações sem suporte, diferencie fato e interpretação, acrescente contraponto quando exigido, preserve o mapa de evidências e não invente fontes. ${normalizeAcademicProfile(input.academicProfile, input).sourcePolicy}
 
-Retorne somente { "lessonPlan": { ... } }. Não gere blocks nem teacherGuide; o servidor preservará/reconstruirá o Material de Mediação. O lessonPlan deve manter título específico, welcome, objetivos observáveis, pelo menos ${textBudget.requiredSectionCount} seções conforme o orçamento, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. lessonPlan.webPractices deve ser sempre []; não inclua qualquer descrição ou instrução da sessão prática no texto-base. Não invente URLs ou fontes verificadas. A prioridade desta resposta é o texto substancial do aluno; não reduza o corpo para economizar tokens.
+  Retorne somente { "lessonPlan": { ... } }. Não gere blocks nem teacherGuide; o servidor preservará/reconstruirá o Material de Mediação. O lessonPlan deve manter título específico, welcome, objetivos observáveis, pelo menos ${textBudget.requiredSectionCount} seções conforme o orçamento, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. lessonPlan.webPractices deve ser sempre []; não inclua qualquer descrição ou instrução da sessão prática no texto-base. Não invente URLs ou fontes verificadas. A prioridade desta resposta é o texto substancial do aluno; não reduza o corpo para economizar tokens.
+  COMPOSIÇÃO OBRIGATÓRIA DA SEMANA: ${compositionTargets.length ? compositionTargets.join("; ") : "nenhum bloco adicional solicitado"}. Se a solicitação do professor pedir acrescentar, remover ou alterar um bloco (por exemplo, “acrescente 1 quiz”), cumpra isso explicitamente e retorne lessonPlan.composition com entradas completas e específicas para a semana. Quando houver uma quantidade configurada maior que zero, não omita silenciosamente o bloco: o servidor o materializará no JSON do Aula Studio.
 
 Briefing essencial do curso:
 ${JSON.stringify(compactInput, null, 2)}
@@ -536,7 +542,7 @@ Retorne JSON completo agora.`;
     temperature: 0.35,
     maxTokens: regenerationMaxTokens,
     retryMaxTokens: regenerationMaxTokens,
-    formatRetryInstruction: `A resposta anterior foi truncada ou continha JSON inválido. Refaça agora somente { "lessonPlan": { ... } }, sem teacherGuide e sem blocks. Preserve a meta mínima de ${textBudget.minimumWords} palavras, ${textBudget.requiredSectionCount} seções com aproximadamente ${textBudget.sectionTargetWords} palavras cada, síntese e avaliação. Responda somente JSON válido, sem markdown, comentários, texto extra ou vírgulas finais.`
+    formatRetryInstruction: `A resposta anterior foi truncada ou continha JSON inválido. Refaça agora somente { "lessonPlan": { ... } }, sem teacherGuide e sem blocks. Preserve a meta mínima de ${textBudget.minimumWords} palavras, ${textBudget.requiredSectionCount} seções com aproximadamente ${textBudget.sectionTargetWords} palavras cada, síntese, avaliação e a composição solicitada (${compositionTargets.join("; ") || "nenhum bloco adicional"}). Responda somente JSON válido, sem markdown, comentários, texto extra ou vírgulas finais.`
   });
   let academicReview = { status: "not-run", issues: [], strengths: [], unsupportedClaims: [], rewriteRequired: false };
   if (!singlePass && process.env.AULA_ACADEMIC_REVIEW !== "false") {
