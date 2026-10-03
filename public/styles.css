@@ -402,3 +402,9 @@ body.welcome-active .recovery-dock{display:none!important}
 
 /* Mesmo acabamento coral nos três painéis laterais. */
 .project-sidebar>.summary-card{border-top:3px solid var(--coral)}
+
+
+/* Ação de sessão: separada do logo (novo projeto) e do atalho do Aula Studio. */
+.session-exit-link{height:32px;padding:0 9px;border:1px solid #e3d5cd;border-radius:8px;background:#fffaf7;color:var(--coral-dark);font-size:10px;font-weight:700;white-space:nowrap;transition:background .15s,border-color .15s,transform .15s}
+.session-exit-link:hover{background:var(--coral-soft);border-color:#e8a18f;transform:translateY(-1px)}
+@media(max-width:620px){.session-exit-link{width:30px;padding:0;font-size:0}.session-exit-link::before{content:"↪";font-size:16px}}

@@ -236,6 +236,91 @@ function enterFromWelcome(event) {
   enterWorkspace();
 }
 
+function resetDisciplineForm(preserveSession = true) {
+  const session = {
+    author: $("#author")?.value || "",
+    institution: $("#institution")?.value || "",
+    accessCode: $("#access-code")?.value || ""
+  };
+  $("#course-form")?.reset();
+  practiceSequence = 0;
+  materialSequence = 0;
+  $("#practice-list").innerHTML = "";
+  $("#materials-list").innerHTML = "";
+  addPractice();
+  addMaterial();
+  renderResourcePlanWeeks();
+  renderCompositionPlanWeeks();
+  toggleCalendar();
+  togglePractice();
+  if (preserveSession) {
+    $("#author").value = session.author;
+    $("#institution").value = session.institution;
+    $("#access-code").value = session.accessCode;
+  } else {
+    $("#author").value = "";
+    $("#institution").value = "";
+    $("#access-code").value = "";
+  }
+  state.input = null;
+  state.weeks = [];
+  state.workload = null;
+  state.generalPlan = null;
+  state.teacherGuides = [];
+  state.provider = null;
+  state.validation = null;
+  state.reviewMarks = createReviewMarks();
+  state.weekApprovals = {};
+  state.activeReviewGuidance = null;
+  state.previewIndex = null;
+  $("#results-section")?.classList.add("hidden");
+  $("#results-section") && ($("#results-section").open = false);
+  $("#general-plan").innerHTML = "";
+  $("#general-plan").classList.add("hidden");
+  $("#week-grid").innerHTML = "";
+  $("#result-alert").className = "result-alert hidden";
+  $("#result-alert").textContent = "";
+  $("#results-title").textContent = "Semanas geradas";
+  $("#results-subtitle").textContent = "";
+  $("#empty-state")?.classList.remove("hidden");
+  document.querySelectorAll(".briefing-sector").forEach((sector, index) => { sector.open = index === 0; });
+  document.querySelectorAll(".results-sector").forEach((sector) => { sector.open = false; });
+  closeLessonPreview();
+  updateAcademicInheritance();
+  updateSummary();
+  updateProgress();
+  resetWorkspaceScroll();
+}
+
+function startNewProject(event) {
+  event?.preventDefault();
+  if (currentSnapshot() && !window.confirm("Iniciar um novo projeto de disciplina? O planejamento atual será removido do salvamento automático.")) return;
+  safeStorageRemove();
+  resetDisciplineForm(true);
+  hideRecoveryDock();
+  document.body.classList.remove("welcome-active");
+  document.body.classList.add("workspace-active");
+  document.documentElement.classList.add("workspace-active");
+  stabilizeWorkspaceLayout();
+  $("#course-title")?.focus({ preventScroll: true });
+}
+
+function exitSession() {
+  if (currentSnapshot() && !window.confirm("Voltar à capa e trocar o usuário, a instituição ou o código? O planejamento atual será removido deste navegador.")) return;
+  safeStorageRemove();
+  resetDisciplineForm(false);
+  $("#welcome-author").value = "";
+  $("#welcome-institution").value = "";
+  $("#welcome-access-code").value = "";
+  hideRecoveryDock();
+  document.body.classList.remove("workspace-active");
+  document.body.classList.add("welcome-active");
+  document.documentElement.classList.remove("workspace-active");
+  $("#welcome-screen")?.classList.remove("hidden");
+  window.scrollTo(0, 0);
+  requestAnimationFrame(() => $("#welcome-author")?.focus({ preventScroll: true }));
+}
+
 function persistedInput() {
   const input = formInput();
   const { accessCode, ...safeInput } = input;
@@ -1584,6 +1669,8 @@ $("#materials-list").addEventListener("click", (event) => {
 addPractice();
 addMaterial();
 $("#welcome-form").addEventListener("submit", enterFromWelcome);
+$("#new-project-link").addEventListener("click", startNewProject);
+$("#exit-session-button").addEventListener("click", exitSession);
 $("#course-form").addEventListener("submit", (event) => { event.preventDefault(); generate(); });
 $("#assist-button").addEventListener("click", assistBriefing);
 $("#zip-button").addEventListener("click", downloadZip);

@@ -245,6 +245,8 @@ O menu de navegação da coluna direita oferece atalhos para os sete setores do 
 
 Em monitores largos, a área útil do workspace é ampliada: o resumo e as ações ficam mais próximos da margem esquerda, a navegação se aproxima da margem direita e a coluna central recebe mais espaço para leitura e edição.
 
+Durante o uso, clique no logo **Gerador de Aulas** para iniciar um **novo projeto de disciplina** sem retornar à capa. O briefing, os resultados e o rascunho local da disciplina atual são limpos, mas os dados de acesso permanecem na sessão. Para encerrar a sessão e solicitar novamente Nome, Instituição e Código de acesso, use **Trocar acesso** no cabeçalho. Essa ação limpa o planejamento local e retorna à capa vazia.
+
 ### 5.3 Seções numeradas
 
 A tela divide o briefing em sete áreas recolhíveis. Somente **Identidade do curso** começa aberta; os demais setores começam recolhidos para manter a tela compacta:
