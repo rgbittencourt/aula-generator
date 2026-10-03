@@ -372,3 +372,15 @@ body.welcome-active .recovery-dock{display:none!important}
 @media(min-width:901px){
   html.workspace-active,html.workspace-active body{overflow:hidden}
 }
+
+
+/* O painel de recuperação acompanha somente a coluna central do workspace. */
+.workspace-dock{position:sticky;top:0;z-index:24;width:100%;max-width:none;margin:0 0 18px;padding:0 0 8px;background:var(--paper);pointer-events:none}
+.workspace-dock>section{width:100%;max-width:none;margin:0;pointer-events:auto}
+.workspace-dock .recovery-bar,.workspace-dock .draft-recovery{margin-bottom:8px}
+@media(min-width:901px){
+  .workspace-grid{height:calc(100vh - var(--site-header-height,72px) - 28px);max-height:none;min-height:520px}
+}
+@media(max-width:900px){
+  .workspace-dock{position:relative;top:auto;margin:0 0 16px;padding:0 0 4px}
+}

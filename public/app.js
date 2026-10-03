@@ -30,6 +30,11 @@ function enhanceLayout() {
   const workspaceGrid = formColumn.parentElement;
   const intro = $(".intro");
   if (intro && intro.parentElement !== formColumn) formColumn.prepend(intro);
+  const recoveryDock = $("#recovery-dock");
+  if (recoveryDock && recoveryDock.parentElement !== formColumn) {
+    formColumn.insertBefore(recoveryDock, intro || formColumn.firstChild || null);
+    recoveryDock.classList.add("workspace-dock");
+  }
   const resultsSection = $("#results-section");
   if (resultsSection && resultsSection.parentElement !== formColumn) formColumn.appendChild(resultsSection);
 
