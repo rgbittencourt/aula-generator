@@ -391,3 +391,10 @@ body.welcome-active .recovery-dock{display:none!important}
   html:has(body:not(.welcome-active)),html:has(body:not(.welcome-active)) body{overflow:hidden}
   html:has(body:not(.welcome-active)) .page-shell{height:100vh;overflow:hidden}
 }
+
+
+/* Em telas amplas, usar melhor a largura disponível sem apertar os menus. */
+@media(min-width:1280px){
+  .page-shell{max-width:1600px}
+  .workspace-grid{grid-template-columns:clamp(250px,20vw,300px) minmax(560px,1fr) clamp(230px,18vw,280px);gap:24px}
+}

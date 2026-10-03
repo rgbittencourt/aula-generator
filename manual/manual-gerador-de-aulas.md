@@ -243,6 +243,8 @@ Esse resumo é preliminar. O cálculo mais preciso acontece depois que o conteú
 
 O menu de navegação da coluna direita oferece atalhos para os sete setores do briefing e para **Carga por atividade**, **Carga aberta por atividade**, **Checklists** e **Semanas planejadas**. Os atalhos calculam a posição dentro da coluna central, sem deslocar a página inteira. No celular, a navegação passa para uma área própria abaixo do conteúdo.
 
+Em monitores largos, a área útil do workspace é ampliada: o resumo e as ações ficam mais próximos da margem esquerda, a navegação se aproxima da margem direita e a coluna central recebe mais espaço para leitura e edição.
+
 ### 5.3 Seções numeradas
 
 A tela divide o briefing em sete áreas recolhíveis. Somente **Identidade do curso** começa aberta; os demais setores começam recolhidos para manter a tela compacta:
