@@ -7,6 +7,12 @@ const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
 const DRAFT_MAX_AGE_DAYS = 30;
 let saveTimer = null;
 
+function syncRecoveryLayout() {
+  const dock = $("#recovery-dock");
+  const height = dock && !dock.classList.contains("hidden") ? Math.ceil(dock.getBoundingClientRect().height) : 0;
+  document.documentElement.style.setProperty("--recovery-stack-height", `${height}px`);
+}
+
 function splitLines(value) { return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : String(value || "").split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
 function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char])); }
 function formatDate(value) { return value ? value.split("-").reverse().join("/") : ""; }
@@ -123,6 +129,7 @@ function setSaveStatus(title, detail, tone = "") {
   if (!document.body.classList.contains("welcome-active")) {
     $("#recovery-dock")?.classList.remove("hidden");
     bar.classList.remove("hidden");
+    syncRecoveryLayout();
   }
   $("#save-status-title").textContent = title;
   $("#save-status").textContent = detail;
@@ -145,11 +152,13 @@ function safeStorageRemove() {
 function showRecoveryDock(showBar = true) {
   $("#recovery-dock")?.classList.remove("hidden");
   if (showBar) $("#recovery-bar")?.classList.remove("hidden");
+  syncRecoveryLayout();
 }
 
 function hideRecoveryDock() {
   $("#recovery-dock")?.classList.add("hidden");
   $("#recovery-bar")?.classList.add("hidden");
+  syncRecoveryLayout();
 }
 
 function enterWorkspace() {
@@ -253,7 +262,7 @@ function readDraft() {
   }
 }
 
-function hideDraftRecovery() { $("#draft-recovery")?.classList.add("hidden"); }
+function hideDraftRecovery() { $("#draft-recovery")?.classList.add("hidden"); syncRecoveryLayout(); }
 
 function offerDraftRecovery() {
   const draft = readDraft();
@@ -262,6 +271,7 @@ function offerDraftRecovery() {
   const hasResults = Boolean(draft.results?.weeks?.length);
   $("#draft-recovery-details").textContent = `Salvo em ${formatSavedAt(draft.savedAt)}${hasResults ? ` · ${draft.results.weeks.length} semana(s) gerada(s)` : " · briefing em andamento"}.`;
   $("#draft-recovery").classList.remove("hidden");
+  syncRecoveryLayout();
   setSaveStatus("Planejamento recuperável encontrado", "Escolha Retomar planejamento ou descarte este rascunho.", "success");
 }
 
@@ -1415,6 +1425,7 @@ $("#close-lesson-modal-secondary").addEventListener("click", closeLessonPreview)
 $("#regenerate-week-button").addEventListener("click", regenerateSelectedWeek);
 $("#lesson-modal").addEventListener("click", (event) => { if (event.target.id === "lesson-modal") closeLessonPreview(); });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.previewIndex != null) closeLessonPreview(); });
+window.addEventListener("resize", syncRecoveryLayout);
 $("#calendar-mode").addEventListener("change", () => { toggleCalendar(); scheduleSave(); });
 $("#weeks").addEventListener("input", () => { const resourcePlan = collectResourcePlan(); const compositionPlan = collectCompositionPlan(); renderResourcePlanWeeks(resourcePlan); renderCompositionPlanWeeks(compositionPlan); updateSummary(); updateProgress(); scheduleSave(); });
 $("#practice-enabled").addEventListener("change", () => { togglePractice(); scheduleSave(); });

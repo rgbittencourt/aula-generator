@@ -296,8 +296,17 @@ body.welcome-active .recovery-dock{display:none!important}
 /* Crédito INOVALAB: conteúdo à esquerda, logo colorido sobre fundo transparente e descrição na linha inferior. */
 .welcome-footer-grid .welcome-development-credit{align-items:flex-start;text-align:left}
 .welcome-development-credit>div.welcome-inovalab-credit{align-items:flex-start}
-.welcome-development-credit>div.welcome-inovalab-credit>img{background:transparent;padding:0;border-radius:0;filter:brightness(1.65) saturate(1.2) contrast(1.04)}
+.welcome-development-credit>div.welcome-inovalab-credit>img{background:transparent;padding:0;border-radius:0;filter:none}
 .welcome-footer-meta{flex-wrap:wrap;column-gap:8px;row-gap:4px}
 .welcome-footer-description{color:#cbd5e4;font-family:var(--sans);font-size:8px;line-height:1.2}
 .welcome-footer-separator{color:#d3b56e;font-size:9px;line-height:1}
 @media(max-width:620px){.welcome-footer-grid .welcome-development-credit{align-items:flex-start;text-align:left}.welcome-footer-meta{column-gap:6px}.welcome-footer-description{font-size:7px}}
+
+/* O painel de recuperação ocupa espaço real acima do cabeçalho e da progressão. */
+:root{--recovery-stack-height:0px}
+.recovery-dock{position:sticky;top:0;left:auto;z-index:20;display:flex;flex-direction:column;gap:8px;width:100%;max-width:none;padding:16px max(20px,calc((100vw - 1440px)/2)) 8px;transform:none;background:var(--paper);pointer-events:none}
+.recovery-dock.hidden{display:none!important}
+.recovery-dock>section{width:100%;max-width:1440px;margin:0 auto;pointer-events:auto;box-shadow:0 10px 30px rgba(20,33,61,.1)}
+.recovery-dock .recovery-bar,.recovery-dock .draft-recovery{border-radius:12px}
+.site-header{top:var(--recovery-stack-height,0px)}
+@media(max-width:620px){.recovery-dock{top:0;width:100%;padding:10px 10px 6px}.recovery-dock .recovery-bar,.recovery-dock .draft-recovery{max-height:calc(100vh - 20px);overflow:auto}}
