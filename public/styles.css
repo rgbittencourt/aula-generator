@@ -221,17 +221,8 @@ body.welcome-active{overflow:hidden}
 .studio-top-link b{color:var(--teal);font-size:16px;font-weight:400;line-height:1}
 @media(max-width:620px){.header-tools{gap:8px}.studio-top-link{width:34px;padding:0;justify-content:center}.studio-top-link span{display:none}.studio-top-link b{font-size:15px}}
 
-/* Assinatura institucional inspirada na capa do AcademiaOS, com assets do próprio projeto do usuário. */
+/* Base da capa: crédito de desenvolvimento e assinaturas institucionais. */
 .welcome-hero-top{position:relative;z-index:1;display:flex;flex-direction:column;gap:24px}
-.welcome-institutional-signature{display:flex;flex-wrap:wrap;align-items:center;gap:20px 26px}
-.welcome-ifsc-signature{display:flex;align-items:center;gap:10px;color:#f8f5ec}
-.welcome-ifsc-signature>img{width:40px;height:48px;object-fit:contain;filter:brightness(0) invert(1)}
-.welcome-ifsc-signature>div{line-height:1.08}
-.welcome-ifsc-signature p{margin:0;font-size:11px;font-weight:900;line-height:1.08;text-transform:uppercase;letter-spacing:-.01em}
-.welcome-ifsc-signature p+p{font-size:10px;font-weight:600;text-transform:none}
-.welcome-ifsc-signature small{display:block;margin-top:4px;color:#cbd5e4;font-size:8px;font-weight:500;letter-spacing:.02em;line-height:1.2}
-.welcome-signature-divider{width:1px;height:40px;background:rgba(211,181,110,.55)}
-.welcome-inovalab-signature{width:184px;height:56px;object-fit:contain;object-position:left;filter:brightness(0) invert(1)}
 .welcome-hero-footer{align-items:flex-start;text-transform:none;letter-spacing:normal}
 .welcome-development-credit{max-width:305px;border-left:2px solid rgba(211,181,110,.75);padding-left:16px;color:#cbd5e4;font-family:var(--sans);font-size:11px;line-height:1.4}
 .welcome-development-credit>p{margin:0;color:#d3b56e;font-size:9px;font-weight:700;letter-spacing:.2em;text-transform:uppercase}
@@ -243,8 +234,7 @@ body.welcome-active{overflow:hidden}
 .welcome-development-credit small{color:#cbd5e4;font-size:10px;line-height:1.35}
 .welcome-development-credit>a{display:inline-flex;margin-top:9px;color:#e1c986;font-size:10px;font-weight:600;letter-spacing:.04em;text-decoration:underline;text-decoration-color:rgba(225,201,134,.45);text-underline-offset:4px}
 .welcome-development-credit em{display:block;margin-top:7px;color:#91a0b4;font-family:var(--mono);font-size:8px;font-style:normal;letter-spacing:.04em}
-@media(max-width:860px){.welcome-institutional-signature{gap:15px 18px}.welcome-hero-top{gap:20px}.welcome-inovalab-signature{width:170px}}
-@media(max-width:620px){.welcome-institutional-signature{align-items:flex-start;gap:14px}.welcome-signature-divider{display:none}.welcome-inovalab-signature{width:165px;height:48px}}
+@media(max-width:860px){.welcome-hero-top{gap:20px}}
 
 
 /* Capa: recuperação e cabeçalho pertencem ao workspace, não à tela de entrada. */
@@ -260,3 +250,22 @@ body.welcome-active .recovery-dock{display:none!important}
 .welcome-footer-grid .welcome-development-credit{max-width:none;border-left:0;padding-left:0;align-self:start}
 @media(max-width:860px){.welcome-footer-grid{gap:22px}}
 @media(max-width:620px){.welcome-footer-grid{grid-template-columns:1fr;gap:22px}.welcome-footer-divider{width:100%;height:1px;min-height:0}.welcome-footer-grid .welcome-development-credit{padding-top:0}}
+
+
+/* Capa: marca do aplicativo em destaque e assinaturas institucionais na base. */
+.welcome-brand{gap:15px}
+.welcome-brand img{width:76px;height:76px;filter:none;border-radius:18px;box-shadow:0 10px 24px rgba(0,0,0,.18)}
+.welcome-brand strong{font-size:25px;letter-spacing:-.035em}
+.welcome-brand small{margin-top:6px;font-size:22px}
+.welcome-ifsc-footer{display:flex;align-items:flex-start;gap:15px;min-width:0;color:#f8f5ec}
+.welcome-ifsc-footer>img{width:68px;height:80px;flex:0 0 auto;object-fit:contain}
+.welcome-ifsc-footer>span{display:flex;flex-direction:column;gap:2px;line-height:1.12}
+.welcome-ifsc-footer strong{font-size:14px;font-weight:800;letter-spacing:-.01em}
+.welcome-ifsc-footer b{font-size:13px;font-weight:700}
+.welcome-ifsc-footer small{margin-top:4px;color:#cbd5e4;font-size:9px;line-height:1.25}
+.welcome-footer-grid .welcome-development-credit{max-width:360px}
+.welcome-development-credit>div.welcome-inovalab-credit{display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin-top:12px}
+.welcome-development-credit>div.welcome-inovalab-credit>img{width:205px;height:80px;border-radius:0;object-fit:contain;object-position:left;filter:brightness(0) invert(1)}
+.welcome-development-credit>div.welcome-inovalab-credit>small{max-width:245px;color:#cbd5e4;font-size:10px;line-height:1.3}
+@media(max-width:860px){.welcome-brand img{width:68px;height:68px}.welcome-brand strong{font-size:23px}.welcome-brand small{font-size:20px}.welcome-development-credit>div.welcome-inovalab-credit>img{width:190px}}
+@media(max-width:620px){.welcome-brand img{width:62px;height:62px;border-radius:15px}.welcome-brand strong{font-size:22px}.welcome-brand small{font-size:19px}.welcome-ifsc-footer>img{width:58px;height:68px}.welcome-ifsc-footer small{font-size:8px}.welcome-development-credit>div.welcome-inovalab-credit>img{width:180px;height:68px}}
