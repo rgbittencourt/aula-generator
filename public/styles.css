@@ -491,3 +491,20 @@ body.welcome-active .recovery-dock{display:none!important}
 .mediation-channel article strong{display:block;color:var(--coral-dark);font-size:11px}
 .mediation-channel article small{display:block;margin-top:2px;color:var(--muted);font-size:10px}
 .mediation-channel article p{margin:6px 0 0;color:var(--ink);font-size:12px;line-height:1.55}
+
+
+/* Edição individual de mensagens no Material de Mediação. */
+.mediation-message-card{margin:14px 0;padding:14px;border:1px solid rgba(21,38,69,.12);border-left:3px solid var(--coral);border-radius:12px;background:#fffdf8;box-shadow:0 5px 18px rgba(21,38,69,.04)}
+.mediation-message-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:5px}
+.mediation-message-heading strong{font-size:14px;color:var(--navy)}
+.mediation-message-heading span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.mediation-message-purpose{display:block;margin-bottom:10px;color:var(--muted);line-height:1.45}
+.mediation-message-card label{display:block;margin-top:9px}
+.mediation-message-card label>span{display:block;margin-bottom:4px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.mediation-message-card input,.mediation-message-card textarea{width:100%;box-sizing:border-box;border:1px solid rgba(21,38,69,.14);border-radius:8px;background:#fff;padding:9px 10px;color:var(--navy);font:inherit;line-height:1.45;resize:vertical}
+.mediation-message-card input:focus,.mediation-message-card textarea:focus{outline:2px solid rgba(224,108,80,.24);border-color:var(--coral)}
+.mediation-message-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:11px}
+.mediation-message-actions small{color:var(--muted)}
+.mediation-message-actions .button{font-size:11px}
+.reader-mediation>p{max-width:760px}
+@media(max-width:700px){.mediation-message-heading{align-items:flex-start;flex-direction:column;gap:4px}.mediation-message-actions{align-items:flex-start;flex-direction:column}}

@@ -224,7 +224,7 @@ Regras de escrita:
 - nunca invente URLs, DOI, durações, autores, números ou referências verificadas. Para recurso ainda não conferido, use searchQuery e verificationStatus "suggested-no-url";
 - não escreva markdown fora das strings do JSON e não inclua comentários.
 
-teacherGuide deve incluir mediationMessages mesmo quando não houver webprática. Gere exatamente duas listas curtas, whatsapp e moodle, normalmente com três mensagens: abertura da semana, acompanhamento durante o estudo e fechamento. O teor deve ser equivalente, mas não uma cópia: WhatsApp pode ser mais informal, próximo, humanizado e ter humor leve; Moodle deve ser mais organizado, claro e adequado a um aviso de curso. As mensagens devem estimular a leitura, a atividade, o fórum quando existir e a webprática quando estiver agendada, sem inventar agenda, link ou obrigação que não esteja no briefing. Cada item deve conter timing, purpose e text. Se houver webprática programada, inclua também em webPracticeProjects a preparação do professor e do aluno, agenda, roteiro com minutos, falas/prompts, produto, critérios, rubrica, plano B, acessibilidade e artefatos. O projeto será exportado em DOCX separado e as mensagens no Material de Mediação em PDF.
+teacherGuide deve incluir resourceNotes, mediationStops e mediationMessages mesmo quando não houver webprática. Crie uma parada de mediação para a abertura, para cada formativeCheck e activity relevante e para o fechamento; se não houver uma parada explícita, crie um ponto de acompanhamento durante o estudo. Gere duas listas paralelas, whatsapp e moodle, com uma mensagem para cada parada. O teor deve ser equivalente, mas não uma cópia: WhatsApp pode ser mais informal, próximo, humanizado e ter humor leve; Moodle deve ser mais organizado, claro e adequado a um aviso de curso. Cada item deve conter relatedId, relatedType, timing, purpose, studentNeed, teacherIntent, tone e text. As mensagens devem explicar por que vale a pena fazer a etapa, reconhecer dificuldades e convidar a uma ação concreta, sem inventar agenda, link ou obrigação que não esteja no briefing. Se houver webprática programada, inclua também em webPracticeProjects a preparação do professor e do aluno, agenda, roteiro com minutos, falas/prompts, produto, critérios, rubrica, plano B, acessibilidade e artefatos. O projeto será exportado em DOCX separado e as mensagens no Material de Mediação em PDF.
 
 Perfil acadêmico desta trilha:
 ${JSON.stringify(profile, null, 2)}
@@ -565,4 +565,35 @@ export async function generateWithAI(input) {
     return buildTeacherGuide(scopedInput, lesson, { ...(weeks[index]?.teacherGuide || {}), webPracticeProjects: weeks[index]?.teacherGuide?.webPracticeProjects || weeks[index]?.teacherGuide?.webPractices || [] }, index);
   });
   return { weeks: normalizedWeeks, teacherGuides };
+}
+
+
+export async function regenerateMediationMessageWithAI({ input = {}, weekNumber = 1, theme = "", channel = "whatsapp", timing = "", purpose = "", studentNeed = "", teacherIntent = "", currentText = "", tone = "", instructions = "", relatedContext = {} } = {}) {
+  const channelLabel = channel === "moodle" ? "Mensagens do Moodle" : "WhatsApp";
+  const prompt = `Reescreva uma única mensagem de acompanhamento para estudantes. Responda somente JSON válido no formato {"text":"...","purpose":"...","teacherIntent":"..."}.
+
+Canal: ${channelLabel}.
+Curso: ${input.title || "curso"}.
+Semana: ${weekNumber}.
+Tema: ${theme || "tema da semana"}.
+Momento: ${timing || "momento da semana"}.
+Propósito pedagógico: ${purpose || "orientar o avanço do estudante"}.
+Necessidade do estudante: ${studentNeed || "compreender o próximo passo"}.
+Intenção de mediação do professor: ${teacherIntent || "acolher, orientar e encorajar"}.
+Tom solicitado para esta mensagem: ${tone || (channel === "moodle" ? "acolhedor, claro e organizado" : "próximo, humano e com humor leve")}.
+Informações específicas acrescentadas pelo professor: ${instructions || "nenhuma"}.
+Texto atual para melhorar: ${currentText || "nenhum"}.
+Contexto adicional da parada/atividade: ${JSON.stringify(relatedContext)}.
+
+Regras: seja específico e empático; explique por que vale a pena fazer a etapa; reconheça dificuldades sem infantilizar; convide a uma ação concreta; não invente data, link, nota, obrigação ou conteúdo ausente; não use frases genéricas de motivação; para WhatsApp escreva como mensagem natural e próxima; para Moodle escreva como aviso claro e bem estruturado; não diga que é uma IA; escreva em português do Brasil.`;
+  const result = await callJson([
+    { role: "system", content: ACADEMIC_SYSTEM_PROMPT },
+    { role: "user", content: prompt }
+  ], { temperature: 0.65, maxTokens: 900, retryMaxTokens: 1200, formatRetryInstruction: "Retorne somente JSON com text, purpose e teacherIntent." });
+  return {
+    text: String(result?.text || result?.message || "").trim(),
+    purpose: String(result?.purpose || purpose).trim(),
+    teacherIntent: String(result?.teacherIntent || teacherIntent).trim(),
+    tone: String(tone || "").trim()
+  };
 }

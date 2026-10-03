@@ -216,7 +216,10 @@ export async function createMediationMaterialPdf(input, teacherGuides = [], gene
         const timing = display(item.timing || item.when || "Momento a definir");
         const purpose = display(item.purpose);
         const message = display(item.text || item.message || item.body);
-        callout(timing, `${purpose ? `Objetivo: ${purpose}\n` : ""}${message || "Mensagem a revisar."}`, { background: pale, border: sage, size: 8.8 });
+        const tone = display(item.tone);
+        const studentNeed = display(item.studentNeed);
+        const teacherIntent = display(item.teacherIntent);
+        callout(timing, `${purpose ? `Objetivo: ${purpose}\n` : ""}${tone ? `Tom: ${tone}\n` : ""}${studentNeed ? `Necessidade do estudante: ${studentNeed}\n` : ""}${teacherIntent ? `Intenção de mediação: ${teacherIntent}\n` : ""}${message || "Mensagem a revisar."}`, { background: pale, border: sage, size: 8.8 });
       });
     });
   };
@@ -295,6 +298,27 @@ export async function createMediationMaterialPdf(input, teacherGuides = [], gene
         bullet(`${status} — ${display(claim.claim)} (${source})`, { color: status === "CONFIRMADA" ? muted : coral });
       }
     }
+    if (guide.resourceNotes?.length) {
+      heading("Recursos no ponto de uso", 2);
+      paragraph("As informações abaixo são internas para o professor: indicam onde o recurso entra, por que foi selecionado e o que observar na mediação. A aula do estudante recebe somente o recurso e sua apresentação necessária.", { color: muted });
+      for (const resource of guide.resourceNotes) {
+        const location = [resource.sectionNumber && `Seção ${resource.sectionNumber}`, resource.sectionTitle, resource.moment].filter(Boolean).join(" · ");
+        const details = [
+          location ? `Ponto de uso: ${location}` : "",
+          resource.required ? "Classificação: obrigatório" : "Classificação: complementar",
+          resource.objective ? `Objetivo: ${resource.objective}` : "",
+          resource.guidingQuestion ? `Pergunta-guia: ${resource.guidingQuestion}` : "",
+          resource.bridgeParagraph ? `Ligação com o estudo: ${resource.bridgeParagraph}` : "",
+          resource.pedagogicalUse ? `Uso pedagógico: ${resource.pedagogicalUse}` : "",
+          resource.selectionReason ? `Por que foi selecionado: ${resource.selectionReason}` : "",
+          resource.durationMinutes ? `Duração: ${resource.durationMinutes} minutos` : "",
+          resource.pages ? `Páginas: ${resource.pages}` : "",
+          resource.verificationStatus ? `Verificação: ${resource.verificationStatus}` : "",
+          resource.humanApproval && resource.humanApproval !== "pending" ? `Aprovação humana: ${resource.humanApproval}` : ""
+        ].filter(Boolean).join("\n");
+        callout(`${resource.kind || "Recurso"}: ${resource.title || "sem título"}`, details || "Detalhamento pedagógico a completar.", { background: pale, border: sage, size: 8.6 });
+      }
+    }
     if (guide.academicReview && (guide.academicReview.issues?.length || guide.academicReview.status)) {
       heading("Revisão acadêmica", 2);
       row("Status", reviewStatus(guide.academicReview.status), { color: guide.academicReview.status === "needs-revision" ? coral : muted });
@@ -303,6 +327,12 @@ export async function createMediationMaterialPdf(input, teacherGuides = [], gene
     }
     if (guide.diagnostic && Object.keys(guide.diagnostic).length) { heading("Diagnóstico inicial", 2); formatDiagnostic(guide.diagnostic); }
     if (guide.formativeChecks?.length) { heading("Checagens formativas", 2); bullets(guide.formativeChecks.map((item) => `${display(item.prompt || item.question || item.title || item.instructions) || "Checagem a definir"}${item.feedback ? ` — feedback: ${display(item.feedback)}` : ""}`)); }
+    if (guide.mediationStops?.length) {
+      heading("Paradas de aprendizagem e mediação", 2);
+      for (const stop of guide.mediationStops) {
+        callout(display(stop.timing || "Parada"), `Propósito: ${display(stop.purpose) || "a definir"}\nNecessidade do estudante: ${display(stop.studentNeed) || "a observar"}\nIntenção do professor: ${display(stop.teacherIntent) || "a definir"}${stop.prompt ? `\nPergunta/ação: ${display(stop.prompt)}` : ""}`, { background: pale, border: sage, size: 8.6 });
+      }
+    }
     if (guide.summativeAssessment && Object.keys(guide.summativeAssessment).length) { heading("Avaliação somativa", 2); row("Formato", `${display(guide.summativeAssessment.title) || "Avaliação final"}${guide.summativeAssessment.format ? ` · ${display(guide.summativeAssessment.format)}` : ""}`); }
     if (guide.mediationQuestions?.length) { heading("Perguntas para mediação", 2); bullets(guide.mediationQuestions); }
     if (guide.commonMisconceptions?.length) { heading("Equívocos comuns", 2); bullets(guide.commonMisconceptions); }
@@ -316,6 +346,18 @@ export async function createMediationMaterialPdf(input, teacherGuides = [], gene
     if (guide.spiralReview && Object.keys(guide.spiralReview).length) { heading("Revisão espiral", 2); formatSpiralReview(guide.spiralReview); }
     if (guide.webPractices?.length) { heading("Webpráticas associadas", 2); guide.webPractices.forEach(formatPractice); }
     if (guide.mediationMessages) { heading("Mensagens de acompanhamento aos estudantes", 2); paragraph("As duas versões têm o mesmo propósito pedagógico, mas foram escritas para os contextos próprios de WhatsApp e Moodle. Ajuste nomes, datas e links antes do envio.", { color: muted }); formatMediationMessages(guide.mediationMessages); }
+    if (guide.timePlan?.items?.length || Object.keys(guide.timePlan?.breakdown || {}).length) {
+      heading("Tempo da semana — uso do professor", 2);
+      const timeItems = (guide.timePlan.items || []).filter((item) => Number(item.minutes || item.learnerMinutes) > 0).map((item) => `${display(item.title || "Atividade")} — ${item.minutes || item.learnerMinutes} min${item.required === false ? " (complementar)" : " (obrigatório)"}`);
+      if (timeItems.length) bullets(timeItems);
+      const breakdown = Object.entries(guide.timePlan.breakdown || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `${key}: ${value} min`);
+      if (breakdown.length) { paragraph("Distribuição calculada:", { font: bold, size: 9.2, after: 2 }); bullets(breakdown); }
+    }
+    if (guide.workloadAdjustment || guide.workloadAdvice?.length) {
+      heading("Ajustes de carga", 2);
+      const suggestions = guide.workloadAdjustment?.suggestions || guide.workloadAdvice || [];
+      bullets(suggestions.map((item) => typeof item === "string" ? item : [item.title, item.action, item.rationale].filter(Boolean).join(" — ")));
+    }
     if (guide.qualityReview?.checks?.length) {
       ensure(180);
       heading("Checklist antes da publicação", 2);

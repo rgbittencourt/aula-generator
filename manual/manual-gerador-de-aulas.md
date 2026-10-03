@@ -87,9 +87,9 @@ Ele contém a experiência que será apresentada ao estudante, incluindo:
 - síntese;
 - referências;
 - conexão com a próxima semana;
-- cálculo e observações de carga.
+- recursos necessários para a experiência do estudante, sem o cálculo interno da carga.
 
-O JSON do aluno **não deve conter o guia interno do professor nem qualquer webprática**. O campo `lessonPlan.webPractices` permanece vazio; a sessão prática é um produto separado em `teacherGuide.webPracticeProjects` e em DOCX.
+O JSON do aluno **não deve conter o guia interno do professor nem qualquer webprática**. Também ficam fora do arquivo o alinhamento pedagógico, os parágrafos internos de ligação dos recursos, as justificativas de curadoria, os estados de revisão, o cálculo de tempo, os ajustes de carga e as mensagens de acompanhamento. O campo `lessonPlan.webPractices` permanece vazio; a sessão prática é um produto separado em `teacherGuide.webPracticeProjects` e em DOCX.
 
 ### 2.2 Material de Mediação em PDF
 
@@ -108,8 +108,10 @@ O PDF é separado da aula do aluno. Ele foi pensado para leitura na tela e inclu
 - observações de avaliação;
 - revisão espiral;
 - conferência dos recursos;
+- ponto exato de uso de cada vídeo, imagem, artigo ou leitura, com a justificativa pedagógica, o que observar e perguntas para a mediação;
 - recomendações de carga e qualidade;
-- mensagens semanais para WhatsApp, em tom próximo e informal, e para Mensagens do Moodle, em linguagem organizada e adequada ao ambiente do curso.
+- paradas de aprendizagem, necessidades prováveis dos estudantes e intervenções do professor;
+- mensagens semanais para WhatsApp, em tom próximo e informal, e para Mensagens do Moodle, em linguagem organizada e adequada ao ambiente do curso. Cada mensagem pode ser editada, receber um tom e informações específicas e ser refeita individualmente pela IA.
 
 ### 2.3 Pacote completo ZIP do Gerador
 
@@ -1261,6 +1263,10 @@ Clique em **Ver aula** no card da semana. A janela de prévia apresenta, na orde
 - atividades e evidências produzidas;
 - a prévia não mostra o roteiro da webprática: a sessão aparece no painel separado **Webpráticas programadas**, com agenda e botão de DOCX;
 - síntese, continuidade, trilhas de diferenciação, glossário, autoavaliação e avaliação.
+
+Depois da leitura da aula, a prévia apresenta o bloco **Material de Mediação · uso do professor**. Nele, os recursos mostram o ponto de uso, a ligação com o estudo, o objetivo, o que observar e o estado de conferência. As **Paradas de aprendizagem** registram a necessidade provável do estudante e a intervenção sugerida. Esses dados são internos e não são enviados ao Aula Studio.
+
+As **Mensagens de acompanhamento** aparecem em dois canais. Em cada cartão, edite diretamente o texto, informe o **Tom desta mensagem** e acrescente **Informações específicas para a IA**. O botão **Refazer esta mensagem com IA** altera somente aquele cartão, mantendo os demais. Revise nomes, datas, links e condições da atividade antes de copiar a mensagem para WhatsApp ou Moodle.
 
 O topo da janela mostra palavras, seções, objetivos e nota estrutural. Leia a aula inteira antes de baixar o JSON. Se aparecer **conteúdo insuficiente**, não abra essa versão no Aula Studio ainda.
 

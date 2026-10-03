@@ -1,3 +1,5 @@
+import { toStudentLesson } from "./student-export.js";
+
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
 const createReviewMarks = () => ({ resources: {}, checks: {}, academic: {}, quality: {} });
@@ -1156,11 +1158,52 @@ function mediationMessagesMarkup(messages = {}, theme = "a semana", weekNumber =
       { timing: "Fechamento", text: "Conclua a atividade prevista, revise a síntese e envie a evidência solicitada." }
     ]
   };
-  const channel = (label, items) => {
+  const channel = (label, channelKey, items) => {
     const rows = Array.isArray(items) ? items : [];
-    return `<div class="mediation-channel"><h4>${escapeHtml(label)}</h4>${rows.length ? rows.map((item) => `<article><strong>${escapeHtml(item.timing || item.when || "Momento da semana")}</strong>${item.purpose ? `<small>${escapeHtml(item.purpose)}</small>` : ""}<p>${escapeHtml(item.text || item.message || item.body || "Mensagem a revisar.")}</p></article>`).join("") : "<p>Mensagem ainda não detalhada.</p>"}</div>`;
+    return `<div class="mediation-channel"><h4>${escapeHtml(label)}</h4>${rows.length ? rows.map((item, messageIndex) => `<article class="mediation-message-card" data-message-channel="${escapeHtml(channelKey)}" data-message-index="${messageIndex}"><div class="mediation-message-heading"><strong>${escapeHtml(item.timing || item.when || "Momento da semana")}</strong><span>${escapeHtml(item.relatedType || "mediação")}</span></div>${item.purpose ? `<small class="mediation-message-purpose">${escapeHtml(item.purpose)}</small>` : ""}<label><span>Tom desta mensagem</span><input class="mediation-message-tone" type="text" value="${escapeHtml(item.tone || (channelKey === "whatsapp" ? "próximo, acolhedor e com humor leve" : "acolhedor, claro e organizado"))}" placeholder="Ex.: mais direto, empático e informal" /></label><label><span>Informações específicas para a IA</span><textarea class="mediation-message-instructions" rows="2" placeholder="Ex.: mencione a dúvida recorrente sobre o conceito 2; lembre que a atividade vale como fórum.">${escapeHtml(item.instructions || "")}</textarea></label><label><span>Mensagem pronta para revisar</span><textarea class="mediation-message-text" rows="5">${escapeHtml(item.text || item.message || item.body || "Mensagem a revisar.")}</textarea></label><div class="mediation-message-actions"><button class="button button-secondary mediation-regenerate" type="button" data-message-channel="${escapeHtml(channelKey)}" data-message-index="${messageIndex}">Refazer esta mensagem com IA <span>↻</span></button><small>Você pode editar o texto diretamente antes de enviar.</small></div></article>`).join("") : "<p>Mensagem ainda não detalhada.</p>"}</div>`;
   };
-  return `<section class="reader-mediation"><div class="reader-mediation-label">MATERIAL DE MEDIAÇÃO · USO DO PROFESSOR</div><h3>Mensagens de acompanhamento</h3><p>Estas mensagens não entram no JSON do aluno. Revise nomes, datas, links e o tom antes de enviar.</p>${channel("WhatsApp", resolved.whatsapp)}${channel("Mensagens do Moodle", resolved.moodle)}</section>`;
+  return `<section class="reader-mediation"><div class="reader-mediation-label">MATERIAL DE MEDIAÇÃO · USO DO PROFESSOR</div><h3>Mensagens de acompanhamento</h3><p>Estas mensagens não entram no JSON do aluno. Cada cartão pode ser editado, receber um tom próprio e ser refeito pela IA com informações específicas.</p>${channel("WhatsApp", "whatsapp", resolved.whatsapp)}${channel("Mensagens do Moodle", "moodle", resolved.moodle)}</section>`;
+}
+
+async function regenerateMediationMessage(button) {
+  const index = state.previewIndex;
+  const channel = button?.dataset.messageChannel;
+  const messageIndex = Number(button?.dataset.messageIndex);
+  const guide = index == null ? null : state.teacherGuides?.[index];
+  const message = guide?.mediationMessages?.[channel]?.[messageIndex];
+  const card = button?.closest(".mediation-message-card");
+  if (!message || !card || !Number.isInteger(messageIndex)) return;
+  if (isGitHubPages) { showError("A refação de mensagens fica disponível na versão Vercel com IA."); return; }
+  if (aiActionBusy || !beginAiAction(button)) return;
+  const dialog = $(".lesson-dialog");
+  const dialogScroll = dialog?.scrollTop || 0;
+  const tone = card.querySelector(".mediation-message-tone")?.value.trim() || "";
+  const instructions = card.querySelector(".mediation-message-instructions")?.value.trim() || "";
+  const currentText = card.querySelector(".mediation-message-text")?.value.trim() || message.text || "";
+  message.tone = tone;
+  message.instructions = instructions;
+  message.text = currentText;
+  setBusy(button, true, "Refazendo…");
+  setAiActivity("Refazendo mensagem", `A IA está reescrevendo a mensagem de ${channel === "moodle" ? "Moodle" : "WhatsApp"} para ${message.timing || "este momento"}…`);
+  try {
+    const stop = (guide.mediationStops || []).find((item) => item.id === message.relatedId) || {};
+    const response = await fetch("/api/regenerate-message", {
+      method: "POST",
+      headers: apiHeaders(),
+      body: JSON.stringify({ input: state.input, weekNumber: index + 1, theme: state.weeks[index]?.lessonPlan?.theme, channel, timing: message.timing, purpose: message.purpose, studentNeed: message.studentNeed, teacherIntent: message.teacherIntent, currentText, tone, instructions, relatedContext: stop })
+    });
+    const data = await readApiResponse(response, "Não foi possível refazer esta mensagem.");
+    Object.assign(message, data.message || {});
+    saveDraft("mensagem de mediação");
+    renderLessonPreview(state.weeks[index], index);
+    if (dialog) dialog.scrollTop = dialogScroll;
+    finishAiActivity("Mensagem refeita", `A mensagem de ${channel === "moodle" ? "Moodle" : "WhatsApp"} foi atualizada. Revise antes de enviar.`, "success");
+  } catch (error) {
+    showError(error.message);
+    finishAiActivity("Mensagem não refeita", error.message, "error");
+  } finally {
+    endAiAction();
+  }
 }
 
 function renderLessonPreview(lesson, index) {
@@ -1216,6 +1259,7 @@ function renderLessonPreview(lesson, index) {
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
   $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${assessment}${alignment}${timeMarkup}${workload}${mediation}`;
+  $("#lesson-reader").querySelectorAll(".mediation-regenerate").forEach((button) => button.addEventListener("click", () => regenerateMediationMessage(button)));
 }
 
 function openLessonPreview(index) {
@@ -1657,7 +1701,7 @@ function downloadWeek(index) {
   const lesson = state.weeks[index];
   if (!lesson) return;
   const number = String(index + 1).padStart(2, "0");
-  downloadBlob(new Blob([JSON.stringify(lesson, null, 2)], { type: "application/json" }), `semana-${number}-${slugify(lesson.meta?.title)}.aula.json`);
+  downloadBlob(new Blob([JSON.stringify(toStudentLesson(lesson), null, 2)], { type: "application/json" }), `semana-${number}-${slugify(lesson.meta?.title)}.aula.json`);
 }
 
 function apiHeaders() {
@@ -1782,7 +1826,7 @@ async function downloadZip() {
     if (isGitHubPages) {
       if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
       const zip = new window.JSZip();
-      state.weeks.forEach((lesson, index) => { const number = String(index + 1).padStart(2, "0"); zip.file(`semanas/semana-${number}-${slugify(lesson.meta?.title)}.aula.json`, JSON.stringify(lesson, null, 2)); });
+      state.weeks.forEach((lesson, index) => { const number = String(index + 1).padStart(2, "0"); zip.file(`semanas/semana-${number}-${slugify(lesson.meta?.title)}.aula.json`, JSON.stringify(toStudentLesson(lesson), null, 2)); });
       if (state.generalPlan) zip.file("planejamento-geral.json", JSON.stringify(state.generalPlan, null, 2));
       zip.file("professor/LEIA-ME.txt", "O Material de Mediação em PDF é gerado na versão Vercel com backend. Este modo público contém apenas o exemplo do aluno.");
       downloadBlob(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), `${slugify(state.input.title)}-semanas.zip`);

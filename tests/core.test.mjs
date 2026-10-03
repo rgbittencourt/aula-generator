@@ -9,6 +9,7 @@ import { buildBriefingPrompt, buildWeekGenerationPrompt } from "../src/ai.js";
 import { compositionPlanForWeek } from "../src/composition.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { createTeacherGuidePdf } from "../src/pdf.js";
+import { toStudentLesson } from "../src/student-export.js";
 import { buildCourseProgression } from "../src/curriculum.js";
 import { measureLessonQuality, qualityTargets } from "../src/content-quality.js";
 
@@ -230,6 +231,38 @@ test("JSON do aluno não carrega webprática e o guia preserva o projeto separad
   assert.deepEqual(lesson.lessonPlan.webPractices, []);
   const guides = buildTeacherGuides(input, [lesson], []);
   assert.equal(guides[0].webPracticeProjects[0].artifacts.length, 1);
+});
+
+test("exportação do Aula Studio remove mediação, alinhamento, tempo e curadoria interna", () => {
+  const input = normalizeCourseInput({ title: "Curso de exportação", weeks: 1, hoursPerWeek: 4, objectives: ["Analisar"] });
+  const lesson = normalizeLesson({
+    lessonPlan: {
+      theme: "Semana de exportação",
+      welcome: "Abertura para o estudante.",
+      learningObjectives: ["Analisar"],
+      contentSections: [{ number: "1", title: "Conceito", body: "Texto do estudante.", resources: [{ id: "video-1", title: "Vídeo", bridgeParagraph: "Ligação interna do professor." }] }],
+      resources: { videos: [{ id: "video-1", title: "Vídeo", href: "https://youtu.be/abc123", bridgeParagraph: "Ligação interna do professor.", pedagogicalUse: "Uso interno", sectionNumber: 1 }] },
+      alignmentMatrix: [{ objective: "Analisar", evidence: "Registro" }],
+      timePlan: { items: [{ title: "Texto-base", minutes: 60 }], workloadAdjustment: { suggestions: [{ title: "Ajuste interno" }] } }
+    },
+    blocks: [
+      { type: "hero", props: { title: "Semana", lead: "Analisar" } },
+      { type: "destaque", props: { title: "Objetivos", body: "Analisar" } },
+      { type: "topic", props: { children: [
+        { type: "titulo", props: { text: "1 Conceito" } },
+        { type: "prose", props: { resourceId: "video-1", body: "Ligação interna do professor.", inlineVideo: { id: "abc123", title: "Vídeo", caption: "Vídeo para a aula" } } }
+      ] } }
+    ]
+  }, input, 0);
+  const exported = toStudentLesson({ ...lesson, teacherGuide: { mediationMessages: { whatsapp: [{ text: "não exportar" }] } } });
+  const serialized = JSON.stringify(exported);
+  assert.doesNotMatch(serialized, /teacherGuide|mediationMessages|alignmentMatrix|timePlan|workloadAdjustment|bridgeParagraph|pedagogicalUse|Ligação interna do professor/);
+  assert.match(serialized, /abc123/);
+  const topic = exported.blocks.find((block) => block.type === "topic");
+  const videoBridge = topic?.props?.children?.find((block) => block.props?.inlineVideo?.id === "abc123");
+  assert.ok(topic);
+  assert.ok(videoBridge);
+  assert.equal(videoBridge.props.body, "");
 });
 
 test("Material de Mediação em PDF é gerado separadamente", async () => {

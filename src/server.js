@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "./calculations.js";
 import { buildFallbackLesson, normalizeCourseInput, normalizeLesson, normalizeWeeklyOutput, slugify, validateLesson } from "./aula-schema.js";
-import { assistBriefing, generateOneWeek, generateWithAI, regenerateWeekWithAI } from "./ai.js";
+import { assistBriefing, generateOneWeek, generateWithAI, regenerateMediationMessageWithAI, regenerateWeekWithAI } from "./ai.js";
 import { enrichLessonsWithResources } from "./research.js";
 import { createWeeksZip } from "./zip.js";
 import { accessRequired, hasValidAccess } from "./access.js";
@@ -134,6 +134,20 @@ app.post("/api/regenerate-week", async (req, res) => {
   } catch (error) {
     const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_INVALID_JSON" ? 502 : 400;
     res.status(status).json({ ok: false, error: error.message || "Não foi possível refazer a semana." });
+  }
+});
+
+app.post("/api/regenerate-message", async (req, res) => {
+  if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
+  try {
+    const input = normalizeCourseInput(req.body?.input || {});
+    const message = await regenerateMediationMessageWithAI({ ...req.body, input });
+    if (!message.text) return res.status(502).json({ ok: false, error: "A IA não retornou uma mensagem utilizável." });
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, message });
+  } catch (error) {
+    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
+    res.status(status).json({ ok: false, error: error.message || "Não foi possível refazer a mensagem." });
   }
 });
 

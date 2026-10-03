@@ -174,8 +174,8 @@ Os quatro checklists exibem todos os itens disponíveis e iniciam marcados os qu
 
 A aplicação produz duas camadas diferentes:
 
-- **Aula do aluno:** cada semana é um `.aula.json` compatível com o botão **Abrir** do Aula Studio. Ele contém apenas a experiência de aprendizagem do aluno: texto, objetivos, recursos contextualizados, atividades, avaliação, síntese e metadados de carga. `lessonPlan.webPractices` é sempre `[]`.
-- **Material de Mediação:** é mantido fora do JSON do aluno e exportado em PDF. Reúne intenção pedagógica, arco didático, matriz de alinhamento, diagnóstico, perguntas de mediação, equívocos comuns, intervenções, diferenciação, acessibilidade, avaliação, revisão espiral, checklist, carga detalhada e mensagens semanais para WhatsApp e Moodle. As mensagens têm o mesmo propósito, mas são redigidas de modo diferente: WhatsApp mais próximo e informal; Moodle mais organizado para o ambiente do curso.
+- **Aula do aluno:** cada semana é um `.aula.json` compatível com o botão **Abrir** do Aula Studio. Ele contém apenas a experiência de aprendizagem do aluno: texto, objetivos, recursos contextualizados, atividades, avaliação, síntese e referências necessárias. O arquivo não leva alinhamento pedagógico, parágrafos internos de ligação, justificativas de curadoria, status de revisão, cálculo de tempo, ajustes de carga ou mensagens de acompanhamento. `lessonPlan.webPractices` é sempre `[]`.
+- **Material de Mediação:** é mantido fora do JSON do aluno e exportado em PDF. Reúne intenção pedagógica, arco didático, matriz de alinhamento, diagnóstico, perguntas de mediação, equívocos comuns, intervenções, diferenciação, acessibilidade, avaliação, revisão espiral, checklist, carga detalhada, o ponto exato de uso e a justificativa de cada recurso, além de mensagens semanais para WhatsApp e Moodle. As mensagens têm o mesmo propósito, mas são redigidas de modo diferente: WhatsApp mais próximo e informal; Moodle mais organizado para o ambiente do curso. Cada mensagem pode ser editada, receber tom e instruções próprias e ser refeita isoladamente pela IA.
 - **Roteiro de webprática:** cada sessão prática agendada é mantida em `teacherGuide.webPracticeProjects` e exportada como DOCX editável próprio, sem ser inserida no texto-base semanal.
 
 Na tela de resultados, **Baixar JSON do aluno** baixa somente a semana selecionada. O painel separado **Webpráticas programadas** mostra a agenda e oferece **Baixar DOCX** para cada sessão. **Material de Mediação PDF** baixa o documento de mediação. **Pacote completo ZIP** reúne os JSONs, o Planejamento Geral, o Material de Mediação em PDF e os projetos de webprática em Markdown, JSON, arquivos auxiliares e DOCX.
@@ -224,6 +224,7 @@ O fallback OpenAlex fica ligado por padrão e aparece como `openAlexFallback: tr
 | `POST /api/generate-week` | gera uma semana isolada, com pesquisa de recursos e guia correspondente |
 | `POST /api/assemble-course` | consolida semanas já geradas e calcula o Planejamento Geral |
 | `POST /api/regenerate-week` | refaz somente uma semana com instrução do professor e recalcula o curso |
+| `POST /api/regenerate-message` | refaz uma mensagem de WhatsApp ou Moodle com tom e instruções próprias |
 | `POST /api/teacher-pdf` | devolve somente o PDF do Material de Mediação |
 | `POST /api/webpractice-docx` | devolve o DOCX editável de uma webprática por `practiceId` ou índice |
 | `POST /api/zip` | devolve o pacote completo, incluindo PDF, DOCX e webpráticas |
