@@ -67,3 +67,53 @@ test("fallback da curadoria insere recurso real quando a IA retorna seleção va
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = previousKey;
   }
 });
+
+test("cobertura de recursos ignora keep:false e completa as metas com candidatos reais", async () => {
+  const input = normalizeCourseInput({
+    title: "Gestão educacional e dados",
+    weeks: 1,
+    content: "Indicadores, governança e tomada de decisão.",
+    objectives: ["Analisar indicadores"],
+    resourcePlan: { default: { videosPerWeek: 3, articlesPerWeek: 1, requiredReadingsPerWeek: 1 } }
+  });
+  const lesson = buildFallbackLesson(input, 0);
+  const previousFetch = globalThis.fetch;
+  const previousKey = process.env.OPENAI_API_KEY;
+  const previousYoutubeKey = process.env.YOUTUBE_API_KEY;
+  const previousResearch = process.env.AULA_RESOURCE_RESEARCH;
+  process.env.OPENAI_API_KEY = "test-key";
+  process.env.YOUTUBE_API_KEY = "test-youtube-key";
+  process.env.AULA_RESOURCE_RESEARCH = "true";
+  globalThis.fetch = async (url) => {
+    const value = String(url);
+    if (value.includes("youtube/v3/search")) {
+      const requestId = new URL(value).searchParams.get("q")?.includes("generated-2") ? "video-generated-2" : new URL(value).searchParams.get("q")?.includes("generated-3") ? "video-generated-3" : "video-generated-1";
+      return new Response(JSON.stringify({ items: [1, 2, 3].map((index) => ({ id: { videoId: `${requestId}-candidate-${index}` }, snippet: { title: `Vídeo real ${requestId} ${index}`, channelTitle: "Canal acadêmico", description: "Descrição contextualizada", publishedAt: "2024-01-01", thumbnails: {} } })) }), { status: 200 });
+    }
+    if (value.includes("youtube/v3/videos")) {
+      const ids = new URL(value).searchParams.get("id")?.split(",") || [];
+      return new Response(JSON.stringify({ items: ids.map((id) => ({ id, status: { embeddable: true, privacyStatus: "public" }, snippet: { title: id, channelTitle: "Canal acadêmico", publishedAt: "2024-01-01", thumbnails: {} }, contentDetails: { duration: "PT8M" } })) }), { status: 200 });
+    }
+    if (value.includes("commons.wikimedia.org")) return new Response(JSON.stringify({ query: { pages: { "1": { title: "File:Fluxo.png", imageinfo: [{ thumburl: "https://commons.wikimedia.org/thumb/fluxo.png", descriptionurl: "https://commons.wikimedia.org/wiki/File:Fluxo.png", extmetadata: { ImageDescription: { value: "Fluxo de dados" }, LicenseShortName: { value: "CC BY-SA" } } }] } } } }), { status: 200 });
+    if (value.includes("api.crossref.org")) return new Response(JSON.stringify({ message: { items: [{ title: ["Governança de dados na educação"], URL: "https://doi.org/10.1234/dados", DOI: "10.1234/dados", author: [{ given: "Ana", family: "Silva" }], published: { "date-parts": [[2024]] }, publisher: "Revista Teste" }] } }), { status: 200 });
+    if (value.includes("/chat/completions")) return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+      videos: [1, 2, 3].map((index) => ({ candidateId: `youtube:video-generated-${index}:1`, keep: false, reason: "Candidato recusado no primeiro passe", use: "Relacionar o vídeo ao conceito", query: "gestão educacional" })),
+      images: [],
+      readings: []
+    }) } }] }), { status: 200 });
+    return new Response("{}", { status: 200 });
+  };
+  try {
+    const [result] = await enrichLessonsWithResources(input, [lesson]);
+    assert.equal(result.lessonPlan.resources.videos.length, 3);
+    assert.ok(result.lessonPlan.resources.videos.every((resource) => resource.href.startsWith("https://www.youtube.com/watch?v=")));
+    assert.equal(result.lessonPlan.resources.images.length, 1);
+    assert.equal(result.lessonPlan.resources.readingsRequired.length, 1);
+    assert.equal(result.lessonPlan.resourceResearch.coverage.videos.selected, 3);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = previousKey;
+    if (previousYoutubeKey === undefined) delete process.env.YOUTUBE_API_KEY; else process.env.YOUTUBE_API_KEY = previousYoutubeKey;
+    if (previousResearch === undefined) delete process.env.AULA_RESOURCE_RESEARCH; else process.env.AULA_RESOURCE_RESEARCH = previousResearch;
+  }
+});

@@ -201,7 +201,7 @@ Após a geração textual, o sistema consulta **YouTube Data API v3** para víde
 
 A arquitetura agora separa três responsabilidades: `src/ai-client.js` faz chamadas JSON, retries e recuperação de respostas inválidas; `src/resource-curator.js` pede à IA apenas a seleção entre candidatos reais; e `src/resource-providers.js` mantém o registro extensível de provedores. Assim, adicionar outro catálogo de vídeos, imagens ou referências não exige alterar o contrato semanal nem a redação da aula.
 
-Os recursos selecionados viram blocos editáveis do Aula Studio: `video`, `imagem` ou `materiais`. Isso permite abrir a aula e **editar o texto, trocar/remover uma imagem ou vídeo, inserir outro bloco e reorganizar a leitura** sem transformar o conteúdo em HTML achatado. Cada recurso possui estado `candidate-found`, `selected-by-ai` ou `approved`, além de pendências de licença, atualidade, acessibilidade, duração e adequação ao idioma. A aprovação final continua humana.
+Os recursos selecionados viram blocos editáveis do Aula Studio: `video`, `imagem` ou `materiais`. Isso permite abrir a aula e **editar o texto, trocar/remover uma imagem ou vídeo, inserir outro bloco e reorganizar a leitura** sem transformar o conteúdo em HTML achatado. Cada recurso possui estado `candidate-found`, `selected-by-ai` ou `approved`, além de pendências de licença, atualidade, acessibilidade, duração e adequação ao idioma. A aprovação final continua humana. Sugestões que ainda não têm URL real permanecem visíveis para conferência no Material de Mediação e na prévia do professor, mas são removidas da fronteira de exportação: não entram no JSON do Aula Studio como vídeo, imagem ou material vazio.
 
 ### Configurar a pesquisa de vídeos
 

@@ -585,10 +585,15 @@ function renderResourcePlanWeeks(plan = {}) {
   if (!container) return;
   const weeks = Math.min(52, Math.max(1, Number($("#weeks")?.value) || 1));
   const entries = Array.isArray(plan.weeks) ? plan.weeks : [];
+  const defaults = plan.default || {};
   const byWeek = new Map(entries.map((entry) => [Number(entry.weekNumber || entry.week), entry]));
+  const inheritedPlaceholder = (attribute) => {
+    const defaultValue = attribute === "videos" ? defaults.videosPerWeek : attribute === "articles" ? defaults.articlesPerWeek : defaults.requiredReadingsPerWeek;
+    return Number.isFinite(Number(defaultValue)) ? `padrão (${Number(defaultValue)})` : "padrão";
+  };
   const field = (label, attribute, value, type = "number") => type === "select"
     ? `<label class="field"><span>${label}</span><select data-resource-${attribute} class="resource-override"><option value="">Padrão</option><option value="none" ${value === "none" ? "selected" : ""}>Nenhuma</option><option value="essential" ${value === "essential" ? "selected" : ""}>Essencial</option><option value="advanced" ${value === "advanced" ? "selected" : ""}>Aprofundada</option><option value="dense" ${value === "dense" ? "selected" : ""}>Densa</option></select></label>`
-    : `<label class="field"><span>${label}</span><input data-resource-${attribute} class="resource-override" type="number" min="0" max="12" step="1" value="${value ?? ""}" placeholder="padrão" /></label>`;
+    : `<label class="field"><span>${label}</span><input data-resource-${attribute} class="resource-override" type="number" min="0" max="12" step="1" value="${value ?? ""}" placeholder="${value === null || value === undefined || value === "" ? inheritedPlaceholder(attribute) : "padrão"}" /></label>`;
   container.innerHTML = Array.from({ length: weeks }, (_, index) => {
     const weekNumber = index + 1;
     const entry = byWeek.get(weekNumber) || {};
@@ -1206,8 +1211,8 @@ function resourcePreview(resource) {
     : isImage
       ? `<div class="reader-resource-media"><img src="${escapeHtml(resource.href)}" alt="${escapeHtml(resource.altText || resource.caption || title)}" loading="lazy" /></div>`
       : "";
-  const sourceLink = resource.href ? `<a href="${escapeHtml(resource.href)}" target="_blank" rel="noreferrer">Abrir fonte</a>` : `<span>Busca sugerida: ${escapeHtml(resource.searchQuery || "a confirmar")}</span>`;
-  const approval = resource.humanApproval === "approved" || resource.verificationStatus === "verified" ? "Conferido" : resource.href ? "Link localizado · revisão humana pendente" : "Ainda é uma sugestão";
+  const sourceLink = resource.href ? `<a href="${escapeHtml(resource.href)}" target="_blank" rel="noreferrer">Abrir fonte</a>` : `<span class="reader-resource-pending">Curadoria pendente: ${escapeHtml(resource.searchQuery || "a confirmar")} · somente Material de Mediação</span>`;
+  const approval = resource.humanApproval === "approved" || resource.verificationStatus === "verified" ? "Conferido" : resource.href ? "Link localizado · revisão humana pendente" : "Não exportado ao aluno até haver URL real";
   const detail = [resource.pedagogicalUse || resource.objective, resource.source, resource.license, approval].filter(Boolean).join(" · ");
   const bridge = resource.bridgeParagraph || resource.connectionParagraph || resource.pedagogicalUse || `Use este recurso neste ponto para relacionar ${title} ao conceito explicado na seção e registrar o que ele confirma, exemplifica ou problematiza.`;
   return `<div class="reader-resource reader-resource-inline"><div class="reader-resource-context"><div class="reader-resource-heading"><strong>${escapeHtml(title)}</strong>${sourceLink}</div><p class="reader-resource-bridge">${escapeHtml(bridge)}</p>${media}<small>${escapeHtml(detail || "Recurso contextualizado para esta seção.")}</small></div></div>`;
@@ -1219,7 +1224,10 @@ function compositionPreview(entry = {}) {
   const title = entry.title || entry.label || labels[type] || "Bloco editorial";
   const body = entry.body || entry.question || entry.intro || entry.description || entry.quote || "";
   const collection = entry.items || entry.cards || entry.steps || entry.questions || entry.features || entry.eras || entry.columns || entry.rows;
-  const rows = Array.isArray(collection) ? collection.slice(0, 6).map((item) => `<li>${escapeHtml(item.title || item.front || item.q || item.label || (Array.isArray(item) ? item.join(" · ") : "Item contextualizado"))}</li>`).join("") : "";
+  const itemLabel = (item) => Array.isArray(item)
+    ? item.join(" · ")
+    : item.title || item.front || item.q || item.question || item.prompt || item.text || item.body || item.answer || item.definition || item.label || "Conteúdo específico da seção";
+  const rows = Array.isArray(collection) ? collection.slice(0, 6).map((item) => `<li>${escapeHtml(itemLabel(item))}</li>`).join("") : "";
   const media = entry.src || entry.href ? `<img src="${escapeHtml(entry.src || entry.href)}" alt="${escapeHtml(entry.caption || title)}" loading="lazy" />` : "";
   return `<div class="reader-composition reader-composition-${escapeHtml(type)}"><div class="reader-composition-kicker">${escapeHtml(labels[type] || "Bloco Aula Studio")}</div><strong>${escapeHtml(title)}</strong>${paragraphsMarkup(body)}${media}${rows ? `<ul>${rows}</ul>` : ""}</div>`;
 }

@@ -51,6 +51,13 @@ function sanitizeBlock(block = {}) {
   delete nextProps.notes;
   if (children) nextProps.children = children;
 
+  // Sugestões sem URL ficam disponíveis para a mediação docente, mas não são
+  // uma experiência utilizável pelo estudante no Aula Studio.
+  if (source.type === "imagem" && !text(props.src || props.href)) return null;
+  if (source.type === "video" && !text(props.id || props.videoId)) return null;
+  if (source.type === "audio" && !text(props.src || props.href || props.spotify)) return null;
+  if (source.type === "externalembed" && !text(props.embed || props.src || props.href)) return null;
+
   // O parágrafo de ligação é uma anotação interna do professor. Quando ele
   // carrega um vídeo inline, preservamos apenas o player para o estudante.
   if (source.type === "prose" && props.resourceId) {
@@ -70,7 +77,8 @@ function sanitizeBlock(block = {}) {
       type: text(item?.type || item?.kind, "material"),
       title: text(item?.title, "Material de apoio"),
       href: text(item?.href || item?.link || item?.url)
-    }));
+    })).filter((item) => item.href);
+    if (!nextProps.items.length) return null;
   }
   if (source.type === "video") {
     nextProps.id = text(props.id);

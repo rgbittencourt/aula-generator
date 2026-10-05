@@ -1,5 +1,6 @@
 import { selectResourcesWithAI } from "./resource-curator.js";
 import { searchResources } from "./resource-providers.js";
+import { resourcePlanForWeek } from "./aula-schema.js";
 
 const text = (value) => String(value ?? "").trim();
 const positive = (value) => { const number = Number(value); return Number.isFinite(number) && number > 0 ? number : 0; };
@@ -14,15 +15,7 @@ function baseQuery(input, lesson) {
 
 function resourceTargetsFor(input, lesson) {
   const weekNumber = Number(lesson?.meta?.weekNumber || 1);
-  const plan = input.resourcePlan || {};
-  const defaults = plan.default || { videosPerWeek: 1, articlesPerWeek: 1, requiredReadingsPerWeek: 1, requiredReadingLevel: "essential" };
-  const override = (plan.weeks || []).find((entry) => Number(entry.weekNumber) === weekNumber) || {};
-  return {
-    videosPerWeek: override.videosPerWeek ?? defaults.videosPerWeek ?? 1,
-    articlesPerWeek: override.articlesPerWeek ?? defaults.articlesPerWeek ?? 1,
-    requiredReadingsPerWeek: override.requiredReadingsPerWeek ?? defaults.requiredReadingsPerWeek ?? 1,
-    requiredReadingLevel: override.requiredReadingLevel || defaults.requiredReadingLevel || "essential"
-  };
+  return resourcePlanForWeek(input, Math.max(0, weekNumber - 1));
 }
 
 function requestsFor(type, input, lesson) {
@@ -146,7 +139,13 @@ function selectedEntries(type, rawSelection, results) {
   const candidates = results.flatMap((result) => result.candidates || []);
   const byId = new Map(candidates.map((candidate) => [candidate.candidateId, candidate]));
   const raw = Array.isArray(rawSelection?.[type]) ? rawSelection[type] : [];
-  const chosen = raw.filter((selection) => selection && selection.keep !== false && byId.has(selection.candidateId)).map((selection) => resourceFromCandidate(byId.get(selection.candidateId), selection));
+  const chosen = [];
+  const used = new Set();
+  raw.filter((selection) => selection && selection.keep !== false && byId.has(selection.candidateId)).forEach((selection) => {
+    if (used.has(selection.candidateId)) return;
+    used.add(selection.candidateId);
+    chosen.push(resourceFromCandidate(byId.get(selection.candidateId), selection));
+  });
   return { chosen, raw, candidates };
 }
 
@@ -166,15 +165,27 @@ function ensureSelectionCoverage(selection, type, results, limit) {
   // Uma resposta vazia ou com IDs inexistentes é falha de formato, não uma
   // decisão pedagógica. Usa-se o primeiro candidato apenas como fallback
   // rastreável e ainda pendente de aprovação humana.
-  if (hasCandidates && (raw === null || raw.length === 0 || hasInvalidPositiveSelection)) {
-    return { items: fallbackSelection(results).slice(0, limit), fallback: `${type}: resposta da curadoria sem seleção utilizável; primeiro candidato inserido para revisão humana.` };
-  }
-  if (hasCandidates && limit > 0) {
-    const selectedIds = new Set((raw || []).filter((item) => item?.keep !== false && candidateIds.has(item?.candidateId)).map((item) => item.candidateId));
-    const additions = fallbackSelection(results).filter((item) => !selectedIds.has(item.candidateId));
-    if (selectedIds.size < limit && additions.length) return { items: [...(raw || []), ...additions].slice(0, limit), fallback: `${type}: a curadoria foi completada com candidatos adicionais para atingir a quantidade solicitada.` };
-  }
-  return { items: raw || [], fallback: "" };
+  if (!hasCandidates) return { items: raw || [], fallback: "" };
+
+  // Nunca preserve seleções keep:false na lista final: elas são recusas da IA,
+  // não recursos que devam ocupar as vagas solicitadas pelo professor.
+  const selected = [];
+  const selectedIds = new Set();
+  (raw || []).filter((item) => item?.keep !== false && candidateIds.has(item?.candidateId)).forEach((item) => {
+    if (selectedIds.has(item.candidateId)) return;
+    selectedIds.add(item.candidateId);
+    selected.push(item);
+  });
+  const additions = fallbackSelection(results).filter((item) => !selectedIds.has(item.candidateId));
+  const items = [...selected, ...additions].slice(0, limit);
+  const completedByFallback = items.length > selected.length;
+  const missingCoverage = items.length < limit;
+  const fallback = raw === null || raw.length === 0 || hasInvalidPositiveSelection || completedByFallback
+    ? `${type}: a curadoria foi completada com candidatos reais do provedor para atingir a quantidade solicitada; revisão humana pendente.`
+    : missingCoverage
+      ? `${type}: o provedor retornou menos candidatos do que a meta solicitada.`
+      : "";
+  return { items, fallback };
 }
 
 function blockKey(value) { return text(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 70) || "recurso"; }
@@ -284,7 +295,14 @@ export async function enrichLessonsWithResources(input, lessons) {
     const [videos, images, readings] = await Promise.all([searchResources("video", videoRequests, input), searchResources("image", imageRequests, input), searchResources("reading", readingRequests, input)]);
     const research = { status: "searched", searchedAt: new Date().toISOString(), targets, providers: { youtube: videos.map((result) => result.status), wikimediaCommons: images.map((result) => result.status), crossref: readings.map((result) => result.providers?.crossref || (result.provider === "crossref" ? result.status : "not-used")), openAlex: readings.map((result) => result.providers?.openalex || "not-used") }, queries: { videos: videoRequests, images: imageRequests, readings: readingRequests }, videos, images, readings };
     const candidateCount = flattenCandidates(research).length;
-    if (!candidateCount) return { ...lesson, lessonPlan: { ...lesson.lessonPlan, resourceResearch: { ...compactResearch({ ...research, status: "no-candidates" }), note: "Não foram encontrados candidatos. Para vídeos, cadastre YOUTUBE_API_KEY na Vercel; imagens e leituras usam provedores públicos." } } };
+    const existingResources = lesson.lessonPlan.resources || {};
+    const countWithHref = (items) => (Array.isArray(items) ? items.filter((item) => text(item?.href)).length : 0);
+    const coverage = {
+      videos: { requested: Number(targets.videosPerWeek || 0), selected: countWithHref(existingResources.videos) },
+      images: { requested: 1, selected: countWithHref(existingResources.images) },
+      readings: { requested: Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)), selected: countWithHref([...(existingResources.readingsRequired || []), ...(existingResources.readingsExtra || [])]) }
+    };
+    if (!candidateCount) return { ...lesson, lessonPlan: { ...lesson.lessonPlan, resourceResearch: { ...compactResearch({ ...research, status: "no-candidates" }), coverage, note: "Não foram encontrados candidatos reais. Para vídeos, confira YOUTUBE_API_KEY; imagens e leituras usam provedores públicos. Sugestões sem URL permanecem somente no Material de Mediação." } } };
     let selection;
     let selectionStatus = "ai-selected";
     try {
@@ -294,7 +312,8 @@ export async function enrichLessonsWithResources(input, lessons) {
       selection = { videos: fallbackSelection(videos), images: fallbackSelection(images), readings: fallbackSelection(readings), error: error.message };
     }
     const videoSelection = ensureSelectionCoverage(selection, "videos", videos, Number(targets.videosPerWeek || 0));
-    const imageSelection = ensureSelectionCoverage(selection, "images", images, 3);
+    const imageCandidateCount = images.flatMap((result) => result.candidates || []).length;
+    const imageSelection = ensureSelectionCoverage(selection, "images", images, Math.min(3, imageCandidateCount || 0));
     const readingSelection = ensureSelectionCoverage(selection, "readings", readings, Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)));
     const selectionFallbacks = [videoSelection.fallback, imageSelection.fallback, readingSelection.fallback].filter(Boolean);
     if (selectionFallbacks.length && selectionStatus === "ai-selected") selectionStatus = "ai-selected-with-provider-fallback";
@@ -307,7 +326,6 @@ export async function enrichLessonsWithResources(input, lessons) {
       images: chosenImages.chosen,
       readings: chosenReadings.chosen.map((resource, index) => ({ ...resource, required: resource.required || index < Number(targets.requiredReadingsPerWeek || 0) }))
     };
-    const existingResources = lesson.lessonPlan.resources || {};
     const selectedRequests = new Set([...selectedResources.videos, ...selectedResources.images, ...selectedResources.readings].map((resource) => resource.researchRequestId));
     const withoutPlaceholders = (resources = []) => resources.filter((resource) => resource.href || !selectedRequests.has(resource.id));
     const resources = {
@@ -318,7 +336,11 @@ export async function enrichLessonsWithResources(input, lessons) {
       readingsExtra: [...withoutPlaceholders(existingResources.readingsExtra), ...selectedResources.readings.filter((resource) => !resource.required)]
     };
     const alternatives = flattenCandidates(research).filter((candidate) => !selectedResources.videos.concat(selectedResources.images, selectedResources.readings).some((resource) => resource.candidateId === candidate.candidateId)).slice(0, 30);
-    const resourceResearch = compactResearch({ ...research, status: selectionStatus, selections: selection, selectionFallbacks, alternatives });
+    const resourceResearch = { ...compactResearch({ ...research, status: selectionStatus, selections: selection, selectionFallbacks, alternatives }), coverage: {
+      videos: { requested: Number(targets.videosPerWeek || 0), selected: selectedResources.videos.length },
+      images: { requested: 1, selected: selectedResources.images.length },
+      readings: { requested: Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)), selected: selectedResources.readings.length }
+    } };
     const enriched = attachResourcesToSections({ ...lesson, lessonPlan: { ...lesson.lessonPlan, resources, resourceResearch } }, selectedResources);
     enriched.blocks = syncResourceBlocks(enriched, selectedResources);
     return enriched;

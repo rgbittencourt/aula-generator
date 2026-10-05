@@ -203,6 +203,70 @@ function sentence(value, fallback) { return stripHtml(value).split(/(?<=[.!?])\s
 function sectionTitle(section, fallback) { return text(section?.title, fallback); }
 function sectionBody(section) { return stripHtml(section?.body); }
 
+function genericCompositionText(value) {
+  return /^(?:item(?:\s+contextualizado)?|pergunta\s+\d+|conteúdo(?:\s+contextualizado)?|bloco(?:\s+editorial)?|a confirmar)$/i.test(stripHtml(value));
+}
+
+function repairCollection(sourceItems, fallbackItems, normalizeItem) {
+  const source = Array.isArray(sourceItems) ? sourceItems : [];
+  const fallback = Array.isArray(fallbackItems) ? fallbackItems : [];
+  const total = Math.max(source.length, fallback.length);
+  return Array.from({ length: total }, (_, index) => normalizeItem(object(source[index]), object(fallback[index]), index)).filter(Boolean);
+}
+
+function repairCompositionEntry(type, sourceEntry, fallback) {
+  const source = object(sourceEntry);
+  const repaired = { ...source };
+  if (type === "accordion") {
+    repaired.items = repairCollection(source.items, fallback.items, (item, fallbackItem) => {
+      const title = text(item.title || item.question || item.prompt || item.label);
+      const body = text(item.body || item.answer || item.explanation || item.description);
+      if (!title || genericCompositionText(title)) return fallbackItem;
+      return { ...fallbackItem, ...item, title, body: body && !genericCompositionText(body) ? body : fallbackItem.body };
+    });
+  }
+  if (type === "flashcards") {
+    repaired.cards = repairCollection(source.cards, fallback.cards, (item, fallbackItem) => {
+      const front = text(item.front || item.question || item.q || item.term || item.title);
+      const back = text(item.back || item.answer || item.definition || item.explanation || item.body);
+      if (!front || genericCompositionText(front)) return fallbackItem;
+      return { ...fallbackItem, ...item, front, back: back && !genericCompositionText(back) ? back : fallbackItem.back };
+    });
+  }
+  if (type === "quiz") {
+    repaired.questions = repairCollection(source.questions, fallback.questions, (item, fallbackItem) => {
+      const question = text(item.q || item.question || item.prompt || item.text || item.statement);
+      const options = Array.isArray(item.options || item.choices || item.alternatives) ? (item.options || item.choices || item.alternatives).map((option) => text(option)).filter(Boolean) : [];
+      if (!question || genericCompositionText(question)) return fallbackItem;
+      return {
+        ...fallbackItem,
+        ...item,
+        q: question,
+        options: options.length >= 2 ? options : fallbackItem.options,
+        answer: Number.isInteger(Number(item.answer)) ? Number(item.answer) : fallbackItem.answer,
+        explanation: text(item.explanation || item.feedback, fallbackItem.explanation)
+      };
+    });
+  }
+  if (type === "cases") {
+    repaired.cards = repairCollection(source.cards, fallback.cards, (item, fallbackItem) => {
+      const title = text(item.title || item.name || item.label);
+      const body = text(item.text || item.body || item.description);
+      if (!title || genericCompositionText(title)) return fallbackItem;
+      return { ...fallbackItem, ...item, title, text: body || fallbackItem.text };
+    });
+  }
+  if (type === "feature") {
+    repaired.features = repairCollection(source.features, fallback.features, (item, fallbackItem) => {
+      const title = text(item.title || item.label || item.name);
+      const body = text(item.text || item.body || item.description);
+      if (!title || genericCompositionText(title)) return fallbackItem;
+      return { ...fallbackItem, ...item, title, text: body || fallbackItem.text };
+    });
+  }
+  return repaired;
+}
+
 function entryForType(entries, type, index) {
   return entries.filter((entry) => text(entry?.type || entry?.kind || entry?.blockType) === type)[index] || {};
 }
@@ -280,7 +344,7 @@ export function materializeComposition(plan = {}, weekPlan, weekNumber = 1) {
       const explicitSection = integer(sourceEntry.sectionNumber || sourceEntry.section, 0);
       const sectionIndex = explicitSection >= 1 && explicitSection <= sections.length ? explicitSection - 1 : (itemIndex + definition.key.length) % sections.length;
       const fallback = fallbackEntry(definition.type, sections[sectionIndex], sectionIndex, itemIndex, weekPlan);
-      const entry = { ...fallback, ...sourceEntry, type: definition.type, sectionNumber: sectionIndex + 1, generatedFallback: !Object.keys(sourceEntry).length };
+      const entry = { ...fallback, ...repairCompositionEntry(definition.type, sourceEntry, fallback), type: definition.type, sectionNumber: sectionIndex + 1, generatedFallback: !Object.keys(sourceEntry).length };
       const block = blockFromEntry(definition.type, entry, fallback, weekNumber, sectionIndex, itemIndex, plan.resources || {});
       if (block) {
         blocksBySection[sectionIndex].push(block);

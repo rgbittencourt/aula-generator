@@ -210,7 +210,7 @@ O cabeçalho mostra o estado dos serviços. Exemplos:
 
 | Indicador | Significado |
 |---|---|
-| **IA configurada · código necessário** | A OpenAI está disponível, mas é necessário informar o código privado |
+| **IA configurada · acesso protegido** | A OpenAI está disponível e as chamadas exigem o código privado informado na capa |
 | **IA configurada · vídeos aguardando chave** | A OpenAI está disponível; a busca de vídeos ainda não recebeu `YOUTUBE_API_KEY` naquele ambiente |
 | **IA indisponível** | O backend não recebeu `OPENAI_API_KEY` ou houve falha na implantação |
 
@@ -371,7 +371,7 @@ Exemplo:
 | Semana 2 | Padrão | 0 | 0 | Nenhuma |
 | Semana 3 | 2 | 1 | 1 | Densa |
 
-O pedido é enviado à redação semanal, à curadoria da IA e à pesquisa dos provedores. Se um provedor não retornar candidatos suficientes, a semana registra a pendência em vez de inventar links.
+O pedido é enviado à redação semanal, à curadoria da IA e à pesquisa dos provedores. Se um provedor não retornar candidatos suficientes, a semana registra a pendência em vez de inventar links. Uma sugestão sem URL pode ser analisada pelo professor na prévia e no Material de Mediação, mas não é exportada como bloco utilizável no JSON do Aula Studio; somente vídeos, imagens e materiais com fonte real atravessam essa fronteira.
 
 ### 7.3 Objetivos de aprendizagem
 

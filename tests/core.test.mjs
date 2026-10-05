@@ -91,6 +91,23 @@ test("refação aplica pedido explícito de quiz à semana e ao bloco Aula Studi
   assert.ok(hasBlock(lesson, "quiz"));
 });
 
+test("repara itens genéricos de composição com conteúdo específico da seção", () => {
+  const input = normalizeCourseInput({ title: "Curso com composição", weeks: 1, compositionPlan: { default: { rows: { accordion: { count: 1, itemsPerBlock: 3 }, quiz: { count: 1, itemsPerBlock: 5 } } } } });
+  const lesson = normalizeLesson({ lessonPlan: {
+    contentSections: [{ number: "1", title: "Governança de dados", body: "A seção explica como decisões dependem de evidências e critérios." }],
+    composition: [
+      { type: "accordion", items: [{ title: "Item contextualizado", body: "Item contextualizado" }] },
+      { type: "quiz", questions: [{ q: "Item contextualizado", options: [] }] }
+    ]
+  } }, input, 0);
+  const topic = lesson.blocks.find((block) => block.type === "topic");
+  const accordion = topic?.props?.children?.find((block) => block.type === "accordion");
+  const quiz = topic?.props?.children?.find((block) => block.type === "quiz");
+  assert.ok(accordion?.props?.items?.every((item) => !/Item contextualizado/i.test(item.title) && /Governança de dados/i.test(item.title)));
+  assert.equal(quiz?.props?.questions?.length, 5);
+  assert.ok(quiz?.props?.questions?.every((question) => !/Item contextualizado/i.test(question.q) && /Governança de dados/i.test(question.q)));
+});
+
 test("agenda webprática por data ou semana ocorre uma única vez", () => {
   const input = normalizeCourseInput({ title: "Curso", weeks: 3, calendarMode: "calendar", startDate: "2026-10-05", webPracticeEnabled: true, webPractices: [{ title: "Por data", date: "2026-10-13" }, { title: "Por semana", weekNumber: 3 }, { title: "Sem agenda" }] });
   const lessons = [0, 1, 2].map((index) => buildFallbackLesson(input, index));
@@ -302,6 +319,23 @@ test("exportação do Aula Studio remove mediação, alinhamento, tempo e curado
   assert.ok(topic);
   assert.ok(videoBridge);
   assert.equal(videoBridge.props.body, "");
+});
+
+test("JSON do Aula Studio não leva sugestões de recurso sem URL nem blocos de mídia vazios", () => {
+  const exported = toStudentLesson({
+    meta: { title: "Semana 1", courseTitle: "Curso", weekNumber: 1 },
+    lessonPlan: { theme: "Tema", contentSections: [], activities: [], assessment: { questions: [] } },
+    blocks: [
+      { type: "materiais", props: { items: [{ type: "video", title: "Busca sugerida: a confirmar", href: "" }] } },
+      { type: "imagem", props: { src: "", caption: "Imagem a confirmar" } },
+      { type: "video", props: { id: "", title: "Vídeo a confirmar" } },
+      { type: "materiais", props: { items: [{ type: "artigo", title: "Artigo conferido", href: "https://doi.org/10.1234/exemplo" }] } }
+    ]
+  });
+  const serialized = JSON.stringify(exported);
+  assert.doesNotMatch(serialized, /Busca sugerida|Imagem a confirmar|Vídeo a confirmar/);
+  assert.equal(exported.blocks.filter((block) => block.type === "materiais").length, 1);
+  assert.equal(exported.blocks.find((block) => block.type === "materiais").props.items[0].href, "https://doi.org/10.1234/exemplo");
 });
 
 test("Material de Mediação em PDF é gerado separadamente", async () => {
