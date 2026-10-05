@@ -8,7 +8,7 @@ export default function handler(request, response) {
   if (accessRequired() && !hasValidAccess(request)) return response.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
     const input = normalizeCourseInput(request.body?.input || {});
-    const result = assembleCourse(input, request.body?.weeks || [], request.body?.teacherGuides || []);
+    const result = assembleCourse(input, request.body?.weeks || [], request.body?.teacherGuides || [], { allowPartial: Boolean(request.body?.allowPartial) });
     return response.status(200).json({ ok: true, provider: "ai-distributed", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", ...result });
   } catch (error) {
     console.error("assemble-course failed", error);

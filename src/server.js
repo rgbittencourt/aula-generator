@@ -87,7 +87,7 @@ app.post("/api/assemble-course", (req, res) => {
   if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
     const input = normalizeCourseInput(req.body?.input || {});
-    const result = assembleCourse(input, req.body?.weeks || [], req.body?.teacherGuides || []);
+    const result = assembleCourse(input, req.body?.weeks || [], req.body?.teacherGuides || [], { allowPartial: Boolean(req.body?.allowPartial) });
     res.setHeader("Cache-Control", "no-store");
     res.json({ ok: true, provider: "ai-distributed", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", ...result });
   } catch (error) {

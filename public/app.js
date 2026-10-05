@@ -941,7 +941,13 @@ function refreshAiButtonAvailability() {
   const recalculate = $("#recalculate-button");
   if (assist) assist.disabled = isGitHubPages || !aiConfigured;
   if (generateButton) generateButton.disabled = isGitHubPages || !aiConfigured;
-  if (recalculate) recalculate.disabled = isGitHubPages || !aiConfigured || !state.weeks.length || Boolean(state.generation);
+  const generationRunning = ["running", "consolidating"].includes(state.generation?.status);
+  if (recalculate) {
+    recalculate.disabled = isGitHubPages || !aiConfigured || !state.weeks.length || generationRunning;
+    recalculate.title = state.generation?.status === "partial" && state.input?.weeks > state.weeks.length
+      ? `Recalcular a qualidade das ${state.weeks.length} semanas disponíveis de ${state.input.weeks}`
+      : "Recalcular qualidade sem gerar novas semanas";
+  }
 }
 
 function beginAiAction(button) {
@@ -1754,21 +1760,25 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   const partial = Boolean(data.partial);
   const totalWeeks = Number(data.input?.weeks || state.input?.weeks || data.weeks.length) || data.weeks.length;
   const complete = !partial && data.weeks.length >= totalWeeks;
+  const partialQualityAvailable = data.weeks.length > 0 && (partial || data.weeks.length < totalWeeks);
   state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider; state.validation = data.validation || data.generalPlan?.validation || null; state.generation = data.generation ?? state.generation; state.reviewMarks = data.reviewMarks || state.reviewMarks || createReviewMarks();
   state.activeReviewGuidance = null;
-  ["recalculate-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const button = $("#" + id); if (button) button.disabled = !complete; });
+  const recalculateButton = $("#recalculate-button");
+  if (recalculateButton) recalculateButton.disabled = !(complete || partialQualityAvailable);
+  ["teacher-pdf-button", "zip-button"].forEach((id) => { const button = $("#" + id); if (button) button.disabled = !complete; });
   updateMediationExportHint();
   refreshAiButtonAvailability();
   const approvedWeeks = data.weeks.filter((_, index) => Boolean(state.weekApprovals?.[index])).length;
   const pendingWeeks = Math.max(0, totalWeeks - approvedWeeks);
   $("#results-title").textContent = partial ? `${data.weeks.length}/${totalWeeks} semanas preservadas` : approvedWeeks ? `${approvedWeeks} liberada(s) · ${pendingWeeks} para revisão` : `${data.weeks.length} semanas prontas para revisão`;
-  $("#results-subtitle").textContent = partial ? "A geração ainda está em andamento; as semanas concluídas ficam disponíveis enquanto a próxima é processada." : data.provider === "static-demo" ? "Modo público GitHub Pages: exemplo gerado no navegador, sem API." : data.provider === "fallback" ? "Exemplo local gerado sem API; use-o para validar o fluxo." : `Gerado por IA com ${data.model || "o provedor configurado"}. Revise antes de publicar.`;
+  const generationInProgress = ["running", "consolidating"].includes(data.generation?.status || state.generation?.status);
+  $("#results-subtitle").textContent = partial ? (generationInProgress ? "A geração ainda está em andamento; as semanas concluídas ficam disponíveis enquanto a próxima é processada." : `${data.weeks.length} de ${totalWeeks} semana(s) disponíveis. Você já pode recalcular a qualidade e retomar a geração depois.`) : data.provider === "static-demo" ? "Modo público GitHub Pages: exemplo gerado no navegador, sem API." : data.provider === "fallback" ? "Exemplo local gerado sem API; use-o para validar o fluxo." : `Gerado por IA com ${data.model || "o provedor configurado"}. Revise antes de publicar.`;
   $("#results-section").classList.remove("hidden");
   $("#empty-state").classList.add("hidden");
   const alert = $("#result-alert");
   alert.className = "result-alert";
   const automaticSummary = state.validation?.summary ? `Diagnóstico automático: ${state.validation.summary.blockedWeeks || 0} bloqueada(s) e ${state.validation.summary.reviewWeeks || 0} em revisão.` : "";
-  alert.textContent = partial ? `Semana(s) concluída(s) preservada(s). A próxima semana está sendo processada; se houver falha, você poderá continuar a partir dela sem perder este material.` : data.provider === "static-demo" ? "Esta versão pública gera exemplos diretamente no navegador. A IA será conectada em uma hospedagem com backend protegido quando você escolher essa opção." : data.provider === "fallback" ? "Este é um exemplo estrutural. A geração por IA será ativada quando OPENAI_API_KEY estiver configurada." : approvedWeeks ? `${approvedWeeks} semana(s) liberada(s) por você; ${pendingWeeks} ainda aguardam sua revisão. ${automaticSummary}` : state.validation?.readyForExport ? "A geração terminou. Faça a revisão humana de cada semana e, depois, baixe os arquivos." : `A geração terminou. ${pendingWeeks} semana(s) ainda aguardam sua revisão. ${automaticSummary}`;
+  alert.textContent = partial ? (generationInProgress ? "Semana(s) concluída(s) preservada(s). A próxima semana está sendo processada; se houver falha, você poderá continuar a partir dela sem perder este material." : `Qualidade recalculada provisoriamente para ${data.weeks.length} de ${totalWeeks} semana(s). As semanas ausentes continuam pendentes e podem ser geradas depois.`) : data.provider === "static-demo" ? "Esta versão pública gera exemplos diretamente no navegador. A IA será conectada em uma hospedagem com backend protegido quando você escolher essa opção." : data.provider === "fallback" ? "Este é um exemplo estrutural. A geração por IA será ativada quando OPENAI_API_KEY estiver configurada." : approvedWeeks ? `${approvedWeeks} semana(s) liberada(s) por você; ${pendingWeeks} ainda aguardam sua revisão. ${automaticSummary}` : state.validation?.readyForExport ? "A geração terminou. Faça a revisão humana de cada semana e, depois, baixe os arquivos." : `A geração terminou. ${pendingWeeks} semana(s) ainda aguardam sua revisão. ${automaticSummary}`;
   const cards = data.weeks.map((lesson, index) => {
     const meta = lesson.meta || {};
     const workload = data.workload?.weeks?.[index];
@@ -2096,11 +2106,15 @@ async function recalculateQuality() {
   setBusy(button, true, "Recalculando…");
   setAiActivity("Recalculando qualidade", "A IA está conferindo conteúdo, referências, carga e checklists…");
   try {
-    const response = await fetch("/api/assemble-course", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
+    const totalWeeks = Number(state.input?.weeks || state.weeks.length);
+    const allowPartial = state.weeks.length < totalWeeks;
+    const response = await fetch("/api/assemble-course", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides, allowPartial }) });
     const data = await readApiResponse(response, "Não foi possível recalcular a qualidade do curso.");
-    renderWeeks({ ...data, input: state.input }, { scrollToResults: false });
+    renderWeeks({ ...data, input: state.input, partial: Boolean(data.partial), generation: state.generation }, { scrollToResults: false });
     $("#result-alert").className = "result-alert";
-    $("#result-alert").textContent = "Qualidade, checklist e carga recalculados sem nova chamada de IA.";
+    $("#result-alert").textContent = data.partial
+      ? `Qualidade, checklist e carga recalculados para ${data.availableWeeks} de ${data.requestedWeeks} semana(s), sem nova chamada de IA. As demais continuam pendentes.`
+      : "Qualidade, checklist e carga recalculados sem nova chamada de IA.";
     $("#result-alert").classList.remove("hidden");
     finishAiActivity("Qualidade recalculada", "Checklists, carga e diagnóstico foram atualizados sem gerar novas semanas.", "success");
   } catch (error) {

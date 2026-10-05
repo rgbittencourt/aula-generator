@@ -13,6 +13,7 @@ import { toStudentLesson } from "../src/student-export.js";
 import { buildCourseProgression } from "../src/curriculum.js";
 import { measureLessonQuality, qualityTargets } from "../src/content-quality.js";
 import { scopeGeneralPlan, scopeMediationMaterial } from "../src/mediation-scope.js";
+import { assembleCourse } from "../src/course-assembly.js";
 
 function hasBlock(lesson, type) {
   const visit = (blocks) => (blocks || []).some((block) => block.type === type || visit(block.props?.children));
@@ -32,6 +33,20 @@ test("Material de Mediação inicial não expõe semanas pendentes e cresce ao l
   assert.deepEqual(plan.weeks.map((item) => item.weekNumber), [2]);
   assert.deepEqual(plan.progression.map((item) => item.weekNumber), [2]);
   assert.deepEqual(plan.mediationScope.releasedWeeks, [2]);
+});
+
+test("recalcula qualidade das semanas disponíveis sem fabricar as semanas pendentes", () => {
+  const input = normalizeCourseInput({ title: "Curso parcial", weeks: 6, hoursPerWeek: 4, objectives: ["Analisar"] });
+  const weeks = [buildFallbackLesson(input, 0), buildFallbackLesson(input, 1)];
+  const result = assembleCourse(input, weeks, [], { allowPartial: true });
+  assert.equal(result.partial, true);
+  assert.equal(result.availableWeeks, 2);
+  assert.equal(result.requestedWeeks, 6);
+  assert.equal(result.weeks.length, 2);
+  assert.equal(result.workload.weeks.length, 2);
+  assert.equal(result.validation.weeks.length, 2);
+  assert.equal(result.generalPlan.course.weeks, 6);
+  assert.throws(() => assembleCourse(input, weeks), /exige 6 semanas/);
 });
 
 test("normaliza briefing com calendário real e webpráticas independentes", () => {
