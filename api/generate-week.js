@@ -1,7 +1,6 @@
 import { accessRequired, hasValidAccess } from "../src/access.js";
 import { normalizeCourseInput, normalizeLesson } from "../src/aula-schema.js";
 import { generateOneWeek } from "../src/ai.js";
-import { enrichLessonsWithResources } from "../src/research.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { buildCourseProgression } from "../src/curriculum.js";
 
@@ -14,10 +13,7 @@ export default async function handler(request, response) {
     const index = Math.max(0, Math.min(input.weeks - 1, Number.parseInt(request.body?.weekIndex, 10) || 0));
     const raw = await generateOneWeek(input, index, { progression: buildCourseProgression(input), previousWeeks: request.body?.previousWeeks || [] });
     const normalized = normalizeLesson(raw, input, index);
-    const researched = process.env.AULA_RESOURCE_RESEARCH === "false"
-      ? normalized
-      : (await enrichLessonsWithResources(input, [normalized]))[0];
-    const teacherGuide = buildTeacherGuides(input, [researched], [raw.teacherGuide || {}])[0];
+    const teacherGuide = buildTeacherGuides(input, [normalized], [raw.teacherGuide || {}])[0];
     return response.status(200).json({
       ok: true,
       provider: "ai-week",
@@ -25,8 +21,9 @@ export default async function handler(request, response) {
       weekIndex: index,
       completed: index + 1,
       total: input.weeks,
-      week: researched,
-      teacherGuide
+      week: normalized,
+      teacherGuide,
+      resourcesDeferred: process.env.AULA_RESOURCE_RESEARCH !== "false"
     });
   } catch (error) {
     console.error("generate-week failed", error);

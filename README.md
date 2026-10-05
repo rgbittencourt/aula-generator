@@ -81,7 +81,7 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 7. Clique em **Deploy**.
 8. Abra a URL fornecida pela Vercel e confira o indicador no cabeçalho.
 9. Se `AULA_ACCESS_CODE` estiver configurado, informe esse código no campo de acesso da interface. Ele não é a chave da OpenAI.
-10. Preencha o briefing, use **Preencher vazios com IA** se quiser assistência e depois clique em **Gerar com IA**. A aplicação gera uma semana por requisição e consolida o curso ao final, evitando que uma geração longa seja interrompida pela hospedagem.
+10. Preencha o briefing, use **Preencher vazios com IA** se quiser assistência e depois clique em **Gerar com IA**. A aplicação gera uma semana por requisição, salva a redação imediatamente e consolida o curso ao final, evitando que uma geração longa ou uma pesquisa externa de recursos faça o usuário perder semanas já concluídas.
 11. Abra cada card em **Ver aula**. Leia título, objetivos, conteúdo, atividades, recursos, síntese e avaliação antes de exportar.
 12. Se uma semana estiver fraca ou precisar de outro foco, escreva a solicitação no final da prévia e clique em **Refazer esta semana com IA**. Somente a semana aberta será reescrita.
 
@@ -116,7 +116,7 @@ Durante o uso, clicar no logo **Gerador de Aulas** inicia um **novo projeto de d
 
 A semana produzida é uma unidade completa: abertura, conteúdo desenvolvido, seções e subseções, exemplos, reflexões, recursos no ponto de uso, síntese, avaliação, conexão com a semana seguinte e cálculo posterior da carga. Vídeos, imagens, diagramas e leituras ficam associados ao trecho ou conceito que motivou seu uso. Cada recurso leva `sectionNumber` e um `bridgeParagraph`: um parágrafo que explica a ligação com o conceito naquele ponto, o que o estudante deve observar e por que o recurso é pertinente. A leitura do aluno não termina com uma galeria de links separada.
 
-O botão de assistência completa somente campos vazios do briefing. A geração final trabalha sobre o briefing revisado, e o backend pesquisa candidatos reais de vídeo, imagem/diagrama e leitura antes da seleção pela IA.
+O botão de assistência completa somente campos vazios do briefing. A geração final trabalha sobre o briefing revisado. A redação da semana é devolvida e salva primeiro; a pesquisa de candidatos reais de vídeo, imagem/diagrama e leitura ocorre em uma etapa complementar separada, que pode ser adiada sem apagar a aula.
 
 ### Controle de qualidade textual
 
@@ -150,7 +150,7 @@ O manual contém os prompts efetivos e o contrato JSON de cada fase. A produçã
 
 ### Por que a geração agora é dividida por semana
 
-Uma turma com várias semanas e revisão acadêmica pode gerar um volume grande de texto e chamar vários provedores externos. Fazer tudo em uma única função serverless aumenta o risco de a Vercel encerrar a requisição e o navegador receber apenas o texto genérico `An error occurred with this application.`. Por isso, **Gerar com IA** chama `POST /api/generate-week` para cada semana e, somente depois, chama `POST /api/assemble-course` para calcular os totais e montar o Planejamento Geral.
+Uma turma com várias semanas e revisão acadêmica pode gerar um volume grande de texto e chamar vários provedores externos. Fazer redação e curadoria na mesma função serverless aumenta o risco de a Vercel encerrar a requisição e o navegador receber apenas o texto genérico `An error occurred with this application.`. Por isso, **Gerar com IA** chama `POST /api/generate-week` para cada semana, salva a redação, usa `POST /api/enrich-week` em uma etapa complementar para pesquisar recursos e somente depois chama `POST /api/assemble-course` para calcular os totais e montar o Planejamento Geral. Se a curadoria exceder seu próprio limite, a semana continua preservada e a geração prossegue.
 
 ### Como a ordem funciona
 
@@ -160,7 +160,7 @@ Não existe uma sequência rígida para todas as semanas. A IA escolhe um arco a
 
 O briefing possui um painel **Recursos e leituras por semana**. Nele, defina quantos vídeos, artigos acadêmicos e leituras obrigatórias devem ser procurados por semana, além do nível da leitura obrigatória. A tabela de distribuição permite substituir o padrão em semanas específicas: use `0` para não solicitar aquele recurso em uma semana e deixe `Padrão` para herdar a configuração geral. Artigos podem contar como leituras obrigatórias, evitando duplicação.
 
-Essas metas entram no prompt semanal, na curadoria da IA e nas solicitações ao YouTube/Crossref. A pesquisa só insere URLs retornadas por provedores ou fornecidas no briefing; quando não há candidatos suficientes, a pendência fica marcada para revisão humana. Imagens continuam sendo pesquisadas como enriquecimento contextual, e todos os recursos selecionados viram blocos editáveis na prévia e no JSON do aluno.
+Essas metas entram no prompt semanal, na curadoria da IA e nas solicitações ao YouTube/Crossref. A pesquisa só insere URLs retornadas por provedores ou fornecidas no briefing; quando não há candidatos suficientes, a pendência fica marcada para revisão humana. A curadoria consulta somente a quantidade solicitada por tipo, em vez de abrir cinco consultas desnecessárias por padrão. Imagens continuam sendo pesquisadas como enriquecimento contextual, e todos os recursos selecionados viram blocos editáveis na prévia e no JSON do aluno.
 
 No **Planejamento geral**, **Carga por atividade** resume as metas, o cálculo total, as categorias e o arco didático; já **Carga aberta por atividade** mostra, em minutos e horas, o que veio do texto-base, de artigos/leituras obrigatórios, de leituras complementares, de vídeos obrigatórios ou extras, de imagens, quiz, fórum, revisão, projeto e webprática. A mesma separação aparece ao abrir **Ver aula**. Assim, a carga não fica escondida em um único total.
 

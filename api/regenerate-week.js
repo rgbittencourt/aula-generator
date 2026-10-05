@@ -3,7 +3,6 @@ import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } fr
 import { normalizeCourseInput, normalizeLesson, normalizeWeeklyOutput } from "../src/aula-schema.js";
 import { regenerateWeekWithAI } from "../src/ai.js";
 import { applyCompositionInstruction } from "../src/composition.js";
-import { enrichLessonsWithResources } from "../src/research.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { validateCourse } from "../src/validation.js";
 
@@ -19,8 +18,7 @@ export default async function handler(request, response) {
     const currentWeeks = normalizeWeeklyOutput({ weeks: Array.isArray(request.body?.weeks) ? request.body.weeks : [] }, input);
     const raw = await regenerateWeekWithAI(input, index, currentWeeks[index], instruction);
     const normalized = normalizeLesson(raw, input, index);
-    const researched = process.env.AULA_RESOURCE_RESEARCH === "false" ? normalized : (await enrichLessonsWithResources(input, [normalized]))[0];
-    const weeks = currentWeeks.map((week, weekIndex) => weekIndex === index ? researched : week);
+    const weeks = currentWeeks.map((week, weekIndex) => weekIndex === index ? normalized : week);
     const workload = calculateCourseWorkload(input, input.formulaConfig, weeks);
     const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
     const providedGuides = Array.isArray(request.body?.teacherGuides) ? [...request.body.teacherGuides] : [];

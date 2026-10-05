@@ -289,7 +289,9 @@ Clicar em “Gerar com IA”
         ↓
 IA escreve as semanas
         ↓
-Sistema pesquisa candidatos de vídeos, imagens e leituras
+A redação de cada semana é salva imediatamente
+        ↓
+Sistema pesquisa candidatos de vídeos, imagens e leituras em etapa separada
         ↓
 IA seleciona os candidatos mais adequados
         ↓
@@ -304,7 +306,7 @@ Abre o JSON no Aula Studio
 Revisa e exporta SCORM para o Moodle
 ```
 
-A etapa de geração não substitui a revisão. O produto ideal é uma **primeira versão consistente e editável**, não um material que deva ser publicado sem leitura humana.
+A etapa de geração não substitui a revisão. O produto ideal é uma **primeira versão consistente e editável**, não um material que deva ser publicado sem leitura humana. A redação de cada semana é salva antes da curadoria de recursos: se a Vercel encerrar a pesquisa externa por tempo excedido, a semana permanece no resultado e pode ser retomada sem reiniciar as anteriores. A curadoria usa uma rota complementar e limita as consultas ao número solicitado no briefing.
 
 ---
 

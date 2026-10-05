@@ -1391,6 +1391,13 @@ async function regenerateSelectedWeek() {
     if (accessCode) headers["x-aula-access-code"] = accessCode;
     const response = await fetch("/api/regenerate-week", { method: "POST", headers, body: JSON.stringify({ input, weekIndex: index, instruction, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
     const data = await readApiResponse(response, "Não foi possível refazer a semana.");
+    state.weeks = data.weeks || state.weeks;
+    state.teacherGuides = data.teacherGuides || state.teacherGuides;
+    saveDraft("semana-refeita");
+    const enriched = await enrichGeneratedWeek({ ...data, week: data.weeks?.[index], teacherGuide: data.teacherGuides?.[index], resourcesDeferred: true }, input, index, headers, button);
+    if (enriched.week) data.weeks[index] = enriched.week;
+    if (enriched.teacherGuide) data.teacherGuides[index] = enriched.teacherGuide;
+    data.resourcesPending = enriched.resourcesPending;
     setAiActivity("Validando a nova semana", "Atualizando qualidade, carga e prévia sem alterar as outras semanas…", { progress: 86 });
     renderWeeks(data);
     $("#regenerate-note").textContent = "Semana atualizada. Confira a nova versão abaixo antes de exportar.";
@@ -1870,6 +1877,29 @@ async function requestGeneratedWeek(input, index, headers, previousWeeks, button
   throw new Error(`Não foi possível gerar a semana ${index + 1}.`);
 }
 
+async function enrichGeneratedWeek(data, input, index, headers, button) {
+  if (!data?.resourcesDeferred || !data.week) return data;
+  setButtonLabel(button, `Pesquisando recursos da semana ${index + 1}…`);
+  setAiActivity("Localizando recursos", `A semana ${index + 1} já foi escrita. Pesquisando vídeos, imagens e leituras em uma etapa separada…`, { progress: Math.round(((index + 0.7) / (input.weeks + 1)) * 100) });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 26000);
+  try {
+    const response = await fetch("/api/enrich-week", {
+      method: "POST",
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify({ input, weekIndex: index, week: data.week, teacherGuide: data.teacherGuide })
+    });
+    const enriched = await readApiResponse(response, `Não foi possível pesquisar os recursos da semana ${index + 1}.`);
+    return { ...data, ...enriched, resourcesDeferred: false };
+  } catch (error) {
+    console.warn(`Curadoria da semana ${index + 1} adiada:`, error);
+    return { ...data, resourcesPending: true, resourcesError: error.message || "A curadoria não foi concluída." };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function generateDistributed(input, accessCode, button, options = {}) {
   const startIndex = Math.max(0, Math.min(input.weeks, Number(options.startIndex) || 0));
   const weeks = Array.isArray(options.initialWeeks) ? options.initialWeeks.slice() : [];
@@ -1916,10 +1946,19 @@ async function generateDistributed(input, accessCode, button, options = {}) {
     state.weeks = weeks.filter(Boolean);
     state.teacherGuides = teacherGuides.filter(Boolean);
     state.generation = { status: "running", nextWeekIndex: index + 1, total: input.weeks, formSignature };
+    saveDraft("semana-gerada");
+    renderWeeks({ ok: true, partial: true, provider: "ai-distributed-partial", model: data.model, input, weeks: state.weeks, teacherGuides: state.teacherGuides, generation: state.generation }, { scrollToResults: false });
+    data = await enrichGeneratedWeek(data, input, index, headers, button);
+    weeks[index] = data.week;
+    teacherGuides[index] = data.teacherGuide;
+    state.weeks = weeks.filter(Boolean);
+    state.teacherGuides = teacherGuides.filter(Boolean);
+    saveDraft(data.resourcesPending ? "semana-gerada-recursos-pendentes" : "recursos-da-semana");
     renderWeeks({ ok: true, partial: true, provider: "ai-distributed-partial", model: data.model, input, weeks: state.weeks, teacherGuides: state.teacherGuides, generation: state.generation }, { scrollToResults: false });
     const alert = $("#result-alert");
     alert.className = "result-alert";
-    alert.textContent = `Semana ${index + 1} de ${input.weeks} gerada e preservada. A consolidação acontece ao final.`;
+    const resourceNote = data.resourcesPending ? " A aula foi preservada; a curadoria de recursos desta semana ficou pendente." : "";
+    alert.textContent = `Semana ${index + 1} de ${input.weeks} gerada e preservada. A consolidação acontece ao final.${resourceNote}`;
     alert.classList.remove("hidden");
   }
 

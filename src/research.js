@@ -47,7 +47,8 @@ function requestsFor(type, input, lesson) {
   for (let index = providedCount + requests.length; index < target; index += 1) {
     requests.push({ requestId: `${type}-generated-${index + 1}`, type, query: `${fallback} ${type === "reading" ? "artigo acadêmico" : "recurso educacional"}`, title: `${type === "reading" ? "Artigo acadêmico" : "Vídeo"} ${index + 1} para ${lesson?.lessonPlan?.theme || input.title}`, objective: "Enriquecer a unidade com um recurso contextualizado.", moment: "ponto de uso", required: type === "reading" && index < Number(targets.requiredReadingsPerWeek || 0), readingLevel: type === "reading" ? targets.requiredReadingLevel : "" });
   }
-  return requests.slice(0, Math.max(5, target));
+  const limit = target > 0 ? Math.max(1, target) : requests.length;
+  return requests.slice(0, limit);
 }
 
 function isoDurationToMinutes(value) {

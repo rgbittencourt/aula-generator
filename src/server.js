@@ -56,14 +56,30 @@ app.post("/api/generate-week", async (req, res) => {
     const index = Math.max(0, Math.min(input.weeks - 1, Number.parseInt(req.body?.weekIndex, 10) || 0));
     const raw = await generateOneWeek(input, index);
     const normalized = normalizeLesson(raw, input, index);
-    const researched = process.env.AULA_RESOURCE_RESEARCH === "false" ? normalized : (await enrichLessonsWithResources(input, [normalized]))[0];
-    const teacherGuide = buildTeacherGuides(input, [researched], [raw.teacherGuide || {}])[0];
+    const teacherGuide = buildTeacherGuides(input, [normalized], [raw.teacherGuide || {}])[0];
     res.setHeader("Cache-Control", "no-store");
-    res.json({ ok: true, provider: "ai-week", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", weekIndex: index, completed: index + 1, total: input.weeks, week: researched, teacherGuide });
+    res.json({ ok: true, provider: "ai-week", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", weekIndex: index, completed: index + 1, total: input.weeks, week: normalized, teacherGuide, resourcesDeferred: process.env.AULA_RESOURCE_RESEARCH !== "false" });
   } catch (error) {
     console.error("generate-week failed", error);
     const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
     res.status(status).json({ ok: false, error: error.message || "Não foi possível gerar esta semana.", code: error.code || "GENERATION_ERROR", retryable: Boolean(error.retryable) });
+  }
+});
+
+app.post("/api/enrich-week", async (req, res) => {
+  if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
+  try {
+    const input = normalizeCourseInput(req.body?.input || {});
+    const index = Math.max(0, Math.min(input.weeks - 1, Number.parseInt(req.body?.weekIndex, 10) || 0));
+    const normalized = normalizeLesson(req.body?.week || {}, input, index);
+    const researched = process.env.AULA_RESOURCE_RESEARCH === "false" ? normalized : (await enrichLessonsWithResources(input, [normalized]))[0];
+    const teacherGuide = buildTeacherGuides(input, [researched], [req.body?.teacherGuide || {}])[0];
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, provider: "resource-enrichment", weekIndex: index, week: researched, teacherGuide });
+  } catch (error) {
+    console.error("enrich-week failed", error);
+    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
+    res.status(status).json({ ok: false, error: error.message || "Não foi possível pesquisar os recursos desta semana.", code: error.code || "RESOURCE_ENRICHMENT_ERROR", retryable: Boolean(error.retryable) });
   }
 });
 
@@ -124,8 +140,7 @@ app.post("/api/regenerate-week", async (req, res) => {
     const currentWeeks = normalizeWeeklyOutput({ weeks: Array.isArray(req.body?.weeks) ? req.body.weeks : [] }, input);
     const raw = await regenerateWeekWithAI(input, index, currentWeeks[index], instruction);
     const normalized = normalizeLesson(raw, input, index);
-    const researched = process.env.AULA_RESOURCE_RESEARCH === "false" ? normalized : (await enrichLessonsWithResources(input, [normalized]))[0];
-    const weeks = currentWeeks.map((week, weekIndex) => weekIndex === index ? researched : week);
+    const weeks = currentWeeks.map((week, weekIndex) => weekIndex === index ? normalized : week);
     const workload = calculateCourseWorkload(input, input.formulaConfig, weeks);
     const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
     const providedGuides = Array.isArray(req.body?.teacherGuides) ? [...req.body.teacherGuides] : [];
