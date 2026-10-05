@@ -20,6 +20,15 @@ function hasBlock(lesson, type) {
   return visit(lesson.blocks);
 }
 
+function findBlock(blocks, type) {
+  for (const block of blocks || []) {
+    if (block.type === type) return block;
+    const nested = findBlock(block.props?.children, type);
+    if (nested) return nested;
+  }
+  return null;
+}
+
 test("Material de Mediação inicial não expõe semanas pendentes e cresce ao liberar semanas", () => {
   const weeks = [{ meta: { weekNumber: 1 } }, { meta: { weekNumber: 2 } }, { meta: { weekNumber: 3 } }];
   const guides = [{ weekNumber: 1 }, { weekNumber: 2 }, { weekNumber: 3 }];
@@ -106,6 +115,9 @@ test("repara itens genéricos de composição com conteúdo específico da seç�
   assert.ok(accordion?.props?.items?.every((item) => !/Item contextualizado/i.test(item.title) && /Governança de dados/i.test(item.title)));
   assert.equal(quiz?.props?.questions?.length, 5);
   assert.ok(quiz?.props?.questions?.every((question) => !/Item contextualizado/i.test(question.q) && /Governança de dados/i.test(question.q)));
+  const exportedQuiz = findBlock(toStudentLesson(lesson).blocks, "quiz");
+  assert.ok(exportedQuiz?.props?.questions?.length >= 1);
+  assert.ok(exportedQuiz.props.questions.every((question) => question.q && question.options?.length >= 2 && Number.isInteger(question.answer) && question.explanation));
 });
 
 test("agenda webprática por data ou semana ocorre uma única vez", () => {

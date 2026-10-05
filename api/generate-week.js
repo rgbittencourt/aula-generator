@@ -11,7 +11,14 @@ export default async function handler(request, response) {
   try {
     const input = normalizeCourseInput(request.body?.input || request.body || {});
     const index = Math.max(0, Math.min(input.weeks - 1, Number.parseInt(request.body?.weekIndex, 10) || 0));
-    const raw = await generateOneWeek(input, index, { progression: buildCourseProgression(input), previousWeeks: request.body?.previousWeeks || [] });
+    const raw = await generateOneWeek(input, index, {
+      progression: buildCourseProgression(input),
+      previousWeeks: request.body?.previousWeeks || [],
+      // Esta rota é chamada uma semana por vez. A primeira versão precisa
+      // retornar e ser salva antes de qualquer refação potencialmente longa.
+      singlePass: true,
+      deferRepair: true
+    });
     const normalized = normalizeLesson(raw, input, index);
     const teacherGuide = buildTeacherGuides(input, [normalized], [raw.teacherGuide || {}])[0];
     return response.status(200).json({
@@ -23,6 +30,7 @@ export default async function handler(request, response) {
       total: input.weeks,
       week: normalized,
       teacherGuide,
+      generation: raw.generationMeta || normalized.generationMeta || { phase: "complete", repairPending: false },
       resourcesDeferred: process.env.AULA_RESOURCE_RESEARCH !== "false"
     });
   } catch (error) {

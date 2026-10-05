@@ -828,7 +828,19 @@ export function normalizeLesson(raw, input, index) {
   const baseMeta = weekMeta(input, index);
   const suppliedMeta = source.meta && typeof source.meta === "object" ? source.meta : {};
   const meta = { ...fallback.meta, ...baseMeta, ...suppliedMeta, title: lessonPlan.theme, courseTitle: input.title, weekNumber: index + 1, weekLabel: baseMeta.weekLabel, calendarStartDate: baseMeta.calendarStartDate, calendarEndDate: baseMeta.calendarEndDate, studyHours: input.hoursPerWeek };
-  const lesson = { meta, lessonPlan, blocks };
+  const generationMeta = source.generationMeta && typeof source.generationMeta === "object" ? {
+    phase: text(source.generationMeta.phase, "complete"),
+    mode: text(source.generationMeta.mode),
+    repairPending: Boolean(source.generationMeta.repairPending),
+    repairAttempts: Math.max(0, integer(source.generationMeta.repairAttempts, 0)),
+    repairReason: Array.isArray(source.generationMeta.repairReason) ? source.generationMeta.repairReason.map((item) => text(item)).filter(Boolean).slice(0, 8) : [],
+    nextAction: text(source.generationMeta.nextAction),
+    resourcesPending: Boolean(source.generationMeta.resourcesPending),
+    resourceError: text(source.generationMeta.resourceError),
+    initialQuality: object(source.generationMeta.initialQuality),
+    finalQuality: object(source.generationMeta.finalQuality)
+  } : null;
+  const lesson = { meta, lessonPlan, blocks, ...(generationMeta ? { generationMeta } : {}) };
   return { ...lesson, contentQuality: measureLessonQuality(lesson, input) };
 }
 

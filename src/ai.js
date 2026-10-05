@@ -331,6 +331,11 @@ export async function generateOneWeek(input, index, options = {}) {
   // acadêmico completo, mas evita as chamadas extras de planejamento/revisão na
   // mesma requisição. O pipeline completo continua disponível com false.
   const singlePass = options.singlePass ?? process.env.AULA_SINGLE_PASS !== "false";
+  // A rota distribuída salva a primeira versão antes de qualquer reparo. Isso
+  // evita que uma semana curta dispare mais uma ou duas chamadas longas e
+  // ultrapasse o limite da função serverless.
+  const deferRepair = Boolean(options.deferRepair);
+  const generationMeta = { phase: "draft", mode: singlePass ? "single-pass" : "academic-pipeline", repairPending: false, repairAttempts: 0, repairReason: [] };
   const progression = options.progression || buildCourseProgression(input);
   const weekFocus = progressionForWeek(input, index, progression);
   const academicPlan = !singlePass && useAcademicPipeline
@@ -359,8 +364,15 @@ export async function generateOneWeek(input, index, options = {}) {
   const initialLesson = normalizeLesson(raw, input, index);
   const initialQuality = measureLessonQuality(initialLesson, input, { peerLessons: options.previousWeeks || [] });
   const repairableIssues = initialQuality.issues.some((issue) => /conteúdo curto|poucas seções|seções ainda|boas-vindas|síntese|avaliação|objetivos insuficientes|título principal|tópico de conteúdo|bloco hero|bloco visível|matriz/i.test(issue));
-  if (!singlePass && process.env.AULA_AUTO_REPAIR !== "false" && (repairableIssues || academicReview.rewriteRequired)) {
+  const needsQualityRepair = repairableIssues || initialQuality.status === "insufficient";
+  if (deferRepair && (needsQualityRepair || academicReview.rewriteRequired)) {
+    generationMeta.repairPending = true;
+    generationMeta.repairReason = [...new Set([...(initialQuality.issues || []), ...((academicReview.issues || []).map((issue) => issue.description).filter(Boolean))])].slice(0, 8);
+    generationMeta.nextAction = "Refazer esta semana pela prévia depois que a versão inicial for salva.";
+  }
+  if (!deferRepair && !singlePass && process.env.AULA_AUTO_REPAIR !== "false" && (repairableIssues || academicReview.rewriteRequired)) {
     try {
+      generationMeta.repairAttempts += 1;
       const repaired = coerceLessonEnvelope(await repairWeekWithAI(input, index, raw, initialQuality, academicPlan, academicReview));
       const repairedLesson = normalizeLesson(repaired, input, index);
       const repairedQuality = measureLessonQuality(repairedLesson, input, { peerLessons: options.previousWeeks || [] });
@@ -377,8 +389,9 @@ export async function generateOneWeek(input, index, options = {}) {
       // A versão inicial será devolvida com pendência explícita para revisão humana.
     }
   }
-  if (singlePass && process.env.AULA_AUTO_REPAIR !== "false" && (repairableIssues || initialQuality.status === "insufficient")) {
+  if (!deferRepair && singlePass && process.env.AULA_AUTO_REPAIR !== "false" && needsQualityRepair) {
     try {
+      generationMeta.repairAttempts += 1;
       const repaired = coerceLessonEnvelope(await regenerateWeekWithAI(
         input,
         index,
@@ -399,8 +412,9 @@ export async function generateOneWeek(input, index, options = {}) {
   }
   let finalLesson = normalizeLesson(raw, input, index);
   let finalQuality = measureLessonQuality(finalLesson, input, { peerLessons: options.previousWeeks || [] });
-  if (singlePass && process.env.AULA_AUTO_REPAIR !== "false" && finalQuality.wordCount < finalQuality.minimumWords * 0.25) {
+  if (!deferRepair && singlePass && process.env.AULA_AUTO_REPAIR !== "false" && finalQuality.wordCount < finalQuality.minimumWords * 0.25) {
     try {
+      generationMeta.repairAttempts += 1;
       const rescue = coerceLessonEnvelope(await regenerateWeekWithAI(
         input,
         index,
@@ -422,10 +436,14 @@ export async function generateOneWeek(input, index, options = {}) {
     }
   }
   enforceWeekFocus(raw, weekFocus, weekNumber);
+  generationMeta.initialQuality = { status: initialQuality.status, score: initialQuality.score, wordCount: initialQuality.wordCount, minimumWords: initialQuality.minimumWords };
+  generationMeta.finalQuality = { status: finalQuality.status, score: finalQuality.score, wordCount: finalQuality.wordCount, minimumWords: finalQuality.minimumWords };
+  if (!generationMeta.repairPending) generationMeta.phase = "complete";
   return {
     ...(raw?.lessonPlan || raw?.blocks ? raw : raw?.week || raw),
     academicPlan,
-    teacherGuide: { ...(raw?.teacherGuide || {}), academicPlan, academicReview, claimEvidence: raw?.lessonPlan?.claimEvidence || academicPlan.claimsRequiringEvidence || [] }
+    teacherGuide: { ...(raw?.teacherGuide || {}), academicPlan, academicReview, claimEvidence: raw?.lessonPlan?.claimEvidence || academicPlan.claimsRequiringEvidence || [] },
+    generationMeta
   };
 }
 

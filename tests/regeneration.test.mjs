@@ -88,6 +88,34 @@ test("regeneração single-pass usa contexto compacto e orçamento próprio", as
   }
 });
 
+test("geração distribuída devolve a primeira versão sem reparo síncrono", async () => {
+  const previousFetch = global.fetch;
+  const previous = { key: process.env.OPENAI_API_KEY, retries: process.env.OPENAI_MAX_RETRIES, autoRepair: process.env.AULA_AUTO_REPAIR };
+  process.env.OPENAI_API_KEY = "test-key";
+  process.env.OPENAI_MAX_RETRIES = "1";
+  process.env.AULA_AUTO_REPAIR = "true";
+  let calls = 0;
+  global.fetch = async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(qualityFixture(30)) } }] }), { status: 200 });
+  };
+  try {
+    const input = normalizeCourseInput({ title: "Curso distribuído", weeks: 6, hoursPerWeek: 4, objectives: ["Explicar o conceito"], academicProfile: { targetWords: 3000, minimumReferences: 0, primarySourcesRequired: 0, requireCounterarguments: false } });
+    const result = await generateOneWeek(input, 3, { singlePass: true, deferRepair: true });
+    assert.equal(calls, 1);
+    assert.equal(result.generationMeta.repairPending, true);
+    assert.equal(result.generationMeta.repairAttempts, 0);
+    assert.match(result.generationMeta.nextAction, /Refazer esta semana/);
+  } finally {
+    global.fetch = previousFetch;
+    for (const [key, value] of Object.entries(previous)) {
+      const envKey = { key: "OPENAI_API_KEY", retries: "OPENAI_MAX_RETRIES", autoRepair: "AULA_AUTO_REPAIR" }[key];
+      if (value === undefined) delete process.env[envKey];
+      else process.env[envKey] = value;
+    }
+  }
+});
+
 test("geração repara automaticamente uma semana em needs-review por ficar abaixo da meta", async () => {
   const previousFetch = global.fetch;
   const previous = { key: process.env.OPENAI_API_KEY, singlePass: process.env.AULA_SINGLE_PASS, repair: process.env.AULA_AUTO_REPAIR, retries: process.env.OPENAI_MAX_RETRIES };

@@ -1232,6 +1232,38 @@ function compositionPreview(entry = {}) {
   return `<div class="reader-composition reader-composition-${escapeHtml(type)}"><div class="reader-composition-kicker">${escapeHtml(labels[type] || "Bloco Aula Studio")}</div><strong>${escapeHtml(title)}</strong>${paragraphsMarkup(body)}${media}${rows ? `<ul>${rows}</ul>` : ""}</div>`;
 }
 
+const compositionCardLabels = { destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", citacao: "Citação", imagem: "Imagem", parallax: "Parallax", textoimagem: "Texto + imagem", cases: "Casos", feature: "Pontos-chave", tabela: "Tabela", filmstrip: "Carrossel", audio: "Áudio", accordion: "Acordeão", flashcards: "Flashcards", slider: "Passo a passo", linhadotempo: "Linha do tempo", columns: "Colunas", quiz: "Quiz formativo", externalembed: "Conteúdo externo" };
+
+function compositionSummaryForLesson(lesson = {}) {
+  const entries = Array.isArray(lesson.lessonPlan?.composition?.entries) ? lesson.lessonPlan.composition.entries : [];
+  const counts = new Map();
+  entries.forEach((entry) => {
+    const type = String(entry?.type || "").toLowerCase();
+    if (type) counts.set(type, (counts.get(type) || 0) + 1);
+  });
+  return [...counts.entries()].map(([type, count]) => `${count} ${compositionCardLabels[type] || type}`).join(" · ");
+}
+
+function resourceCoverageSummary(coverage = {}) {
+  const labels = { videos: "Vídeos", images: "Imagens", readings: "Leituras" };
+  return Object.entries(labels).map(([key, label]) => {
+    const item = coverage[key];
+    if (!item || Number(item.requested || 0) <= 0) return "";
+    const selected = Number(item.selected || 0);
+    const candidates = Number(item.candidates || 0);
+    const suffix = candidates && candidates !== selected ? ` · ${candidates} candidatos` : "";
+    return `${label}: ${item.requested} solicitados · ${selected} encontrados${suffix}`;
+  }).filter(Boolean).join(" | ");
+}
+
+function collectNestedBlockTypes(blocks = [], output = []) {
+  (blocks || []).forEach((block) => {
+    if (block?.type) output.push(block.type);
+    if (Array.isArray(block?.props?.children)) collectNestedBlockTypes(block.props.children, output);
+  });
+  return output;
+}
+
 function mediationMessagesMarkup(messages = {}, theme = "a semana", weekNumber = 1) {
   const hasMessages = (Array.isArray(messages.whatsapp) && messages.whatsapp.length) || (Array.isArray(messages.moodle) && messages.moodle.length);
   const resolved = hasMessages ? messages : {
@@ -1796,7 +1828,11 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   const cards = data.weeks.map((lesson, index) => {
     const meta = lesson.meta || {};
     const workload = data.workload?.weeks?.[index];
-    const types = [...new Set((lesson.blocks || []).map((block) => blockLabels[block.type] || block.type))].slice(0, 5);
+    const types = [...new Set(collectNestedBlockTypes(lesson.blocks).map((type) => blockLabels[type] || type))].slice(0, 6);
+    const compositionSummary = compositionSummaryForLesson(lesson);
+    const resourceCoverage = resourceCoverageSummary(lesson.lessonPlan?.resourceResearch?.coverage || {});
+    const pendingGeneration = lesson.generationMeta?.repairPending ? "Reparo textual pendente — rascunho preservado" : "";
+    const pendingResources = lesson.generationMeta?.resourcesPending ? "Curadoria de recursos pendente" : "";
     const date = meta.calendarStartDate ? `${formatDate(meta.calendarStartDate)}–${formatDate(meta.calendarEndDate)}` : meta.weekLabel;
     const calculated = workload?.calculatedMinutes != null ? formatMinutes(workload.calculatedMinutes) : `${workload?.totalHours ?? meta.studyHours ?? "—"} h`;
     const target = workload?.targetMinutes != null ? formatMinutes(workload.targetMinutes) : "meta —";
@@ -1810,7 +1846,7 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
     const qualityLabel = manuallyApproved ? "conferida e liberada por você" : ({ ready: "conteúdo pronto", complete: "conteúdo completo", blocked: "bloqueada: pendência crítica", review: "revisão recomendada", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[automaticStatus] || "qualidade não medida");
     const approvalButton = automaticStatus !== "ready" && automaticStatus !== "complete" ? `<button class="week-approve ${manuallyApproved ? "is-approved" : ""}" data-index="${index}" type="button">${manuallyApproved ? "Desfazer liberação" : "Liberar após conferência"}</button>` : "";
     const statusDetail = reasons.length ? `<small class="week-status-detail">${escapeHtml(manuallyApproved ? `Diagnóstico automático: ${reasons.join(" · ")}` : reasons.join(" · "))}</small>` : "";
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div><h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div><span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button">Baixar JSON <span>↓</span></button>${approvalButton}</div></article>`;
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div><h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button">Baixar JSON <span>↓</span></button>${approvalButton}</div></article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
   const weeksNote = $("#weeks-sector-note");
@@ -1864,6 +1900,7 @@ function toggleWeekApproval(index) {
 
 function generationErrorIsRetryable(error) {
   if (!error) return false;
+  if (["AI_INVALID_JSON", "AI_OUTPUT_TRUNCATED"].includes(error.code)) return false;
   if (error.retryable) return true;
   if ([408, 425, 429, 500, 502, 503, 504].includes(Number(error.status))) return true;
   return /temporar|timeout|timed out|rate limit|limite.*token|resposta vazia|não respondeu|failed to fetch|networkerror|erro de rede/i.test(String(error.message || ""));
@@ -1874,7 +1911,10 @@ function generationRetryDelay(attempt) {
 }
 
 async function requestGeneratedWeek(input, index, headers, previousWeeks, button) {
-  const maxAttempts = 3;
+  // O backend já faz retries controlados para respostas transitórias e JSON
+  // inválido. Duas tentativas no navegador evitam multiplicar uma chamada
+  // pesada depois de um timeout da hospedagem.
+  const maxAttempts = 2;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
       const response = await fetch("/api/generate-week", {
@@ -1918,7 +1958,13 @@ async function enrichGeneratedWeek(data, input, index, headers, button) {
     return { ...data, ...enriched, resourcesDeferred: false };
   } catch (error) {
     console.warn(`Curadoria da semana ${index + 1} adiada:`, error);
-    return { ...data, resourcesPending: true, resourcesError: error.message || "A curadoria não foi concluída." };
+    const resourceError = error.message || "A curadoria não foi concluída.";
+    return {
+      ...data,
+      resourcesPending: true,
+      resourcesError: resourceError,
+      week: { ...data.week, generationMeta: { ...(data.week.generationMeta || {}), resourcesPending: true, resourceError } }
+    };
   } finally {
     clearTimeout(timer);
   }

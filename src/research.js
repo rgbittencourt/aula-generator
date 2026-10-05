@@ -71,6 +71,14 @@ function flattenCandidates(research) {
   ];
 }
 
+function candidateIdentity(candidate = {}) {
+  return text(candidate.href) || text(candidate.candidateId);
+}
+
+function uniqueCandidateCount(results = []) {
+  return new Set(results.flatMap((result) => result.candidates || []).map(candidateIdentity).filter(Boolean)).size;
+}
+
 function resourceFromCandidate(candidate, selection) {
   const type = candidate.type;
   return {
@@ -141,19 +149,20 @@ function selectedEntries(type, rawSelection, results) {
   const raw = Array.isArray(rawSelection?.[type]) ? rawSelection[type] : [];
   const chosen = [];
   const used = new Set();
+  const usedResources = new Set();
   raw.filter((selection) => selection && selection.keep !== false && byId.has(selection.candidateId)).forEach((selection) => {
-    if (used.has(selection.candidateId)) return;
+    const candidate = byId.get(selection.candidateId);
+    const identity = candidateIdentity(candidate);
+    if (used.has(selection.candidateId) || (identity && usedResources.has(identity))) return;
     used.add(selection.candidateId);
-    chosen.push(resourceFromCandidate(byId.get(selection.candidateId), selection));
+    if (identity) usedResources.add(identity);
+    chosen.push(resourceFromCandidate(candidate, selection));
   });
   return { chosen, raw, candidates };
 }
 
 function fallbackSelection(results) {
-  return results.flatMap((result) => {
-    const candidate = result.candidates?.[0];
-    return candidate ? [{ candidateId: candidate.candidateId, keep: true, reason: "Primeiro candidato retornado pelo provedor; revisar manualmente.", use: result.request.objective || "Recurso contextualizado para a semana.", required: result.request.required, moment: result.request.moment, query: result.request.query }] : [];
-  });
+  return results.flatMap((result) => (result.candidates || []).map((candidate) => ({ candidateId: candidate.candidateId, keep: true, reason: "Candidato real retornado pelo provedor; revisar manualmente.", use: result.request.objective || "Recurso contextualizado para a semana.", required: result.request.required, moment: result.request.moment, query: result.request.query })));
 }
 
 function ensureSelectionCoverage(selection, type, results, limit) {
@@ -171,12 +180,23 @@ function ensureSelectionCoverage(selection, type, results, limit) {
   // não recursos que devam ocupar as vagas solicitadas pelo professor.
   const selected = [];
   const selectedIds = new Set();
+  const selectedResources = new Set();
   (raw || []).filter((item) => item?.keep !== false && candidateIds.has(item?.candidateId)).forEach((item) => {
-    if (selectedIds.has(item.candidateId)) return;
+    const candidate = results.flatMap((result) => result.candidates || []).find((entry) => entry.candidateId === item.candidateId);
+    const identity = candidateIdentity(candidate);
+    if (selectedIds.has(item.candidateId) || (identity && selectedResources.has(identity))) return;
     selectedIds.add(item.candidateId);
+    if (identity) selectedResources.add(identity);
     selected.push(item);
   });
-  const additions = fallbackSelection(results).filter((item) => !selectedIds.has(item.candidateId));
+  const additions = fallbackSelection(results).filter((item) => {
+    if (selectedIds.has(item.candidateId)) return false;
+    const candidate = results.flatMap((result) => result.candidates || []).find((entry) => entry.candidateId === item.candidateId);
+    const identity = candidateIdentity(candidate);
+    if (identity && selectedResources.has(identity)) return false;
+    if (identity) selectedResources.add(identity);
+    return true;
+  });
   const items = [...selected, ...additions].slice(0, limit);
   const completedByFallback = items.length > selected.length;
   const missingCoverage = items.length < limit;
@@ -296,11 +316,21 @@ export async function enrichLessonsWithResources(input, lessons) {
     const research = { status: "searched", searchedAt: new Date().toISOString(), targets, providers: { youtube: videos.map((result) => result.status), wikimediaCommons: images.map((result) => result.status), crossref: readings.map((result) => result.providers?.crossref || (result.provider === "crossref" ? result.status : "not-used")), openAlex: readings.map((result) => result.providers?.openalex || "not-used") }, queries: { videos: videoRequests, images: imageRequests, readings: readingRequests }, videos, images, readings };
     const candidateCount = flattenCandidates(research).length;
     const existingResources = lesson.lessonPlan.resources || {};
-    const countWithHref = (items) => (Array.isArray(items) ? items.filter((item) => text(item?.href)).length : 0);
+    const countWithHref = (items) => new Set((Array.isArray(items) ? items : []).map((item) => text(item?.href)).filter(Boolean)).size;
+    const countVideoBlocks = (blocks) => {
+      const ids = new Set();
+      const visit = (items) => (items || []).forEach((block) => {
+        if (block?.type === "video" && text(block.props?.id)) ids.add(text(block.props.id));
+        if (block?.type === "prose" && text(block.props?.inlineVideo?.id)) ids.add(text(block.props.inlineVideo.id));
+        visit(block?.props?.children);
+      });
+      visit(blocks);
+      return ids.size;
+    };
     const coverage = {
-      videos: { requested: Number(targets.videosPerWeek || 0), selected: countWithHref(existingResources.videos) },
-      images: { requested: 1, selected: countWithHref(existingResources.images) },
-      readings: { requested: Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)), selected: countWithHref([...(existingResources.readingsRequired || []), ...(existingResources.readingsExtra || [])]) }
+      videos: { requested: Number(targets.videosPerWeek || 0), candidates: uniqueCandidateCount(videos), selected: countWithHref(existingResources.videos) },
+      images: { requested: 1, candidates: uniqueCandidateCount(images), selected: countWithHref(existingResources.images) },
+      readings: { requested: Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)), candidates: uniqueCandidateCount(readings), selected: countWithHref([...(existingResources.readingsRequired || []), ...(existingResources.readingsExtra || [])]) }
     };
     if (!candidateCount) return { ...lesson, lessonPlan: { ...lesson.lessonPlan, resourceResearch: { ...compactResearch({ ...research, status: "no-candidates" }), coverage, note: "Não foram encontrados candidatos reais. Para vídeos, confira YOUTUBE_API_KEY; imagens e leituras usam provedores públicos. Sugestões sem URL permanecem somente no Material de Mediação." } } };
     let selection;
@@ -328,21 +358,31 @@ export async function enrichLessonsWithResources(input, lessons) {
     };
     const selectedRequests = new Set([...selectedResources.videos, ...selectedResources.images, ...selectedResources.readings].map((resource) => resource.researchRequestId));
     const withoutPlaceholders = (resources = []) => resources.filter((resource) => resource.href || !selectedRequests.has(resource.id));
+    const uniqueResources = (items = []) => {
+      const seen = new Set();
+      return items.filter((resource) => {
+        const identity = text(resource?.href) || text(resource?.id);
+        if (!identity || seen.has(identity)) return false;
+        seen.add(identity);
+        return true;
+      });
+    };
     const resources = {
       ...existingResources,
-      videos: [...withoutPlaceholders(existingResources.videos), ...selectedResources.videos],
-      images: [...withoutPlaceholders(existingResources.images), ...selectedResources.images],
-      readingsRequired: [...withoutPlaceholders(existingResources.readingsRequired), ...selectedResources.readings.filter((resource) => resource.required)],
-      readingsExtra: [...withoutPlaceholders(existingResources.readingsExtra), ...selectedResources.readings.filter((resource) => !resource.required)]
+      videos: uniqueResources([...withoutPlaceholders(existingResources.videos), ...selectedResources.videos]),
+      images: uniqueResources([...withoutPlaceholders(existingResources.images), ...selectedResources.images]),
+      readingsRequired: uniqueResources([...withoutPlaceholders(existingResources.readingsRequired), ...selectedResources.readings.filter((resource) => resource.required)]),
+      readingsExtra: uniqueResources([...withoutPlaceholders(existingResources.readingsExtra), ...selectedResources.readings.filter((resource) => !resource.required)])
     };
     const alternatives = flattenCandidates(research).filter((candidate) => !selectedResources.videos.concat(selectedResources.images, selectedResources.readings).some((resource) => resource.candidateId === candidate.candidateId)).slice(0, 30);
     const resourceResearch = { ...compactResearch({ ...research, status: selectionStatus, selections: selection, selectionFallbacks, alternatives }), coverage: {
-      videos: { requested: Number(targets.videosPerWeek || 0), selected: selectedResources.videos.length },
-      images: { requested: 1, selected: selectedResources.images.length },
-      readings: { requested: Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)), selected: selectedResources.readings.length }
+      videos: { requested: Number(targets.videosPerWeek || 0), candidates: uniqueCandidateCount(videos), selected: countWithHref(resources.videos), materialized: 0 },
+      images: { requested: 1, candidates: uniqueCandidateCount(images), selected: countWithHref(resources.images), materialized: countWithHref(resources.images) },
+      readings: { requested: Math.max(Number(targets.articlesPerWeek || 0), Number(targets.requiredReadingsPerWeek || 0)), candidates: uniqueCandidateCount(readings), selected: countWithHref([...(resources.readingsRequired || []), ...(resources.readingsExtra || [])]), materialized: countWithHref([...(resources.readingsRequired || []), ...(resources.readingsExtra || [])]) }
     } };
     const enriched = attachResourcesToSections({ ...lesson, lessonPlan: { ...lesson.lessonPlan, resources, resourceResearch } }, selectedResources);
     enriched.blocks = syncResourceBlocks(enriched, selectedResources);
+    enriched.lessonPlan.resourceResearch.coverage.videos.materialized = countVideoBlocks(enriched.blocks);
     return enriched;
   }));
 }

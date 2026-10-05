@@ -513,3 +513,10 @@ body.welcome-active .recovery-dock{display:none!important}
 .mediation-message-actions .button{font-size:11px}
 .reader-mediation>p{max-width:760px}
 @media(max-width:700px){.mediation-message-heading{align-items:flex-start;flex-direction:column;gap:4px}.mediation-message-actions{align-items:flex-start;flex-direction:column}}
+
+/* Cobertura real e composição materializada da semana. */
+.week-resource-coverage,.week-composition-summary,.week-generation-pending{display:block;margin-top:7px;color:var(--muted);font-size:10px;line-height:1.45}
+.week-resource-coverage strong,.week-composition-summary strong{color:var(--navy)}
+.week-resource-coverage.is-pending,.week-generation-pending{color:var(--coral-dark)}
+.reader-coverage-inline,.reader-composition-inline{color:var(--navy);font-weight:700}
+.reader-composition-inline{border-left:2px solid var(--teal);padding-left:7px}

@@ -15,7 +15,7 @@ export default async function handler(request, response) {
       ? normalized
       : (await enrichLessonsWithResources(input, [normalized]))[0];
     const teacherGuide = buildTeacherGuides(input, [researched], [request.body?.teacherGuide || {}])[0];
-    return response.status(200).json({ ok: true, provider: "resource-enrichment", weekIndex: index, week: researched, teacherGuide });
+    return response.status(200).json({ ok: true, provider: "resource-enrichment", weekIndex: index, week: researched, teacherGuide, generation: researched.generationMeta || { phase: "complete", repairPending: false } });
   } catch (error) {
     console.error("enrich-week failed", error);
     const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;

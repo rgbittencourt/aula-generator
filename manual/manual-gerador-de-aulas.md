@@ -26,6 +26,7 @@ pre { font-size: 8.5pt !important; line-height: 1.28 !important; }
 7. [Preenchendo o briefing](#7-preenchendo-o-briefing)
 8. [Usando a IA para completar campos vazios](#8-usando-a-ia-para-completar-campos-vazios)
 9. [Gerando as semanas com IA](#9-gerando-as-semanas-com-ia)
+9.1. [Geração segura e retomada](#91-geração-segura-e-retomada)
 10. [Como a IA organiza cada semana](#10-como-a-ia-organiza-cada-semana)
 10.1. [Perfil acadêmico e prompts do sistema](#101-perfil-acadêmico-e-prompts-do-sistema)
 10.2. [Limites de tokens e geração sequencial](#102-limites-de-tokens-e-geração-sequencial)
@@ -371,7 +372,7 @@ Exemplo:
 | Semana 2 | Padrão | 0 | 0 | Nenhuma |
 | Semana 3 | 2 | 1 | 1 | Densa |
 
-O pedido é enviado à redação semanal, à curadoria da IA e à pesquisa dos provedores. Se um provedor não retornar candidatos suficientes, a semana registra a pendência em vez de inventar links. Uma sugestão sem URL pode ser analisada pelo professor na prévia e no Material de Mediação, mas não é exportada como bloco utilizável no JSON do Aula Studio; somente vídeos, imagens e materiais com fonte real atravessam essa fronteira.
+O pedido é enviado à redação semanal, à curadoria da IA e à pesquisa dos provedores. Se um provedor não retornar candidatos suficientes, a semana registra a pendência em vez de inventar links. A cobertura aparece no card e na prévia como `3 solicitados · 3 encontrados` quando há três URLs reais; a seleção elimina duplicatas por URL e registra `requested`, `candidates`, `selected` e `materialized` em `lessonPlan.resourceResearch.coverage`. Uma sugestão sem URL pode ser analisada pelo professor na prévia e no Material de Mediação, mas não é exportada como bloco utilizável no JSON do Aula Studio; somente vídeos, imagens e materiais com fonte real atravessam essa fronteira.
 
 ### 7.3 Objetivos de aprendizagem
 
@@ -496,7 +497,7 @@ Depois de revisar o briefing:
 
 A geração pode envolver mais de uma etapa do backend. O sistema primeiro redige a semana e depois pode consultar YouTube, Wikimedia Commons e Crossref para localizar candidatos de recursos.
 
-Por segurança, as semanas são processadas **uma por vez**. Uma unidade pode passar pelas etapas de planejamento acadêmico, redação, revisão crítica, eventual reparo, pesquisa de recursos e cálculo. Isso reduz picos de tokens por minuto, embora possa tornar a geração de um curso longo mais demorada. O navegador exibe um painel de atividade com a etapa atual. Em respostas temporárias de rede, hospedagem, limite ou provedor, a semana recebe até três tentativas automáticas. Se todas falharem, as semanas anteriores permanecem nos cards e no autosave; clique em **Continuar da semana N** para tentar somente a unidade interrompida. Enquanto o curso estiver parcial, **Recalcular qualidade** também fica disponível: ele recalcula apenas as semanas presentes, sem criar semanas fictícias, e permite adiantar a conferência antes de gerar as próximas.
+Por segurança, as semanas são processadas **uma por vez**. A rota de redação faz uma chamada pesada por invocação e devolve a primeira versão antes de qualquer reparo textual; a pesquisa de recursos ocorre em `POST /api/enrich-week`, separado. Isso reduz o risco de a Vercel encerrar a função por duração excessiva. O navegador exibe um painel de atividade com a etapa atual. Em respostas temporárias de rede, hospedagem, limite ou provedor, o backend mantém retries controlados e o navegador faz no máximo duas tentativas. Se todas falharem, as semanas anteriores permanecem nos cards e no autosave; clique em **Continuar da semana N** para tentar somente a unidade interrompida. Enquanto o curso estiver parcial, **Recalcular qualidade** também fica disponível: ele recalcula apenas as semanas presentes, sem criar semanas fictícias, e permite adiantar a conferência antes de gerar as próximas.
 
 ### 9.1 Geração com IA
 
@@ -509,6 +510,21 @@ O comando **Gerar com IA**:
 - produz Material de Mediação e Planejamento Geral.
 
 O modo de exemplo local permanece restrito a smoke tests e manutenção. Ele não aparece como ação no menu do usuário e não deve ser confundido com a versão final de uma aula.
+
+### 9.1 Geração segura e retomada
+
+O erro `An error occurred with this application` na quarta semana normalmente é um HTTP 504 causado por duração excessiva da função, não por perda intencional do conteúdo. A implantação mantém `maxDuration: 300`, mas esse limite não deve ser usado para acumular redação, reparos, resgates e curadoria na mesma chamada. A geração semanal atual salva a redação primeiro e registra `generationMeta.repairPending` quando a análise detectar texto curto ou estrutura que merece refação.
+
+Se a semana 4 falhar depois de as semanas 1–3 terem sido concluídas:
+
+1. Não limpe o armazenamento do navegador e não comece um projeto novo.
+2. Reabra a aplicação no mesmo navegador e clique em **Retomar planejamento**.
+3. Confirme que os cards preservados continuam disponíveis e que o botão mostra **Continuar da semana 4**.
+4. Use **Recalcular qualidade** para adiantar a conferência das semanas já salvas.
+5. Clique em **Continuar da semana 4**. A requisição envia somente a unidade ausente; as semanas 1–3 não são reescritas.
+6. Se o card indicar **Reparo textual pendente**, abra **Ver aula**, confira a versão inicial e use **Refazer esta semana com IA** apenas se quiser reparar o conteúdo.
+
+O mesmo fluxo protege contra queda de energia, falha de rede e erro da semana seguinte. O backup manual continua recomendado: o autosave fica no `localStorage` do navegador e não sincroniza entre computadores.
 
 ---
 
@@ -615,9 +631,9 @@ PADRÃO ACADÊMICO CONFIGURADO: perfil {profile.level}, profundidade {profile.de
 
 O piso de palavras corresponde à própria meta configurada, nunca menos que 1.400 palavras. Assim, uma meta de 3.000 palavras exige pelo menos 3.000 antes de a semana ser considerada completa. A medição considera o texto didático do aluno — abertura, seções, exemplos, síntese, conexão e orientações de aprendizagem — e não pode ser inflada apenas com referências, alternativas de prova ou outros metadados. Para orientar a redação, o sistema calcula uma quantidade de seções e uma faixa de palavras por seção. A meta, o número mínimo de seções e o número mínimo de referências são ajustados automaticamente a partir do nível herdado da Identidade do curso e das escolhas específicas do Perfil acadêmico.
 
-O gerador também constrói um **mapa longitudinal** antes de redigir as semanas. Esse mapa distribui tema, pergunta central, conceitos novos, objetivos específicos, sequência editorial, ponte entre semanas, marco de evidência e arco didático. As chamadas seguintes recebem resumos das semanas já geradas e uma regra do que não repetir. Se uma resposta em `AULA_SINGLE_PASS=true` ficar curta, uma regeneração textual é tentada: ela retorna apenas `lessonPlan`, sem duplicar o Material de Mediação, e só é aceita se alcançar o piso ou crescer substancialmente. Se a resposta vier absurdamente curta — por exemplo, uma aula de algumas dezenas de palavras — o sistema faz um único **resgate de saída** com orçamento ampliado. Uma correção que acrescente apenas poucas palavras não é aceita como solução.
+O gerador também constrói um **mapa longitudinal** antes de redigir as semanas. Esse mapa distribui tema, pergunta central, conceitos novos, objetivos específicos, sequência editorial, ponte entre semanas, marco de evidência e arco didático. As chamadas seguintes recebem resumos das semanas já geradas e uma regra do que não repetir. Na rota distribuída, uma resposta curta é devolvida e salva com `generationMeta.repairPending`; ela não dispara uma regeneração e um resgate dentro da mesma função. Depois de a versão estar preservada, o professor pode usar **Refazer esta semana com IA**. Essa refação retorna apenas `lessonPlan`, sem duplicar o Material de Mediação, e só é aceita se alcançar o piso ou crescer substancialmente. Uma correção que acrescente apenas poucas palavras não é aceita como solução.
 
-Na classificação, **insuficiente** fica reservado para texto criticamente curto — abaixo de aproximadamente 75% do piso — ou para uma unidade sem núcleo mínimo de conteúdo desenvolvido. Uma aula com texto desenvolvido, ainda que esteja abaixo do piso completo ou pendente de título específico, referências, recursos, avaliação ou revisão pedagógica, fica em **revisão recomendada**; essas pendências não reduzem artificialmente a contagem de palavras. A aplicação continua tentando reparar automaticamente o déficit textual antes de devolver a semana.
+Na classificação, **insuficiente** fica reservado para texto criticamente curto — abaixo de aproximadamente 75% do piso — ou para uma unidade sem núcleo mínimo de conteúdo desenvolvido. Uma aula com texto desenvolvido, ainda que esteja abaixo do piso completo ou pendente de título específico, referências, recursos, avaliação ou revisão pedagógica, fica em **revisão recomendada**; essas pendências não reduzem artificialmente a contagem de palavras. A primeira versão continua disponível para conferência, e o reparo fica explícito como pendência posterior em vez de estender a invocação original.
 
 O checklist também confere os recursos no ponto de uso: vídeos, imagens e leituras dentro de uma seção precisam ter `sectionNumber`/momento e um `bridgeParagraph` desenvolvido. Isso verifica a presença da ligação estrutural; a coerência acadêmica, atualidade, acessibilidade, duração e licença do recurso continuam exigindo conferência docente.
 
@@ -1119,7 +1135,7 @@ Os tipos disponíveis incluem:
 - **Mídia e estruturas:** imagem com legenda, imagem parallax, texto + imagem, cards de casos, pontos-chave, tabela comparativa, filmstrip, áudio e conteúdo externo;
 - **Interativos:** acordeão/FAQ, flashcards, slider passo a passo, linha do tempo, colunas comparativas e quiz formativo.
 
-O prompt exige que cada bloco tenha conteúdo específico, `sectionNumber` e uma função pedagógica. O Gerador materializa a composição em `lessonPlan.composition` e em blocos editáveis do JSON do aluno, inserindo-a no tópico depois do texto da seção correspondente. O tempo desses interativos aparece como **Interativos Aula Studio** na carga aberta. Ao refazer uma semana, também é possível escrever um pedido explícito como **“acrescente 1 quiz formativo”**; a exceção semanal é atualizada e o bloco aparece no card e no JSON da semana refeita. A composição não altera a regra de separação: webpráticas continuam fora do texto-base e do JSON do aluno.
+O prompt exige que cada bloco tenha conteúdo específico, `sectionNumber` e uma função pedagógica. O Gerador materializa a composição em `lessonPlan.composition` e em blocos editáveis do JSON do aluno, inserindo-a no tópico depois do texto da seção correspondente. O tempo desses interativos aparece como **Interativos Aula Studio** na carga aberta. Ao refazer uma semana, também é possível escrever um pedido explícito como **“acrescente 1 quiz formativo”**; a exceção semanal é atualizada e o bloco aparece no card e no JSON da semana refeita. Um quiz materializado precisa trazer pergunta, alternativas, índice da resposta correta e explicação útil; se a IA omitir a entrada de composição, o normalizador cria um fallback contextualizado, não um bloco vazio ou genérico. A composição não altera a regra de separação: webpráticas continuam fora do texto-base e do JSON do aluno.
 
 No checklist, todos os itens continuam visíveis. Os aprovados automaticamente começam marcados; desmarque um item para indicar que deseja refazê-lo. A tela preserva a rolagem e o foco do item após cada marcação, portanto não é necessário voltar ao ponto em que estava.
 
@@ -1272,7 +1288,7 @@ Depois da leitura da aula, a prévia apresenta o bloco **Material de Mediação 
 
 As **Mensagens de acompanhamento** aparecem em dois canais. Em cada cartão, edite diretamente o texto, informe o **Tom desta mensagem** e acrescente **Informações específicas para a IA**. O botão **Refazer esta mensagem com IA** altera somente aquele cartão, mantendo os demais. Revise nomes, datas, links e condições da atividade antes de copiar a mensagem para WhatsApp ou Moodle.
 
-O topo da janela mostra palavras, seções, objetivos e nota estrutural. Leia a aula inteira antes de baixar o JSON. Se aparecer **conteúdo insuficiente**, não abra essa versão no Aula Studio ainda.
+O topo da janela mostra palavras, seções, objetivos, nota estrutural, cobertura real de recursos e composição materializada. Leia a aula inteira antes de baixar o JSON. Se aparecer **conteúdo insuficiente** ou **reparo textual pendente**, use a versão para diagnóstico e refaça a semana antes de liberá-la no Aula Studio.
 
 ### 15.3 Refazer somente uma semana
 

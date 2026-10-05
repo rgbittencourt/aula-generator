@@ -87,8 +87,7 @@ test("cobertura de recursos ignora keep:false e completa as metas com candidatos
   globalThis.fetch = async (url) => {
     const value = String(url);
     if (value.includes("youtube/v3/search")) {
-      const requestId = new URL(value).searchParams.get("q")?.includes("generated-2") ? "video-generated-2" : new URL(value).searchParams.get("q")?.includes("generated-3") ? "video-generated-3" : "video-generated-1";
-      return new Response(JSON.stringify({ items: [1, 2, 3].map((index) => ({ id: { videoId: `${requestId}-candidate-${index}` }, snippet: { title: `Vídeo real ${requestId} ${index}`, channelTitle: "Canal acadêmico", description: "Descrição contextualizada", publishedAt: "2024-01-01", thumbnails: {} } })) }), { status: 200 });
+      return new Response(JSON.stringify({ items: [1, 2, 3].map((index) => ({ id: { videoId: `video-candidate-${index}` }, snippet: { title: `Vídeo real ${index}`, channelTitle: "Canal acadêmico", description: "Descrição contextualizada", publishedAt: "2024-01-01", thumbnails: {} } })) }), { status: 200 });
     }
     if (value.includes("youtube/v3/videos")) {
       const ids = new URL(value).searchParams.get("id")?.split(",") || [];
@@ -107,9 +106,14 @@ test("cobertura de recursos ignora keep:false e completa as metas com candidatos
     const [result] = await enrichLessonsWithResources(input, [lesson]);
     assert.equal(result.lessonPlan.resources.videos.length, 3);
     assert.ok(result.lessonPlan.resources.videos.every((resource) => resource.href.startsWith("https://www.youtube.com/watch?v=")));
+    assert.equal(new Set(result.lessonPlan.resources.videos.map((resource) => resource.href)).size, 3);
     assert.equal(result.lessonPlan.resources.images.length, 1);
     assert.equal(result.lessonPlan.resources.readingsRequired.length, 1);
     assert.equal(result.lessonPlan.resourceResearch.coverage.videos.selected, 3);
+    assert.equal(result.lessonPlan.resourceResearch.coverage.videos.materialized, 3);
+    const topic = result.blocks.find((block) => block.type === "topic");
+    const inlineVideos = topic?.props?.children?.filter((block) => block.type === "prose" && block.props?.inlineVideo?.id) || [];
+    assert.equal(new Set(inlineVideos.map((block) => block.props.inlineVideo.id)).size, 3);
   } finally {
     globalThis.fetch = previousFetch;
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = previousKey;
