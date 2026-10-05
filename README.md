@@ -28,7 +28,9 @@ O Aula Studio mantém sua identidade complementar em `assets/aula-mark.svg`, `as
 
 ## Salvamento e recuperação contra queda de energia
 
-O navegador salva automaticamente o briefing e, depois da geração, as semanas, o Planejamento Geral, o Material de Mediação e o estado de validação em `localStorage`. Ao reabrir a aplicação no mesmo navegador e dispositivo, aparecerá a opção **Retomar planejamento**.
+O navegador salva automaticamente o briefing e, durante a geração distribuída, cada semana concluída imediatamente, além do Planejamento Geral, do Material de Mediação e do estado de validação em `localStorage`. Ao reabrir a aplicação no mesmo navegador e dispositivo, aparecerá a opção **Retomar planejamento**.
+
+Se uma semana falhar depois de outras já concluídas, as anteriores continuam visíveis nos cards e ficam preservadas no rascunho. O botão **Gerar com IA** muda para **Continuar da semana N**: uma nova tentativa envia somente a semana interrompida e, depois, consolida o curso, sem reiniciar o que já foi produzido. A aplicação também faz até três tentativas automáticas para erros transitórios de hospedagem, rede, limite ou provedor.
 
 Para uma proteção adicional, use **Baixar backup** antes de fechar o navegador ou depois de uma geração importante. O arquivo JSON baixado pode ser recuperado com **Restaurar backup**. Por segurança, o código de acesso da IA nunca é salvo no autosave nem no backup.
 

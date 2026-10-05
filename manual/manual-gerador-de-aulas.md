@@ -192,13 +192,13 @@ Digite o código no campo **Código de acesso da IA publicada**. Se o código es
 
 ### 4.2 Salvamento automático e recuperação
 
-O Gerador salva automaticamente o briefing e, depois da geração, também salva as semanas, o Planejamento Geral, os guias do professor e o estado de revisão no navegador. Se houver queda de energia, atualização acidental ou fechamento inesperado, abra novamente a mesma URL no mesmo navegador e dispositivo.
+O Gerador salva automaticamente o briefing e, durante a geração distribuída, salva cada semana assim que ela é concluída, além do Planejamento Geral, dos guias do professor e do estado de revisão no navegador. Se houver queda de energia, atualização acidental ou fechamento inesperado, abra novamente a mesma URL no mesmo navegador e dispositivo.
 
 Se existir um planejamento salvo, aparecerá a faixa:
 
 > Encontramos um planejamento salvo neste navegador.
 
-Clique em **Retomar planejamento** para restaurar o briefing e, quando disponível, as semanas já geradas. O campo do código de acesso não é salvo; informe-o novamente quando precisar gerar ou refazer uma semana.
+Clique em **Retomar planejamento** para restaurar o briefing e, quando disponível, as semanas já geradas. Se uma semana falhar depois de outras concluídas, os cards preservados continuam disponíveis e o botão **Gerar com IA** passa a indicar **Continuar da semana N**. Essa nova tentativa envia apenas a semana interrompida e depois consolida o curso; não reinicia as semanas já concluídas. O campo do código de acesso não é salvo; informe-o novamente quando precisar gerar ou refazer uma semana.
 
 Para maior segurança, clique em **Baixar backup** depois de uma geração importante. Guarde o arquivo `.json` em outro local. Em caso de perda do armazenamento do navegador, clique em **Restaurar backup** e selecione esse arquivo.
 
@@ -494,7 +494,7 @@ Depois de revisar o briefing:
 
 A geração pode envolver mais de uma etapa do backend. O sistema primeiro redige a semana e depois pode consultar YouTube, Wikimedia Commons e Crossref para localizar candidatos de recursos.
 
-Por segurança, as semanas são processadas **uma por vez**. Uma unidade pode passar pelas etapas de planejamento acadêmico, redação, revisão crítica, eventual reparo, pesquisa de recursos e cálculo. Isso reduz picos de tokens por minuto, embora possa tornar a geração de um curso longo mais demorada. Em respostas temporárias 429 ou 503, o backend aguarda e tenta novamente automaticamente.
+Por segurança, as semanas são processadas **uma por vez**. Uma unidade pode passar pelas etapas de planejamento acadêmico, redação, revisão crítica, eventual reparo, pesquisa de recursos e cálculo. Isso reduz picos de tokens por minuto, embora possa tornar a geração de um curso longo mais demorada. O navegador exibe um painel de atividade com a etapa atual. Em respostas temporárias de rede, hospedagem, limite ou provedor, a semana recebe até três tentativas automáticas. Se todas falharem, as semanas anteriores permanecem nos cards e no autosave; clique em **Continuar da semana N** para tentar somente a unidade interrompida.
 
 ### 9.1 Geração com IA
 

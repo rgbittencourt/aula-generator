@@ -3,7 +3,7 @@ import { toStudentLesson } from "./student-export.js";
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
 const createReviewMarks = () => ({ resources: {}, checks: {}, academic: {}, quality: {} });
-const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, activeReviewGuidance: null };
+const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, activeReviewGuidance: null, generation: null };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
 const DRAFT_MAX_AGE_DAYS = 30;
@@ -357,6 +357,7 @@ function resetDisciplineForm(preserveSession = true) {
   state.reviewMarks = createReviewMarks();
   state.weekApprovals = {};
   state.activeReviewGuidance = null;
+  state.generation = null;
   state.previewIndex = null;
   $("#results-section")?.classList.add("hidden");
   $("#results-section") && ($("#results-section").open = false);
@@ -429,7 +430,7 @@ function currentSnapshot() {
     app: "aula-generator",
     savedAt: new Date().toISOString(),
     form: input,
-    results: state.weeks.length ? {
+    results: state.weeks.length || state.generation ? {
       ok: true,
       provider: state.provider,
       input: state.input || input,
@@ -439,6 +440,7 @@ function currentSnapshot() {
       validation: state.validation,
       reviewMarks: state.reviewMarks,
       weekApprovals: state.weekApprovals,
+      generation: state.generation,
       weeks: state.weeks
     } : null
   };
@@ -493,9 +495,13 @@ function updateDraftRecoveryCard(draft = readDraft()) {
     return;
   }
   const hasResults = Boolean(draft.results?.weeks?.length);
+  const partialGeneration = ["partial", "running", "consolidating"].includes(draft.results?.generation?.status);
   const title = section.querySelector("strong");
   if (title) title.textContent = document.body.classList.contains("workspace-active") ? "Rascunho disponível neste navegador." : "Encontramos um planejamento salvo neste navegador.";
-  $("#draft-recovery-details").textContent = `Salvo em ${formatSavedAt(draft.savedAt)}${hasResults ? ` · ${draft.results.weeks.length} semana(s) gerada(s)` : " · briefing em andamento"}.`;
+  const savedDetail = hasResults ? ` · ${draft.results.weeks.length} semana(s) preservada(s)` : " · briefing em andamento";
+  const nextWeekIndex = Number(draft.results?.generation?.nextWeekIndex) || 0;
+  const generationDetail = partialGeneration ? ` · geração interrompida${nextWeekIndex < Number(draft.results?.generation?.total || 0) ? ` na semana ${nextWeekIndex + 1}` : " durante a consolidação"}` : "";
+  $("#draft-recovery-details").textContent = `Salvo em ${formatSavedAt(draft.savedAt)}${savedDetail}${generationDetail}.`;
   section.classList.remove("hidden");
   syncRecoveryLayout();
 }
@@ -646,10 +652,24 @@ function restoreSnapshot(snapshot) {
   applyInputToForm(snapshot.form);
   state.reviewMarks = snapshot.results?.reviewMarks || snapshot.reviewMarks || createReviewMarks();
   state.weekApprovals = snapshot.results?.weekApprovals || snapshot.weekApprovals || {};
+  state.generation = snapshot.results?.generation || snapshot.generation || null;
+  if (["running", "consolidating"].includes(state.generation?.status)) state.generation = { ...state.generation, status: "partial" };
+  if (state.generation?.status === "partial") {
+    const nextWeekIndex = Number(state.generation.nextWeekIndex) || 0;
+    const resumeLabel = nextWeekIndex < Number(state.generation.total || 0) ? `Continuar da semana ${nextWeekIndex + 1}` : "Tentar consolidar novamente";
+    const generateButton = $("#generate-button");
+    if (generateButton) { generateButton.dataset.label = resumeLabel; setButtonLabel(generateButton, resumeLabel); }
+  }
   hideDraftRecovery();
   if (snapshot.results?.weeks?.length) {
-    renderWeeks({ ...snapshot.results, input: snapshot.results.input || snapshot.form }, { scrollToResults: false });
-    setSaveStatus("Planejamento retomado", `${snapshot.results.weeks.length} semana(s) recuperada(s).`, "success");
+    renderWeeks({ ...snapshot.results, partial: state.generation?.status === "partial", input: snapshot.results.input || snapshot.form }, { scrollToResults: false });
+    const nextWeekIndex = Number(state.generation?.nextWeekIndex) || 0;
+    const generationMessage = state.generation?.status === "partial" ? ` A geração foi interrompida; use Gerar com IA para continuar${nextWeekIndex < Number(state.generation.total || 0) ? ` pela semana ${nextWeekIndex + 1}` : " a consolidação"}.` : "";
+    setSaveStatus("Planejamento retomado", `${snapshot.results.weeks.length} semana(s) recuperada(s).${generationMessage}`, "success");
+    if (state.generation?.status === "partial") $("#results-section").open = true;
+  } else if (state.generation?.status === "partial") {
+    const nextWeekIndex = Number(state.generation.nextWeekIndex) || 0;
+    setSaveStatus("Geração parcial retomada", `A geração foi interrompida${nextWeekIndex < Number(state.generation.total || 0) ? ` na semana ${nextWeekIndex + 1}` : " durante a consolidação"}. Use Gerar com IA para tentar novamente.`, "warning");
   } else {
     setSaveStatus("Briefing retomado", "Continue preenchendo; o salvamento automático está ativo.", "success");
   }
@@ -921,7 +941,7 @@ function refreshAiButtonAvailability() {
   const recalculate = $("#recalculate-button");
   if (assist) assist.disabled = isGitHubPages || !aiConfigured;
   if (generateButton) generateButton.disabled = isGitHubPages || !aiConfigured;
-  if (recalculate) recalculate.disabled = isGitHubPages || !aiConfigured || !state.weeks.length;
+  if (recalculate) recalculate.disabled = isGitHubPages || !aiConfigured || !state.weeks.length || Boolean(state.generation);
 }
 
 function beginAiAction(button) {
@@ -989,9 +1009,18 @@ async function readApiResponse(response, fallbackMessage = "O servidor não cons
     const timeoutHint = /an error occurred|function timed out|timed out|504/i.test(detail)
       ? " A função demorou além do limite da hospedagem; a geração distribuída por semana será usada nas próximas tentativas."
       : "";
-    throw new Error(`${fallbackMessage} (HTTP ${response.status}). ${detail || response.statusText || "Resposta vazia."}${timeoutHint}`);
+    const error = new Error(`${fallbackMessage} (HTTP ${response.status}). ${detail || response.statusText || "Resposta vazia."}${timeoutHint}`);
+    error.status = response.status;
+    error.retryable = [408, 425, 429, 500, 502, 503, 504].includes(response.status) || Boolean(timeoutHint);
+    throw error;
   }
-  if (!response.ok || !data?.ok) throw new Error(data?.error || `${fallbackMessage} (HTTP ${response.status}).`);
+  if (!response.ok || !data?.ok) {
+    const error = new Error(data?.error || `${fallbackMessage} (HTTP ${response.status}).`);
+    error.status = response.status;
+    error.code = data?.code || "API_REQUEST_ERROR";
+    error.retryable = Boolean(data?.retryable) || [408, 425, 429, 500, 502, 503, 504].includes(response.status);
+    throw error;
+  }
   return data;
 }
 
@@ -1715,21 +1744,24 @@ function renderGeneralPlan(plan) {
 }
 
 function renderWeeks(data, { scrollToResults = true } = {}) {
-  state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider; state.validation = data.validation || data.generalPlan?.validation || null; state.reviewMarks = data.reviewMarks || state.reviewMarks || createReviewMarks();
+  const partial = Boolean(data.partial);
+  const totalWeeks = Number(data.input?.weeks || state.input?.weeks || data.weeks.length) || data.weeks.length;
+  const complete = !partial && data.weeks.length >= totalWeeks;
+  state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider; state.validation = data.validation || data.generalPlan?.validation || null; state.generation = data.generation ?? state.generation; state.reviewMarks = data.reviewMarks || state.reviewMarks || createReviewMarks();
   state.activeReviewGuidance = null;
-  ["teacher-pdf-button", "zip-button"].forEach((id) => { const button = $("#" + id); if (button) button.disabled = false; });
+  ["recalculate-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const button = $("#" + id); if (button) button.disabled = !complete; });
   updateMediationExportHint();
   refreshAiButtonAvailability();
   const approvedWeeks = data.weeks.filter((_, index) => Boolean(state.weekApprovals?.[index])).length;
-  const pendingWeeks = data.weeks.length - approvedWeeks;
-  $("#results-title").textContent = approvedWeeks ? `${approvedWeeks} liberada(s) · ${pendingWeeks} para revisão` : `${data.weeks.length} semanas prontas para revisão`;
-  $("#results-subtitle").textContent = data.provider === "static-demo" ? "Modo público GitHub Pages: exemplo gerado no navegador, sem API." : data.provider === "fallback" ? "Exemplo local gerado sem API; use-o para validar o fluxo." : `Gerado por IA com ${data.model || "o provedor configurado"}. Revise antes de publicar.`;
+  const pendingWeeks = Math.max(0, totalWeeks - approvedWeeks);
+  $("#results-title").textContent = partial ? `${data.weeks.length}/${totalWeeks} semanas preservadas` : approvedWeeks ? `${approvedWeeks} liberada(s) · ${pendingWeeks} para revisão` : `${data.weeks.length} semanas prontas para revisão`;
+  $("#results-subtitle").textContent = partial ? "A geração ainda está em andamento; as semanas concluídas ficam disponíveis enquanto a próxima é processada." : data.provider === "static-demo" ? "Modo público GitHub Pages: exemplo gerado no navegador, sem API." : data.provider === "fallback" ? "Exemplo local gerado sem API; use-o para validar o fluxo." : `Gerado por IA com ${data.model || "o provedor configurado"}. Revise antes de publicar.`;
   $("#results-section").classList.remove("hidden");
   $("#empty-state").classList.add("hidden");
   const alert = $("#result-alert");
   alert.className = "result-alert";
   const automaticSummary = state.validation?.summary ? `Diagnóstico automático: ${state.validation.summary.blockedWeeks || 0} bloqueada(s) e ${state.validation.summary.reviewWeeks || 0} em revisão.` : "";
-  alert.textContent = data.provider === "static-demo" ? "Esta versão pública gera exemplos diretamente no navegador. A IA será conectada em uma hospedagem com backend protegido quando você escolher essa opção." : data.provider === "fallback" ? "Este é um exemplo estrutural. A geração por IA será ativada quando OPENAI_API_KEY estiver configurada." : approvedWeeks ? `${approvedWeeks} semana(s) liberada(s) por você; ${pendingWeeks} ainda aguardam sua revisão. ${automaticSummary}` : state.validation?.readyForExport ? "A geração terminou. Faça a revisão humana de cada semana e, depois, baixe os arquivos." : `A geração terminou. ${pendingWeeks} semana(s) ainda aguardam sua revisão. ${automaticSummary}`;
+  alert.textContent = partial ? `Semana(s) concluída(s) preservada(s). A próxima semana está sendo processada; se houver falha, você poderá continuar a partir dela sem perder este material.` : data.provider === "static-demo" ? "Esta versão pública gera exemplos diretamente no navegador. A IA será conectada em uma hospedagem com backend protegido quando você escolher essa opção." : data.provider === "fallback" ? "Este é um exemplo estrutural. A geração por IA será ativada quando OPENAI_API_KEY estiver configurada." : approvedWeeks ? `${approvedWeeks} semana(s) liberada(s) por você; ${pendingWeeks} ainda aguardam sua revisão. ${automaticSummary}` : state.validation?.readyForExport ? "A geração terminou. Faça a revisão humana de cada semana e, depois, baixe os arquivos." : `A geração terminou. ${pendingWeeks} semana(s) ainda aguardam sua revisão. ${automaticSummary}`;
   const cards = data.weeks.map((lesson, index) => {
     const meta = lesson.meta || {};
     const workload = data.workload?.weeks?.[index];
@@ -1751,13 +1783,14 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   }).join("");
   $("#week-grid").innerHTML = cards;
   const weeksNote = $("#weeks-sector-note");
-  if (weeksNote) weeksNote.textContent = `${data.weeks.length} semana(s) gerada(s); abra cada cartão para revisar o conteúdo do aluno.`;
+  if (weeksNote) weeksNote.textContent = partial ? `${data.weeks.length} de ${totalWeeks} semana(s) preservada(s); a geração pode ser retomada pela próxima semana.` : `${data.weeks.length} semana(s) gerada(s); abra cada cartão para revisar o conteúdo do aluno.`;
   $("#week-grid").querySelectorAll(".week-preview").forEach((button) => button.addEventListener("click", () => openLessonPreview(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-download").forEach((button) => button.addEventListener("click", () => downloadWeek(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-approve").forEach((button) => button.addEventListener("click", () => toggleWeekApproval(Number(button.dataset.index))));
   renderGeneralPlan(data.generalPlan);
   renderWorkload(data.workload);
   saveDraft("resultado");
+  if (partial) $("#results-section").open = true;
   if (scrollToResults) scrollFormTo("#results-section");
 }
 
@@ -1798,53 +1831,112 @@ function toggleWeekApproval(index) {
   renderWeeks({ input: state.input, weeks: state.weeks, workload: state.workload, generalPlan: state.generalPlan, teacherGuides: state.teacherGuides, provider: state.provider, validation: state.validation }, { scrollToResults: false });
 }
 
-async function generateDistributed(input, accessCode, button) {
-  const weeks = [];
-  const teacherGuides = [];
+function generationErrorIsRetryable(error) {
+  if (!error) return false;
+  if (error.retryable) return true;
+  if ([408, 425, 429, 500, 502, 503, 504].includes(Number(error.status))) return true;
+  return /temporar|timeout|timed out|rate limit|limite.*token|resposta vazia|não respondeu|failed to fetch|networkerror|erro de rede/i.test(String(error.message || ""));
+}
+
+function generationRetryDelay(attempt) {
+  return Math.min(8000, 1200 * (2 ** attempt) + Math.round(Math.random() * 400));
+}
+
+async function requestGeneratedWeek(input, index, headers, previousWeeks, button) {
+  const maxAttempts = 3;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch("/api/generate-week", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ input, weekIndex: index, previousWeeks })
+      });
+      const data = await readApiResponse(response, `Não foi possível gerar a semana ${index + 1}.`);
+      if (!data.week) {
+        const error = new Error(`A semana ${index + 1} foi retornada sem conteúdo.`);
+        error.retryable = true;
+        throw error;
+      }
+      return data;
+    } catch (error) {
+      if (attempt >= maxAttempts - 1 || !generationErrorIsRetryable(error)) throw error;
+      const nextAttempt = attempt + 2;
+      const delay = generationRetryDelay(attempt);
+      setButtonLabel(button, `Tentando semana ${index + 1} novamente…`);
+      setAiActivity("Tentando novamente", `A semana ${index + 1} não respondeu na primeira tentativa. Nova tentativa ${nextAttempt}/${maxAttempts} em instantes…`, { progress: Math.round(((index + 0.35) / (input.weeks + 1)) * 100) });
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error(`Não foi possível gerar a semana ${index + 1}.`);
+}
+
+async function generateDistributed(input, accessCode, button, options = {}) {
+  const startIndex = Math.max(0, Math.min(input.weeks, Number(options.startIndex) || 0));
+  const weeks = Array.isArray(options.initialWeeks) ? options.initialWeeks.slice() : [];
+  const teacherGuides = Array.isArray(options.initialTeacherGuides) ? options.initialTeacherGuides.slice() : [];
+  const formSignature = options.formSignature || JSON.stringify(input);
   const headers = { "Content-Type": "application/json" };
   if (accessCode) headers["x-aula-access-code"] = accessCode;
+  const annotateFailure = (error, failedWeekIndex) => {
+    error.completedWeeks = weeks.filter(Boolean);
+    error.completedTeacherGuides = teacherGuides.filter(Boolean);
+    error.failedWeekIndex = failedWeekIndex;
+    error.generationInput = input;
+    return error;
+  };
 
-  for (let index = 0; index < input.weeks; index += 1) {
+  state.input = input;
+  state.provider = "ai-distributed-partial";
+  state.generation = { status: "running", nextWeekIndex: startIndex, total: input.weeks, formSignature };
+  saveDraft("geração-em-andamento");
+
+  for (let index = startIndex; index < input.weeks; index += 1) {
+    state.generation = { status: "running", nextWeekIndex: index, total: input.weeks, formSignature };
+    saveDraft("geração-em-andamento");
     setButtonLabel(button, `Gerando semana ${index + 1}/${input.weeks}…`);
     setAiActivity("Gerando material com IA", `Escrevendo a semana ${index + 1} de ${input.weeks}…`, { progress: Math.round((index / (input.weeks + 1)) * 100) });
-    const response = await fetch("/api/generate-week", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        input,
-        weekIndex: index,
-        previousWeeks: weeks.filter(Boolean).map((lesson) => ({
-          meta: { weekNumber: lesson.meta?.weekNumber, title: lesson.meta?.title },
-          lessonPlan: {
-            weekNumber: lesson.lessonPlan?.weekNumber,
-            theme: lesson.lessonPlan?.theme,
-            learningObjectives: (lesson.lessonPlan?.learningObjectives || []).slice(0, 4),
-            contentSections: (lesson.lessonPlan?.contentSections || []).map((section) => ({ title: section.title })).slice(0, 8)
-          }
-        }))
-      })
-    });
-    const data = await readApiResponse(response, `Não foi possível gerar a semana ${index + 1}.`);
+    const previousWeeks = weeks.filter(Boolean).map((lesson) => ({
+      meta: { weekNumber: lesson.meta?.weekNumber, title: lesson.meta?.title },
+      lessonPlan: {
+        weekNumber: lesson.lessonPlan?.weekNumber,
+        theme: lesson.lessonPlan?.theme,
+        learningObjectives: (lesson.lessonPlan?.learningObjectives || []).slice(0, 4),
+        contentSections: (lesson.lessonPlan?.contentSections || []).map((section) => ({ title: section.title })).slice(0, 8)
+      }
+    }));
+    let data;
+    try {
+      data = await requestGeneratedWeek(input, index, headers, previousWeeks, button);
+    } catch (error) {
+      throw annotateFailure(error, index);
+    }
     weeks[index] = data.week;
     teacherGuides[index] = data.teacherGuide;
     state.input = input;
     state.weeks = weeks.filter(Boolean);
     state.teacherGuides = teacherGuides.filter(Boolean);
-    saveDraft("resultado-parcial");
+    state.generation = { status: "running", nextWeekIndex: index + 1, total: input.weeks, formSignature };
+    renderWeeks({ ok: true, partial: true, provider: "ai-distributed-partial", model: data.model, input, weeks: state.weeks, teacherGuides: state.teacherGuides, generation: state.generation }, { scrollToResults: false });
     const alert = $("#result-alert");
     alert.className = "result-alert";
-    alert.textContent = `Semana ${index + 1} de ${input.weeks} gerada. A consolidação acontece ao final.`;
+    alert.textContent = `Semana ${index + 1} de ${input.weeks} gerada e preservada. A consolidação acontece ao final.`;
     alert.classList.remove("hidden");
   }
 
+  state.generation = { status: "consolidating", nextWeekIndex: input.weeks, total: input.weeks, formSignature };
+  saveDraft("consolidação-em-andamento");
   setButtonLabel(button, "Consolidando curso…");
   setAiActivity("Consolidando curso", "Recalculando carga, qualidade, checklists e materiais finais…", { progress: Math.round((input.weeks / (input.weeks + 1)) * 100) });
-  const response = await fetch("/api/assemble-course", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ input, weeks, teacherGuides })
-  });
-  return readApiResponse(response, "Não foi possível consolidar o curso.");
+  try {
+    const response = await fetch("/api/assemble-course", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ input, weeks, teacherGuides })
+    });
+    return await readApiResponse(response, "Não foi possível consolidar o curso.");
+  } catch (error) {
+    throw annotateFailure(error, input.weeks);
+  }
 }
 
 async function generate() {
@@ -1852,31 +1944,68 @@ async function generate() {
   const input = formInput();
   const accessCode = input.accessCode;
   delete input.accessCode;
+  const formSignature = JSON.stringify(input);
   if (!input.title.trim()) { showError("Informe o tema geral ou título do curso."); $("#course-title").focus(); return; }
   if (!input.objectives.length && !input.content.trim()) { showError("Informe ao menos um objetivo ou conteúdo-base para orientar a geração."); $("#objectives").focus(); return; }
   if (input.webPractice.enabled) {
     const incomplete = input.webPractices.find((practice) => !practice.title || (!practice.weekNumber && !practice.date));
     if (incomplete) { showError("Cada webprática precisa de um título e de uma semana ou data de ocorrência. Ela não será alocada automaticamente."); return; }
   }
-  state.reviewMarks = createReviewMarks();
-  state.weekApprovals = {};
+  const generation = state.generation;
+  const resumeGeneration = generation?.status === "partial"
+    && generation.formSignature === formSignature
+    && Number(generation.total) === input.weeks
+    && Number(generation.nextWeekIndex) === state.weeks.length
+    && state.weeks.length <= input.weeks;
+  const startIndex = resumeGeneration ? state.weeks.length : 0;
+  if (!resumeGeneration) {
+    state.weeks = [];
+    state.teacherGuides = [];
+    state.workload = null;
+    state.generalPlan = null;
+    state.validation = null;
+    state.generation = null;
+    $("#results-section")?.classList.add("hidden");
+    $("#general-plan") && $("#general-plan").classList.add("hidden");
+    $("#week-grid") && ($("#week-grid").innerHTML = "");
+  }
+  state.reviewMarks = resumeGeneration ? state.reviewMarks : createReviewMarks();
+  state.weekApprovals = resumeGeneration ? state.weekApprovals : {};
   const button = $("#generate-button");
   if (!beginAiAction(button)) return;
-  button.dataset.label = "Gerar com IA";
+  button.dataset.label = resumeGeneration ? `Continuar da semana ${startIndex + 1}` : "Gerar com IA";
   ["recalculate-button", "teacher-pdf-button", "zip-button"].forEach((id) => { const action = $("#" + id); if (action) action.disabled = true; });
   setBusy(button, true, "Gerando material…");
-  setAiActivity("Preparando geração", `A IA vai construir ${input.weeks} semana(s), uma por vez, e depois consolidar o curso…`, { progress: 0 });
+  setAiActivity(resumeGeneration ? "Retomando geração" : "Preparando geração", resumeGeneration ? `As semanas anteriores foram preservadas. Continuando pela semana ${startIndex + 1} de ${input.weeks}…` : `A IA vai construir ${input.weeks} semana(s), uma por vez, e depois consolidar o curso…`, { progress: resumeGeneration ? Math.round((startIndex / (input.weeks + 1)) * 100) : 0 });
   $("#result-alert").classList.add("hidden");
   try {
     if (isGitHubPages) {
       throw new Error("A IA está disponível na URL Vercel, onde o backend protegido pode ser acessado. Abra o Gerador pela versão publicada com IA.");
     }
-    const data = await generateDistributed(input, accessCode, button);
+    const data = await generateDistributed(input, accessCode, button, { startIndex, initialWeeks: resumeGeneration ? state.weeks : [], initialTeacherGuides: resumeGeneration ? state.teacherGuides : [], formSignature });
+    state.generation = null;
+    button.dataset.label = "Gerar com IA";
     renderWeeks(data);
     finishAiActivity("Geração concluída", `${input.weeks} semana(s) foram geradas e consolidadas. Revise o resultado antes de exportar.`, "success");
   } catch (error) {
-    showError(error.message);
-    finishAiActivity("Geração não concluída", error.message, "error");
+    const completedWeeks = Array.isArray(error.completedWeeks) ? error.completedWeeks : state.weeks;
+    const completedTeacherGuides = Array.isArray(error.completedTeacherGuides) ? error.completedTeacherGuides : state.teacherGuides;
+    const failedWeekIndex = Number.isInteger(error.failedWeekIndex) ? error.failedWeekIndex : completedWeeks.length;
+    state.input = input;
+    state.weeks = completedWeeks.filter(Boolean);
+    state.teacherGuides = completedTeacherGuides.filter(Boolean);
+    state.provider = "ai-distributed-partial";
+    state.generation = { status: "partial", nextWeekIndex: Math.min(input.weeks, failedWeekIndex), total: input.weeks, formSignature, error: error.message };
+    if (state.weeks.length) {
+      renderWeeks({ ok: true, partial: true, provider: "ai-distributed-partial", input, weeks: state.weeks, teacherGuides: state.teacherGuides, generation: state.generation }, { scrollToResults: false });
+      $("#results-section").open = true;
+    } else saveDraft("geração-parcial");
+    const resumeLabel = failedWeekIndex < input.weeks ? `Continuar da semana ${failedWeekIndex + 1}` : "Tentar consolidar novamente";
+    button.dataset.label = resumeLabel;
+    const preserved = state.weeks.length ? ` ${state.weeks.length} semana(s) concluída(s) permanecem preservada(s).` : "";
+    const resumeHint = failedWeekIndex < input.weeks ? ` Clique em “${resumeLabel}” para tentar novamente sem reiniciar as semanas concluídas.` : " Clique novamente em Gerar com IA para tentar a consolidação.";
+    showError(`A geração parou na semana ${Math.min(input.weeks, failedWeekIndex + 1)}. ${error.message}.${preserved}${resumeHint}`);
+    finishAiActivity("Geração interrompida", `A semana ${Math.min(input.weeks, failedWeekIndex + 1)} falhou, mas o progresso foi preservado.${resumeHint}`, "error");
   } finally {
     setBusy(button, false, "");
     endAiAction();
