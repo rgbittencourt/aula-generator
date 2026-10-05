@@ -210,8 +210,10 @@ app.post("/api/zip", async (req, res) => {
 app.post("/api/teacher-pdf", async (req, res) => {
   try {
     const input = normalizeCourseInput(req.body?.input || {});
-    const weeks = normalizeWeeklyOutput({ weeks: req.body?.weeks || [] }, input);
-    const workload = calculateCourseWorkload(input, input.formulaConfig, weeks);
+    const submittedWeeks = Array.isArray(req.body?.weeks) ? req.body.weeks : [];
+    const weeks = submittedWeeks.map((week, index) => normalizeLesson(week, input, index)).filter(Boolean);
+    const calculationInput = { ...input, weeks: weeks.length };
+    const workload = calculateCourseWorkload(calculationInput, calculationInput.formulaConfig, weeks);
     const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
     const teacherGuides = buildTeacherGuides(input, enrichedWeeks, req.body?.teacherGuides || []);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);

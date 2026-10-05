@@ -941,9 +941,8 @@ function refreshAiButtonAvailability() {
   const recalculate = $("#recalculate-button");
   if (assist) assist.disabled = isGitHubPages || !aiConfigured;
   if (generateButton) generateButton.disabled = isGitHubPages || !aiConfigured;
-  const generationRunning = ["running", "consolidating"].includes(state.generation?.status);
   if (recalculate) {
-    recalculate.disabled = isGitHubPages || !aiConfigured || !state.weeks.length || generationRunning;
+    recalculate.disabled = isGitHubPages || !aiConfigured || !state.weeks.length;
     recalculate.title = state.generation?.status === "partial" && state.input?.weeks > state.weeks.length
       ? `Recalcular a qualidade das ${state.weeks.length} semanas disponíveis de ${state.input.weeks}`
       : "Recalcular qualidade sem gerar novas semanas";
@@ -970,6 +969,10 @@ function endAiAction() {
     if (action) delete action.dataset.aiLocked;
   });
   refreshAiButtonAvailability();
+  const teacherPdf = $("#teacher-pdf-button");
+  if (teacherPdf && state.weeks.length) teacherPdf.disabled = false;
+  const zip = $("#zip-button");
+  if (zip && state.weeks.length >= Number(state.input?.weeks || 0)) zip.disabled = false;
   const regenerate = $("#regenerate-week-button");
   if (regenerate && !isGitHubPages) regenerate.disabled = false;
 }
@@ -1763,15 +1766,18 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   const partialQualityAvailable = data.weeks.length > 0 && (partial || data.weeks.length < totalWeeks);
   state.input = data.input; state.weeks = data.weeks; state.workload = data.workload; state.generalPlan = data.generalPlan || null; state.teacherGuides = data.teacherGuides || []; state.provider = data.provider; state.validation = data.validation || data.generalPlan?.validation || null; state.generation = data.generation ?? state.generation; state.reviewMarks = data.reviewMarks || state.reviewMarks || createReviewMarks();
   state.activeReviewGuidance = null;
+  const generationInProgress = ["running", "consolidating"].includes(data.generation?.status || state.generation?.status);
   const recalculateButton = $("#recalculate-button");
-  if (recalculateButton) recalculateButton.disabled = !(complete || partialQualityAvailable);
-  ["teacher-pdf-button", "zip-button"].forEach((id) => { const button = $("#" + id); if (button) button.disabled = !complete; });
+  if (recalculateButton) recalculateButton.disabled = aiActionBusy || !(complete || partialQualityAvailable);
+  const teacherPdfButton = $("#teacher-pdf-button");
+  if (teacherPdfButton) teacherPdfButton.disabled = aiActionBusy || !data.weeks.length;
+  const zipButton = $("#zip-button");
+  if (zipButton) zipButton.disabled = !complete;
   updateMediationExportHint();
   refreshAiButtonAvailability();
   const approvedWeeks = data.weeks.filter((_, index) => Boolean(state.weekApprovals?.[index])).length;
   const pendingWeeks = Math.max(0, totalWeeks - approvedWeeks);
   $("#results-title").textContent = partial ? `${data.weeks.length}/${totalWeeks} semanas preservadas` : approvedWeeks ? `${approvedWeeks} liberada(s) · ${pendingWeeks} para revisão` : `${data.weeks.length} semanas prontas para revisão`;
-  const generationInProgress = ["running", "consolidating"].includes(data.generation?.status || state.generation?.status);
   $("#results-subtitle").textContent = partial ? (generationInProgress ? "A geração ainda está em andamento; as semanas concluídas ficam disponíveis enquanto a próxima é processada." : `${data.weeks.length} de ${totalWeeks} semana(s) disponíveis. Você já pode recalcular a qualidade e retomar a geração depois.`) : data.provider === "static-demo" ? "Modo público GitHub Pages: exemplo gerado no navegador, sem API." : data.provider === "fallback" ? "Exemplo local gerado sem API; use-o para validar o fluxo." : `Gerado por IA com ${data.model || "o provedor configurado"}. Revise antes de publicar.`;
   $("#results-section").classList.remove("hidden");
   $("#empty-state").classList.add("hidden");
