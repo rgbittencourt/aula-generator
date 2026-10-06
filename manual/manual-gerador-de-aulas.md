@@ -662,39 +662,36 @@ O botão **Baixar DOCX** envia automaticamente o código de acesso preenchido no
 
 #### 10.1.4 Prompt de preenchimento assistido do briefing
 
-O botão **Preencher vazios com IA** faz uma chamada com este sistema e este prompt de usuário:
+O botão **Preencher vazios com IA** faz uma chamada específica e menor que a geração de aulas. O servidor não envia o objeto bruto inteiro: remove configurações de cálculo, composição e demais campos que não são necessários para completar o briefing, limita textos e listas muito extensos e mantém apenas o contexto pedagógico essencial. Isso evita que um formulário com muitas semanas, materiais ou webpráticas consuma o orçamento de entrada da organização.
+
+O contrato lógico da chamada é:
 
 ```text
 [SYSTEM]
-{ACADEMIC_SYSTEM_PROMPT}
-
-Nesta etapa, complete somente os campos vazios do briefing. Não invente URLs, fontes verificadas ou dados factuais não fornecidos.
+Você é um designer instrucional brasileiro. Complete somente os campos vazios do briefing, preserve o que já existe, escreva em português do Brasil e não invente URLs, fontes verificadas ou dados factuais. Responda apenas JSON válido e mantenha listas concisas.
 
 [USER]
-Atue como designer instrucional e assistente de planejamento de curso. Complete somente os campos que estão vazios no briefing abaixo. Responda somente JSON válido com estas propriedades: audience (string), objectives (array de strings), content (string), webPractices (array de objetos), materials (array de objetos), references (array de strings), videoSearchSuggestions (array de strings), imageSearchSuggestions (array de strings), notes (array de strings).
+Atue como designer instrucional e assistente de planejamento de curso. Complete somente os campos que estão vazios. Responda somente JSON válido com estas propriedades: audience (string), objectives (array de strings), content (string), webPractices (array de objetos), materials (array de objetos), references (array de strings), videoSearchSuggestions (array de strings), imageSearchSuggestions (array de strings), notes (array de strings).
 
 Campos que precisam de preenchimento: {missingFields ou "nenhum; apenas revise e sugira melhorias"}.
 
-Regras:
-- não altere nem repita informações que já foram fornecidas;
+Regras principais:
+- não altere nem repita informações já fornecidas;
 - escreva em português do Brasil, com linguagem humana, clara e pedagogicamente útil;
 - produza objetivos observáveis, progressivos e adequados ao público e ao nível;
-- organize o conteúdo em uma sequência didática coerente com o número de semanas e a carga horária;
-- respeite o academicProfile recebido, especialmente profundidade, quantidade de seções, referências e exigência de contrapontos;
-- se webpráticas estiverem ativadas, gere no mínimo uma e, quando pedagogicamente justificável, várias práticas distintas. Cada objeto deve conter title, type, modality, weekNumber/date quando disponível, startTime/endTime quando disponíveis, platform/tool, context, problem, objective, preparation, teacherPreparation, studentPreparation, materials, instructions, steps, product, criteria, rubric, assessment, continuation, fallbackPlan, prompts, artifacts, resources, roteiro com blocos cronometrados e durationMinutes;
-- trate cada webprática como aula síncrona ou laboratório independente, com roteiro operacional próprio; nunca a transforme em leitura, seção, atividade ou bloco do texto-base semanal;
-- alinhe cada webprática a objetivos e conteúdos específicos, distribuindo-as em semanas e datas coerentes do calendário;
-- gere materiais de apoio como objetos com type, title, link, moment, required, objective, alignment, use, pages, durationMinutes e notes. Eles devem servir aos objetivos e conteúdos, indicar por que serão usados, em que momento entram e como o estudante trabalhará com eles;
-- para referências e artigos, sugira obras, autores, documentos ou fontes que o professor deve conferir; não invente URLs, DOI, páginas ou dados bibliográficos específicos;
-- para vídeos e imagens, gere termos de busca e intenção pedagógica; use links somente quando já tiverem sido fornecidos pelo usuário;
-- não preencha nome de autor ou instituição, pois esses dados devem vir do usuário;
-- não escreva markdown fora das strings do JSON.
+- trate cada webprática como aula síncrona/laboratório independente, nunca como texto-base semanal;
+- preserve o id e a ordem de cada webprática; se houver N itens, retorne exatamente N itens;
+- gere materiais, referências e termos de busca alinhados ao tema, sem inventar URLs, DOI ou fontes verificadas;
+- retorne no máximo 6 objetivos, 8 materiais, 8 referências e 8 termos de busca de cada tipo;
+- complete somente os campos listados e responda sem markdown fora das strings.
 
-Briefing atual:
-{input em JSON indentado}
+Contexto essencial do briefing atual:
+{compactBriefingInput(input, missingFields) em JSON indentado}
 
 Retorne JSON válido agora.
 ```
+
+O orçamento padrão dessa chamada é `OPENAI_ASSIST_MAX_TOKENS=6000`, separado de `OPENAI_MAX_TOKENS`, que é reservado para a redação semanal. O resultado continua sendo mesclado apenas nos campos vazios; o texto que o professor já escreveu não é substituído indiscriminadamente.
 
 #### 10.1.5 Prompt de planejamento acadêmico da semana
 
@@ -983,7 +980,7 @@ Após a regeneração, o sistema revisa novamente a semana e recalcula o Planeja
 | Reparo | `0.35` | Reescreve as seções curtas até cumprir o piso e as quotas, sem aceitar acréscimos marginais. |
 | Regeneração | `0.35` | Altera somente a semana solicitada. |
 
-Todas as etapas usam o modelo definido por `OPENAI_CONTENT_MODEL`; se essa variável estiver vazia, usam `OPENAI_MODEL`. Todas usam `OPENAI_MAX_TOKENS`, `OPENAI_MAX_RETRIES` e o mecanismo de espera progressiva descrito na seção 10.2.
+Todas as etapas usam o modelo definido por `OPENAI_CONTENT_MODEL`; se essa variável estiver vazia, usam `OPENAI_MODEL`. A redação semanal usa `OPENAI_MAX_TOKENS`, a regeneração usa `OPENAI_REGEN_MAX_TOKENS` e o preenchimento assistido usa `OPENAI_ASSIST_MAX_TOKENS`. Todas compartilham `OPENAI_MAX_RETRIES` e o mecanismo de espera progressiva descrito na seção 10.2.
 
 ### 10.2 Limites de tokens e geração sequencial
 
@@ -994,10 +991,11 @@ O Gerador foi configurado para:
 1. processar uma semana por vez por padrão;
 2. respeitar o cabeçalho `Retry-After` quando a OpenAI enviar um prazo;
 3. usar espera progressiva com pequena variação entre tentativas;
-4. repetir até três vezes erros temporários `429` ou `503`;
-5. informar no healthcheck `maxTokens`, `maxRetries` e `aiBatchSize`.
+4. repetir até três vezes erros temporários `429` ou `503`, mas não repetir automaticamente um excesso real de contexto;
+5. usar `OPENAI_ASSIST_MAX_TOKENS=6000` como orçamento separado para **Preencher vazios com IA**;
+6. informar no healthcheck `maxTokens`, `assistMaxTokens`, `maxRetries` e `aiBatchSize`.
 
-Não clique repetidamente em **Gerar com IA** enquanto a solicitação anterior estiver em andamento. Se o curso for muito longo, aguarde a conclusão de cada geração antes de iniciar uma nova.
+Não clique repetidamente em **Gerar com IA** enquanto a solicitação anterior estiver em andamento. Se o curso for muito longo, aguarde a conclusão de cada geração antes de iniciar uma nova. Se aparecer **“Request too large”** no preenchimento assistido, a versão publicada deve estar usando o contexto compacto e o orçamento próprio; nesse caso, remova textos repetidos do briefing e tente novamente. Se aparecer o detalhe **TPM / tokens per minute**, aguarde a janela indicada pelo provedor.
 
 ---
 
@@ -1491,6 +1489,7 @@ Na Vercel, em **Settings → Environment Variables**, configure:
 | `OPENAI_MODEL` | modelo padrão, por exemplo `gpt-4o-mini` |
 | `OPENAI_CONTENT_MODEL` | modelo escolhido para texto longo, por exemplo `gpt-4.1` |
 | `OPENAI_MAX_TOKENS` | `16000` para aulas longas; considere `12000` se houver 429 frequente |
+| `OPENAI_ASSIST_MAX_TOKENS` | `6000` para o preenchimento assistido; orçamento separado |
 | `OPENAI_MAX_RETRIES` | `3` |
 | `AULA_AI_BATCH_SIZE` | `1` |
 | `AULA_ACADEMIC_PIPELINE` | `true` |
@@ -1618,6 +1617,7 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_CONTENT_MODEL=gpt-4.1
 OPENAI_MAX_TOKENS=16000
+OPENAI_ASSIST_MAX_TOKENS=6000
 OPENAI_MAX_RETRIES=3
 AULA_AI_BATCH_SIZE=1
 AULA_ACADEMIC_PIPELINE=true
@@ -1893,9 +1893,9 @@ Sim. O modo local permite testar a aplicação e gerar exemplos. Para geração 
 
 Não. A aplicação precisa de uma chave de API da plataforma OpenAI. A senha da conta ChatGPT não deve ser usada como credencial do backend.
 
-### Por que aparece erro 429 mesmo com a chave correta?
+### Por que aparece erro 429 ou “Request too large” mesmo com a chave correta?
 
-Porque a organização atingiu temporariamente o limite de tokens por minuto do modelo. O sistema agora processa uma semana por vez e tenta novamente respostas temporárias, mas o aumento permanente deve ser feito em **Settings → Organization → Limits** na plataforma OpenAI.
+São situações diferentes. **429 / TPM / tokens per minute** significa que a organização atingiu temporariamente o limite de tokens por minuto; aguarde alguns segundos e evite chamadas simultâneas. **Request too large** pode significar excesso de contexto ou, em algumas mensagens da OpenAI, uma solicitação que excedeu o orçamento de TPM disponível. Para o botão de preenchimento, o Gerador envia um contexto compacto e usa `OPENAI_ASSIST_MAX_TOKENS=6000`. O aumento permanente de TPM deve ser feito em **Settings → Organization → Limits** na plataforma OpenAI; criar outra chave na mesma organização não resolve.
 
 ### Por que não vejo mais disciplina, nível e profundidade dentro do Perfil acadêmico?
 

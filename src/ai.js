@@ -9,6 +9,7 @@ import { selectResourcesWithAI } from "./resource-curator.js";
 export { selectResourcesWithAI };
 
 export function buildBriefingPrompt(input, missingFields = []) {
+  const compactInput = compactBriefingInput(input, missingFields);
   const requestedPracticeCount = Array.isArray(input.webPractices) ? input.webPractices.length : 0;
   return `Atue como designer instrucional e assistente de planejamento de curso. Complete somente os campos que estão vazios no briefing abaixo. Responda somente JSON válido com estas propriedades: audience (string), objectives (array de strings), content (string), webPractices (array de objetos), materials (array de objetos), references (array de strings), videoSearchSuggestions (array de strings), imageSearchSuggestions (array de strings), notes (array de strings).
 
@@ -31,10 +32,11 @@ Regras:
 - para vídeos e imagens, gere termos de busca e intenção pedagógica; use links somente quando já tiverem sido fornecidos pelo usuário;
 - não preencha nome de autor ou instituição, pois esses dados devem vir do usuário;
 - não escreva markdown fora das strings do JSON.
+- mantenha as respostas concisas: no máximo 6 objetivos, 8 materiais, 8 referências e 8 termos de busca de cada tipo; complete somente os campos listados e preserve os demais valores;
 - QUANTIDADE DE WEBPRÁTICAS: o briefing recebeu ${requestedPracticeCount} item(ns). Se esse número for maior que zero, retorne exatamente ${requestedPracticeCount} webprática(s), na mesma ordem e preservando cada id; nunca reduza a lista a uma só prática e nunca descarte um item parcialmente preenchido. Se o número for zero e as webpráticas estiverem ativadas, crie pelo menos uma.
 
-Briefing atual:
-${JSON.stringify(input, null, 2)}
+Contexto essencial do briefing atual (campos extensos e configurações não relacionadas foram omitidos para manter a solicitação dentro do limite do modelo):
+${JSON.stringify(compactInput, null, 2)}
 
 Retorne JSON válido agora.`;
 }
@@ -42,6 +44,105 @@ Retorne JSON válido agora.`;
 function text(value) { return typeof value === "string" ? value.trim() : ""; }
 function stringList(value) { return Array.isArray(value) ? value.map(text).filter(Boolean) : []; }
 function safeNumber(value, fallback = 0) { const n = Number(value); return Number.isFinite(n) ? n : fallback; }
+function clipText(value, limit = 600) {
+  const source = text(value);
+  return source.length > limit ? `${source.slice(0, Math.max(0, limit - 1)).trim()}…` : source;
+}
+function compactList(value, itemLimit = 8, textLimit = 240) {
+  return (Array.isArray(value) ? value : stringList(value)).slice(0, itemLimit).map((item) => clipText(item, textLimit)).filter(Boolean);
+}
+function compactBriefingPractice(practice = {}, index = 0) {
+  return {
+    id: text(practice.id) || `webpractice-${index + 1}`,
+    title: clipText(practice.title, 140),
+    type: clipText(practice.type, 100),
+    modality: clipText(practice.modality, 120),
+    weekNumber: safeNumber(practice.weekNumber, 0),
+    date: clipText(practice.date, 40),
+    dayOfWeek: clipText(practice.dayOfWeek, 40),
+    startTime: clipText(practice.startTime, 20),
+    endTime: clipText(practice.endTime, 20),
+    platform: clipText(practice.platform, 120),
+    tool: clipText(practice.tool, 160),
+    context: clipText(practice.context, 420),
+    problem: clipText(practice.problem, 420),
+    objective: clipText(practice.objective, 420),
+    preparation: clipText(practice.preparation, 420),
+    materials: compactList(practice.materials, 6, 140),
+    instructions: clipText(practice.instructions, 520),
+    steps: (Array.isArray(practice.steps) ? practice.steps : []).slice(0, 6).map((step) => ({
+      title: clipText(step?.title, 120),
+      instructions: clipText(step?.instructions, 220),
+      minutes: safeNumber(step?.minutes, 0)
+    })).filter((step) => step.title || step.instructions),
+    product: clipText(practice.product, 300),
+    assessment: clipText(practice.assessment, 300),
+    criteria: compactList(practice.criteria, 5, 180),
+    fallbackPlan: clipText(practice.fallbackPlan, 300),
+    durationMinutes: Math.max(0, safeNumber(practice.durationMinutes, 45))
+  };
+}
+function compactBriefingMaterial(material = {}, index = 0) {
+  return {
+    id: text(material.id) || `material-${index + 1}`,
+    type: clipText(material.type, 80),
+    title: clipText(material.title, 180),
+    link: clipText(material.link || material.href, 500),
+    source: clipText(material.source, 160),
+    required: Boolean(material.required),
+    moment: clipText(material.moment, 160),
+    objective: clipText(material.objective, 320),
+    alignment: clipText(material.alignment, 320),
+    use: clipText(material.use, 320),
+    durationMinutes: Math.max(0, safeNumber(material.durationMinutes, 0)),
+    notes: clipText(material.notes, 200)
+  };
+}
+function compactProfile(profile = {}) {
+  return {
+    discipline: clipText(profile.discipline || profile.subject || profile.theme, 180),
+    depth: clipText(profile.depth || profile.depthLevel, 80),
+    targetWords: safeNumber(profile.targetWords, 0),
+    minimumSections: safeNumber(profile.minimumSections, 0),
+    minimumReferences: safeNumber(profile.minimumReferences, 0),
+    primarySourcesRequired: safeNumber(profile.primarySourcesRequired, 0),
+    historicalScope: clipText(profile.historicalScope, 260),
+    requiredAuthors: compactList(profile.requiredAuthors, 6, 160),
+    requiredFrameworks: compactList(profile.requiredFrameworks, 6, 180),
+    avoidTopics: compactList(profile.avoidTopics, 8, 160),
+    sourcePolicy: clipText(profile.sourcePolicy, 260),
+    requireCounterarguments: Boolean(profile.requireCounterarguments),
+    requireConceptComparison: Boolean(profile.requireConceptComparison),
+    requireCaseStudy: Boolean(profile.requireCaseStudy)
+  };
+}
+export function compactBriefingInput(input = {}, missingFields = []) {
+  const fields = new Set(Array.isArray(missingFields) ? missingFields : []);
+  const include = (name) => !fields.size || fields.has(name) || [...fields].some((field) => field.startsWith(`${name}[`));
+  const context = {
+    title: clipText(input.title, 240),
+    audience: clipText(input.audience, 240),
+    level: clipText(input.level, 80),
+    weeks: Math.max(1, safeNumber(input.weeks, 1)),
+    hoursPerWeek: Math.max(0, safeNumber(input.hoursPerWeek, 0)),
+    calendarMode: clipText(input.calendarMode, 40),
+    startDate: clipText(input.startDate, 40),
+    objectives: compactList(input.objectives, 8, 240),
+    content: clipText(input.content, 5000),
+    academicProfile: compactProfile(input.academicProfile),
+    webPractice: { enabled: Boolean(input.webPractice?.enabled), durationMinutes: Math.max(0, safeNumber(input.webPractice?.durationMinutes, 0)) },
+    webPracticeCount: Array.isArray(input.webPractices) ? input.webPractices.length : 0
+  };
+  if (include("webPractices")) context.webPractices = (Array.isArray(input.webPractices) ? input.webPractices : []).slice(0, 16).map(compactBriefingPractice);
+  if (include("materials")) context.materials = (Array.isArray(input.materials) ? input.materials : []).slice(0, 10).map(compactBriefingMaterial);
+  if (include("references")) context.references = compactList(input.references, 8, 260);
+  if (include("videoSearchSuggestions")) context.videoSearchSuggestions = compactList(input.videoSearchSuggestions, 8, 180);
+  if (include("imageSearchSuggestions")) context.imageSearchSuggestions = compactList(input.imageSearchSuggestions, 8, 180);
+  if (include("notes")) context.notes = compactList(input.notes, 8, 220);
+  const defaults = input.resourcePlan?.default || {};
+  context.resourcePlan = { videosPerWeek: safeNumber(defaults.videosPerWeek, 0), articlesPerWeek: safeNumber(defaults.articlesPerWeek, 0), requiredReadingsPerWeek: safeNumber(defaults.requiredReadingsPerWeek, 0), requiredReadingLevel: clipText(defaults.requiredReadingLevel, 50) };
+  return context;
+}
 
 function normalizeBriefingPractice(practice, index) {
   return {
@@ -109,9 +210,14 @@ function mergeBriefingPractice(original = {}, suggestion = {}, index = 0) {
 
 export async function assistBriefing(input, missingFields = []) {
   const raw = await callJson([
-    { role: "system", content: `${ACADEMIC_SYSTEM_PROMPT}\n\nNesta etapa, complete somente os campos vazios do briefing. Não invente URLs, fontes verificadas ou dados factuais não fornecidos.` },
+    { role: "system", content: `Você é um designer instrucional brasileiro. Complete somente os campos vazios do briefing, preserve o que já existe, escreva em português do Brasil e não invente URLs, fontes verificadas ou dados factuais. Responda apenas JSON válido e mantenha listas concisas.` },
     { role: "user", content: buildBriefingPrompt(input, missingFields) }
-  ]);
+  ], {
+    temperature: 0.35,
+    maxTokens: Math.min(8000, Math.max(3000, Number(process.env.OPENAI_ASSIST_MAX_TOKENS || 6000))),
+    retryMaxTokens: Math.min(8000, Math.max(3000, Number(process.env.OPENAI_ASSIST_MAX_TOKENS || 6000))),
+    formatRetryInstruction: "Retorne somente JSON válido e compacto com audience, objectives, content, webPractices, materials, references, videoSearchSuggestions, imageSearchSuggestions e notes. Preserve IDs e não repita textos longos já fornecidos."
+  });
   const requestedPractices = Array.isArray(input.webPractices) ? input.webPractices : [];
   const suggestedPractices = Array.isArray(raw.webPractices) ? raw.webPractices.map(normalizeBriefingPractice) : [];
   const practices = requestedPractices.length

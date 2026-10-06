@@ -5,7 +5,7 @@ import { buildFallbackLesson, normalizeCourseInput, normalizeLesson, normalizeWe
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload, calculateWeekWorkload } from "../src/calculations.js";
 import { digitalContentMinutes, readingMinutes } from "../src/formula-profile.js";
 import { createWeeksZip } from "../src/zip.js";
-import { buildBriefingPrompt, buildWeekGenerationPrompt } from "../src/ai.js";
+import { buildBriefingPrompt, buildWeekGenerationPrompt, compactBriefingInput } from "../src/ai.js";
 import { applyCompositionInstruction, compositionPlanForWeek } from "../src/composition.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { createTeacherGuidePdf } from "../src/pdf.js";
@@ -147,6 +147,32 @@ test("prompt do assistente exige práticas distintas, materiais alinhados e font
   assert.match(prompt, /títulos automáticos.*placeholders/i);
   assert.match(prompt, /materiais de apoio/i);
   assert.match(prompt, /não invente URLs/i);
+});
+
+test("prompt do assistente compacta briefings extensos sem enviar configurações irrelevantes", () => {
+  const input = normalizeCourseInput({
+    title: "Curso extenso",
+    weeks: 12,
+    hoursPerWeek: 20,
+    objectives: Array.from({ length: 12 }, (_, index) => `Objetivo ${index + 1} sobre análise, aplicação e avaliação em contexto profissional.`),
+    content: "Conteúdo-base repetido para teste. ".repeat(1800),
+    webPracticeEnabled: true,
+    webPractices: Array.from({ length: 6 }, (_, index) => ({ id: `p${index + 1}`, title: `Prática ${index + 1}`, weekNumber: index + 1, context: "Contexto extenso. ".repeat(120), instructions: "Instruções extensas. ".repeat(120), materials: Array.from({ length: 20 }, (_, item) => `Material ${item + 1}`) })),
+    materials: Array.from({ length: 30 }, (_, index) => ({ title: `Material ${index + 1}`, description: "Descrição extensa. ".repeat(40) })),
+    references: Array.from({ length: 30 }, (_, index) => `Referência ${index + 1} ${"detalhe ".repeat(30)}`),
+    videoSearchSuggestions: Array.from({ length: 20 }, (_, index) => `vídeo ${index + 1}`),
+    imageSearchSuggestions: Array.from({ length: 20 }, (_, index) => `imagem ${index + 1}`),
+    formulaConfig: { internalPrivateCalculation: "não deve entrar no prompt" },
+    compositionPlan: { default: { rows: { quiz: { count: 3 }, accordion: { count: 4 } } } }
+  });
+  const missingFields = ["audience", "content", "webPractices[0].title", "materials", "references", "videoSearchSuggestions", "imageSearchSuggestions"];
+  const compact = compactBriefingInput(input, missingFields);
+  const prompt = buildBriefingPrompt(input, missingFields);
+  assert.ok(JSON.stringify(compact).length < 24000);
+  assert.ok(prompt.length < 32000);
+  assert.doesNotMatch(prompt, /internalPrivateCalculation/);
+  assert.doesNotMatch(prompt, /compositionPlan/);
+  assert.match(prompt, /Contexto essencial do briefing atual/);
 });
 
 test("prompt semanal exige unidade didática completa antes do cálculo de tempo", () => {

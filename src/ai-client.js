@@ -103,14 +103,17 @@ export async function callJson(messages, options = {}) {
     const payload = await response.json().catch(() => ({}));
     const providerError = payload?.error?.message || (typeof payload?.error === "string" ? payload.error : "");
     if (providerError) {
-      const retryable = response.status === 429 || response.status === 503 || /tokens per min|request too large|rate limit|temporar|timeout/i.test(providerError);
+      const tpmLimit = /tokens per min|tokens per minute|\btpm\b/i.test(providerError);
+      const contextTooLarge = /context length|maximum context|prompt is too long|request too large|too many tokens/i.test(providerError) && !tpmLimit;
+      const retryable = response.status === 503 || (response.status === 429 && !contextTooLarge) || /temporar|timeout/i.test(providerError);
       if (retryable && attempt < maxAttempts - 1) {
         await wait(retryDelay(response, attempt));
         continue;
       }
       const error = new Error(`A API de IA recusou a solicitação: ${providerError}`);
-      error.code = /tokens per min|request too large|rate limit/i.test(providerError) ? "AI_TPM_LIMIT" : "AI_PROVIDER_ERROR";
+      error.code = tpmLimit || /rate limit/i.test(providerError) ? "AI_TPM_LIMIT" : contextTooLarge ? "AI_REQUEST_TOO_LARGE" : "AI_PROVIDER_ERROR";
       error.retryable = retryable;
+      error.providerMessage = providerError;
       throw error;
     }
     if (response.ok) {
@@ -145,14 +148,17 @@ export async function callJson(messages, options = {}) {
       }
     }
     const detail = payload?.error?.message || `HTTP ${response.status}`;
-    const retryable = response.status === 429 || response.status === 503;
+    const tpmLimit = /tokens per min|tokens per minute|\btpm\b/i.test(detail);
+    const contextTooLarge = /context length|maximum context|prompt is too long|request too large|too many tokens/i.test(detail) && !tpmLimit;
+    const retryable = (response.status === 429 && !contextTooLarge) || response.status === 503;
     if (retryable && attempt < maxAttempts - 1) {
       await wait(retryDelay(response, attempt));
       continue;
     }
     const error = new Error(`A API de IA recusou a solicitação: ${detail}`);
-    error.code = /tokens per min|request too large|rate limit/i.test(detail) ? "AI_TPM_LIMIT" : "AI_PROVIDER_ERROR";
+    error.code = tpmLimit || /rate limit/i.test(detail) ? "AI_TPM_LIMIT" : contextTooLarge ? "AI_REQUEST_TOO_LARGE" : "AI_PROVIDER_ERROR";
     error.retryable = retryable;
+    error.providerMessage = detail;
     throw error;
   }
   throw new Error("A API de IA não respondeu após as tentativas configuradas.");

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { generateOneWeek, regenerateWeekWithAI } from "../src/ai.js";
+import { assistBriefing, generateOneWeek, regenerateWeekWithAI } from "../src/ai.js";
 import { normalizeCourseInput } from "../src/aula-schema.js";
 
 function qualityFixture(wordsPerSection) {
@@ -85,6 +85,40 @@ test("regeneração single-pass usa contexto compacto e orçamento próprio", as
       if (value === undefined) delete process.env[envKey];
       else process.env[envKey] = value;
     }
+  }
+});
+
+test("preenchimento assistido usa orçamento menor e não envia o briefing bruto", async () => {
+  const previousFetch = global.fetch;
+  const previous = { key: process.env.OPENAI_API_KEY, retries: process.env.OPENAI_MAX_RETRIES, assistTokens: process.env.OPENAI_ASSIST_MAX_TOKENS };
+  process.env.OPENAI_API_KEY = "test-key";
+  process.env.OPENAI_MAX_RETRIES = "1";
+  delete process.env.OPENAI_ASSIST_MAX_TOKENS;
+  let requestBody;
+  global.fetch = async (_url, options) => {
+    requestBody = JSON.parse(options.body);
+    const content = JSON.stringify({ audience: "Estudantes", objectives: [], content: "", webPractices: [], materials: [], references: [], videoSearchSuggestions: [], imageSearchSuggestions: [], notes: [] });
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
+  };
+  try {
+    const input = normalizeCourseInput({
+      title: "Curso extenso",
+      weeks: 12,
+      content: "Conteúdo repetido. ".repeat(1800),
+      webPracticeEnabled: true,
+      webPractices: Array.from({ length: 6 }, (_, index) => ({ id: `p${index + 1}`, title: `Prática ${index + 1}`, context: "Contexto. ".repeat(160), instructions: "Instruções. ".repeat(160) })),
+      materials: Array.from({ length: 30 }, (_, index) => ({ title: `Material ${index + 1}`, description: "Descrição. ".repeat(50) }))
+    });
+    await assistBriefing(input, ["audience", "content", "webPractices[0].objective", "materials"]);
+    assert.equal(requestBody.max_tokens, 6000);
+    const promptChars = requestBody.messages.reduce((sum, message) => sum + String(message.content).length, 0);
+    assert.ok(promptChars < 32000, `prompt compacto esperado; recebeu ${promptChars} caracteres`);
+    assert.doesNotMatch(requestBody.messages.at(-1).content, /compositionPlan/);
+  } finally {
+    global.fetch = previousFetch;
+    if (previous.key === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = previous.key;
+    if (previous.retries === undefined) delete process.env.OPENAI_MAX_RETRIES; else process.env.OPENAI_MAX_RETRIES = previous.retries;
+    if (previous.assistTokens === undefined) delete process.env.OPENAI_ASSIST_MAX_TOKENS; else process.env.OPENAI_ASSIST_MAX_TOKENS = previous.assistTokens;
   }
 });
 

@@ -66,6 +66,7 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 | `OPENAI_MODEL` | `gpt-4o-mini` | Production, Preview e Development |
 | `OPENAI_CONTENT_MODEL` | opcional; modelo mais capaz para texto longo | Production, Preview e Development |
 | `OPENAI_MAX_TOKENS` | `16000` | Production, Preview e Development |
+| `OPENAI_ASSIST_MAX_TOKENS` | `6000` para **Preencher vazios com IA** | Production, Preview e Development |
 | `OPENAI_REGEN_MAX_TOKENS` | `10000` para refazer uma semana | Production, Preview e Development |
 | `AULA_SINGLE_PASS` | `true` | Production, Preview e Development |
 | `AULA_RESEARCH_TIMEOUT_MS` | `8000` | Production, Preview e Development |
@@ -87,9 +88,11 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 
 Depois de alterar qualquer variável, abra **Deployments**, escolha a implantação mais recente e faça **Redeploy** para que a função receba os valores novos.
 
-### Erro 429: limite de tokens por minuto (TPM)
+### Erro 429 ou “Request too large” no preenchimento assistido
 
-Se aparecer uma mensagem como `Limit 30000, Used 23843, Requested 8631`, a chave está funcionando, mas a organização atingiu temporariamente o limite de tokens por minuto do modelo. Não adianta criar outra chave dentro da mesma organização: o limite é aplicado à organização/projeto/modelo.
+Se aparecer uma mensagem como `Limit 30000, Used 23843, Requested 8631` ou `Request too large for gpt-4.1 in organization ...`, a chave está funcionando, mas a organização atingiu temporariamente o limite de tokens por minuto do modelo. Não adianta criar outra chave dentro da mesma organização: o limite é aplicado à organização/projeto/modelo.
+
+O botão **Preencher vazios com IA** não envia mais o briefing bruto inteiro. A aplicação remove configurações de cálculo e composição que não são necessárias nessa etapa, limita textos/listas extensos e usa um orçamento separado de saída (`OPENAI_ASSIST_MAX_TOKENS`, padrão `6000`). Assim, esse erro não deve mais ocorrer apenas porque o formulário contém muitas semanas, materiais ou webpráticas. Se o provedor ainda indicar excesso de contexto, a resposta agora informa a causa sem repetir tentativas inúteis.
 
 Para ampliar o limite:
 
@@ -100,7 +103,7 @@ Para ampliar o limite:
 5. Confirme o novo limite específico do modelo `gpt-4.1`.
 6. Faça **Redeploy** na Vercel somente se também tiver alterado variáveis de ambiente.
 
-O código já reduz o pico usando uma semana por vez (`AULA_AI_BATCH_SIZE=1`) e faz até três novas tentativas em respostas 429/503, respeitando `Retry-After`. Se ainda houver muitos 429, aguarde alguns segundos antes de clicar novamente e evite abrir várias gerações simultâneas. A OpenAI também recomenda manter `OPENAI_MAX_TOKENS` próximo do tamanho realmente esperado da resposta; para uma unidade menor, `10000–12000` pode reduzir o consumo de TPM, mas pode cortar uma aula que precise de mais espaço.
+O código já reduz o pico usando uma semana por vez (`AULA_AI_BATCH_SIZE=1`) e faz até três novas tentativas em respostas transitórias 429/503, respeitando `Retry-After`. Um excesso real de contexto não é repetido automaticamente. Se ainda houver muitos 429, aguarde alguns segundos antes de clicar novamente e evite abrir várias gerações simultâneas. A OpenAI também recomenda manter `OPENAI_MAX_TOKENS` próximo do tamanho realmente esperado da resposta; para uma unidade menor, `10000–12000` pode reduzir o consumo de TPM, mas pode cortar uma aula que precise de mais espaço.
 
 Ao usar **Refazer esta semana com IA**, o sistema envia somente um briefing essencial e uma versão compacta da semana selecionada. Com `AULA_SINGLE_PASS=true`, a regeneração faz uma única chamada de redação e não dispara planejamento/revisão/reparo extras. O orçamento separado `OPENAI_REGEN_MAX_TOKENS` evita que uma regeneração ultrapasse o limite de tokens por minuto mesmo quando `OPENAI_MAX_TOKENS` está configurado para aulas novas mais longas.
 

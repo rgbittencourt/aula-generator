@@ -42,6 +42,7 @@ app.get("/api/health", (_req, res) => {
     researchTimeoutMs: Math.max(3000, Number(process.env.AULA_RESEARCH_TIMEOUT_MS || 8000)),
     reviewBeforeExport: true,
     maxTokens: Number(process.env.OPENAI_MAX_TOKENS || 16000),
+    assistMaxTokens: Math.min(8000, Math.max(3000, Number(process.env.OPENAI_ASSIST_MAX_TOKENS || 6000))),
     regenerationMaxTokens: Math.min(Number(process.env.OPENAI_REGEN_MAX_TOKENS || 10000), 12000),
     maxRetries: Number(process.env.OPENAI_MAX_RETRIES || 3),
     aiBatchSize: Math.min(3, Math.max(1, Number(process.env.AULA_AI_BATCH_SIZE) || 1)),
@@ -178,8 +179,13 @@ app.post("/api/assist-briefing", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     res.json({ ok: true, briefing, filledFields: missingFields });
   } catch (error) {
-    const status = error.code === "AI_KEY_MISSING" ? 503 : 400;
-    res.status(status).json({ ok: false, error: error.message || "Não foi possível completar o briefing." });
+    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_REQUEST_TOO_LARGE" ? 413 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
+    const message = error.code === "AI_REQUEST_TOO_LARGE"
+      ? "A solicitação do preenchimento ficou grande demais para o modelo. O sistema envia somente o contexto essencial; remova textos repetidos do briefing e tente novamente."
+      : error.code === "AI_TPM_LIMIT"
+        ? "O limite temporário de tokens por minuto da organização foi atingido. Aguarde alguns segundos e tente novamente; não é necessário criar outra chave."
+        : error.message || "Não foi possível completar o briefing.";
+    res.status(status).json({ ok: false, error: message, code: error.code || "BRIEFING_ASSIST_ERROR", retryable: Boolean(error.retryable) });
   }
 });
 
