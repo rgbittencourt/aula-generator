@@ -150,6 +150,43 @@ test("geração distribuída devolve a primeira versão sem reparo síncrono", a
   }
 });
 
+test("geração semanal extensa limita a soma de prompt e saída ao orçamento da organização", async () => {
+  const previousFetch = global.fetch;
+  const previous = { key: process.env.OPENAI_API_KEY, retries: process.env.OPENAI_MAX_RETRIES, budget: process.env.OPENAI_REQUEST_TOKEN_BUDGET };
+  process.env.OPENAI_API_KEY = "test-key";
+  process.env.OPENAI_MAX_RETRIES = "1";
+  process.env.OPENAI_REQUEST_TOKEN_BUDGET = "28000";
+  let requestBody;
+  global.fetch = async (_url, options) => {
+    requestBody = JSON.parse(options.body);
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(qualityFixture(30)) } }] }), { status: 200 });
+  };
+  try {
+    const input = normalizeCourseInput({
+      title: "Curso extenso",
+      weeks: 12,
+      hoursPerWeek: 20,
+      objectives: Array.from({ length: 12 }, (_, index) => `Objetivo ${index + 1} sobre análise, aplicação e avaliação em contexto profissional.`),
+      content: "Conteúdo-base repetido. ".repeat(1800),
+      webPracticeEnabled: true,
+      webPractices: Array.from({ length: 6 }, (_, index) => ({ id: `p${index + 1}`, title: `Prática ${index + 1}`, weekNumber: index + 1, context: "Contexto. ".repeat(120), instructions: "Instruções. ".repeat(120) })),
+      materials: Array.from({ length: 30 }, (_, index) => ({ title: `Material ${index + 1}`, description: "Descrição. ".repeat(40) })),
+      references: Array.from({ length: 30 }, (_, index) => `Referência ${index + 1} ${"detalhe ".repeat(30)}`),
+      academicProfile: { targetWords: 3000, minimumReferences: 4, primarySourcesRequired: 1 }
+    });
+    await generateOneWeek(input, 0, { singlePass: true, deferRepair: true });
+    const messageChars = requestBody.messages.reduce((sum, message) => sum + String(message.content).length, 0);
+    const conservativeRequestTokens = Math.ceil(messageChars / 3.5) + requestBody.max_tokens + 512;
+    assert.ok(requestBody.max_tokens < 16000, `a saída deveria ser limitada; recebeu ${requestBody.max_tokens}`);
+    assert.ok(conservativeRequestTokens <= 28000, `entrada + saída excederam o orçamento: ${conservativeRequestTokens}`);
+  } finally {
+    global.fetch = previousFetch;
+    if (previous.key === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = previous.key;
+    if (previous.retries === undefined) delete process.env.OPENAI_MAX_RETRIES; else process.env.OPENAI_MAX_RETRIES = previous.retries;
+    if (previous.budget === undefined) delete process.env.OPENAI_REQUEST_TOKEN_BUDGET; else process.env.OPENAI_REQUEST_TOKEN_BUDGET = previous.budget;
+  }
+});
+
 test("geração repara automaticamente uma semana em needs-review por ficar abaixo da meta", async () => {
   const previousFetch = global.fetch;
   const previous = { key: process.env.OPENAI_API_KEY, singlePass: process.env.AULA_SINGLE_PASS, repair: process.env.AULA_AUTO_REPAIR, retries: process.env.OPENAI_MAX_RETRIES };

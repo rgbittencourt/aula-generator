@@ -67,6 +67,7 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 | `OPENAI_CONTENT_MODEL` | opcional; modelo mais capaz para texto longo | Production, Preview e Development |
 | `OPENAI_MAX_TOKENS` | `16000` | Production, Preview e Development |
 | `OPENAI_ASSIST_MAX_TOKENS` | `6000` para **Preencher vazios com IA** | Production, Preview e Development |
+| `OPENAI_REQUEST_TOKEN_BUDGET` | `28000` para manter entrada + saída abaixo do limite de 30.000 TPM | Production, Preview e Development |
 | `OPENAI_REGEN_MAX_TOKENS` | `10000` para refazer uma semana | Production, Preview e Development |
 | `AULA_SINGLE_PASS` | `true` | Production, Preview e Development |
 | `AULA_RESEARCH_TIMEOUT_MS` | `8000` | Production, Preview e Development |
@@ -93,6 +94,8 @@ Depois de alterar qualquer variável, abra **Deployments**, escolha a implantaç
 Se aparecer uma mensagem como `Limit 30000, Used 23843, Requested 8631` ou `Request too large for gpt-4.1 in organization ...`, a chave está funcionando, mas a organização atingiu temporariamente o limite de tokens por minuto do modelo. Não adianta criar outra chave dentro da mesma organização: o limite é aplicado à organização/projeto/modelo.
 
 O botão **Preencher vazios com IA** não envia mais o briefing bruto inteiro. A aplicação remove configurações de cálculo e composição que não são necessárias nessa etapa, limita textos/listas extensos e usa um orçamento separado de saída (`OPENAI_ASSIST_MAX_TOKENS`, padrão `6000`). Assim, esse erro não deve mais ocorrer apenas porque o formulário contém muitas semanas, materiais ou webpráticas. Se o provedor ainda indicar excesso de contexto, a resposta agora informa a causa sem repetir tentativas inúteis.
+
+Na geração semanal, o prompt também é compactado: o modelo recebe o foco da semana, um índice resumido das demais semanas, o perfil acadêmico, o briefing essencial e somente as webpráticas agendadas naquela semana. O cliente calcula uma margem de segurança e reduz `max_tokens` quando a soma estimada da entrada e da saída se aproxima de `OPENAI_REQUEST_TOKEN_BUDGET` (padrão `28000`). Isso evita a mensagem `Limit 30000 ... Requested 44732` sem transformar a aula em um resumo; o texto do aluno continua sendo a prioridade.
 
 Para ampliar o limite:
 

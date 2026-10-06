@@ -144,6 +144,103 @@ export function compactBriefingInput(input = {}, missingFields = []) {
   return context;
 }
 
+function compactReference(value, index = 0) {
+  if (typeof value === "string") return clipText(value, 280);
+  const item = value && typeof value === "object" ? value : {};
+  return {
+    id: clipText(item.id, 80) || `ref-${index + 1}`,
+    citation: clipText(item.citation || item.title || item.reference, 280),
+    type: clipText(item.type, 80),
+    authors: compactList(item.authors || item.author, 4, 120),
+    year: clipText(item.year, 20),
+    publisher: clipText(item.publisher || item.journal || item.institution, 160),
+    href: clipText(item.href || item.url || item.link, 500),
+    verificationStatus: clipText(item.verificationStatus, 80)
+  };
+}
+
+function compactAcademicPlan(plan = {}) {
+  return {
+    weekNumber: safeNumber(plan.weekNumber, 0),
+    theme: clipText(plan.theme, 220),
+    centralQuestion: clipText(plan.centralQuestion, 320),
+    centralConcepts: compactList(plan.centralConcepts, 10, 180),
+    relatedConcepts: compactList(plan.relatedConcepts, 8, 160),
+    objectives: compactList(plan.objectives, 8, 260),
+    sectionSequence: (Array.isArray(plan.sectionSequence) ? plan.sectionSequence : []).slice(0, 10).map((section) => ({
+      number: clipText(section?.number, 20),
+      title: clipText(section?.title, 180),
+      purpose: clipText(section?.purpose, 240),
+      keyClaims: compactList(section?.keyClaims, 3, 180),
+      example: clipText(section?.example, 220),
+      counterpoint: clipText(section?.counterpoint, 220)
+    })),
+    requiredSources: (Array.isArray(plan.requiredSources) ? plan.requiredSources : []).slice(0, 8).map((source) => ({ topic: clipText(source?.topic, 180), sourceType: clipText(source?.sourceType, 100), reason: clipText(source?.reason, 220) })),
+    claimsRequiringEvidence: (Array.isArray(plan.claimsRequiringEvidence) ? plan.claimsRequiringEvidence : []).slice(0, 10).map((claim) => ({ id: clipText(claim?.id, 60), claim: clipText(claim?.claim, 260), sectionNumber: clipText(claim?.sectionNumber, 20), sourceType: clipText(claim?.sourceType, 100) })),
+    examples: compactList(plan.examples, 6, 220),
+    controversies: compactList(plan.controversies, 6, 220),
+    assessmentPlan: (Array.isArray(plan.assessmentPlan) ? plan.assessmentPlan : []).slice(0, 8).map((item) => ({ objective: clipText(item?.objective, 180), evidence: clipText(item?.evidence, 180), questionType: clipText(item?.questionType, 80) })),
+    omissions: (Array.isArray(plan.omissions) ? plan.omissions : []).slice(0, 8).map((item) => ({ phase: clipText(item?.phase, 100), reason: clipText(item?.reason, 240) }))
+  };
+}
+
+function compactProgressionMap(progression = {}) {
+  return {
+    courseTitle: clipText(progression.courseTitle, 240),
+    rule: clipText(progression.rule, 320),
+    weeks: (Array.isArray(progression.weeks) ? progression.weeks : []).map((week) => ({
+      weekNumber: safeNumber(week?.weekNumber, 0),
+      theme: clipText(week?.theme, 220),
+      centralQuestion: clipText(week?.centralQuestion, 260),
+      objectives: compactList(week?.objectives, 3, 180),
+      newConcepts: compactList(week?.newConcepts, 6, 140),
+      arc: clipText(week?.arc, 100),
+      bridgeToNext: clipText(week?.bridgeToNext, 280),
+      doNotRepeat: clipText(week?.doNotRepeat, 280)
+    }))
+  };
+}
+
+function compactWeekInput(input = {}, index = 0, resourcePlan = {}) {
+  const defaults = input.resourcePlan?.default || {};
+  return {
+    title: clipText(input.title, 240),
+    audience: clipText(input.audience, 240),
+    level: clipText(input.level, 100),
+    language: clipText(input.language, 20),
+    weeks: Math.max(1, safeNumber(input.weeks, 1)),
+    hoursPerWeek: Math.max(0, safeNumber(input.hoursPerWeek, 0)),
+    calendarMode: clipText(input.calendarMode, 40),
+    startDate: clipText(input.startDate, 40),
+    objectives: compactList(input.objectives, 8, 260),
+    content: clipText(input.content, 5000),
+    references: (Array.isArray(input.references) ? input.references : []).slice(0, 8).map(compactReference),
+    videoLinks: compactList(input.videoLinks, 6, 500),
+    videoSearchSuggestions: compactList(input.videoSearchSuggestions, 8, 180),
+    imageLinks: compactList(input.imageLinks, 6, 500),
+    imageSearchSuggestions: compactList(input.imageSearchSuggestions, 8, 180),
+    materials: (Array.isArray(input.materials) ? input.materials : []).slice(0, 8).map((item, itemIndex) => ({
+      id: text(item?.id) || `material-${itemIndex + 1}`,
+      type: clipText(item?.type, 80),
+      title: clipText(item?.title, 180),
+      link: clipText(item?.link || item?.href, 500),
+      required: Boolean(item?.required),
+      moment: clipText(item?.moment, 160),
+      objective: clipText(item?.objective, 280),
+      alignment: clipText(item?.alignment, 280),
+      use: clipText(item?.use, 280),
+      durationMinutes: Math.max(0, safeNumber(item?.durationMinutes, 0))
+    })),
+    resourcePlan: {
+      default: { videosPerWeek: safeNumber(defaults.videosPerWeek, 0), articlesPerWeek: safeNumber(defaults.articlesPerWeek, 0), requiredReadingsPerWeek: safeNumber(defaults.requiredReadingsPerWeek, 0), requiredReadingLevel: clipText(defaults.requiredReadingLevel, 50) },
+      week: resourcePlan
+    },
+    academicProfile: compactProfile(input.academicProfile),
+    webPractices: [],
+    weekToGenerate: index + 1
+  };
+}
+
 function normalizeBriefingPractice(practice, index) {
   return {
     id: text(practice?.id) || `webpractice-${index + 1}`,
@@ -247,6 +344,9 @@ export function buildWeekGenerationPrompt(input, weekIndex = 0, academicPlan = n
   const resourcePlan = resourcePlanForWeek(input, weekIndex);
   const compositionPlan = compositionPlanForWeek(input, weekIndex);
   const compositionTargets = Object.values(compositionPlan.rows).filter((row) => row.count > 0).map((row) => `${row.count}× ${row.label} (${row.policy}, ${row.itemsPerBlock > 1 ? `${row.itemsPerBlock} itens/bloco` : "bloco único"})`);
+  const compactProgression = compactProgressionMap(progressionMap);
+  const compactInput = compactWeekInput(input, weekIndex, resourcePlan);
+  const compactPlan = compactAcademicPlan(academicPlan || {});
   const previousSummaries = (previousWeeks || []).slice(-3).map((lesson, index) => ({
     weekNumber: lesson?.lessonPlan?.weekNumber || index + 1,
     theme: lesson?.lessonPlan?.theme || lesson?.meta?.title,
@@ -333,19 +433,19 @@ Regras de escrita:
 teacherGuide deve incluir resourceNotes, mediationStops e mediationMessages mesmo quando não houver webprática. Crie uma parada de mediação para a abertura, para cada formativeCheck e activity relevante e para o fechamento; se não houver uma parada explícita, crie um ponto de acompanhamento durante o estudo. Gere duas listas paralelas, whatsapp e moodle, com uma mensagem para cada parada. O teor deve ser equivalente, mas não uma cópia: WhatsApp pode ser mais informal, próximo, humanizado e ter humor leve; Moodle deve ser mais organizado, claro e adequado a um aviso de curso. Cada item deve conter relatedId, relatedType, timing, purpose, studentNeed, teacherIntent, tone e text. As mensagens devem explicar por que vale a pena fazer a etapa, reconhecer dificuldades e convidar a uma ação concreta, sem inventar agenda, link ou obrigação que não esteja no briefing. Se houver webprática programada, inclua também em webPracticeProjects a preparação do professor e do aluno, agenda, roteiro com minutos, falas/prompts, produto, critérios, rubrica, plano B, acessibilidade e artefatos. O projeto será exportado em DOCX separado e as mensagens no Material de Mediação em PDF.
 
 Perfil acadêmico desta trilha:
-${JSON.stringify(profile, null, 2)}
+${JSON.stringify(compactProfile(profile), null, 2)}
 
 Mapa completo do curso para garantir progressão e não repetição:
-${JSON.stringify(progressionMap, null, 2)}
+${JSON.stringify(compactProgression, null, 2)}
 
 Planejamento acadêmico prévio desta semana:
-${JSON.stringify(academicPlan || { status: "não disponível; construa um plano interno antes de escrever" }, null, 2)}
+${JSON.stringify(academicPlan ? compactPlan : { status: "não disponível; construa um plano interno antes de escrever" }, null, 2)}
 
 Briefing estruturado da aula-base:
-${JSON.stringify({ ...input, webPractices: [], weekToGenerate: weekNumber }, null, 2)}
+${JSON.stringify(compactInput, null, 2)}
 
 Sessões práticas independentes agendadas para esta semana (não inserir no texto-base; desenvolver somente em teacherGuide.webPracticeProjects e no DOCX separado):
-${JSON.stringify(scheduledPractices, null, 2)}
+${JSON.stringify(scheduledPractices.map((practice, practiceIndex) => compactBriefingPractice(practice, practiceIndex)), null, 2)}
 
 Retorne JSON completo, sem omitir propriedades obrigatórias.`;
 }

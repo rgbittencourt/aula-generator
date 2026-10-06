@@ -43,6 +43,7 @@ app.get("/api/health", (_req, res) => {
     reviewBeforeExport: true,
     maxTokens: Number(process.env.OPENAI_MAX_TOKENS || 16000),
     assistMaxTokens: Math.min(8000, Math.max(3000, Number(process.env.OPENAI_ASSIST_MAX_TOKENS || 6000))),
+    requestTokenBudget: Number(process.env.OPENAI_REQUEST_TOKEN_BUDGET || 28000),
     regenerationMaxTokens: Math.min(Number(process.env.OPENAI_REGEN_MAX_TOKENS || 10000), 12000),
     maxRetries: Number(process.env.OPENAI_MAX_RETRIES || 3),
     aiBatchSize: Math.min(3, Math.max(1, Number(process.env.AULA_AI_BATCH_SIZE) || 1)),

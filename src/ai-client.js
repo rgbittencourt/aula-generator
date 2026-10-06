@@ -66,6 +66,23 @@ export function parseJson(content) {
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+function estimateInputTokens(messages = []) {
+  const characters = messages.reduce((total, message) => total + String(message?.content || "").length, 0);
+  // JSON, português e instruções longas costumam ficar próximos de 3,5–4
+  // caracteres por token. Usamos uma estimativa conservadora para reservar
+  // espaço também para pequenas variações do tokenizador.
+  return Math.ceil(characters / 3.5);
+}
+
+function boundedOutputTokens(messages, requested) {
+  const budget = Number(process.env.OPENAI_REQUEST_TOKEN_BUDGET || 28000);
+  const requestedTokens = Math.max(256, Number(requested) || 16000);
+  if (!Number.isFinite(budget) || budget <= 0) return requestedTokens;
+  const safetyMargin = 512;
+  const available = budget - estimateInputTokens(messages) - safetyMargin;
+  return Math.max(256, Math.min(requestedTokens, available));
+}
+
 function retryDelay(response, attempt) {
   const retryAfter = Number(response.headers.get("retry-after"));
   if (Number.isFinite(retryAfter) && retryAfter > 0) return Math.min(30000, Math.max(1000, retryAfter * 1000));
@@ -89,13 +106,14 @@ export async function callJson(messages, options = {}) {
     const requestMessages = formatRetry
       ? [...messages, { role: "user", content: options.formatRetryInstruction || "A resposta anterior veio em formato JSON inválido ou foi truncada. Gere novamente uma versão compacta e completa do mesmo objeto, sem markdown, comentários ou texto fora do JSON; use aspas duplas em todas as propriedades e não deixe vírgula antes de } ou ]." }]
       : messages;
+    const requestedMaxTokens = retryingFormat ? (options.retryMaxTokens || options.maxTokens || process.env.OPENAI_MAX_TOKENS || 16000) : (options.maxTokens || process.env.OPENAI_MAX_TOKENS || 16000);
     const response = await fetch(`${providerBase()}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: options.model || process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
         temperature: options.temperature ?? 0.45,
-        max_tokens: Math.max(256, Number(retryingFormat ? (options.retryMaxTokens || options.maxTokens || process.env.OPENAI_MAX_TOKENS || 16000) : (options.maxTokens || process.env.OPENAI_MAX_TOKENS || 16000))),
+        max_tokens: boundedOutputTokens(requestMessages, requestedMaxTokens),
         response_format: { type: "json_object" },
         messages: requestMessages
       })

@@ -993,9 +993,10 @@ O Gerador foi configurado para:
 3. usar espera progressiva com pequena variação entre tentativas;
 4. repetir até três vezes erros temporários `429` ou `503`, mas não repetir automaticamente um excesso real de contexto;
 5. usar `OPENAI_ASSIST_MAX_TOKENS=6000` como orçamento separado para **Preencher vazios com IA**;
-6. informar no healthcheck `maxTokens`, `assistMaxTokens`, `maxRetries` e `aiBatchSize`.
+6. limitar a soma estimada de entrada e saída de cada requisição a `OPENAI_REQUEST_TOKEN_BUDGET=28000`, preservando margem para o limite organizacional de 30.000 TPM;
+7. informar no healthcheck `maxTokens`, `assistMaxTokens`, `requestTokenBudget`, `maxRetries` e `aiBatchSize`.
 
-Não clique repetidamente em **Gerar com IA** enquanto a solicitação anterior estiver em andamento. Se o curso for muito longo, aguarde a conclusão de cada geração antes de iniciar uma nova. Se aparecer **“Request too large”** no preenchimento assistido, a versão publicada deve estar usando o contexto compacto e o orçamento próprio; nesse caso, remova textos repetidos do briefing e tente novamente. Se aparecer o detalhe **TPM / tokens per minute**, aguarde a janela indicada pelo provedor.
+Não clique repetidamente em **Gerar com IA** enquanto a solicitação anterior estiver em andamento. Se o curso for muito longo, aguarde a conclusão de cada geração antes de iniciar uma nova. A geração semanal envia um índice longitudinal compacto e não repete o briefing bruto completo. Se aparecer **“Request too large”** no preenchimento assistido, a versão publicada deve estar usando o contexto compacto e o orçamento próprio; nesse caso, remova textos repetidos do briefing e tente novamente. Se aparecer o detalhe **TPM / tokens per minute**, aguarde a janela indicada pelo provedor.
 
 ---
 
@@ -1490,6 +1491,7 @@ Na Vercel, em **Settings → Environment Variables**, configure:
 | `OPENAI_CONTENT_MODEL` | modelo escolhido para texto longo, por exemplo `gpt-4.1` |
 | `OPENAI_MAX_TOKENS` | `16000` para aulas longas; considere `12000` se houver 429 frequente |
 | `OPENAI_ASSIST_MAX_TOKENS` | `6000` para o preenchimento assistido; orçamento separado |
+| `OPENAI_REQUEST_TOKEN_BUDGET` | `28000` para entrada + saída; margem abaixo de 30.000 TPM |
 | `OPENAI_MAX_RETRIES` | `3` |
 | `AULA_AI_BATCH_SIZE` | `1` |
 | `AULA_ACADEMIC_PIPELINE` | `true` |
@@ -1618,6 +1620,7 @@ OPENAI_MODEL=gpt-4o-mini
 OPENAI_CONTENT_MODEL=gpt-4.1
 OPENAI_MAX_TOKENS=16000
 OPENAI_ASSIST_MAX_TOKENS=6000
+OPENAI_REQUEST_TOKEN_BUDGET=28000
 OPENAI_MAX_RETRIES=3
 AULA_AI_BATCH_SIZE=1
 AULA_ACADEMIC_PIPELINE=true
@@ -1895,7 +1898,7 @@ Não. A aplicação precisa de uma chave de API da plataforma OpenAI. A senha da
 
 ### Por que aparece erro 429 ou “Request too large” mesmo com a chave correta?
 
-São situações diferentes. **429 / TPM / tokens per minute** significa que a organização atingiu temporariamente o limite de tokens por minuto; aguarde alguns segundos e evite chamadas simultâneas. **Request too large** pode significar excesso de contexto ou, em algumas mensagens da OpenAI, uma solicitação que excedeu o orçamento de TPM disponível. Para o botão de preenchimento, o Gerador envia um contexto compacto e usa `OPENAI_ASSIST_MAX_TOKENS=6000`. O aumento permanente de TPM deve ser feito em **Settings → Organization → Limits** na plataforma OpenAI; criar outra chave na mesma organização não resolve.
+São situações diferentes. **429 / TPM / tokens per minute** significa que a organização atingiu temporariamente o limite de tokens por minuto; aguarde alguns segundos e evite chamadas simultâneas. **Request too large** pode significar excesso de contexto ou, em algumas mensagens da OpenAI, uma solicitação que excedeu o orçamento de TPM disponível. Para o botão de preenchimento, o Gerador envia um contexto compacto e usa `OPENAI_ASSIST_MAX_TOKENS=6000`. Para a geração semanal, ele compacta o prompt e limita a soma de entrada + saída a `OPENAI_REQUEST_TOKEN_BUDGET=28000`; assim, uma mensagem como `Limit 30000 ... Requested 44732` deixa de ser enviada nessa dimensão. O aumento permanente de TPM deve ser feito em **Settings → Organization → Limits** na plataforma OpenAI; criar outra chave na mesma organização não resolve.
 
 ### Por que não vejo mais disciplina, nível e profundidade dentro do Perfil acadêmico?
 
