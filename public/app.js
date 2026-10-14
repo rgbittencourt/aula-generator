@@ -1029,9 +1029,19 @@ async function readApiResponse(response, fallbackMessage = "O servidor não cons
     throw error;
   }
   if (!response.ok || !data?.ok) {
-    const error = new Error(data?.error || `${fallbackMessage} (HTTP ${response.status}).`);
+    const retryAfterHeader = response.headers.get("retry-after");
+    const retryAfterMs = Number(data?.retryAfterMs || (retryAfterHeader ? Number(retryAfterHeader) * 1000 : 0)) || 0;
+    const codeHint = data?.code === "AI_TPM_LIMIT"
+      ? " O limite de tokens por minuto do provedor foi atingido; aguarde a janela indicada antes de tentar novamente."
+      : data?.code === "AI_REQUEST_TOO_LARGE"
+        ? " O contexto enviado ficou grande demais para esta chamada; reduza o briefing ou gere uma semana por vez."
+        : data?.code === "AI_KEY_MISSING"
+          ? " A chave do provedor ativo não está configurada na Vercel."
+          : "";
+    const error = new Error(`${data?.error || `${fallbackMessage} (HTTP ${response.status}).`}${codeHint}`);
     error.status = response.status;
     error.code = data?.code || "API_REQUEST_ERROR";
+    error.retryAfterMs = retryAfterMs;
     error.retryable = Boolean(data?.retryable) || [408, 425, 429, 500, 502, 503, 504].includes(response.status);
     throw error;
   }

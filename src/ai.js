@@ -4,9 +4,14 @@ import { buildTeacherGuide } from "./teacher-guide.js";
 import { ACADEMIC_SYSTEM_PROMPT, buildAcademicPlanPrompt, buildAcademicReviewPrompt, normalizeAcademicPlan, normalizeAcademicReview, normalizeAcademicProfile } from "./academic.js";
 import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
 import { applyCompositionInstruction, compositionPlanForWeek } from "./composition.js";
-import { callJson } from "./ai-client.js";
+import { callJson, getAIProvider } from "./ai-client.js";
 import { selectResourcesWithAI } from "./resource-curator.js";
 export { selectResourcesWithAI };
+
+function providerTokenSetting(name, fallback) {
+  const providerKey = getAIProvider() === "anthropic" ? `ANTHROPIC_${name}` : `OPENAI_${name}`;
+  return Number(process.env[`AI_${name}`] || process.env[providerKey] || process.env[`OPENAI_${name}`] || fallback);
+}
 
 export function buildBriefingPrompt(input, missingFields = []) {
   const compactInput = compactBriefingInput(input, missingFields);
@@ -311,8 +316,8 @@ export async function assistBriefing(input, missingFields = []) {
     { role: "user", content: buildBriefingPrompt(input, missingFields) }
   ], {
     temperature: 0.35,
-    maxTokens: Math.min(8000, Math.max(3000, Number(process.env.OPENAI_ASSIST_MAX_TOKENS || 6000))),
-    retryMaxTokens: Math.min(8000, Math.max(3000, Number(process.env.OPENAI_ASSIST_MAX_TOKENS || 6000))),
+    maxTokens: Math.min(8000, Math.max(3000, providerTokenSetting("ASSIST_MAX_TOKENS", 6000))),
+    retryMaxTokens: Math.min(8000, Math.max(3000, providerTokenSetting("ASSIST_MAX_TOKENS", 6000))),
     formatRetryInstruction: "Retorne somente JSON válido e compacto com audience, objectives, content, webPractices, materials, references, videoSearchSuggestions, imageSearchSuggestions e notes. Preserve IDs e não repita textos longos já fornecidos."
   });
   const requestedPractices = Array.isArray(input.webPractices) ? input.webPractices : [];
@@ -672,7 +677,7 @@ function compactRegenerationSection(section = {}) {
 
 function regenerationTokenBudget(input, options = {}) {
   const target = qualityTargets(input).targetWords;
-  const configured = Number(options.maxTokens || process.env.OPENAI_REGEN_MAX_TOKENS || 10000);
+  const configured = Number(options.maxTokens || providerTokenSetting("REGEN_MAX_TOKENS", 10000));
   // O reparo devolve apenas lessonPlan. Para 3.000 palavras, 8–10 mil
   // tokens permitem texto substancial e JSON completo sem carregar o guia.
   return Math.min(14000, Math.max(8000, configured, Math.ceil(target * 2.2)));

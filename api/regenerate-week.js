@@ -5,6 +5,7 @@ import { regenerateWeekWithAI } from "../src/ai.js";
 import { applyCompositionInstruction } from "../src/composition.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { validateCourse } from "../src/validation.js";
+import { getAIModel, getAIProvider } from "../src/ai-client.js";
 
 export default async function handler(request, response) {
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
@@ -27,9 +28,9 @@ export default async function handler(request, response) {
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
     const validation = validateCourse(input, enrichedWeeks, workload, teacherGuides);
     response.setHeader("Cache-Control", "no-store");
-    return response.status(200).json({ ok: true, provider: "ai-regenerate", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", weekIndex: index, instruction, input, workload, generalPlan: { ...generalPlan, validation }, validation, week: enrichedWeeks[index], weeks: enrichedWeeks, teacherGuides });
+    return response.status(200).json({ ok: true, provider: "ai-regenerate", aiProvider: getAIProvider(), model: getAIModel(), weekIndex: index, instruction, input, workload, generalPlan: { ...generalPlan, validation }, validation, week: enrichedWeeks[index], weeks: enrichedWeeks, teacherGuides });
   } catch (error) {
-    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_INVALID_JSON" ? 502 : 400;
-    return response.status(status).json({ ok: false, error: error.message || "Não foi possível refazer a semana." });
+    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_REQUEST_TOO_LARGE" ? 413 : error.code === "AI_INVALID_JSON" ? 502 : 400;
+    return response.status(status).json({ ok: false, error: error.message || "Não foi possível refazer a semana.", code: error.code || "REGENERATION_ERROR", retryable: Boolean(error.retryable), retryAfterMs: error.retryAfterMs || 0 });
   }
 }

@@ -1,7 +1,206 @@
-const providerBase = () => (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
+const normalizeProvider = (value) => {
+  const provider = String(value || "openai").trim().toLowerCase();
+  return provider === "anthropic" || provider === "claude" ? "anthropic" : "openai";
+};
+
+export function getAIProvider() {
+  return normalizeProvider(process.env.AI_PROVIDER || process.env.AULA_AI_PROVIDER || "openai");
+}
+
+export function getAIModel() {
+  return getAIProvider() === "anthropic"
+    ? (process.env.ANTHROPIC_MODEL || process.env.AI_MODEL || "claude-sonnet-5-5")
+    : (process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || process.env.AI_MODEL || "gpt-4o-mini");
+}
+
+export function isAIConfigured() {
+  return Boolean(getAIProvider() === "anthropic" ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY);
+}
+
+function providerNumberSetting(name, fallback) {
+  const providerKey = getAIProvider() === "anthropic" ? `ANTHROPIC_${name}` : `OPENAI_${name}`;
+  return Number(process.env[`AI_${name}`] || process.env[providerKey] || process.env[`OPENAI_${name}`] || fallback);
+}
+
+export function getAITokenSettings() {
+  return {
+    maxTokens: providerNumberSetting("MAX_TOKENS", 16000),
+    assistMaxTokens: Math.min(8000, Math.max(3000, providerNumberSetting("ASSIST_MAX_TOKENS", 6000))),
+    requestTokenBudget: providerNumberSetting("REQUEST_TOKEN_BUDGET", 28000),
+    regenerationMaxTokens: Math.min(providerNumberSetting("REGEN_MAX_TOKENS", 10000), 12000),
+    maxRetries: providerNumberSetting("MAX_RETRIES", 3)
+  };
+}
+
+function providerBase() {
+  const provider = getAIProvider();
+  const configured = provider === "anthropic" ? process.env.ANTHROPIC_BASE_URL : process.env.OPENAI_BASE_URL;
+  return (configured || (provider === "anthropic" ? "https://api.anthropic.com" : "https://api.openai.com/v1")).replace(/\/$/u, "");
+}
+
+function providerKey() {
+  return getAIProvider() === "anthropic" ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY;
+}
+
+function endpointUrl() {
+  const base = providerBase();
+  if (getAIProvider() !== "anthropic") return `${base}/chat/completions`;
+  return base.endsWith("/v1") ? `${base}/messages` : `${base}/v1/messages`;
+}
+
+function configuredMaxTokens(options = {}, retryingFormat = false) {
+  const provider = getAIProvider();
+  const providerDefault = provider === "anthropic" ? process.env.ANTHROPIC_MAX_TOKENS : process.env.OPENAI_MAX_TOKENS;
+  const requested = retryingFormat ? (options.retryMaxTokens || options.maxTokens) : options.maxTokens;
+  return Math.max(256, Number(requested || process.env.AI_MAX_TOKENS || providerDefault || getAITokenSettings().maxTokens || 16000));
+}
+
+function requestTokenBudget() {
+  return getAITokenSettings().requestTokenBudget;
+}
+
+function estimateInputTokens(messages = []) {
+  const characters = messages.reduce((total, message) => total + String(message?.content || "").length, 0);
+  // JSON, português e instruções longas costumam ficar próximos de 3,5–4
+  // caracteres por token. Usamos uma estimativa conservadora para reservar
+  // espaço também para pequenas variações do tokenizador.
+  return Math.ceil(characters / 3.5);
+}
+
+function boundedOutputTokens(messages, requested) {
+  const budget = requestTokenBudget();
+  const requestedTokens = Math.max(256, Number(requested) || 16000);
+  if (!Number.isFinite(budget) || budget <= 0) return requestedTokens;
+  const safetyMargin = 512;
+  const available = budget - estimateInputTokens(messages) - safetyMargin;
+  return Math.max(256, Math.min(requestedTokens, available));
+}
+
+function parseDurationMs(value) {
+  const source = String(value ?? "").trim().toLowerCase();
+  if (!source) return 0;
+  if (/^\d+(?:\.\d+)?$/u.test(source)) return Math.round(Number(source) * 1000);
+  let total = 0;
+  const pattern = /(\d+(?:\.\d+)?)(ms|s|m|h)/gu;
+  let match;
+  while ((match = pattern.exec(source))) {
+    const amount = Number(match[1]);
+    const unit = match[2];
+    total += unit === "h" ? amount * 3600000 : unit === "m" ? amount * 60000 : unit === "s" ? amount * 1000 : amount;
+  }
+  return Math.round(total);
+}
+
+function retryDelay(response, attempt) {
+  const retryAfter = parseDurationMs(response.headers.get("retry-after"));
+  const reset = parseDurationMs(response.headers.get("x-ratelimit-reset-tokens") || response.headers.get("x-ratelimit-reset-project-tokens"));
+  if (retryAfter > 0) return retryAfter;
+  if (reset > 0) return reset;
+  return Math.min(30000, 1000 * (2 ** attempt) + Math.round(Math.random() * 500));
+}
+
+function providerMessages(messages = []) {
+  return messages.map((message) => ({
+    role: message?.role === "assistant" ? "assistant" : "user",
+    content: String(message?.content || "")
+  }));
+}
+
+function buildRequest(messages, options, maxTokens) {
+  const provider = getAIProvider();
+  if (provider !== "anthropic") {
+    return {
+      url: endpointUrl(),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${providerKey()}` },
+      body: {
+        model: options.model || getAIModel(),
+        temperature: options.temperature ?? 0.45,
+        max_tokens: maxTokens,
+        response_format: { type: "json_object" },
+        messages
+      }
+    };
+  }
+  const system = messages.filter((message) => message?.role === "system").map((message) => String(message.content || "").trim()).filter(Boolean).join("\n\n");
+  const body = {
+    model: options.model || getAIModel(),
+    max_tokens: maxTokens,
+    temperature: options.temperature ?? 0.45,
+    messages: providerMessages(messages.filter((message) => message?.role !== "system"))
+  };
+  if (system) body.system = system;
+  // Ative somente para modelos Anthropic que tenham structured outputs habilitado
+  // na conta. O padrão continua baseado em JSON para manter compatibilidade.
+  if (process.env.ANTHROPIC_STRUCTURED_OUTPUTS === "true") {
+    body.output_config = { format: { type: "json_schema", schema: { type: "object", additionalProperties: true } } };
+  }
+  return {
+    url: endpointUrl(),
+    headers: { "Content-Type": "application/json", "x-api-key": providerKey(), "anthropic-version": process.env.ANTHROPIC_VERSION || "2023-06-01" },
+    body
+  };
+}
+
+function responseText(payload) {
+  if (getAIProvider() !== "anthropic") return payload?.choices?.[0]?.message?.content;
+  return Array.isArray(payload?.content)
+    ? payload.content.filter((block) => block?.type === "text").map((block) => block.text).join("\n")
+    : "";
+}
+
+function responseFinishedByLength(payload) {
+  return getAIProvider() === "anthropic" ? payload?.stop_reason === "max_tokens" : payload?.choices?.[0]?.finish_reason === "length";
+}
+
+function providerErrorMessage(payload, response) {
+  if (getAIProvider() === "anthropic") return payload?.error?.message || payload?.message || `HTTP ${response.status}`;
+  return payload?.error?.message || (typeof payload?.error === "string" ? payload.error : `HTTP ${response.status}`);
+}
+
+function classifyProviderError(message, status) {
+  const detail = String(message || "");
+  const tpmLimit = /tokens per min|tokens per minute|\btpm\b|input tokens per minute|output tokens per minute|itpm|otpm/i.test(detail);
+  const contextTooLarge = /context length|maximum context|prompt is too long|request too large|too many tokens/i.test(detail) && !tpmLimit;
+  const actionRequired = /invalid[_ ]?api[_ ]?key|authentication|unauthorized|insufficient[_ ]?quota|quota|billing|spend limit|usage limit|credit balance|payment required|enforced_spend_limit_reached/i.test(detail);
+  const transient = /temporar|timeout|overload|slow_down|try again|capacity/i.test(detail);
+  const retryable = !actionRequired && !contextTooLarge && (status === 408 || status === 425 || status === 429 || status === 500 || status === 502 || status === 503 || transient);
+  const rateLimit = !actionRequired && (status === 429 || /rate limit|rate_limit_error/i.test(detail));
+  return {
+    code: tpmLimit || rateLimit ? "AI_TPM_LIMIT" : contextTooLarge ? "AI_REQUEST_TOO_LARGE" : "AI_PROVIDER_ERROR",
+    retryable,
+    tpmLimit,
+    contextTooLarge
+  };
+}
+
+function createProviderError(message, response, retryAfterMs, classification) {
+  const waitTooLong = retryAfterMs > 30000;
+  const error = new Error(`A API de IA (${getAIProvider()}) recusou a solicitação: ${message}${waitTooLong ? ` Aguarde aproximadamente ${Math.ceil(retryAfterMs / 60000)} minuto(s) antes de tentar novamente.` : ""}`);
+  error.code = classification.code;
+  error.retryable = Boolean(classification.retryable && !waitTooLong);
+  error.provider = getAIProvider();
+  error.status = response.status;
+  error.providerMessage = message;
+  error.retryAfterMs = retryAfterMs;
+  return error;
+}
+
+export function parseJson(content) {
+  if (content && typeof content === "object") return content;
+  const candidate = extractJsonValue(content);
+  try {
+    return JSON.parse(candidate);
+  } catch (firstError) {
+    try {
+      return JSON.parse(removeTrailingCommas(candidate));
+    } catch {
+      throw firstError;
+    }
+  }
+}
 
 function extractJsonValue(content) {
-  const source = String(content || "").replace(/^\uFEFF/, "").trim().replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  const source = String(content || "").replace(/^\uFEFF/u, "").trim().replace(/^```(?:json)?/iu, "").replace(/```$/u, "").trim();
   const starts = [source.indexOf("{"), source.indexOf("[")].filter((index) => index >= 0);
   if (!starts.length) return source;
   const start = Math.min(...starts);
@@ -42,7 +241,7 @@ function removeTrailingCommas(value) {
     if (char === '"') { quoted = true; output += char; continue; }
     if (char === ",") {
       let next = index + 1;
-      while (/\s/.test(value[next] || "")) next += 1;
+      while (/\s/u.test(value[next] || "")) next += 1;
       if (value[next] === "}" || value[next] === "]") continue;
     }
     output += char;
@@ -50,134 +249,78 @@ function removeTrailingCommas(value) {
   return output;
 }
 
-export function parseJson(content) {
-  if (content && typeof content === "object") return content;
-  const candidate = extractJsonValue(content);
-  try {
-    return JSON.parse(candidate);
-  } catch (firstError) {
-    try {
-      return JSON.parse(removeTrailingCommas(candidate));
-    } catch {
-      throw firstError;
-    }
-  }
-}
-
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-function estimateInputTokens(messages = []) {
-  const characters = messages.reduce((total, message) => total + String(message?.content || "").length, 0);
-  // JSON, português e instruções longas costumam ficar próximos de 3,5–4
-  // caracteres por token. Usamos uma estimativa conservadora para reservar
-  // espaço também para pequenas variações do tokenizador.
-  return Math.ceil(characters / 3.5);
-}
-
-function boundedOutputTokens(messages, requested) {
-  const budget = Number(process.env.OPENAI_REQUEST_TOKEN_BUDGET || 28000);
-  const requestedTokens = Math.max(256, Number(requested) || 16000);
-  if (!Number.isFinite(budget) || budget <= 0) return requestedTokens;
-  const safetyMargin = 512;
-  const available = budget - estimateInputTokens(messages) - safetyMargin;
-  return Math.max(256, Math.min(requestedTokens, available));
-}
-
-function retryDelay(response, attempt) {
-  const retryAfter = Number(response.headers.get("retry-after"));
-  if (Number.isFinite(retryAfter) && retryAfter > 0) return Math.min(30000, Math.max(1000, retryAfter * 1000));
-  const reset = response.headers.get("x-ratelimit-reset-tokens") || response.headers.get("x-ratelimit-reset-project-tokens") || "";
-  const seconds = Number.parseFloat(reset);
-  if (Number.isFinite(seconds) && seconds > 0) return Math.min(30000, Math.max(1000, seconds * 1000));
-  return Math.min(30000, 1000 * (2 ** attempt) + Math.round(Math.random() * 500));
-}
-
 export async function callJson(messages, options = {}) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    const error = new Error("OPENAI_API_KEY não está configurada. Cadastre a chave como segredo na Vercel.");
+  if (!isAIConfigured()) {
+    const error = new Error(`A chave da API ${getAIProvider() === "anthropic" ? "Anthropic" : "OpenAI"} não está configurada.`);
     error.code = "AI_KEY_MISSING";
+    error.provider = getAIProvider();
     throw error;
   }
-  const maxAttempts = Math.max(1, Number(process.env.OPENAI_MAX_RETRIES || 3));
+  const maxAttempts = Math.max(1, getAITokenSettings().maxRetries);
   let formatRetry = false;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const retryingFormat = formatRetry;
     const requestMessages = formatRetry
       ? [...messages, { role: "user", content: options.formatRetryInstruction || "A resposta anterior veio em formato JSON inválido ou foi truncada. Gere novamente uma versão compacta e completa do mesmo objeto, sem markdown, comentários ou texto fora do JSON; use aspas duplas em todas as propriedades e não deixe vírgula antes de } ou ]." }]
       : messages;
-    const requestedMaxTokens = retryingFormat ? (options.retryMaxTokens || options.maxTokens || process.env.OPENAI_MAX_TOKENS || 16000) : (options.maxTokens || process.env.OPENAI_MAX_TOKENS || 16000);
-    const response = await fetch(`${providerBase()}/chat/completions`, {
+    const requestedMaxTokens = configuredMaxTokens(options, retryingFormat);
+    const maxTokens = boundedOutputTokens(requestMessages, requestedMaxTokens);
+    const request = buildRequest(requestMessages, options, maxTokens);
+    const response = await fetch(request.url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: options.model || process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
-        temperature: options.temperature ?? 0.45,
-        max_tokens: boundedOutputTokens(requestMessages, requestedMaxTokens),
-        response_format: { type: "json_object" },
-        messages: requestMessages
-      })
+      headers: request.headers,
+      body: JSON.stringify(request.body)
     });
     const payload = await response.json().catch(() => ({}));
-    const providerError = payload?.error?.message || (typeof payload?.error === "string" ? payload.error : "");
-    if (providerError) {
-      const tpmLimit = /tokens per min|tokens per minute|\btpm\b/i.test(providerError);
-      const contextTooLarge = /context length|maximum context|prompt is too long|request too large|too many tokens/i.test(providerError) && !tpmLimit;
-      const retryable = response.status === 503 || (response.status === 429 && !contextTooLarge) || /temporar|timeout/i.test(providerError);
-      if (retryable && attempt < maxAttempts - 1) {
-        await wait(retryDelay(response, attempt));
+    const providerError = providerErrorMessage(payload, response);
+    if (!response.ok || providerError && !payload?.choices && !payload?.content) {
+      const classification = classifyProviderError(providerError, response.status);
+      const retryAfterMs = retryDelay(response, attempt);
+      if (classification.retryable && attempt < maxAttempts - 1 && retryAfterMs <= 30000) {
+        await wait(retryAfterMs);
         continue;
       }
-      const error = new Error(`A API de IA recusou a solicitação: ${providerError}`);
-      error.code = tpmLimit || /rate limit/i.test(providerError) ? "AI_TPM_LIMIT" : contextTooLarge ? "AI_REQUEST_TOO_LARGE" : "AI_PROVIDER_ERROR";
-      error.retryable = retryable;
-      error.providerMessage = providerError;
-      throw error;
+      throw createProviderError(providerError, response, retryAfterMs, classification);
     }
-    if (response.ok) {
-      const choice = payload?.choices?.[0];
-      const content = choice?.message?.content;
-      if (!content) throw new Error("A API de IA retornou uma resposta vazia.");
-      if (choice?.finish_reason === "length") {
-        if (attempt < maxAttempts - 1) {
-          formatRetry = true;
-          await wait(250);
-          continue;
-        }
-        const truncatedError = new Error("A resposta da IA atingiu o limite de saída antes de concluir a aula.");
-        truncatedError.code = "AI_OUTPUT_TRUNCATED";
-        truncatedError.retryable = true;
-        throw truncatedError;
+    const content = responseText(payload);
+    if (!content) {
+      const emptyError = new Error("A API de IA retornou uma resposta vazia.");
+      emptyError.code = "AI_EMPTY_RESPONSE";
+      emptyError.retryable = true;
+      emptyError.provider = getAIProvider();
+      if (attempt < maxAttempts - 1) { await wait(250); continue; }
+      throw emptyError;
+    }
+    if (responseFinishedByLength(payload)) {
+      if (attempt < maxAttempts - 1) {
+        formatRetry = true;
+        await wait(250);
+        continue;
       }
-      try {
-        const parsed = parseJson(content);
-        formatRetry = false;
-        return parsed;
-      } catch (error) {
-        if (attempt < maxAttempts - 1) {
-          formatRetry = true;
-          await wait(250);
-          continue;
-        }
-        const parseError = new Error(`A IA retornou uma resposta em JSON inválido após ${maxAttempts} tentativa(s). Tente refazer a semana novamente; a aula atual foi preservada. Detalhe técnico: ${error.message}`);
-        parseError.code = "AI_INVALID_JSON";
-        parseError.retryable = true;
-        throw parseError;
+      const truncatedError = new Error("A resposta da IA atingiu o limite de saída antes de concluir a aula.");
+      truncatedError.code = "AI_OUTPUT_TRUNCATED";
+      truncatedError.retryable = true;
+      truncatedError.provider = getAIProvider();
+      throw truncatedError;
+    }
+    try {
+      const parsed = parseJson(content);
+      formatRetry = false;
+      return parsed;
+    } catch (error) {
+      if (attempt < maxAttempts - 1) {
+        formatRetry = true;
+        await wait(250);
+        continue;
       }
+      const parseError = new Error(`A IA retornou uma resposta em JSON inválido após ${maxAttempts} tentativa(s). Tente refazer a semana novamente; a aula atual foi preservada. Detalhe técnico: ${error.message}`);
+      parseError.code = "AI_INVALID_JSON";
+      parseError.retryable = true;
+      parseError.provider = getAIProvider();
+      throw parseError;
     }
-    const detail = payload?.error?.message || `HTTP ${response.status}`;
-    const tpmLimit = /tokens per min|tokens per minute|\btpm\b/i.test(detail);
-    const contextTooLarge = /context length|maximum context|prompt is too long|request too large|too many tokens/i.test(detail) && !tpmLimit;
-    const retryable = (response.status === 429 && !contextTooLarge) || response.status === 503;
-    if (retryable && attempt < maxAttempts - 1) {
-      await wait(retryDelay(response, attempt));
-      continue;
-    }
-    const error = new Error(`A API de IA recusou a solicitação: ${detail}`);
-    error.code = tpmLimit || /rate limit/i.test(detail) ? "AI_TPM_LIMIT" : contextTooLarge ? "AI_REQUEST_TOO_LARGE" : "AI_PROVIDER_ERROR";
-    error.retryable = retryable;
-    error.providerMessage = detail;
-    throw error;
   }
   throw new Error("A API de IA não respondeu após as tentativas configuradas.");
 }

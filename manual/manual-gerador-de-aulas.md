@@ -38,8 +38,8 @@ pre { font-size: 8.5pt !important; line-height: 1.28 !important; }
 16. [Baixando os arquivos](#16-baixando-os-arquivos)
 17. [Abrindo o JSON no Aula Studio](#17-abrindo-o-json-no-aula-studio)
 18. [Publicando no Moodle via SCORM](#18-publicando-no-moodle-via-scorm)
-19. [Configuração da OpenAI](#19-configuração-da-openai)
-19.1. [Limite TPM e aumento de tier](#191-limite-tpm-e-aumento-de-tier)
+19. [Configuração da OpenAI ou Anthropic Claude](#19-configuração-da-openai-ou-anthropic-claude)
+19.5. [Limite TPM e aumento de tier](#195-limite-tpm-e-aumento-de-tier)
 20. [Pesquisa automática de vídeos, imagens e leituras](#20-pesquisa-automática-de-vídeos-imagens-e-leituras)
 21. [Uso local e modo de exemplo](#21-uso-local-e-modo-de-exemplo)
 22. [Problemas comuns e soluções](#22-problemas-comuns-e-soluções)
@@ -980,23 +980,23 @@ Após a regeneração, o sistema revisa novamente a semana e recalcula o Planeja
 | Reparo | `0.35` | Reescreve as seções curtas até cumprir o piso e as quotas, sem aceitar acréscimos marginais. |
 | Regeneração | `0.35` | Altera somente a semana solicitada. |
 
-Todas as etapas usam o modelo definido por `OPENAI_CONTENT_MODEL`; se essa variável estiver vazia, usam `OPENAI_MODEL`. A redação semanal usa `OPENAI_MAX_TOKENS`, a regeneração usa `OPENAI_REGEN_MAX_TOKENS` e o preenchimento assistido usa `OPENAI_ASSIST_MAX_TOKENS`. Todas compartilham `OPENAI_MAX_RETRIES` e o mecanismo de espera progressiva descrito na seção 10.2.
+Todas as etapas usam o provedor definido por `AI_PROVIDER`, que permanece `openai` por padrão. Com `AI_PROVIDER=openai`, o modelo vem de `OPENAI_CONTENT_MODEL` ou `OPENAI_MODEL`; com `AI_PROVIDER=anthropic`, vem de `ANTHROPIC_MODEL`. A redação semanal, a regeneração e a assistência usam os orçamentos específicos do provedor ativo. O cliente mantém o mesmo contrato JSON, a mesma normalização da aula e a mesma separação entre aluno e professor.
 
 ### 10.2 Limites de tokens e geração sequencial
 
-A API OpenAI mede, entre outros indicadores, **TPM — tokens por minuto**. Como cada semana pode gerar várias chamadas — planejamento, redação, revisão e reparo — um curso com muitas semanas ou várias solicitações simultâneas pode atingir esse limite mesmo com a chave correta.
+OpenAI mede, entre outros indicadores, **TPM — tokens por minuto**. Anthropic mede **RPM**, **ITPM** e **OTPM**. Como cada semana pode gerar várias chamadas — planejamento, redação, revisão e reparo — um curso com muitas semanas ou várias solicitações simultâneas pode atingir o limite do provedor mesmo com a chave correta.
 
 O Gerador foi configurado para:
 
 1. processar uma semana por vez por padrão;
-2. respeitar o cabeçalho `Retry-After` quando a OpenAI enviar um prazo;
-3. usar espera progressiva com pequena variação entre tentativas;
-4. repetir até três vezes erros temporários `429` ou `503`, mas não repetir automaticamente um excesso real de contexto;
+2. respeitar `Retry-After` e os cabeçalhos de reset quando o provedor enviar um prazo, inclusive formatos como `6m0s`;
+3. usar espera progressiva com pequena variação entre tentativas apenas quando a espera for curta;
+4. repetir até três vezes erros temporários `429` ou `503`, mas não repetir automaticamente um excesso real de contexto, uma quota esgotada ou uma janela longa;
 5. usar `OPENAI_ASSIST_MAX_TOKENS=6000` como orçamento separado para **Preencher vazios com IA**;
 6. limitar a soma estimada de entrada e saída de cada requisição a `OPENAI_REQUEST_TOKEN_BUDGET=28000`, preservando margem para o limite organizacional de 30.000 TPM;
 7. informar no healthcheck `maxTokens`, `assistMaxTokens`, `requestTokenBudget`, `maxRetries` e `aiBatchSize`.
 
-Não clique repetidamente em **Gerar com IA** enquanto a solicitação anterior estiver em andamento. Se o curso for muito longo, aguarde a conclusão de cada geração antes de iniciar uma nova. A geração semanal envia um índice longitudinal compacto e não repete o briefing bruto completo. Se aparecer **“Request too large”** no preenchimento assistido, a versão publicada deve estar usando o contexto compacto e o orçamento próprio; nesse caso, remova textos repetidos do briefing e tente novamente. Se aparecer o detalhe **TPM / tokens per minute**, aguarde a janela indicada pelo provedor.
+Não clique repetidamente em **Gerar com IA** enquanto a solicitação anterior estiver em andamento. Se o curso for muito longo, aguarde a conclusão de cada geração antes de iniciar uma nova. A geração semanal envia um índice longitudinal compacto e não repete o briefing bruto completo. Se aparecer **“Request too large”** no preenchimento assistido, a versão publicada deve estar usando o contexto compacto e o orçamento próprio; nesse caso, remova textos repetidos do briefing e tente novamente. Se aparecer **TPM**, **ITPM**, **OTPM** ou **tokens per minute**, aguarde a janela indicada pelo provedor. Quando a API indicar vários minutos, o Gerador encerra a tentativa atual para não multiplicar o bloqueio.
 
 ---
 
@@ -1455,7 +1455,7 @@ O Gerador não publica diretamente no Moodle. A publicação ocorre depois da re
 
 ---
 
-## 19. Configuração da OpenAI
+## 19. Configuração da OpenAI ou Anthropic Claude
 
 A assinatura do ChatGPT e a API da OpenAI são serviços distintos. Para o Gerador, é necessária uma chave de API.
 
@@ -1481,7 +1481,7 @@ A chave nunca deve ser colocada:
 
 ### 19.2 Variáveis da Vercel
 
-Na Vercel, em **Settings → Environment Variables**, configure:
+Na Vercel, em **Settings → Environment Variables**, configure a OpenAI como padrão ou o conjunto Anthropic para um teste com Claude:
 
 | Variável | Valor |
 |---|---|
@@ -1493,6 +1493,14 @@ Na Vercel, em **Settings → Environment Variables**, configure:
 | `OPENAI_ASSIST_MAX_TOKENS` | `6000` para o preenchimento assistido; orçamento separado |
 | `OPENAI_REQUEST_TOKEN_BUDGET` | `28000` para entrada + saída; margem abaixo de 30.000 TPM |
 | `OPENAI_MAX_RETRIES` | `3` |
+| `AI_PROVIDER` | `openai` (padrão) ou `anthropic` |
+| `ANTHROPIC_API_KEY` | chave secreta criada no Console Anthropic, se o provedor for `anthropic` |
+| `ANTHROPIC_MODEL` | `claude-sonnet-5-5` |
+| `ANTHROPIC_MAX_TOKENS` | `16000` |
+| `ANTHROPIC_ASSIST_MAX_TOKENS` | `6000` |
+| `ANTHROPIC_REQUEST_TOKEN_BUDGET` | `28000` como margem local do Gerador |
+| `ANTHROPIC_REGEN_MAX_TOKENS` | `10000` |
+| `ANTHROPIC_MAX_RETRIES` | `3` |
 | `AULA_AI_BATCH_SIZE` | `1` |
 | `AULA_ACADEMIC_PIPELINE` | `true` |
 | `AULA_ACADEMIC_REVIEW` | `true` |
@@ -1501,18 +1509,23 @@ Na Vercel, em **Settings → Environment Variables**, configure:
 | `YOUTUBE_API_KEY` | chave opcional de pesquisa de vídeos |
 | `AULA_OPENALEX_ENABLED` | `true` por padrão; `false` desativa o fallback acadêmico |
 
-Use o tipo **Secret** para as chaves. Depois de salvar alterações, faça **Redeploy**.
+Use o tipo **Secret** para as chaves. Depois de salvar alterações, faça **Redeploy**. Para testar Claude, mantenha a chave OpenAI até confirmar o resultado, adicione `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY` e `ANTHROPIC_MODEL`, publique uma implantação de teste e confira `/api/health`. O retorno deve mostrar `provider: "anthropic"`. Para voltar à OpenAI, remova `AI_PROVIDER` ou defina `AI_PROVIDER=openai` e faça novo Redeploy.
 
-### 19.3 Diferença entre as credenciais
+### 19.3.1 O Claude ficará melhor?
+
+Claude pode produzir texto longo mais coeso em alguns briefings, mas a qualidade depende do modelo, das instruções e do contexto enviado. A API Anthropic oferece saída estruturada por schema em modelos e contas compatíveis, enquanto o Gerador mantém por padrão a validação JSON própria para preservar compatibilidade entre os provedores. A Anthropic também possui limites de RPM, ITPM, OTPM e gasto mensal. Portanto, a troca é uma opção de comparação, não uma garantia de que toda aula ficará melhor.
+
+### 19.4 Diferença entre as credenciais
 
 | Credencial | Serve para |
 |---|---|
 | `OPENAI_API_KEY` | gerar e completar conteúdos com IA |
+| `ANTHROPIC_API_KEY` | gerar e completar conteúdos com Claude quando `AI_PROVIDER=anthropic` |
 | `YOUTUBE_API_KEY` | pesquisar candidatos de vídeos |
 | `AULA_ACCESS_CODE` | proteger o endpoint público da aplicação |
 | senha do ChatGPT | entrar na conta ChatGPT; não deve ser colocada no aplicativo |
 
-### 19.4 Limite TPM e aumento de tier
+### 19.5 Limite TPM e aumento de tier
 
 Uma mensagem como:
 
@@ -1614,6 +1627,10 @@ cp .env.example .env
 Exemplo de configuração:
 
 ```text
+AI_PROVIDER=openai
+# Para testar Claude: AI_PROVIDER=anthropic e preencha ANTHROPIC_API_KEY.
+ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=claude-sonnet-5-5
 OPENAI_API_KEY=chave-local
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini

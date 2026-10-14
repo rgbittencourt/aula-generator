@@ -18,7 +18,7 @@ export default async function handler(request, response) {
     return response.status(200).json({ ok: true, provider: "resource-enrichment", weekIndex: index, week: researched, teacherGuide, generation: researched.generationMeta || { phase: "complete", repairPending: false } });
   } catch (error) {
     console.error("enrich-week failed", error);
-    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
-    return response.status(status).json({ ok: false, error: error.message || "Não foi possível pesquisar os recursos desta semana.", code: error.code || "RESOURCE_ENRICHMENT_ERROR", retryable: Boolean(error.retryable) });
+    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_REQUEST_TOO_LARGE" ? 413 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
+    return response.status(status).json({ ok: false, error: error.message || "Não foi possível pesquisar os recursos desta semana.", code: error.code || "RESOURCE_ENRICHMENT_ERROR", retryable: Boolean(error.retryable), retryAfterMs: error.retryAfterMs || 0 });
   }
 }

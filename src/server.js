@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "./calculations.js";
 import { buildFallbackLesson, normalizeCourseInput, normalizeLesson, normalizeWeeklyOutput, slugify, validateLesson } from "./aula-schema.js";
 import { assistBriefing, generateOneWeek, generateWithAI, regenerateMediationMessageWithAI, regenerateWeekWithAI } from "./ai.js";
+import { getAIModel, getAIProvider, getAITokenSettings, isAIConfigured } from "./ai-client.js";
 import { enrichLessonsWithResources } from "./research.js";
 import { createWeeksZip } from "./zip.js";
 import { accessRequired, hasValidAccess } from "./access.js";
@@ -26,14 +27,16 @@ app.use(express.json({ limit: "4mb" }));
 app.use(express.static(publicDir, { etag: true }));
 
 app.get("/api/health", (_req, res) => {
+  const settings = getAITokenSettings();
   res.json({
     ok: true,
-    aiConfigured: Boolean(process.env.OPENAI_API_KEY),
+    aiConfigured: isAIConfigured(),
+    provider: getAIProvider(),
     accessRequired: accessRequired(),
     resourceResearch: process.env.AULA_RESOURCE_RESEARCH !== "false",
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),
     openAlexFallback: process.env.AULA_OPENALEX_ENABLED !== "false",
-    model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
+    model: getAIModel(),
     autoRepair: process.env.AULA_AUTO_REPAIR !== "false",
     academicPipeline: process.env.AULA_ACADEMIC_PIPELINE !== "false",
     academicReview: process.env.AULA_ACADEMIC_REVIEW !== "false",
@@ -41,11 +44,11 @@ app.get("/api/health", (_req, res) => {
     singlePass: process.env.AULA_SINGLE_PASS !== "false",
     researchTimeoutMs: Math.max(3000, Number(process.env.AULA_RESEARCH_TIMEOUT_MS || 8000)),
     reviewBeforeExport: true,
-    maxTokens: Number(process.env.OPENAI_MAX_TOKENS || 16000),
-    assistMaxTokens: Math.min(8000, Math.max(3000, Number(process.env.OPENAI_ASSIST_MAX_TOKENS || 6000))),
-    requestTokenBudget: Number(process.env.OPENAI_REQUEST_TOKEN_BUDGET || 28000),
-    regenerationMaxTokens: Math.min(Number(process.env.OPENAI_REGEN_MAX_TOKENS || 10000), 12000),
-    maxRetries: Number(process.env.OPENAI_MAX_RETRIES || 3),
+    maxTokens: settings.maxTokens,
+    assistMaxTokens: settings.assistMaxTokens,
+    requestTokenBudget: settings.requestTokenBudget,
+    regenerationMaxTokens: settings.regenerationMaxTokens,
+    maxRetries: settings.maxRetries,
     aiBatchSize: Math.min(3, Math.max(1, Number(process.env.AULA_AI_BATCH_SIZE) || 1)),
     output: ".aula.json por semana + ZIP + revisão/regeneração individual"
   });
@@ -60,7 +63,7 @@ app.post("/api/generate-week", async (req, res) => {
     const normalized = normalizeLesson(raw, input, index);
     const teacherGuide = buildTeacherGuides(input, [normalized], [raw.teacherGuide || {}])[0];
     res.setHeader("Cache-Control", "no-store");
-    res.json({ ok: true, provider: "ai-week", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", weekIndex: index, completed: index + 1, total: input.weeks, week: normalized, teacherGuide, resourcesDeferred: process.env.AULA_RESOURCE_RESEARCH !== "false" });
+    res.json({ ok: true, provider: "ai-week", aiProvider: getAIProvider(), model: getAIModel(), weekIndex: index, completed: index + 1, total: input.weeks, week: normalized, teacherGuide, resourcesDeferred: process.env.AULA_RESOURCE_RESEARCH !== "false" });
   } catch (error) {
     console.error("generate-week failed", error);
     const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
@@ -80,8 +83,8 @@ app.post("/api/enrich-week", async (req, res) => {
     res.json({ ok: true, provider: "resource-enrichment", weekIndex: index, week: researched, teacherGuide });
   } catch (error) {
     console.error("enrich-week failed", error);
-    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
-    res.status(status).json({ ok: false, error: error.message || "Não foi possível pesquisar os recursos desta semana.", code: error.code || "RESOURCE_ENRICHMENT_ERROR", retryable: Boolean(error.retryable) });
+    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_REQUEST_TOO_LARGE" ? 413 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
+    res.status(status).json({ ok: false, error: error.message || "Não foi possível pesquisar os recursos desta semana.", code: error.code || "RESOURCE_ENRICHMENT_ERROR", retryable: Boolean(error.retryable), retryAfterMs: error.retryAfterMs || 0 });
   }
 });
 
@@ -91,7 +94,7 @@ app.post("/api/assemble-course", (req, res) => {
     const input = normalizeCourseInput(req.body?.input || {});
     const result = assembleCourse(input, req.body?.weeks || [], req.body?.teacherGuides || [], { allowPartial: Boolean(req.body?.allowPartial) });
     res.setHeader("Cache-Control", "no-store");
-    res.json({ ok: true, provider: "ai-distributed", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", ...result });
+    res.json({ ok: true, provider: "ai-distributed", aiProvider: getAIProvider(), model: getAIModel(), ...result });
   } catch (error) {
     console.error("assemble-course failed", error);
     res.status(400).json({ ok: false, error: error.message || "Não foi possível consolidar o curso.", code: error.code || "ASSEMBLY_ERROR" });
@@ -116,7 +119,8 @@ app.post("/api/generate", async (req, res) => {
     res.json({
       ok: true,
       provider: useFallback ? "fallback" : "ai",
-      model: useFallback ? null : (process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini"),
+      aiProvider: useFallback ? null : getAIProvider(),
+      model: useFallback ? null : getAIModel(),
       input,
       workload,
       generalPlan: { ...generalPlan, validation },
@@ -126,8 +130,8 @@ app.post("/api/generate", async (req, res) => {
       filePrefix: slugify(input.title, "curso")
     });
   } catch (error) {
-    const status = error.code === "AI_KEY_MISSING" ? 503 : 400;
-    res.status(status).json({ ok: false, error: error.message || "Não foi possível gerar o curso." });
+    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_REQUEST_TOO_LARGE" ? 413 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
+    res.status(status).json({ ok: false, error: error.message || "Não foi possível gerar o curso.", code: error.code || "GENERATION_ERROR", retryable: Boolean(error.retryable), retryAfterMs: error.retryAfterMs || 0 });
   }
 });
 
@@ -150,7 +154,7 @@ app.post("/api/regenerate-week", async (req, res) => {
     const teacherGuides = buildTeacherGuides(input, enrichedWeeks, providedGuides);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
     const validation = validateCourse(input, enrichedWeeks, workload, teacherGuides);
-    res.json({ ok: true, provider: "ai-regenerate", model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini", weekIndex: index, instruction, input, workload, generalPlan: { ...generalPlan, validation }, validation, week: enrichedWeeks[index], weeks: enrichedWeeks, teacherGuides });
+    res.json({ ok: true, provider: "ai-regenerate", aiProvider: getAIProvider(), model: getAIModel(), weekIndex: index, instruction, input, workload, generalPlan: { ...generalPlan, validation }, validation, week: enrichedWeeks[index], weeks: enrichedWeeks, teacherGuides });
   } catch (error) {
     const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_INVALID_JSON" ? 502 : 400;
     res.status(status).json({ ok: false, error: error.message || "Não foi possível refazer a semana." });

@@ -25,7 +25,7 @@ export default async function handler(request, response) {
     response.setHeader("Cache-Control", "no-store");
     return response.status(200).json({ ok: true, message });
   } catch (error) {
-    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
-    return response.status(status).json({ ok: false, error: error.message || "Não foi possível refazer a mensagem." });
+    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_REQUEST_TOO_LARGE" ? 413 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
+    return response.status(status).json({ ok: false, error: error.message || "Não foi possível refazer a mensagem.", code: error.code || "MESSAGE_REGENERATION_ERROR", retryable: Boolean(error.retryable), retryAfterMs: error.retryAfterMs || 0 });
   }
 }

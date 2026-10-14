@@ -3,6 +3,7 @@ import { normalizeCourseInput, normalizeLesson } from "../src/aula-schema.js";
 import { generateOneWeek } from "../src/ai.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { buildCourseProgression } from "../src/curriculum.js";
+import { getAIModel, getAIProvider } from "../src/ai-client.js";
 
 export default async function handler(request, response) {
   response.setHeader("Cache-Control", "no-store");
@@ -24,7 +25,8 @@ export default async function handler(request, response) {
     return response.status(200).json({
       ok: true,
       provider: "ai-week",
-      model: process.env.OPENAI_CONTENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
+      aiProvider: getAIProvider(),
+      model: getAIModel(),
       weekIndex: index,
       completed: index + 1,
       total: input.weeks,
@@ -35,7 +37,7 @@ export default async function handler(request, response) {
     });
   } catch (error) {
     console.error("generate-week failed", error);
-    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
+    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_PROVIDER_ERROR" ? 502 : error.code === "AI_REQUEST_TOO_LARGE" ? 413 : 400;
     return response.status(status).json({ ok: false, error: error.message || "Não foi possível gerar esta semana.", code: error.code || "GENERATION_ERROR", retryable: Boolean(error.retryable) });
   }
 }

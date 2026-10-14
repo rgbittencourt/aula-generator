@@ -50,6 +50,14 @@ A assinatura do ChatGPT e o uso da API são gerenciados em áreas diferentes da 
 
 Se a plataforma solicitar configuração de cobrança ou limites de uso, faça essa configuração diretamente no painel da OpenAI. O código da aplicação não configura cobrança.
 
+## Provedor alternativo: Anthropic Claude
+
+O Gerador agora mantém uma camada compatível com OpenAI e Anthropic. A OpenAI continua sendo o padrão para não interromper a implantação atual. Para testar Claude, crie uma chave em <https://console.anthropic.com/settings/keys> e cadastre, na Vercel, `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY` e `ANTHROPIC_MODEL=claude-sonnet-5-5`. O código nunca coloca a chave no navegador ou no GitHub.
+
+Depois do Redeploy, o endpoint `/api/health` mostrará `provider: "anthropic"` e o modelo efetivo. A geração semanal, a assistência do briefing, a refação e as mensagens de mediação continuam usando o mesmo contrato JSON do Gerador. A troca é reversível: remova `AI_PROVIDER` ou use `AI_PROVIDER=openai` para voltar à OpenAI.
+
+Claude pode ser melhor para coerência e redação longa em alguns testes, mas não é uma garantia automática. A Anthropic também aplica limites de RPM, tokens de entrada/saída por minuto e gasto mensal. Por isso, a comparação correta deve ser feita com o mesmo briefing, mesma quantidade de semanas e uma avaliação das semanas geradas, não apenas pela ausência de um erro de limite.
+
 ## Passo a passo: publicar a versão com IA na Vercel
 
 1. Abra <https://vercel.com/>.
@@ -72,6 +80,14 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 | `AULA_SINGLE_PASS` | `true` | Production, Preview e Development |
 | `AULA_RESEARCH_TIMEOUT_MS` | `8000` | Production, Preview e Development |
 | `OPENAI_MAX_RETRIES` | `3` | Production, Preview e Development |
+| `AI_PROVIDER` | `openai` (padrão) ou `anthropic` | Production, Preview e Development |
+| `ANTHROPIC_API_KEY` | chave secreta da Anthropic, somente se `AI_PROVIDER=anthropic` | Production, Preview e Development |
+| `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Production, Preview e Development |
+| `ANTHROPIC_MAX_TOKENS` | `16000` | Production, Preview e Development |
+| `ANTHROPIC_ASSIST_MAX_TOKENS` | `6000` | Production, Preview e Development |
+| `ANTHROPIC_REQUEST_TOKEN_BUDGET` | `28000` como margem local do Gerador | Production, Preview e Development |
+| `ANTHROPIC_REGEN_MAX_TOKENS` | `10000` | Production, Preview e Development |
+| `ANTHROPIC_MAX_RETRIES` | `3` | Production, Preview e Development |
 | `AULA_AI_BATCH_SIZE` | `1` | Production, Preview e Development |
 | `AULA_ACADEMIC_PIPELINE` | `true` | Production, Preview e Development |
 | `AULA_ACADEMIC_REVIEW` | `true` | Production, Preview e Development |
@@ -82,7 +98,7 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 
 7. Clique em **Deploy**.
 8. Abra a URL fornecida pela Vercel e confira o indicador no cabeçalho.
-9. Se `AULA_ACCESS_CODE` estiver configurado, informe esse código no campo de acesso da interface. Ele não é a chave da OpenAI.
+9. Se `AULA_ACCESS_CODE` estiver configurado, informe esse código no campo de acesso da interface. Ele não é a chave da OpenAI nem da Anthropic.
 10. Preencha o briefing, use **Preencher vazios com IA** se quiser assistência e depois clique em **Gerar com IA**. A aplicação gera uma semana por requisição, salva a redação imediatamente e consolida o curso ao final, evitando que uma geração longa ou uma pesquisa externa de recursos faça o usuário perder semanas já concluídas.
 11. Abra cada card em **Ver aula**. Leia título, objetivos, conteúdo, atividades, recursos, síntese e avaliação antes de exportar.
 12. Se uma semana estiver fraca ou precisar de outro foco, escreva a solicitação no final da prévia e clique em **Refazer esta semana com IA**. Somente a semana aberta será reescrita.
@@ -106,7 +122,7 @@ Para ampliar o limite:
 5. Confirme o novo limite específico do modelo `gpt-4.1`.
 6. Faça **Redeploy** na Vercel somente se também tiver alterado variáveis de ambiente.
 
-O código já reduz o pico usando uma semana por vez (`AULA_AI_BATCH_SIZE=1`) e faz até três novas tentativas em respostas transitórias 429/503, respeitando `Retry-After`. Um excesso real de contexto não é repetido automaticamente. Se ainda houver muitos 429, aguarde alguns segundos antes de clicar novamente e evite abrir várias gerações simultâneas. A OpenAI também recomenda manter `OPENAI_MAX_TOKENS` próximo do tamanho realmente esperado da resposta; para uma unidade menor, `10000–12000` pode reduzir o consumo de TPM, mas pode cortar uma aula que precise de mais espaço.
+O código já reduz o pico usando uma semana por vez (`AULA_AI_BATCH_SIZE=1`) e faz novas tentativas somente em respostas transitórias. O cliente interpreta `Retry-After` e resets como `6m0s`; quando a espera é longa, ele encerra a chamada e informa o tempo, em vez de repetir a solicitação imediatamente. Um excesso real de contexto não é repetido automaticamente. Isso vale para OpenAI e Anthropic, embora os nomes dos limites sejam diferentes.
 
 Ao usar **Refazer esta semana com IA**, o sistema envia somente um briefing essencial e uma versão compacta da semana selecionada. Com `AULA_SINGLE_PASS=true`, a regeneração faz uma única chamada de redação e não dispara planejamento/revisão/reparo extras. O orçamento separado `OPENAI_REGEN_MAX_TOKENS` evita que uma regeneração ultrapasse o limite de tokens por minuto mesmo quando `OPENAI_MAX_TOKENS` está configurado para aulas novas mais longas.
 
@@ -252,11 +268,15 @@ Abra <http://127.0.0.1:4310>.
 Variáveis principais:
 
 ```text
+AI_PROVIDER=openai
+ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=claude-sonnet-5-5
 OPENAI_API_KEY=chave-local-nunca-commitada
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_CONTENT_MODEL=
 OPENAI_MAX_TOKENS=16000
+OPENAI_ASSIST_MAX_TOKENS=6000
 AULA_SINGLE_PASS=true
 AULA_RESEARCH_TIMEOUT_MS=8000
 OPENAI_MAX_RETRIES=3
