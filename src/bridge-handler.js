@@ -1,12 +1,13 @@
-import { accessRequired, hasValidAccess } from "../src/access.js";
-import { normalizeCourseInput, normalizeLesson } from "../src/aula-schema.js";
-import { adjustWeekEdgesWithAI } from "../src/ai.js";
-import { applyEdgePatch, compareBridges, sanitizeBridges, summarizeWeekBridge } from "../src/bridge.js";
-import { getAIModel, getAIProvider } from "../src/ai-client.js";
+import { accessRequired, hasValidAccess } from "./access.js";
+import { normalizeCourseInput, normalizeLesson } from "./aula-schema.js";
+import { adjustWeekEdgesWithAI } from "./ai.js";
+import { applyEdgePatch, compareBridges, sanitizeBridges, summarizeWeekBridge } from "./bridge.js";
+import { getAIModel, getAIProvider } from "./ai-client.js";
 
-// Uma única função serverless para as duas ações de ponte entre semanas. O plano
-// Hobby da Vercel aceita no máximo 12 funções por implantação, então as ações
-// ficam juntas em vez de uma rota por ação.
+// Manipulador das duas ações de ponte entre semanas. Não é uma função serverless
+// própria: o plano Hobby da Vercel aceita no máximo 12 por implantação, então
+// api/regenerate-week.js o chama quando recebe action "summary" ou "adjust"
+// (vercel.json encaminha /api/bridge para lá). O servidor local o monta em /api/bridge.
 //
 //   action "summary" (padrão): resumo de ponte de uma semana; não chama IA.
 //     previousSummary: a última versão aprovada desta mesma semana (detecta

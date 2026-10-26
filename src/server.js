@@ -17,7 +17,7 @@ import { assembleCourse } from "./course-assembly.js";
 import { scopeGeneralPlan, scopeMediationMaterial } from "./mediation-scope.js";
 import { applyCompositionInstruction } from "./composition.js";
 import generateWeekHandler from "../api/generate-week.js";
-import bridgeHandler from "../api/bridge.js";
+import bridgeHandler from "../src/bridge-handler.js";
 import regenerateWeekHandler from "../api/regenerate-week.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

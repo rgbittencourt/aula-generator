@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import bridgeHandler from "../api/bridge.js";
+import bridgeHandler from "../src/bridge-handler.js";
 import regenerateWeekHandler from "../api/regenerate-week.js";
 import { buildFallbackLesson, normalizeCourseInput, normalizeLesson } from "../src/aula-schema.js";
 import { summarizeWeekBridge } from "../src/bridge.js";
@@ -70,4 +70,13 @@ test("refazer uma semana com o curso pausado devolve só as semanas enviadas (n�
     if (previousKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = previousKey;
     if (previousProvider !== undefined) process.env.AI_PROVIDER = previousProvider;
   }
+});
+
+test("na Vercel, /api/bridge é encaminhado a api/regenerate-week.js, que despacha a ação de ponte", async () => {
+  const config = JSON.parse(fs.readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
+  assert.ok(config.routes.some((route) => route.src === "/api/bridge" && route.dest === "/api/regenerate-week"));
+  const week = buildFallbackLesson(input, 0);
+  const result = await call(regenerateWeekHandler, { action: "summary", weekIndex: 0, week });
+  assert.equal(result.status, 200);
+  assert.ok(result.body.summary.fingerprint);
 });

@@ -6,8 +6,11 @@ import { applyCompositionInstruction } from "../src/composition.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { validateCourse } from "../src/validation.js";
 import { getAIModel, getAIProvider } from "../src/ai-client.js";
+import bridgeHandler from "../src/bridge-handler.js";
 
 export default async function handler(request, response) {
+  // /api/bridge é encaminhado para esta função (limite de 12 funções do plano Hobby).
+  if (["summary", "adjust"].includes(request.body?.action)) return bridgeHandler(request, response);
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
   if (accessRequired() && !hasValidAccess(request)) return response.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
