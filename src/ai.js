@@ -6,6 +6,7 @@ import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
 import { applyCompositionInstruction, compositionPlanForWeek } from "./composition.js";
 import { callJson, getAIProvider } from "./ai-client.js";
 import { selectResourcesWithAI } from "./resource-curator.js";
+import { clip as bridgeClip, closingRequirement, formatBridgeContext, sanitizeBridges } from "./bridge.js";
 export { selectResourcesWithAI };
 
 function providerTokenSetting(name, fallback) {
@@ -338,7 +339,7 @@ export async function assistBriefing(input, missingFields = []) {
 
 const BLOCK_TYPES = [...KNOWN_BLOCK_TYPES].join(", ");
 
-export function buildWeekGenerationPrompt(input, weekIndex = 0, academicPlan = null, progression = null, previousWeeks = []) {
+export function buildWeekGenerationPrompt(input, weekIndex = 0, academicPlan = null, progression = null, previousWeeks = [], bridges = []) {
   const weekNumber = weekIndex + 1;
   const progressionMap = progression || buildCourseProgression(input);
   const weekFocus = progressionForWeek(input, weekIndex, progressionMap);
@@ -401,6 +402,10 @@ COMPOSIÇÃO EDITORIAL DO AULA STUDIO — a saída deve conter uma propriedade s
 
 Semanas já geradas (use somente para continuidade; não copie seus títulos, objetivos ou seções):
 ${JSON.stringify(previousSummaries, null, 2)}
+
+${formatBridgeContext(bridges, weekNumber)}
+
+${closingRequirement()}
 
 Retorne somente este objeto de alto nível: { "lessonPlan": { ... }, "teacherGuide": { "webPracticeProjects": [...], "mediationMessages": { "whatsapp": [...], "moodle": [...] } } }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. O lessonPlan é a prioridade absoluta. teacherGuide não deve duplicar o texto-base do aluno; mantenha nele as orientações internas do professor, projetos de webprática quando houver sessão agendada e mensagens de acompanhamento.
 
@@ -562,7 +567,7 @@ export async function generateOneWeek(input, index, options = {}) {
       }, input, index);
   let raw = coerceLessonEnvelope(await callJson([
     { role: "system", content: ACADEMIC_SYSTEM_PROMPT },
-    { role: "user", content: buildWeekGenerationPrompt(input, index, academicPlan, progression, options.previousWeeks) }
+    { role: "user", content: buildWeekGenerationPrompt(input, index, academicPlan, progression, options.previousWeeks, options.bridges) }
   ], {
     temperature: 0.42,
     formatRetryInstruction: "A resposta anterior foi truncada ou inválida. Retorne somente { \"lessonPlan\": { ... }, \"teacherGuide\": { \"webPracticeProjects\": [], \"mediationMessages\": { \"whatsapp\": [], \"moodle\": [] } } }, com o texto didático completo, as seções desenvolvidas, as mensagens de acompanhamento e o piso de palavras solicitado. Não gere blocks, não repita o conteúdo no teacherGuide e responda somente JSON válido."
@@ -831,4 +836,45 @@ Regras: seja específico e empático; explique por que vale a pena fazer a etapa
     teacherIntent: String(result?.teacherIntent || teacherIntent).trim(),
     tone: String(tone || "").trim()
   };
+}
+
+
+// Ajuste de pontas: reescreve somente a abertura (welcome) e/ou o fechamento
+// (nextWeekConnection) de uma semana, para que voltem a encaixar com a semana
+// vizinha depois que o professor refez uma semana já aprovada. Não reescreve o
+// corpo, não cria fatos novos e custa uma chamada curta.
+export async function adjustWeekEdgesWithAI(input, index, lesson, context = {}) {
+  const plan = lesson?.lessonPlan || {};
+  const wantsOpening = Boolean(context.opening);
+  const wantsClosing = Boolean(context.closing);
+  if (!wantsOpening && !wantsClosing) return {};
+  const [previous] = sanitizeBridges(context.opening?.previousBridge ? [context.opening.previousBridge] : []);
+  const [next] = sanitizeBridges(context.closing?.nextBridge ? [context.closing.nextBridge] : []);
+  const targets = [wantsOpening ? "welcome" : "", wantsClosing ? "nextWeekConnection" : ""].filter(Boolean);
+  const sections = (plan.contentSections || []).map((section) => section.title).filter(Boolean).slice(0, 10);
+  const glossary = (plan.glossary || []).map((item) => item.term).filter(Boolean).slice(0, 12);
+  const prompt = `Reescreva SOMENTE ${targets.map((target) => `"${target}"`).join(" e ")} da semana ${index + 1} do curso "${bridgeClip(input.title, 200)}" (${bridgeClip(input.audience, 160)}; ${bridgeClip(input.level, 80)}), em ${input.language || "português do Brasil"}. O corpo da aula já foi aprovado e NÃO deve ser alterado; ajuste apenas a costura com a semana vizinha, que mudou.
+
+Semana atual (aprovada):
+- título: ${bridgeClip(plan.theme, 200)}
+- seções: ${JSON.stringify(sections)}
+- conceitos ensinados: ${JSON.stringify(glossary)}
+- síntese: ${bridgeClip(plan.synthesis, 1200)}
+${wantsOpening ? `- welcome atual: ${bridgeClip(plan.welcome, 1200)}` : ""}
+${wantsClosing ? `- nextWeekConnection atual: ${bridgeClip(plan.nextWeekConnection, 1200)}` : ""}
+
+${wantsOpening && previous ? `SEMANA ANTERIOR (aprovada, refeita): tema "${previous.theme}"; conceitos ensinados ${JSON.stringify(previous.concepts)}; exemplo-âncora "${previous.anchorExample}"; pergunta em aberto "${previous.openQuestion}"; gancho prometido no fechamento: "${previous.hookOut}".
+O novo "welcome" (80 a 160 palavras) deve retomar um conceito e o exemplo-âncora dessa semana anterior e cumprir o gancho prometido, sem reensinar o que ela já ensinou e sem contradizer o corpo da semana atual.` : ""}
+${wantsClosing && next ? `PRÓXIMA SEMANA (aprovada): tema "${next.theme}"; ela abre assim: "${next.hookIn}"; conceitos novos ${JSON.stringify(next.concepts)}.
+O novo "nextWeekConnection" (pelo menos 60 palavras) deve declarar (1) qual conceito desta semana passa adiante, (2) a pergunta que fica em aberto e (3) o que o estudante vai encontrar na próxima semana, de modo que a abertura da próxima semana o cumpra.` : ""}
+
+Regras: texto corrido para o estudante, sem markdown, sem listas, sem URLs, sem números ou fatos novos, sem mencionar webprática. Retorne somente JSON com ${targets.map((target) => `"${target}"`).join(" e ")} como strings.`;
+  const result = await callJson([
+    { role: "system", content: ACADEMIC_SYSTEM_PROMPT },
+    { role: "user", content: prompt }
+  ], { temperature: 0.4, maxTokens: 2500, retryMaxTokens: 3500 });
+  const out = {};
+  if (wantsOpening && typeof result?.welcome === "string" && result.welcome.trim()) out.welcome = result.welcome.trim();
+  if (wantsClosing && typeof result?.nextWeekConnection === "string" && result.nextWeekConnection.trim()) out.nextWeekConnection = result.nextWeekConnection.trim();
+  return out;
 }

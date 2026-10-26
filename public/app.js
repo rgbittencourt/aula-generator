@@ -1,9 +1,10 @@
 import { toStudentLesson } from "./student-export.js";
+import { applyAdjustment, applyRewrite, approveWeek, bridgesBefore, canGenerateNext, dismissIssue, emptyFlow, normalizeFlow, recordGenerated, weekFlowStatus } from "./step-flow.js";
 
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
 const createReviewMarks = () => ({ resources: {}, checks: {}, academic: {}, quality: {} });
-const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, activeReviewGuidance: null, generation: null };
+const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, activeReviewGuidance: null, generation: null, flow: emptyFlow() };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
 const DRAFT_MAX_AGE_DAYS = 30;
@@ -112,6 +113,8 @@ function enhanceLayout() {
   ["assist-button", "generate-button", "recalculate-button", "teacher-pdf-button", "zip-button"].forEach((id) => {
     const button = $("#" + id);
     if (!button) return;
+    // O seletor do fluxo semana a semana fica logo acima do botão de gerar.
+    if (id === "generate-button") { const stepToggle = $(".step-mode-toggle"); if (stepToggle) actions.appendChild(stepToggle); }
     button.classList.add("sidebar-action");
     if (["recalculate-button", "teacher-pdf-button", "zip-button"].includes(id)) button.disabled = true;
     actions.appendChild(button);
@@ -356,6 +359,7 @@ function resetDisciplineForm(preserveSession = true) {
   state.validation = null;
   state.reviewMarks = createReviewMarks();
   state.weekApprovals = {};
+  state.flow = emptyFlow();
   state.activeReviewGuidance = null;
   state.generation = null;
   state.previewIndex = null;
@@ -440,6 +444,7 @@ function currentSnapshot() {
       validation: state.validation,
       reviewMarks: state.reviewMarks,
       weekApprovals: state.weekApprovals,
+      stepFlow: state.flow,
       generation: state.generation,
       weeks: state.weeks
     } : null
@@ -657,6 +662,7 @@ function restoreSnapshot(snapshot) {
   applyInputToForm(snapshot.form);
   state.reviewMarks = snapshot.results?.reviewMarks || snapshot.reviewMarks || createReviewMarks();
   state.weekApprovals = snapshot.results?.weekApprovals || snapshot.weekApprovals || {};
+  state.flow = normalizeFlow(snapshot.results?.stepFlow);
   state.generation = snapshot.results?.generation || snapshot.generation || null;
   if (["running", "consolidating"].includes(state.generation?.status)) state.generation = { ...state.generation, status: "partial" };
   if (state.generation?.status === "partial") {
@@ -1389,6 +1395,7 @@ function renderLessonPreview(lesson, index) {
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
   $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${assessment}${alignment}${timeMarkup}${workload}${mediation}`;
+  renderFlowPanel(index);
   $("#lesson-reader").querySelectorAll(".mediation-regenerate").forEach((button) => button.addEventListener("click", () => regenerateMediationMessage(button)));
   $("#lesson-reader").querySelectorAll(".mediation-message-card").forEach((card) => {
     const channel = card.dataset.messageChannel;
@@ -1457,6 +1464,7 @@ async function regenerateSelectedWeek() {
     if (enriched.week) data.weeks[index] = enriched.week;
     if (enriched.teacherGuide) data.teacherGuides[index] = enriched.teacherGuide;
     data.resourcesPending = enriched.resourcesPending;
+    await afterWeekRewritten(index);
     setAiActivity("Validando a nova semana", "Atualizando qualidade, carga e prévia sem alterar as outras semanas…", { progress: 86 });
     renderWeeks(data);
     $("#regenerate-note").textContent = "Semana atualizada. Confira a nova versão abaixo antes de exportar.";
@@ -1856,7 +1864,7 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
     const qualityLabel = manuallyApproved ? "conferida e liberada por você" : ({ ready: "conteúdo pronto", complete: "conteúdo completo", blocked: "bloqueada: pendência crítica", review: "revisão recomendada", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[automaticStatus] || "qualidade não medida");
     const approvalButton = automaticStatus !== "ready" && automaticStatus !== "complete" ? `<button class="week-approve ${manuallyApproved ? "is-approved" : ""}" data-index="${index}" type="button">${manuallyApproved ? "Desfazer liberação" : "Liberar após conferência"}</button>` : "";
     const statusDetail = reasons.length ? `<small class="week-status-detail">${escapeHtml(manuallyApproved ? `Diagnóstico automático: ${reasons.join(" · ")}` : reasons.join(" · "))}</small>` : "";
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div><h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button">Baixar JSON <span>↓</span></button>${approvalButton}</div></article>`;
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button">Baixar JSON <span>↓</span></button>${approvalButton}</div></article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
   const weeksNote = $("#weeks-sector-note");
@@ -1920,7 +1928,7 @@ function generationRetryDelay(attempt) {
   return Math.min(8000, 1200 * (2 ** attempt) + Math.round(Math.random() * 400));
 }
 
-async function requestGeneratedWeek(input, index, headers, previousWeeks, button) {
+async function requestGeneratedWeek(input, index, headers, previousWeeks, button, bridges = []) {
   // O backend já faz retries controlados para respostas transitórias e JSON
   // inválido. Duas tentativas no navegador evitam multiplicar uma chamada
   // pesada depois de um timeout da hospedagem.
@@ -1930,7 +1938,7 @@ async function requestGeneratedWeek(input, index, headers, previousWeeks, button
       const response = await fetch("/api/generate-week", {
         method: "POST",
         headers,
-        body: JSON.stringify({ input, weekIndex: index, previousWeeks })
+        body: JSON.stringify({ input, weekIndex: index, previousWeeks, bridges })
       });
       const data = await readApiResponse(response, `Não foi possível gerar a semana ${index + 1}.`);
       if (!data.week) {
@@ -1980,6 +1988,155 @@ async function enrichGeneratedWeek(data, input, index, headers, button) {
   }
 }
 
+// ───────── Fluxo semana a semana: aprovar, refazer e ajustar pontas ─────────
+const STEP_MODE_KEY = "aula-generator:step-mode:v1";
+
+function stepModeEnabled() {
+  return Boolean($("#step-mode")?.checked);
+}
+
+function initStepMode() {
+  const checkbox = $("#step-mode");
+  if (!checkbox) return;
+  try { const saved = localStorage.getItem(STEP_MODE_KEY); if (saved !== null) checkbox.checked = saved === "true"; } catch { /* preferência não é essencial */ }
+  checkbox.addEventListener("change", () => {
+    try { localStorage.setItem(STEP_MODE_KEY, String(checkbox.checked)); } catch { /* preferência não é essencial */ }
+    if (state.previewIndex != null) renderFlowPanel(state.previewIndex);
+  });
+}
+
+async function postJson(url, body, fallbackMessage) {
+  const response = await fetch(url, { method: "POST", headers: apiHeaders(), body: JSON.stringify(body) });
+  return readApiResponse(response, fallbackMessage);
+}
+
+function rerenderWeeks() {
+  renderWeeks({ input: state.input, weeks: state.weeks, workload: state.workload, generalPlan: state.generalPlan, teacherGuides: state.teacherGuides, provider: state.provider, validation: state.validation, partial: state.generation?.status === "partial", generation: state.generation }, { scrollToResults: false });
+}
+
+// Resumo de ponte da semana recém-escrita. Não usa IA; se falhar, a geração segue
+// e a semana apenas fica sem resumo (a próxima recebe o contexto compacto de sempre).
+async function captureWeekBridge(index) {
+  try {
+    const data = await postJson("/api/week-bridge", { weekIndex: index, week: state.weeks[index] }, "Não foi possível resumir a ponte desta semana.");
+    recordGenerated(state.flow, index, data.summary);
+  } catch (error) {
+    console.warn(`Resumo de ponte da semana ${index + 1} indisponível:`, error);
+  }
+}
+
+function flowBadge(index) {
+  const status = weekFlowStatus(state.flow, index);
+  return status.key === "none" ? "" : `<div class="week-flow flow-${status.key}">${escapeHtml(status.label)}</div>`;
+}
+
+function flowIssueMarkup(index) {
+  const issue = state.flow.issues[index];
+  if (!issue) return "";
+  const reasons = issue.reasons?.length ? ` <small>(${escapeHtml(issue.reasons.join("; "))})</small>` : "";
+  const actions = [];
+  if (issue.opening && state.flow.bridges[index - 1]) actions.push(`<button class="button button-secondary flow-adjust" type="button" data-kind="opening" data-index="${index}">Ajustar a abertura para cumprir o gancho da semana ${index}</button>`);
+  if (issue.closing && state.flow.bridges[index + 1]) actions.push(`<button class="button button-secondary flow-adjust" type="button" data-kind="closing" data-index="${index}">Ajustar o fechamento para encaixar na semana ${index + 2}</button>`);
+  actions.push(`<button class="button button-secondary flow-dismiss" type="button" data-index="${index}">Manter como está</button>`);
+  const title = issue.stale ? `A semana anterior mudou bastante: esta semana pode estar desatualizada.` : `A ponte com a semana vizinha ficou desencaixada.`;
+  const hint = issue.stale ? "Ajustar só a abertura é barato; se o conteúdo central também mudou, considere refazer a semana abaixo." : "O ajuste reescreve somente o trecho de ponta, sem tocar no corpo da aula.";
+  return `<div class="flow-issue"><p><strong>${title}</strong>${reasons}</p><p class="flow-hint">${hint}</p><div class="flow-actions">${actions.join("")}</div></div>`;
+}
+
+function renderFlowPanel(index) {
+  const panel = $("#reader-flow");
+  if (!panel) return;
+  if (!state.weeks[index] || isGitHubPages) { panel.classList.add("hidden"); panel.innerHTML = ""; return; }
+  const flow = state.flow;
+  const total = Number(state.input?.weeks || state.generation?.total || state.weeks.length);
+  const status = weekFlowStatus(flow, index);
+  const nextPending = index + 1 < total && state.weeks.length === index + 1;
+  const step = stepModeEnabled();
+  let main = "";
+  if (!flow.approved[index]) {
+    main = nextPending
+      ? `<button class="button button-primary flow-approve" type="button" data-index="${index}" data-next="true"><span class="button-label">Aprovar e gerar a semana ${index + 2}</span><span class="button-arrow">→</span></button><button class="button button-secondary flow-approve" type="button" data-index="${index}" data-next="false">Só aprovar</button>`
+      : `<button class="button button-primary flow-approve" type="button" data-index="${index}" data-next="false"><span class="button-label">Aprovar esta semana</span></button>`;
+  } else if (nextPending) {
+    main = `<button class="button button-primary flow-next" type="button" data-index="${index}"><span class="button-label">Gerar a semana ${index + 2}</span><span class="button-arrow">→</span></button>`;
+  }
+  const lead = status.key === "approved"
+    ? "Você aprovou esta semana. Se refizer o texto, o sistema compara a ponte e só pede ajuste nas pontas que realmente mudaram."
+    : step
+      ? "Leia a semana. Se estiver boa, aprove: a próxima será escrita retomando o gancho exato do fechamento desta. Se não, refaça abaixo quantas vezes precisar."
+      : "Aprove para registrar o gancho desta semana; ele orienta as semanas seguintes.";
+  panel.innerHTML = `<h3>Fluxo semana a semana</h3>${status.label ? `<p class="flow-status flow-${status.key}">${escapeHtml(status.label)}</p>` : ""}<p>${lead}</p>${flowIssueMarkup(index)}<div class="flow-actions">${main}</div><p class="flow-note" id="flow-note" role="status"></p>`;
+  panel.classList.remove("hidden");
+  panel.querySelectorAll(".flow-approve").forEach((button) => button.addEventListener("click", () => approveSelectedWeek(Number(button.dataset.index), { generateNext: button.dataset.next === "true" }, button)));
+  panel.querySelectorAll(".flow-next").forEach((button) => button.addEventListener("click", () => { closeLessonPreview(); generate(); }));
+  panel.querySelectorAll(".flow-adjust").forEach((button) => button.addEventListener("click", () => adjustBridge(Number(button.dataset.index), button.dataset.kind, button)));
+  panel.querySelectorAll(".flow-dismiss").forEach((button) => button.addEventListener("click", () => { dismissIssue(state.flow, Number(button.dataset.index)); saveDraft("ponte-mantida"); rerenderWeeks(); renderFlowPanel(index); }));
+}
+
+function setFlowNote(message) {
+  const note = $("#flow-note");
+  if (note) note.textContent = message || "";
+}
+
+async function approveSelectedWeek(index, { generateNext = false } = {}, button = null) {
+  if (aiActionBusy || !state.weeks[index]) return;
+  if (button) button.disabled = true;
+  try {
+    const data = await postJson("/api/week-bridge", { weekIndex: index, week: state.weeks[index], previousSummary: state.flow.bridges[index] }, "Não foi possível registrar a aprovação desta semana.");
+    approveWeek(state.flow, index, data.summary);
+    saveDraft("semana-aprovada");
+    rerenderWeeks();
+    renderFlowPanel(index);
+  } catch (error) {
+    setFlowNote(error.message);
+    if (button) button.disabled = false;
+    return;
+  }
+  if (generateNext) {
+    closeLessonPreview();
+    await generate();
+  }
+}
+
+// Reescreve somente a abertura ou o fechamento, com a ponte da semana vizinha.
+async function adjustBridge(index, kind, button = null) {
+  if (aiActionBusy || !state.weeks[index]) return;
+  const neighbor = kind === "opening" ? state.flow.bridges[index - 1] : state.flow.bridges[index + 1];
+  if (!neighbor) { setFlowNote("Não encontrei o resumo da semana vizinha para ajustar esta ponta."); return; }
+  if (!beginAiAction(button)) return;
+  if (button) { button.dataset.label = button.textContent; setBusy(button, true, "Ajustando…"); }
+  setAiActivity("Ajustando a ponte", `Reescrevendo só ${kind === "opening" ? "a abertura" : "o fechamento"} da semana ${index + 1}…`);
+  try {
+    const input = state.input || formInput();
+    const body = { input, weekIndex: index, week: state.weeks[index], ...(kind === "opening" ? { previousBridge: neighbor } : { nextBridge: neighbor }) };
+    const data = await postJson("/api/adjust-bridges", body, "Não foi possível ajustar a ponte.");
+    state.weeks[index] = data.week;
+    applyAdjustment(state.flow, index, kind, data.summary);
+    saveDraft("pontas-ajustadas");
+    rerenderWeeks();
+    renderLessonPreview(state.weeks[index], index);
+    finishAiActivity("Ponte ajustada", `Somente ${kind === "opening" ? "a abertura" : "o fechamento"} da semana ${index + 1} foi reescrito.`, "success");
+  } catch (error) {
+    setFlowNote(error.message);
+    finishAiActivity("Ponte não ajustada", error.message, "error");
+  } finally {
+    if (button) setBusy(button, false, "");
+    endAiAction();
+  }
+}
+
+// Depois de refazer uma semana: compara a ponte nova com a anterior e com aquela
+// sobre a qual a semana seguinte foi construída. Não usa IA.
+async function afterWeekRewritten(index) {
+  try {
+    const data = await postJson("/api/week-bridge", { weekIndex: index, week: state.weeks[index], previousSummary: state.flow.bridges[index], linkedSummary: state.flow.links[index + 1] }, "Não foi possível comparar a ponte desta semana.");
+    applyRewrite(state.flow, index, data.summary, { comparison: data.comparison, linkComparison: data.linkComparison, totalWeeks: state.weeks.length });
+    saveDraft("ponte-comparada");
+  } catch (error) {
+    console.warn("Comparação de ponte indisponível:", error);
+  }
+}
+
 async function generateDistributed(input, accessCode, button, options = {}) {
   const startIndex = Math.max(0, Math.min(input.weeks, Number(options.startIndex) || 0));
   const weeks = Array.isArray(options.initialWeeks) ? options.initialWeeks.slice() : [];
@@ -2016,7 +2173,7 @@ async function generateDistributed(input, accessCode, button, options = {}) {
     }));
     let data;
     try {
-      data = await requestGeneratedWeek(input, index, headers, previousWeeks, button);
+      data = await requestGeneratedWeek(input, index, headers, previousWeeks, button, bridgesBefore(state.flow, index));
     } catch (error) {
       throw annotateFailure(error, index);
     }
@@ -2033,13 +2190,22 @@ async function generateDistributed(input, accessCode, button, options = {}) {
     teacherGuides[index] = data.teacherGuide;
     state.weeks = weeks.filter(Boolean);
     state.teacherGuides = teacherGuides.filter(Boolean);
+    await captureWeekBridge(index);
     saveDraft(data.resourcesPending ? "semana-gerada-recursos-pendentes" : "recursos-da-semana");
     renderWeeks({ ok: true, partial: true, provider: "ai-distributed-partial", model: data.model, input, weeks: state.weeks, teacherGuides: state.teacherGuides, generation: state.generation }, { scrollToResults: false });
     const alert = $("#result-alert");
     alert.className = "result-alert";
     const resourceNote = data.resourcesPending ? " A aula foi preservada; a curadoria de recursos desta semana ficou pendente." : "";
-    alert.textContent = `Semana ${index + 1} de ${input.weeks} gerada e preservada. A consolidação acontece ao final.${resourceNote}`;
+    const pauseForApproval = Boolean(options.stepMode) && index + 1 < input.weeks;
+    alert.textContent = pauseForApproval
+      ? `Semana ${index + 1} de ${input.weeks} gerada e preservada. Revise, refaça se quiser e aprove para gerar a semana ${index + 2}.${resourceNote}`
+      : `Semana ${index + 1} de ${input.weeks} gerada e preservada. A consolidação acontece ao final.${resourceNote}`;
     alert.classList.remove("hidden");
+    if (pauseForApproval) {
+      state.generation = { status: "partial", nextWeekIndex: index + 1, total: input.weeks, formSignature, awaitingApproval: true };
+      saveDraft("aguardando-aprovação");
+      return { stepPaused: true, index };
+    }
   }
 
   state.generation = { status: "consolidating", nextWeekIndex: input.weeks, total: input.weeks, formSignature };
@@ -2077,7 +2243,16 @@ async function generate() {
     && Number(generation.nextWeekIndex) === state.weeks.length
     && state.weeks.length <= input.weeks;
   const startIndex = resumeGeneration ? state.weeks.length : 0;
+  // Semanas já escritas não são apagadas em silêncio: se o briefing mudou depois delas,
+  // recomeçar exige confirmação explícita.
+  if (!resumeGeneration && state.weeks.length && !window.confirm(`O briefing mudou desde a última semana gerada. Recomeçar vai apagar as ${state.weeks.length} semana(s) já geradas deste planejamento. Continuar mesmo assim?`)) return;
+  if (resumeGeneration && !canGenerateNext(state.flow, startIndex, stepModeEnabled())) {
+    showError(`Aprove a semana ${startIndex} (ou refaça-a) antes de gerar a próxima. Desative “Aprovar cada semana antes de gerar a próxima” para gerar em sequência.`);
+    openLessonPreview(startIndex - 1);
+    return;
+  }
   if (!resumeGeneration) {
+    state.flow = emptyFlow();
     state.weeks = [];
     state.teacherGuides = [];
     state.workload = null;
@@ -2101,7 +2276,13 @@ async function generate() {
     if (isGitHubPages) {
       throw new Error("A IA está disponível na URL Vercel, onde o backend protegido pode ser acessado. Abra o Gerador pela versão publicada com IA.");
     }
-    const data = await generateDistributed(input, accessCode, button, { startIndex, initialWeeks: resumeGeneration ? state.weeks : [], initialTeacherGuides: resumeGeneration ? state.teacherGuides : [], formSignature });
+    const data = await generateDistributed(input, accessCode, button, { startIndex, initialWeeks: resumeGeneration ? state.weeks : [], initialTeacherGuides: resumeGeneration ? state.teacherGuides : [], formSignature, stepMode: stepModeEnabled() });
+    if (data?.stepPaused) {
+      button.dataset.label = `Gerar a semana ${data.index + 2}`;
+      finishAiActivity("Semana pronta para revisão", `Revise a semana ${data.index + 1}, refaça se quiser e aprove para gerar a próxima.`, "success");
+      openLessonPreview(data.index);
+      return;
+    }
     state.generation = null;
     button.dataset.label = "Gerar com IA";
     renderWeeks(data);
@@ -2257,6 +2438,7 @@ $("#welcome-form").addEventListener("submit", enterFromWelcome);
 $("#new-project-link").addEventListener("click", startNewProject);
 $("#exit-session-button").addEventListener("click", exitSession);
 $("#course-form").addEventListener("submit", (event) => { event.preventDefault(); generate(); });
+initStepMode();
 $("#assist-button").addEventListener("click", assistBriefing);
 $("#zip-button").addEventListener("click", downloadZip);
 $("#teacher-pdf-button").addEventListener("click", downloadTeacherPdf);

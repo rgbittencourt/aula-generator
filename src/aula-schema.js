@@ -715,11 +715,19 @@ export function weekMeta(input, index) {
 }
 
 function html(value) { return text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-function richHtml(value) {
+export function richHtml(value) {
   const source = text(value);
   if (!source) return "";
   if (/<(?:p|ul|ol|h[1-6]|strong|em|blockquote|br)\b/i.test(source)) return source.replace(/<script[\s\S]*?<\/script>/gi, "");
   return source.split(/\n\s*\n|\r?\n/).map((paragraph) => paragraph.trim()).filter(Boolean).map((paragraph) => `<p>${html(paragraph)}</p>`).join("");
+}
+// Corpo do bloco de síntese: fecha a semana com o gancho para a próxima, que o
+// estudante precisa ver no próprio material (antes só ficava no lessonPlan).
+export function synthesisBlockBody(plan = {}) {
+  const base = richHtml(plan.synthesis);
+  const next = text(plan.nextWeekConnection);
+  if (!next) return base;
+  return `${base}<p><strong>Na próxima semana:</strong> ${richHtml(next).replace(/^<p>/, "").replace(/<\/p>$/, "")}</p>`;
 }
 function youtubeId(value) { const match = text(value).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&#/]+)/i); return match ? match[1] : ""; }
 
@@ -775,7 +783,7 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
     if (section.reflection?.question) children.push({ id: newId("c-reflection-", week, sectionIndex + 1), type: "reflexao", props: { title: "Para refletir", question: html(section.reflection.question), body: html(section.reflection.body), tone: "lavender", icon: "" } });
   });
   blocks.push({ id: newId("b-topic-", week, 1), type: "topic", bg: "neutral-default", pad: "normal", props: { children } });
-  if (plan.synthesis) blocks.push({ id: newId("b-synthesis-", week, 0), type: "sintese", bg: "sage-deep", pad: "airy", props: { eyebrow: "Síntese", title: "A ideia que fecha a semana", body: richHtml(plan.synthesis) } });
+  if (plan.synthesis) blocks.push({ id: newId("b-synthesis-", week, 0), type: "sintese", bg: "sage-deep", pad: "airy", props: { eyebrow: "Síntese", title: "A ideia que fecha a semana", body: synthesisBlockBody(plan) } });
   if (plan.references.length) blocks.push({ id: newId("b-references-", week, 0), type: "referencias", bg: "neutral-default", pad: "normal", props: { title: "Referências", items: plan.references.map((item) => ({ html: html(item.citation || item.title || item.href), href: item.href || "", credit: item.publisher || item.authors?.join(", ") || "" })) } });
   if (plan.assessment.questions.length) blocks.push({ id: newId("b-quiz-", week, 0), type: "quiz", bg: "neutral-subtle", pad: "normal", props: { title: plan.assessment.title, intro: plan.assessment.format, avaliativo: true, passMark: plan.assessment.passMark, questions: plan.assessment.questions } });
   return blocks;

@@ -4,6 +4,7 @@ import { generateOneWeek } from "../src/ai.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { buildCourseProgression } from "../src/curriculum.js";
 import { getAIModel, getAIProvider } from "../src/ai-client.js";
+import { sanitizeBridges } from "../src/bridge.js";
 
 export default async function handler(request, response) {
   response.setHeader("Cache-Control", "no-store");
@@ -15,6 +16,8 @@ export default async function handler(request, response) {
     const raw = await generateOneWeek(input, index, {
       progression: buildCourseProgression(input),
       previousWeeks: request.body?.previousWeeks || [],
+      // Resumos de ponte das semanas já aprovadas pelo professor (fluxo semana a semana).
+      bridges: sanitizeBridges(request.body?.bridges),
       // Esta rota é chamada uma semana por vez. A primeira versão precisa
       // retornar e ser salva antes de qualquer refação potencialmente longa.
       singlePass: true,

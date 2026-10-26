@@ -174,6 +174,22 @@ O manual contém os prompts efetivos e o contrato JSON de cada fase. A produçã
 
 Uma turma com várias semanas e revisão acadêmica pode gerar um volume grande de texto e chamar vários provedores externos. Fazer redação, reparo e curadoria na mesma função serverless aumenta o risco de a Vercel encerrar a requisição e o navegador receber apenas o texto genérico `An error occurred with this application.`. Por isso, **Gerar com IA** chama `POST /api/generate-week` para cada semana, salva a redação imediatamente, usa `POST /api/enrich-week` em uma etapa complementar para pesquisar recursos e somente depois chama `POST /api/assemble-course` para calcular os totais e montar o Planejamento Geral. Se a curadoria exceder seu próprio limite, a semana continua preservada e a geração prossegue. A documentação oficial da Vercel registra HTTP 504 `FUNCTION_INVOCATION_TIMEOUT` quando uma função ultrapassa sua duração; no plano Hobby, o máximo atual é 300 segundos. A correção aplicada é limitar o trabalho de cada invocação, não apenas aumentar `maxDuration`.
 
+### Geração semana a semana, com aprovação
+
+Por padrão, **Gerar com IA** escreve **uma semana e para**: a prévia abre sozinha e a semana seguinte só é gerada depois que você **aprova** a atual (botão **Aprovar e gerar a semana N**) ou a **refaz** quantas vezes quiser. O seletor **Aprovar cada semana antes de gerar a próxima** fica acima do botão; desmarcado, o comportamento volta a ser gerar todas em sequência.
+
+Ao aprovar, o sistema grava um **contrato de ponte** (`src/bridge.js`): os conceitos realmente ensinados, o exemplo-âncora, a pergunta deixada em aberto e o gancho prometido no fechamento. A semana seguinte recebe esse resumo, e não o texto completo; a abertura dela precisa cumprir o gancho. O resumo é derivado do próprio texto (`POST /api/week-bridge`), sem custo de IA, e o contexto cresce pouco ao longo do curso.
+
+Se você refizer uma semana já escrita, o sistema compara a ponte nova com a anterior e com aquela sobre a qual a semana vizinha foi construída. Há três resultados:
+
+| Resultado | O que acontece |
+| --- | --- |
+| Nada mudou na ponte | Nenhuma outra semana é tocada. |
+| O gancho ou o exemplo mudou | A vizinha ganha o aviso **Abertura precisa de ajuste** (ou **Fechamento…**). **Ajustar a abertura** reescreve só esse trecho, em uma chamada curta (`POST /api/adjust-bridges`), sem mexer no corpo da aula. |
+| Os conceitos centrais mudaram | A vizinha fica **Desatualizada**: ajustar a abertura continua possível, e refazer a semana é decisão sua. |
+
+**Manter como está** dispensa o aviso. O estado (aprovações, resumos e avisos) vai no salvamento local e no backup. O fechamento de cada semana, o gancho para a próxima, agora também aparece no bloco de síntese que o estudante lê (**Na próxima semana:**), e não só no `lessonPlan`.
+
 ### Como a ordem funciona
 
 Não existe uma sequência rígida para todas as semanas. A IA escolhe um arco adequado — descoberta conceitual, caso, oficina, análise de dados, debate ou síntese — e registra quais fases estão ativas: abertura, diagnóstico, explicação, exemplo, prática guiada, prática independente, reflexão, avaliação e síntese. Quando uma fase é omitida, a omissão recebe justificativa. Vídeos, imagens e leituras entram dentro do tópico/conceito que os torna úteis; não são despejados em uma galeria final.

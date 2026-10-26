@@ -16,6 +16,9 @@ import { validateCourse } from "./validation.js";
 import { assembleCourse } from "./course-assembly.js";
 import { scopeGeneralPlan, scopeMediationMaterial } from "./mediation-scope.js";
 import { applyCompositionInstruction } from "./composition.js";
+import generateWeekHandler from "../api/generate-week.js";
+import weekBridgeHandler from "../api/week-bridge.js";
+import adjustBridgesHandler from "../api/adjust-bridges.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "..", "public");
@@ -54,22 +57,11 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-app.post("/api/generate-week", async (req, res) => {
-  if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
-  try {
-    const input = normalizeCourseInput(req.body?.input || req.body || {});
-    const index = Math.max(0, Math.min(input.weeks - 1, Number.parseInt(req.body?.weekIndex, 10) || 0));
-    const raw = await generateOneWeek(input, index);
-    const normalized = normalizeLesson(raw, input, index);
-    const teacherGuide = buildTeacherGuides(input, [normalized], [raw.teacherGuide || {}])[0];
-    res.setHeader("Cache-Control", "no-store");
-    res.json({ ok: true, provider: "ai-week", aiProvider: getAIProvider(), model: getAIModel(), weekIndex: index, completed: index + 1, total: input.weeks, week: normalized, teacherGuide, resourcesDeferred: process.env.AULA_RESOURCE_RESEARCH !== "false" });
-  } catch (error) {
-    console.error("generate-week failed", error);
-    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;
-    res.status(status).json({ ok: false, error: error.message || "Não foi possível gerar esta semana.", code: error.code || "GENERATION_ERROR", retryable: Boolean(error.retryable) });
-  }
-});
+// As rotas abaixo usam os mesmos handlers da Vercel, para que o servidor local
+// se comporte como a produção (mapa longitudinal, resumos de ponte, etc.).
+app.post("/api/generate-week", (req, res) => generateWeekHandler(req, res));
+app.post("/api/week-bridge", (req, res) => weekBridgeHandler(req, res));
+app.post("/api/adjust-bridges", (req, res) => adjustBridgesHandler(req, res));
 
 app.post("/api/enrich-week", async (req, res) => {
   if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
