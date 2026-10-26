@@ -135,10 +135,9 @@ Devolva somente este objeto JSON:
 {
   "assessment": {
     "title": "Atividade avaliativa — Semana ${weekNumber}",
-    "format": "6 questões objetivas, correção automática no Moodle (4 de múltipla escolha + 2 de verdadeiro/falso)",
+    "format": "6 questões objetivas de múltipla escolha, com 5 alternativas e feedback em todas elas",
     "questions": [
-      { "type": "multiple-choice", "objective": "objetivo observável coberto", "q": "enunciado", "options": ["A","B","C","D"], "answer": 0, "explanation": "por que a correta está certa, citando o texto", "feedbackByOption": ["feedback da alternativa A","...B","...C","...D"] },
-      { "type": "true-false", "objective": "...", "q": "afirmação", "options": ["Verdadeiro","Falso"], "answer": 1, "explanation": "...", "feedbackByOption": ["...","..."] }
+      { "type": "multiple-choice", "objective": "objetivo observável coberto", "q": "enunciado", "options": ["A","B","C","D","E"], "answer": 0, "explanation": "por que a correta está certa, citando o texto", "feedbackByOption": ["feedback da alternativa A","...B","...C","...D","...E"] }
     ]
   },
   "diagnostic": { "prompt": "pergunta de entrada ligada ao dia a dia do estudante", "expectedEvidence": "...", "feedback": "..." },
@@ -156,9 +155,9 @@ Devolva somente este objeto JSON:
 }
 
 REGRAS DA AVALIAÇÃO
-- Exatamente 6 questões: 4 de múltipla escolha com 4 alternativas e 2 de verdadeiro/falso, cobrindo todos os objetivos. "answer" é o índice (começando em 0) da alternativa correta; varie a posição da correta.
+- Exatamente 6 questões, todas de múltipla escolha com EXATAMENTE 5 alternativas e uma única correta, cobrindo todos os objetivos. Não use verdadeiro/falso. "answer" é o índice (começando em 0, de 0 a 4) da alternativa correta; varie a posição da correta entre as questões.
 - Enunciados diretos, sem "todas as anteriores" e sem pegadinha de redação. As alternativas erradas devem ser plausíveis: erros reais de leitura do conceito, não absurdos.
-- "feedbackByOption" tem uma entrada por alternativa. Na correta, explique por que está certa; nas erradas, explique o equívoco em uma frase e aponte a seção do texto que o corrige (por exemplo, "releia a seção 3").
+- "feedbackByOption" tem EXATAMENTE 5 entradas, na mesma ordem das alternativas, todas preenchidas: a da correta explica por que está certa (citando o texto); cada uma das 4 erradas explica o equívoco de leitura em uma ou duas frases e aponta a seção que o corrige (por exemplo, "releia a seção 3"). Nenhum feedback pode ser vazio ou genérico ("errado").
 - Nada de números, nomes ou datas que o texto não tenha dito.
 
 REGRAS DO MATERIAL DE MEDIAÇÃO

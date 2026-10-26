@@ -403,15 +403,17 @@ function normalizeAssessment(value = {}) {
   const questions = Array.isArray(assessment.questions) ? assessment.questions.map((question, index) => {
     const item = object(question);
     const options = Array.isArray(item.options) ? item.options.map((option) => text(option)).filter(Boolean) : [];
+    const rawFeedback = Array.isArray(item.feedbackByOption || item.optionFeedback) ? (item.feedbackByOption || item.optionFeedback) : [];
+    const rawAnswer = Number.isFinite(Number(item.answer)) ? Number(item.answer) : (typeof item.answer === "boolean" ? (item.answer ? 1 : 0) : 0);
     return {
       id: text(item.id, `question-${index + 1}`),
       type: text(item.type, options.length === 2 ? "true-false" : "multiple-choice"),
       objective: text(item.objective),
       q: text(item.q || item.question),
       options,
-      answer: Number.isFinite(Number(item.answer)) ? Number(item.answer) : (typeof item.answer === "boolean" ? (item.answer ? 1 : 0) : 0),
+      answer: options.length ? Math.min(Math.max(0, Math.trunc(rawAnswer)), options.length - 1) : Math.max(0, Math.trunc(rawAnswer)),
       explanation: text(item.explanation || item.feedback),
-      feedbackByOption: Array.isArray(item.feedbackByOption || item.optionFeedback) ? (item.feedbackByOption || item.optionFeedback).map((feedback) => text(feedback)) : [],
+      feedbackByOption: options.length ? options.map((_, i) => text(rawFeedback[i])) : rawFeedback.map((feedback) => text(feedback)),
       formative: bool(item.formative, false),
       summative: bool(item.summative, true),
       points: Math.max(0, number(item.points, 1))
@@ -419,7 +421,7 @@ function normalizeAssessment(value = {}) {
   }).filter((item) => item.q) : [];
   return {
     title: text(assessment.title, "Atividade avaliativa"),
-    format: text(assessment.format, "4 questões de múltipla escolha + 2 de verdadeiro/falso"),
+    format: text(assessment.format, "Questões objetivas de múltipla escolha, com 5 alternativas e feedback em todas"),
     required: bool(assessment.required, true),
     passMark: number(assessment.passMark, 6),
     durationMinutes: Math.max(0, number(assessment.durationMinutes || assessment.timeEstimateMinutes, 0)),

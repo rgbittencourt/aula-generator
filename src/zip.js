@@ -4,6 +4,7 @@ import { createWebPracticeDocxFiles, createWebPracticeFiles } from "./webpractic
 import { createMediationMaterialPdf } from "./pdf.js";
 import { collectWebPracticeProjects } from "./teacher-guide.js";
 import { toStudentLesson } from "./student-export.js";
+import { createMoodleXml, createCombinedMoodleXml } from "./moodle-xml.js";
 
 export async function createWeeksZip(input, weeks, generalPlan = null, teacherGuides = [], options = {}) {
   const zip = new JSZip();
@@ -12,7 +13,12 @@ export async function createWeeksZip(input, weeks, generalPlan = null, teacherGu
     const number = String(index + 1).padStart(2, "0");
     const slug = slugify(lesson.meta?.title || `${input.title}-semana-${number}`, `semana-${number}`);
     folder.file(`semana-${number}-${slug}.aula.json`, JSON.stringify(toStudentLesson(lesson), null, 2));
+    // O quiz do Moodle vai em arquivo separado, fora do .aula.json.
+    const xml = createMoodleXml(lesson, { courseTitle: input.title, weekNumber: index + 1 });
+    if (xml) zip.file(`moodle/semana-${number}-quiz.xml`, xml);
   }
+  const combined = createCombinedMoodleXml(weeks, { courseTitle: input.title });
+  if (combined && weeks.length > 1) zip.file("moodle/todas-as-semanas-quiz.xml", combined);
   if (generalPlan) zip.file("planejamento-geral.json", JSON.stringify(generalPlan, null, 2));
   const pdf = await createMediationMaterialPdf(input, teacherGuides, generalPlan, options);
   zip.file("professor/material-de-mediacao.pdf", pdf);

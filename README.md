@@ -328,6 +328,9 @@ A chave é usada apenas pelo backend e nunca é enviada ao navegador.
 ```text
 semanas/semana-01-titulo.aula.json
 semanas/semana-02-titulo.aula.json
+moodle/semana-01-quiz.xml
+moodle/semana-02-quiz.xml
+moodle/todas-as-semanas-quiz.xml
 planejamento-geral.json
 professor/material-de-mediacao.pdf
 webpraticas/01-tema/guia-e-roteiro.md
@@ -335,6 +338,12 @@ webpraticas/01-tema/pacote.json
 webpraticas/01-tema/roteiro-webpratica.docx
 webpraticas/01-tema/arquivos/*
 ```
+
+### Quiz: 5 alternativas, feedback em todas e XML do Moodle
+
+Cada semana traz 6 questões de múltipla escolha com **5 alternativas** e **feedback em todas elas**, certas ou erradas (a certa explica por quê; cada errada aponta o equívoco e a seção a reler). Verdadeiro/falso não é mais usado.
+
+O quiz continua dentro do `.aula.json` (bloco `quiz` do Aula Studio) **e** sai em arquivo separado, em **Moodle XML**, na pasta `moodle/`: um arquivo por semana e um `todas-as-semanas-quiz.xml`, com uma categoria `$course$/top/<Curso>/Semana N` por semana. Para importar: Moodle → Banco de questões → Importar → formato **Moodle XML**. As questões são de resposta única, com alternativas embaralhadas e feedback por alternativa.
 
 Depois de revisar o JSON no Aula Studio, use **Exportar → Pacote SCORM (.zip)** para enviar a aula ao Moodle. O Gerador de Aulas prepara a autoria e o planejamento; a publicação SCORM continua sendo feita no Aula Studio.
 

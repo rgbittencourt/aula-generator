@@ -426,7 +426,7 @@ lessonPlan obrigatório:
 - spiralReview com previousConceptsReviewed, newConcepts, preparationForNextWeek, cumulativeEvidence e projectMilestone;
 - synthesis com pelo menos 100 palavras, nextWeekConnection com pelo menos 60 palavras, glossary com 5–10 termos, references como objetos estruturados e assessment;
 - claimEvidence: mapa de evidências com id, claim, sectionNumber, sourceIds, sourceType, supportLevel, verificationStatus e note. Afirmações sem fonte devem usar supportLevel "insufficient" e verificationStatus "needs-human-review";
-- assessment com normalmente 6 questões: 4 múltipla escolha com 4 alternativas e 2 verdadeiro/falso, alinhadas a objetivos e texto, com resposta e explicação;
+- assessment com 6 questões de múltipla escolha, cada uma com exatamente 5 alternativas (options), answer (índice 0-4) e feedbackByOption com 5 entradas preenchidas (uma para cada alternativa, certa ou errada), alinhadas a objetivos e texto, com explanation;
 - timePlan com targetMinutes 0, items vazio e calculationMethod "derived-after-content".
 
 Regras de escrita:

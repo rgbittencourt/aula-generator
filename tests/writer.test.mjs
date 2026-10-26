@@ -75,10 +75,10 @@ Na Semana 3, vamos sair da infraestrutura e entrar nos dados que os sistemas pro
 const DERIVATIVES = {
   assessment: {
     title: "Atividade avaliativa — Semana 2",
-    format: "6 questões objetivas",
+    format: "6 questões objetivas, 5 alternativas",
     questions: [
-      { type: "multiple-choice", objective: "Definir SIGE", q: "O que é um SIGE?", options: ["Um sistema de informação para gestão educacional", "Um navegador", "Um banco de dados isolado", "Uma norma"], answer: 0, explanation: "Veja a seção 1.", feedbackByOption: ["Correto.", "Não: releia a seção 1.", "Não: releia a seção 1.", "Não: releia a seção 1."] },
-      { type: "true-false", objective: "Comparar", q: "Todo sistema é neutro.", options: ["Verdadeiro", "Falso"], answer: 1, explanation: "Seção 1.1.", feedbackByOption: ["Releia a seção 1.1.", "Correto."] }
+      { type: "multiple-choice", objective: "Definir SIGE", q: "O que é um SIGE?", options: ["Um sistema de informação para gestão educacional", "Um navegador", "Um banco de dados isolado", "Uma norma", "Uma planilha de notas"], answer: 0, explanation: "Veja a seção 1.", feedbackByOption: ["Correto: a seção 1 define o SIGE assim.", "Não: releia a seção 1.", "Não: releia a seção 1.", "Não: releia a seção 1.1.", "Não: releia a seção 1."] },
+      { type: "multiple-choice", objective: "Comparar", q: "Qual afirmação sobre neutralidade de sistemas é sustentada pelo texto?", options: ["Todo sistema é neutro.", "Sistemas carregam pressupostos de quem os desenhou.", "Só sistemas legados têm viés.", "Neutralidade depende do fornecedor.", "Sistemas livres são sempre neutros."], answer: 1, explanation: "Seção 1.1.", feedbackByOption: ["Releia a seção 1.1.", "Correto: é a lição do caso da seção 1.1.", "Releia a seção 1.1.", "Releia a seção 2.", "Releia a seção 2."] }
     ]
   },
   activities: [{ type: "fórum", title: "Fórum da semana", instructions: "Discuta.", durationMinutes: 40, evidence: "Post", required: true }],
@@ -191,7 +191,7 @@ test("modo de prosa: duas chamadas (texto e derivados), blocos no formato de ref
     assert.ok(order.indexOf("reflexao") < order.indexOf("2 Quem mantém o seu sistema?"));
     const quiz = week.blocks.find((block) => block.type === "quiz");
     assert.ok(quiz, "avaliação veio dos derivados");
-    assert.equal(quiz.props.questions[0].feedbackByOption.length, 4);
+    assert.equal(quiz.props.questions[0].feedbackByOption.length, 5);
     assert.equal(raw.teacherGuide.mediationMessages.whatsapp[0].text, "Oi, gente! A semana começou.");
     assert.equal(week.lessonPlan.claimEvidence[0].verificationStatus, "needs-human-review");
     assert.equal(raw.generationMeta.writer, "prose");
@@ -289,7 +289,7 @@ test("com deferDerivatives a redação sai sozinha e os derivados vêm de /api/d
     assert.equal(result.status, 200);
     assert.equal(result.body.generation.derivativesPending, false);
     assert.equal(result.body.week.generationMeta.derivativesPending, false);
-    assert.equal(result.body.week.lessonPlan.assessment.questions[0].feedbackByOption.length, 4);
+    assert.equal(result.body.week.lessonPlan.assessment.questions[0].feedbackByOption.length, 5);
     assert.ok(result.body.week.blocks.some((block) => block.type === "quiz"));
     assert.equal(result.body.teacherGuide.mediationMessages.moodle[0].text, "Aviso: a semana começou.");
     assert.ok(result.body.week.lessonPlan.contentSections.length >= 2, "o texto escrito é preservado");
