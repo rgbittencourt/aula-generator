@@ -178,14 +178,14 @@ Uma turma com várias semanas e revisão acadêmica pode gerar um volume grande 
 
 Por padrão, **Gerar com IA** escreve **uma semana e para**: a prévia abre sozinha e a semana seguinte só é gerada depois que você **aprova** a atual (botão **Aprovar e gerar a semana N**) ou a **refaz** quantas vezes quiser. O seletor **Aprovar cada semana antes de gerar a próxima** fica acima do botão; desmarcado, o comportamento volta a ser gerar todas em sequência.
 
-Ao aprovar, o sistema grava um **contrato de ponte** (`src/bridge.js`): os conceitos realmente ensinados, o exemplo-âncora, a pergunta deixada em aberto e o gancho prometido no fechamento. A semana seguinte recebe esse resumo, e não o texto completo; a abertura dela precisa cumprir o gancho. O resumo é derivado do próprio texto (`POST /api/week-bridge`), sem custo de IA, e o contexto cresce pouco ao longo do curso.
+Ao aprovar, o sistema grava um **contrato de ponte** (`src/bridge.js`): os conceitos realmente ensinados, o exemplo-âncora, a pergunta deixada em aberto e o gancho prometido no fechamento. A semana seguinte recebe esse resumo, e não o texto completo; a abertura dela precisa cumprir o gancho. O resumo é derivado do próprio texto (`POST /api/bridge`, ação `summary`), sem custo de IA, e o contexto cresce pouco ao longo do curso.
 
 Se você refizer uma semana já escrita, o sistema compara a ponte nova com a anterior e com aquela sobre a qual a semana vizinha foi construída. Há três resultados:
 
 | Resultado | O que acontece |
 | --- | --- |
 | Nada mudou na ponte | Nenhuma outra semana é tocada. |
-| O gancho ou o exemplo mudou | A vizinha ganha o aviso **Abertura precisa de ajuste** (ou **Fechamento…**). **Ajustar a abertura** reescreve só esse trecho, em uma chamada curta (`POST /api/adjust-bridges`), sem mexer no corpo da aula. |
+| O gancho ou o exemplo mudou | A vizinha ganha o aviso **Abertura precisa de ajuste** (ou **Fechamento…**). **Ajustar a abertura** reescreve só esse trecho, em uma chamada curta (`POST /api/bridge`, ação `adjust`), sem mexer no corpo da aula. |
 | Os conceitos centrais mudaram | A vizinha fica **Desatualizada**: ajustar a abertura continua possível, e refazer a semana é decisão sua. |
 
 **Manter como está** dispensa o aviso. O estado (aprovações, resumos e avisos) vai no salvamento local e no backup. O fechamento de cada semana, o gancho para a próxima, agora também aparece no bloco de síntese que o estudante lê (**Na próxima semana:**), e não só no `lessonPlan`.

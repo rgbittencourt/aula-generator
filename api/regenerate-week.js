@@ -16,10 +16,24 @@ export default async function handler(request, response) {
     const instruction = String(request.body?.instruction || "").trim().slice(0, 4000);
     if (!instruction) return response.status(400).json({ ok: false, error: "Descreva o que deve mudar nesta semana." });
     const input = applyCompositionInstruction(baseInput, index, instruction);
-    const currentWeeks = normalizeWeeklyOutput({ weeks: Array.isArray(request.body?.weeks) ? request.body.weeks : [] }, input);
+    // Curso ainda em geração (por exemplo, pausado para aprovação): normalizeWeeklyOutput
+    // completaria as semanas que faltam com semanas de reserva, e o cliente perderia a
+    // noção de qual é a próxima a gerar. Nesse caso devolvemos somente as semanas enviadas.
+    const submittedWeeks = Array.isArray(request.body?.weeks) ? request.body.weeks : [];
+    const partial = submittedWeeks.length > 0 && submittedWeeks.length < input.weeks && index < submittedWeeks.length;
+    const currentWeeks = partial
+      ? submittedWeeks.map((week, weekIndex) => normalizeLesson(week, input, weekIndex))
+      : normalizeWeeklyOutput({ weeks: submittedWeeks }, input);
     const raw = await regenerateWeekWithAI(input, index, currentWeeks[index], instruction);
     const normalized = normalizeLesson(raw, input, index);
     const weeks = currentWeeks.map((week, weekIndex) => weekIndex === index ? normalized : week);
+    if (partial) {
+      const partialGuides = Array.isArray(request.body?.teacherGuides) ? [...request.body.teacherGuides] : [];
+      partialGuides[index] = raw.teacherGuide || partialGuides[index] || {};
+      const teacherGuides = buildTeacherGuides(input, weeks, partialGuides).slice(0, weeks.length);
+      response.setHeader("Cache-Control", "no-store");
+      return response.status(200).json({ ok: true, partial: true, provider: "ai-regenerate", aiProvider: getAIProvider(), model: getAIModel(), weekIndex: index, instruction, input, week: normalized, weeks, teacherGuides });
+    }
     const workload = calculateCourseWorkload(input, input.formulaConfig, weeks);
     const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
     const providedGuides = Array.isArray(request.body?.teacherGuides) ? [...request.body.teacherGuides] : [];

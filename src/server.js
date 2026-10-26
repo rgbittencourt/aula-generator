@@ -17,8 +17,8 @@ import { assembleCourse } from "./course-assembly.js";
 import { scopeGeneralPlan, scopeMediationMaterial } from "./mediation-scope.js";
 import { applyCompositionInstruction } from "./composition.js";
 import generateWeekHandler from "../api/generate-week.js";
-import weekBridgeHandler from "../api/week-bridge.js";
-import adjustBridgesHandler from "../api/adjust-bridges.js";
+import bridgeHandler from "../api/bridge.js";
+import regenerateWeekHandler from "../api/regenerate-week.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "..", "public");
@@ -60,8 +60,7 @@ app.get("/api/health", (_req, res) => {
 // As rotas abaixo usam os mesmos handlers da Vercel, para que o servidor local
 // se comporte como a produção (mapa longitudinal, resumos de ponte, etc.).
 app.post("/api/generate-week", (req, res) => generateWeekHandler(req, res));
-app.post("/api/week-bridge", (req, res) => weekBridgeHandler(req, res));
-app.post("/api/adjust-bridges", (req, res) => adjustBridgesHandler(req, res));
+app.post("/api/bridge", (req, res) => bridgeHandler(req, res));
 
 app.post("/api/enrich-week", async (req, res) => {
   if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
@@ -127,31 +126,7 @@ app.post("/api/generate", async (req, res) => {
   }
 });
 
-app.post("/api/regenerate-week", async (req, res) => {
-  if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
-  try {
-    const baseInput = normalizeCourseInput(req.body?.input || {});
-    const index = Math.max(0, Math.min(baseInput.weeks - 1, Number.parseInt(req.body?.weekIndex, 10) || 0));
-    const instruction = String(req.body?.instruction || "").trim().slice(0, 4000);
-    if (!instruction) return res.status(400).json({ ok: false, error: "Descreva o que deve mudar nesta semana." });
-    const input = applyCompositionInstruction(baseInput, index, instruction);
-    const currentWeeks = normalizeWeeklyOutput({ weeks: Array.isArray(req.body?.weeks) ? req.body.weeks : [] }, input);
-    const raw = await regenerateWeekWithAI(input, index, currentWeeks[index], instruction);
-    const normalized = normalizeLesson(raw, input, index);
-    const weeks = currentWeeks.map((week, weekIndex) => weekIndex === index ? normalized : week);
-    const workload = calculateCourseWorkload(input, input.formulaConfig, weeks);
-    const enrichedWeeks = attachWorkloadToLessons(weeks, workload);
-    const providedGuides = Array.isArray(req.body?.teacherGuides) ? [...req.body.teacherGuides] : [];
-    providedGuides[index] = raw.teacherGuide || providedGuides[index] || {};
-    const teacherGuides = buildTeacherGuides(input, enrichedWeeks, providedGuides);
-    const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
-    const validation = validateCourse(input, enrichedWeeks, workload, teacherGuides);
-    res.json({ ok: true, provider: "ai-regenerate", aiProvider: getAIProvider(), model: getAIModel(), weekIndex: index, instruction, input, workload, generalPlan: { ...generalPlan, validation }, validation, week: enrichedWeeks[index], weeks: enrichedWeeks, teacherGuides });
-  } catch (error) {
-    const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_INVALID_JSON" ? 502 : 400;
-    res.status(status).json({ ok: false, error: error.message || "Não foi possível refazer a semana." });
-  }
-});
+app.post("/api/regenerate-week", (req, res) => regenerateWeekHandler(req, res));
 
 app.post("/api/regenerate-message", async (req, res) => {
   if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });

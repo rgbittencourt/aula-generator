@@ -2018,7 +2018,7 @@ function rerenderWeeks() {
 // e a semana apenas fica sem resumo (a próxima recebe o contexto compacto de sempre).
 async function captureWeekBridge(index) {
   try {
-    const data = await postJson("/api/week-bridge", { weekIndex: index, week: state.weeks[index] }, "Não foi possível resumir a ponte desta semana.");
+    const data = await postJson("/api/bridge", { action: "summary", weekIndex: index, week: state.weeks[index] }, "Não foi possível resumir a ponte desta semana.");
     recordGenerated(state.flow, index, data.summary);
   } catch (error) {
     console.warn(`Resumo de ponte da semana ${index + 1} indisponível:`, error);
@@ -2082,7 +2082,7 @@ async function approveSelectedWeek(index, { generateNext = false } = {}, button 
   if (aiActionBusy || !state.weeks[index]) return;
   if (button) button.disabled = true;
   try {
-    const data = await postJson("/api/week-bridge", { weekIndex: index, week: state.weeks[index], previousSummary: state.flow.bridges[index] }, "Não foi possível registrar a aprovação desta semana.");
+    const data = await postJson("/api/bridge", { action: "summary", weekIndex: index, week: state.weeks[index], previousSummary: state.flow.bridges[index] }, "Não foi possível registrar a aprovação desta semana.");
     approveWeek(state.flow, index, data.summary);
     saveDraft("semana-aprovada");
     rerenderWeeks();
@@ -2109,7 +2109,7 @@ async function adjustBridge(index, kind, button = null) {
   try {
     const input = state.input || formInput();
     const body = { input, weekIndex: index, week: state.weeks[index], ...(kind === "opening" ? { previousBridge: neighbor } : { nextBridge: neighbor }) };
-    const data = await postJson("/api/adjust-bridges", body, "Não foi possível ajustar a ponte.");
+    const data = await postJson("/api/bridge", { ...body, action: "adjust" }, "Não foi possível ajustar a ponte.");
     state.weeks[index] = data.week;
     applyAdjustment(state.flow, index, kind, data.summary);
     saveDraft("pontas-ajustadas");
@@ -2129,7 +2129,7 @@ async function adjustBridge(index, kind, button = null) {
 // sobre a qual a semana seguinte foi construída. Não usa IA.
 async function afterWeekRewritten(index) {
   try {
-    const data = await postJson("/api/week-bridge", { weekIndex: index, week: state.weeks[index], previousSummary: state.flow.bridges[index], linkedSummary: state.flow.links[index + 1] }, "Não foi possível comparar a ponte desta semana.");
+    const data = await postJson("/api/bridge", { action: "summary", weekIndex: index, week: state.weeks[index], previousSummary: state.flow.bridges[index], linkedSummary: state.flow.links[index + 1] }, "Não foi possível comparar a ponte desta semana.");
     applyRewrite(state.flow, index, data.summary, { comparison: data.comparison, linkComparison: data.linkComparison, totalWeeks: state.weeks.length });
     saveDraft("ponte-comparada");
   } catch (error) {

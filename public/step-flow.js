@@ -7,7 +7,7 @@
 //   issues[i]   o que precisa de atenção na semana i depois que uma vizinha mudou:
 //               { opening, closing, stale, reasons[] }
 //
-// Os resumos vêm de /api/week-bridge (src/bridge.js) e as comparações também.
+// Os resumos vêm de /api/bridge, ação "summary" (src/bridge.js), e as comparações também.
 
 export const emptyFlow = () => ({ bridges: {}, approved: {}, links: {}, issues: {} });
 
