@@ -17,7 +17,8 @@ import { assembleCourse } from "./course-assembly.js";
 import { scopeGeneralPlan, scopeMediationMaterial } from "./mediation-scope.js";
 import { applyCompositionInstruction } from "./composition.js";
 import generateWeekHandler from "../api/generate-week.js";
-import bridgeHandler from "../src/bridge-handler.js";
+import bridgeHandler from "./bridge-handler.js";
+import derivativesHandler from "./derivatives-handler.js";
 import regenerateWeekHandler from "../api/regenerate-week.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -61,6 +62,7 @@ app.get("/api/health", (_req, res) => {
 // se comporte como a produção (mapa longitudinal, resumos de ponte, etc.).
 app.post("/api/generate-week", (req, res) => generateWeekHandler(req, res));
 app.post("/api/bridge", (req, res) => bridgeHandler(req, res));
+app.post("/api/derivatives", (req, res) => derivativesHandler(req, res));
 
 app.post("/api/enrich-week", async (req, res) => {
   if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });

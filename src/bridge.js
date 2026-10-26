@@ -13,6 +13,8 @@
 import { richHtml, synthesisBlockBody } from "./aula-schema.js";
 
 const text = (value) => String(value ?? "").trim();
+// Os textos do modo de prosa chegam como HTML (<p>, <strong>); o resumo é só texto.
+const stripTags = (value) => text(value).replace(/<\/(p|li|blockquote)>/gi, " ").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 const normalizeKey = (value) => text(value).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 const STOP = new Set("a ao aos as com da das de do dos e em entre essa esse esta este para por que um uma o os no nos na nas se sem sua seu suas seus como mais menos sobre ou ja foi ser sao vai vamos tem nos voce voces semana".split(" "));
 
@@ -66,7 +68,7 @@ export function summarizeWeekBridge(lesson = {}, index = 0) {
     ? clip([withCase.caseStudy.title, withCase.caseStudy.context].filter(Boolean).join(": "), 260)
     : clip(sections[0]?.title, 160);
   const reflections = sections.map((section) => text(section?.reflection?.question)).filter(Boolean);
-  const synthesisQuestion = sentences(plan.synthesis).filter((sentence) => sentence.includes("?")).at(-1) || "";
+  const synthesisQuestion = sentences(stripTags(plan.synthesis)).filter((sentence) => sentence.includes("?")).at(-1) || "";
   const openQuestion = clip(reflections.at(-1) || synthesisQuestion, 260);
   const summary = {
     weekNumber: Number(plan.weekNumber) || index + 1,
@@ -75,8 +77,8 @@ export function summarizeWeekBridge(lesson = {}, index = 0) {
     anchorExample,
     openQuestion,
     sectionTitles: sections.map((section) => clip(section?.title, 120)).filter(Boolean).slice(0, 10),
-    hookIn: clip(sentences(plan.welcome).slice(0, 3).join(" "), 480),
-    hookOut: clip(plan.nextWeekConnection, 800)
+    hookIn: clip(sentences(stripTags(plan.welcome)).slice(0, 3).join(" "), 480),
+    hookOut: clip(stripTags(plan.nextWeekConnection), 800)
   };
   summary.fingerprint = hash(JSON.stringify([summary.concepts.map(normalizeKey), summary.anchorExample, summary.hookOut]));
   return summary;

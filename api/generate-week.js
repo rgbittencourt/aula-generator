@@ -21,7 +21,9 @@ export default async function handler(request, response) {
       // Esta rota é chamada uma semana por vez. A primeira versão precisa
       // retornar e ser salva antes de qualquer refação potencialmente longa.
       singlePass: true,
-      deferRepair: true
+      deferRepair: true,
+      // Modo de prosa: a avaliação e a mediação saem em /api/derivatives, logo depois.
+      deferDerivatives: true
     });
     const normalized = normalizeLesson(raw, input, index);
     const teacherGuide = buildTeacherGuides(input, [normalized], [raw.teacherGuide || {}])[0];

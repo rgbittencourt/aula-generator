@@ -174,6 +174,20 @@ O manual contém os prompts efetivos e o contrato JSON de cada fase. A produçã
 
 Uma turma com várias semanas e revisão acadêmica pode gerar um volume grande de texto e chamar vários provedores externos. Fazer redação, reparo e curadoria na mesma função serverless aumenta o risco de a Vercel encerrar a requisição e o navegador receber apenas o texto genérico `An error occurred with this application.`. Por isso, **Gerar com IA** chama `POST /api/generate-week` para cada semana, salva a redação imediatamente, usa `POST /api/enrich-week` em uma etapa complementar para pesquisar recursos e somente depois chama `POST /api/assemble-course` para calcular os totais e montar o Planejamento Geral. Se a curadoria exceder seu próprio limite, a semana continua preservada e a geração prossegue. A documentação oficial da Vercel registra HTTP 504 `FUNCTION_INVOCATION_TIMEOUT` quando uma função ultrapassa sua duração; no plano Hobby, o máximo atual é 300 segundos. A correção aplicada é limitar o trabalho de cada invocação, não apenas aumentar `maxDuration`.
 
+### Redação em prosa, no formato do Claude
+
+A semana não é mais gerada como um JSON de ~40 campos. O modo padrão (`AULA_WRITER=prose`) faz duas chamadas:
+
+1. **Redação** (`src/claude-writer.js`): o texto da aula sai em Markdown corrido, com boas-vindas, objetivos, seções numeradas, callouts no ponto do texto (🔎 Veja mais aqui, 💭 Para refletir, 💡 Em uma frase, ⚠️ Atenção), síntese, "O que vem por aí", glossário, referências e **Pontos a conferir** (as afirmações específicas que o professor precisa verificar). O guia de voz e um trecho de aula aprovada (Semana 3 de TGE) ficam em `src/writer-voice.js`. Na Anthropic, esse bloco usa cache de prompt, então só a primeira semana paga o preço cheio por ele.
+2. **Derivados**: uma chamada curta em JSON, que lê o texto já escrito e produz a avaliação (4 de múltipla escolha + 2 de verdadeiro/falso, com feedback por alternativa), as atividades, as verificações formativas e o Material de Mediação (WhatsApp e Moodle). Como a avaliação nasce do texto pronto, ela não cobra o que a aula não ensinou.
+
+O analisador `src/writer-markdown.js` converte o Markdown em `lessonPlan` sem usar IA, e o resto do sistema (blocos do Aula Studio, ponte entre semanas, pesquisa de recursos, qualidade) continua igual. Detalhes que valem saber:
+
+- **Links.** O modelo nunca escreve URL: cada 🔎 traz uma `busca`, que a pesquisa de recursos resolve depois. Só links que o professor colocou no briefing podem aparecer, e URL inventada é descartada.
+- **Refazer a semana** envia ao modelo o texto atual e o pedido do professor, com a instrução de manter praticamente idênticos os trechos que ele não mencionou. Os derivados são refeitos junto, para a avaliação não ficar falando de um caso que saiu do texto. Cada refação custa duas chamadas.
+- **Cota de composição.** Destaques, atenções e reflexões já escritos no texto contam para a cota; só blocos marcados como `required` e ainda ausentes são completados. Blocos genéricos de reserva não são mais inseridos.
+- `AULA_WRITER=json` volta ao modo anterior. `AULA_WRITER_MAX_TOKENS` ajusta o limite de saída da redação (padrão calculado a partir da meta de palavras, até 16000).
+
 ### Geração semana a semana, com aprovação
 
 Por padrão, **Gerar com IA** escreve **uma semana e para**: a prévia abre sozinha e a semana seguinte só é gerada depois que você **aprova** a atual (botão **Aprovar e gerar a semana N**) ou a **refaz** quantas vezes quiser. O seletor **Aprovar cada semana antes de gerar a próxima** fica acima do botão; desmarcado, o comportamento volta a ser gerar todas em sequência.

@@ -116,7 +116,7 @@ function buildRequest(messages, options, maxTokens) {
         model: options.model || getAIModel(),
         temperature: options.temperature ?? 0.45,
         max_tokens: maxTokens,
-        response_format: { type: "json_object" },
+        ...(options.plainText ? {} : { response_format: { type: "json_object" } }),
         messages
       }
     };
@@ -128,7 +128,9 @@ function buildRequest(messages, options, maxTokens) {
     temperature: options.temperature ?? 0.45,
     messages: providerMessages(messages.filter((message) => message?.role !== "system"))
   };
-  if (system) body.system = system;
+  // O guia de voz e os exemplos são idênticos em todas as semanas: o cache de
+  // prompt da Anthropic evita reprocessá-los (e cobra menos por eles) a cada chamada.
+  if (system) body.system = options.cacheSystem ? [{ type: "text", text: system, cache_control: { type: "ephemeral" } }] : system;
   // Ative somente para modelos Anthropic que tenham structured outputs habilitado
   // na conta. O padrão continua baseado em JSON para manter compatibilidade.
   if (process.env.ANTHROPIC_STRUCTURED_OUTPUTS === "true") {
@@ -321,6 +323,48 @@ export async function callJson(messages, options = {}) {
       parseError.provider = getAIProvider();
       throw parseError;
     }
+  }
+  throw new Error("A API de IA não respondeu após as tentativas configuradas.");
+}
+
+
+// Texto livre (Markdown) em vez de JSON. Usado pelo modo de escrita em prosa, em
+// que o texto da aula é redigido sem a camada de um esquema JSON e só depois
+// convertido por um analisador local. Mesmo tratamento de erros, tentativas e
+// limites de tokens de callJson; devolve { text, truncated }.
+export async function callText(messages, options = {}) {
+  if (!isAIConfigured()) {
+    const error = new Error(`A chave da API ${getAIProvider() === "anthropic" ? "Anthropic" : "OpenAI"} não está configurada.`);
+    error.code = "AI_KEY_MISSING";
+    error.provider = getAIProvider();
+    throw error;
+  }
+  const maxAttempts = Math.max(1, getAITokenSettings().maxRetries);
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const maxTokens = boundedOutputTokens(messages, configuredMaxTokens(options));
+    const request = buildRequest(messages, { ...options, plainText: true }, maxTokens);
+    const response = await fetch(request.url, { method: "POST", headers: request.headers, body: JSON.stringify(request.body) });
+    const payload = await response.json().catch(() => ({}));
+    const providerError = providerErrorMessage(payload, response);
+    if (!response.ok || providerError && !payload?.choices && !payload?.content) {
+      const classification = classifyProviderError(providerError, response.status);
+      const retryAfterMs = retryDelay(response, attempt);
+      if (classification.retryable && attempt < maxAttempts - 1 && retryAfterMs <= 30000) {
+        await wait(retryAfterMs);
+        continue;
+      }
+      throw createProviderError(providerError, response, retryAfterMs, classification);
+    }
+    const content = responseText(payload);
+    if (!content) {
+      const emptyError = new Error("A API de IA retornou uma resposta vazia.");
+      emptyError.code = "AI_EMPTY_RESPONSE";
+      emptyError.retryable = true;
+      emptyError.provider = getAIProvider();
+      if (attempt < maxAttempts - 1) { await wait(250); continue; }
+      throw emptyError;
+    }
+    return { text: String(content), truncated: responseFinishedByLength(payload) };
   }
   throw new Error("A API de IA não respondeu após as tentativas configuradas.");
 }

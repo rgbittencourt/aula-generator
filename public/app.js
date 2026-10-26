@@ -198,7 +198,17 @@ function stabilizeWorkspaceLayout() {
   requestAnimationFrame(apply);
 }
 
-function paragraphsMarkup(value) { return String(value ?? "").split(/\n\s*\n|\r?\n/).map((part) => readableText(part)).filter(Boolean).map((part) => `<p>${escapeHtml(part)}</p>`).join(""); }
+// Textos do modo de prosa chegam como HTML simples (<p>, <strong>, <em>): mantém
+// parágrafos e ênfase, descarta qualquer outra tag e escapa o resto.
+function inlineMarkup(html) {
+  const parts = String(html ?? "").replace(/<(?!\/?(?:strong|em|b|i)\b)[^>]*>/gi, " ").split(/(<\/?(?:strong|em|b|i)>)/gi);
+  return parts.map((part) => /^<\/?(?:strong|em|b|i)>$/i.test(part) ? part.toLowerCase() : part.replace(/&(?!(?:amp|lt|gt|quot|#039|#39);)/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")).join("").replace(/\s+/g, " ").trim();
+}
+function paragraphsMarkup(value) {
+  const source = String(value ?? "");
+  if (/<(?:p|ul|li|strong|em|br)\b/i.test(source)) return source.split(/<\/p>|<\/li>|<br\s*\/?>/i).map(inlineMarkup).filter(Boolean).map((part) => `<p>${part}</p>`).join("");
+  return source.split(/\n\s*\n|\r?\n/).map((part) => readableText(part)).filter(Boolean).map((part) => `<p>${escapeHtml(part)}</p>`).join("");
+}
 function slugify(value) { return String(value || "curso").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "curso"; }
 function downloadBlob(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
 function addDays(dateString, days) { const date = new Date(`${dateString}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); }
@@ -1460,7 +1470,8 @@ async function regenerateSelectedWeek() {
     state.weeks = data.weeks || state.weeks;
     state.teacherGuides = data.teacherGuides || state.teacherGuides;
     saveDraft("semana-refeita");
-    const enriched = await enrichGeneratedWeek({ ...data, week: data.weeks?.[index], teacherGuide: data.teacherGuides?.[index], resourcesDeferred: true }, input, index, headers, button);
+    const completed = await completeDerivativesStep({ ...data, week: data.weeks?.[index], teacherGuide: data.teacherGuides?.[index], resourcesDeferred: true }, input, index, headers, button);
+    const enriched = await enrichGeneratedWeek(completed, input, index, headers, button);
     if (enriched.week) data.weeks[index] = enriched.week;
     if (enriched.teacherGuide) data.teacherGuides[index] = enriched.teacherGuide;
     data.resourcesPending = enriched.resourcesPending;
@@ -1959,6 +1970,25 @@ async function requestGeneratedWeek(input, index, headers, previousWeeks, button
   throw new Error(`Não foi possível gerar a semana ${index + 1}.`);
 }
 
+// Modo de prosa: a avaliação e o Material de Mediação saem numa segunda requisição,
+// com o próprio limite de tempo. Se falhar, o texto já está salvo e a semana fica
+// marcada; "Refazer esta semana" também refaz essas peças.
+async function completeDerivativesStep(data, input, index, headers, button) {
+  const pending = data?.generation?.derivativesPending ?? data?.week?.generationMeta?.derivativesPending;
+  if (!pending || !data.week) return data;
+  setButtonLabel(button, `Gerando avaliação e mediação da semana ${index + 1}…`);
+  setAiActivity("Avaliação e mediação", `O texto da semana ${index + 1} já está salvo. Escrevendo as questões (com feedback por alternativa), as atividades e as mensagens de acompanhamento a partir dele…`, { progress: Math.round(((index + 0.6) / (input.weeks + 1)) * 100) });
+  try {
+    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input, weekIndex: index, week: data.week, teacherGuide: data.teacherGuide }) });
+    const done = await readApiResponse(response, `Não foi possível gerar a avaliação da semana ${index + 1}.`);
+    return { ...data, week: done.week, teacherGuide: done.teacherGuide, generation: done.generation };
+  } catch (error) {
+    console.warn(`Avaliação e mediação da semana ${index + 1} adiadas:`, error);
+    const reason = error.message || "A avaliação não foi concluída.";
+    return { ...data, derivativesError: reason, week: { ...data.week, generationMeta: { ...(data.week.generationMeta || {}), derivativesPending: true, repairPending: true, repairReason: [...new Set([...(data.week.generationMeta?.repairReason || []), "a avaliação e o Material de Mediação ainda não foram gerados; refaça a semana"])] } } };
+  }
+}
+
 async function enrichGeneratedWeek(data, input, index, headers, button) {
   if (!data?.resourcesDeferred || !data.week) return data;
   setButtonLabel(button, `Pesquisando recursos da semana ${index + 1}…`);
@@ -2185,6 +2215,7 @@ async function generateDistributed(input, accessCode, button, options = {}) {
     state.generation = { status: "running", nextWeekIndex: index + 1, total: input.weeks, formSignature };
     saveDraft("semana-gerada");
     renderWeeks({ ok: true, partial: true, provider: "ai-distributed-partial", model: data.model, input, weeks: state.weeks, teacherGuides: state.teacherGuides, generation: state.generation }, { scrollToResults: false });
+    data = await completeDerivativesStep(data, input, index, headers, button);
     data = await enrichGeneratedWeek(data, input, index, headers, button);
     weeks[index] = data.week;
     teacherGuides[index] = data.teacherGuide;

@@ -6,6 +6,7 @@ import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
 import { applyCompositionInstruction, compositionPlanForWeek } from "./composition.js";
 import { callJson, getAIProvider } from "./ai-client.js";
 import { selectResourcesWithAI } from "./resource-curator.js";
+import { generateWeekProse, regenerateWeekProse, writerMode } from "./claude-writer.js";
 import { clip as bridgeClip, closingRequirement, formatBridgeContext, sanitizeBridges } from "./bridge.js";
 export { selectResourcesWithAI };
 
@@ -57,7 +58,7 @@ function clipText(value, limit = 600) {
 function compactList(value, itemLimit = 8, textLimit = 240) {
   return (Array.isArray(value) ? value : stringList(value)).slice(0, itemLimit).map((item) => clipText(item, textLimit)).filter(Boolean);
 }
-function compactBriefingPractice(practice = {}, index = 0) {
+export function compactBriefingPractice(practice = {}, index = 0) {
   return {
     id: text(practice.id) || `webpractice-${index + 1}`,
     title: clipText(practice.title, 140),
@@ -207,7 +208,7 @@ function compactProgressionMap(progression = {}) {
   };
 }
 
-function compactWeekInput(input = {}, index = 0, resourcePlan = {}) {
+export function compactWeekInput(input = {}, index = 0, resourcePlan = {}) {
   const defaults = input.resourcePlan?.default || {};
   return {
     title: clipText(input.title, 240),
@@ -513,7 +514,7 @@ async function planWeekWithAI(input, index, progression = null) {
   }
 }
 
-function coerceLessonEnvelope(value) {
+export function coerceLessonEnvelope(value) {
   const source = value && typeof value === "object" ? value : {};
   if (source.lessonPlan && typeof source.lessonPlan === "object") return source;
   if (source.plan && typeof source.plan === "object") return { ...source, lessonPlan: source.plan };
@@ -523,7 +524,7 @@ function coerceLessonEnvelope(value) {
   return source;
 }
 
-function enforceWeekFocus(raw, weekFocus, weekNumber) {
+export function enforceWeekFocus(raw, weekFocus, weekNumber) {
   raw = coerceLessonEnvelope(raw);
   if (!raw?.lessonPlan || typeof raw.lessonPlan !== "object") return raw;
   raw.lessonPlan.theme = weekFocus.theme;
@@ -541,6 +542,9 @@ function enforceWeekFocus(raw, weekFocus, weekNumber) {
 }
 
 export async function generateOneWeek(input, index, options = {}) {
+  // Modo padrão: redação em prosa no formato do Claude (src/claude-writer.js).
+  // AULA_WRITER=json mantém o modo anterior, em que a IA preenche o JSON do lessonPlan.
+  if (writerMode() === "prose") return generateWeekProse(input, index, options);
   const weekNumber = index + 1;
   const useAcademicPipeline = process.env.AULA_ACADEMIC_PIPELINE !== "false";
   // A Vercel Hobby encerra funções longas. O modo de uma etapa mantém o prompt
@@ -680,7 +684,7 @@ function compactRegenerationSection(section = {}) {
   };
 }
 
-function regenerationTokenBudget(input, options = {}) {
+export function regenerationTokenBudget(input, options = {}) {
   const target = qualityTargets(input).targetWords;
   const configured = Number(options.maxTokens || providerTokenSetting("REGEN_MAX_TOKENS", 10000));
   // O reparo devolve apenas lessonPlan. Para 3.000 palavras, 8–10 mil
@@ -699,6 +703,7 @@ function mergeRepairedResponse(original, repaired) {
 }
 
 export async function regenerateWeekWithAI(input, index, currentWeek, instruction, options = {}) {
+  if (writerMode() === "prose") return regenerateWeekProse(input, index, currentWeek, instruction, options);
   input = applyCompositionInstruction(input, index, instruction);
   const weekNumber = index + 1;
   const singlePass = process.env.AULA_SINGLE_PASS !== "false";

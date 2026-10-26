@@ -342,7 +342,12 @@ function normalizeSection(value = {}, index = 0) {
     keyTerms: splitLines(section.keyTerms || section.terms),
     counterpoint: text(section.counterpoint || section.limit || section.alternativeInterpretation),
     didacticRole: text(section.didacticRole || section.role),
-    resources: normalizeResources(section.resources, "section-resource")
+    resources: normalizeResources(section.resources, "section-resource"),
+    // Callouts escritos no ponto do texto (modo de prosa): destaque, atenção e reflexão.
+    callouts: Array.isArray(section.callouts) ? section.callouts.map((callout) => ({
+      kind: ["destaque", "atencao", "reflexao"].includes(callout?.kind) ? callout.kind : "destaque",
+      title: text(callout?.title), body: text(callout?.body), anchor: text(callout?.anchor)
+    })).filter((callout) => callout.body) : []
   };
 }
 
@@ -488,6 +493,21 @@ function normalizeSelfAssessment(value) {
   return { title: text(source.title, "Autoavaliação"), prompts: splitLines(source.prompts || source.questions || source.items), scale: splitLines(source.scale), feedback: text(source.feedback) };
 }
 
+// No modo de prosa o autor já escreveu destaques, atenções e reflexões no ponto do
+// texto, e o glossário vira acordeão. A cota de composição só completa o que o
+// professor marcou como "required" e que o texto ainda não trouxe; as demais
+// ("prefer"/"auto") não ganham blocos genéricos de reserva.
+function proseCompositionRequest(request, plan, sections) {
+  if (text(plan.writer) !== "prose") return request;
+  const provided = { destaque: 0, atencao: 0, reflexao: 0, accordion: Array.isArray(plan.glossary) && plan.glossary.length >= 3 ? 1 : 0 };
+  sections.forEach((section) => (section.callouts || []).forEach((callout) => { provided[callout.kind] = (provided[callout.kind] || 0) + 1; }));
+  const rows = {};
+  Object.entries(request.rows).forEach(([key, row]) => {
+    rows[key] = { ...row, count: row.policy === "required" ? Math.max(0, row.count - (provided[key] || 0)) : 0 };
+  });
+  return { ...request, rows };
+}
+
 export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
   const plan = object(raw);
   const resources = object(plan.resources);
@@ -501,7 +521,7 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
   const images = normalizeResources(resources.images || plan.images, "image");
   const podcasts = normalizeResources(resources.podcasts || plan.podcasts, "podcast");
   const datasets = normalizeResources(resources.datasets || plan.datasets, "dataset");
-  const compositionRequest = compositionPlanForWeek(input, index);
+  const compositionRequest = proseCompositionRequest(compositionPlanForWeek(input, index), plan, contentSections);
   const composition = materializeComposition({ ...plan, resources: { ...resources, images } }, compositionRequest, index + 1);
   // A webprática é uma sessão síncrona independente e será entregue em DOCX.
   // Nunca a misture no texto-base nem nos blocos do aluno.
@@ -535,6 +555,7 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
     spiralReview: object(plan.spiralReview),
     timePlan: normalizeTimePlan(plan.timePlan),
     humanReview: bool(plan.humanReview ?? plan.requiresHumanReview, true),
+    writer: text(plan.writer),
     academicProfile: normalizeAcademicProfile(input.academicProfile, input),
     academicPlan: object(plan.academicPlan),
     notes: splitLines(plan.notes)
@@ -763,25 +784,54 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
   if (plan.learningObjectives.length) children.push({ id: newId("c-objectives-", week, children.length), type: "destaque", props: { title: "Objetivos de aprendizagem", body: `<ul>${plan.learningObjectives.map((item) => `<li>${html(item)}</li>`).join("")}</ul>`, tone: "sage", icon: "" } });
   const allResources = [...plan.resources.videos, ...plan.resources.images, ...plan.resources.readingsRequired, ...plan.resources.readingsExtra, ...plan.resources.podcasts, ...plan.resources.datasets];
   const usedResources = new Set();
-  const resourceChildren = (resources, sectionIndex) => {
+  const resourceChildren = (resources, sectionIndex, { exactNumber = "", skipNumbers = null, idBase = sectionIndex * 10 } = {}) => {
     const selected = resources.filter((resource) => {
+      if (usedResources.has(resource.id)) return false;
+      // Recurso ancorado em subseção ("3.1") aparece junto da subseção, não da seção.
+      if (exactNumber) return text(resource.sectionNumber) === exactNumber;
+      if (skipNumbers?.has(text(resource.sectionNumber))) return false;
       const declared = Number.parseInt(resource.sectionNumber, 10);
-      return !usedResources.has(resource.id) && (!resource.sectionNumber || declared === sectionIndex + 1 || (!Number.isFinite(declared) && sectionIndex === 0));
+      return !resource.sectionNumber || declared === sectionIndex + 1 || (!Number.isFinite(declared) && sectionIndex === 0);
     });
     selected.forEach((resource) => usedResources.add(resource.id));
-    const bridges = selected.map((resource, resourceIndex) => ({ id: newId("c-resource-bridge-", week, sectionIndex * 10 + resourceIndex), type: "prose", props: { body: richHtml(resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || `Use este recurso neste ponto para relacionar ${resource.title || "o material"} ao conceito estudado nesta seção.`), dropcap: false, dropcapTone: "terracotta", resourceId: resource.id, ...(inlineVideoProps(resource) ? { inlineVideo: inlineVideoProps(resource) } : {}) } }));
-    const images = selected.filter((resource) => resource.kind === "image" && resource.href).slice(0, 2).map((resource, resourceIndex) => ({ id: newId("c-image-", week, sectionIndex * 10 + resourceIndex), type: "imagem", props: { src: resource.href, slotId: "", caption: resource.caption || resource.title, credit: resource.credit || resource.source || "", ratio: "16/9", resourceId: resource.id } }));
-    const materials = selected.filter((resource) => !inlineVideoProps(resource) && !images.some((block) => block.props.caption === resource.title) && (resource.title || resource.href)).map((resource) => ({ type: resource.kind, title: `${resource.required ? "Leitura orientada: " : "Para aprofundar: "}${resource.title}`, source: resource.source || resource.objective || resource.pedagogicalUse, href: resource.href, resourceId: resource.id }));
-    return [...bridges, ...images, ...(materials.length ? [{ id: newId("c-materials-", week, sectionIndex), type: "materiais", props: { title: "Recurso para usar nesta seção", items: materials } }] : [])];
+    // Modo de prosa: recurso com link vira o callout "Veja mais aqui" (parágrafo de
+    // ligação + link) no ponto do texto, como nas aulas de referência. Sem link, o
+    // parágrafo de ligação continua só como anotação para o professor.
+    const asCallout = (resource) => plan.writer === "prose" && resource.href && !inlineVideoProps(resource) && resource.kind !== "image";
+    const calloutBlocks = selected.filter(asCallout).map((resource, resourceIndex) => ({ id: newId("c-veja-mais-", week, idBase + resourceIndex), type: "destaque", props: { title: "🔎 Veja mais aqui", body: `${richHtml(resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || resource.title)}<p>🔗 <a href="${html(resource.href)}" target="_blank" rel="noopener">${html(resource.title || resource.href)}</a>${resource.source ? ` — ${html(resource.source)}` : ""}</p>`, tone: "sage", icon: "", resourceId: resource.id } }));
+    const bridges = selected.filter((resource) => !asCallout(resource)).map((resource, resourceIndex) => ({ id: newId("c-resource-bridge-", week, idBase + resourceIndex), type: "prose", props: { body: richHtml(resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || `Use este recurso neste ponto para relacionar ${resource.title || "o material"} ao conceito estudado nesta seção.`), dropcap: false, dropcapTone: "terracotta", resourceId: resource.id, ...(inlineVideoProps(resource) ? { inlineVideo: inlineVideoProps(resource) } : {}) } }));
+    const images = selected.filter((resource) => resource.kind === "image" && resource.href).slice(0, 2).map((resource, resourceIndex) => ({ id: newId("c-image-", week, idBase + resourceIndex), type: "imagem", props: { src: resource.href, slotId: "", caption: resource.caption || resource.title, credit: resource.credit || resource.source || "", ratio: "16/9", resourceId: resource.id } }));
+    const materials = selected.filter((resource) => !asCallout(resource) && !inlineVideoProps(resource) && !images.some((block) => block.props.caption === resource.title) && (resource.title || resource.href)).map((resource) => ({ type: resource.kind, title: `${resource.required ? "Leitura orientada: " : "Para aprofundar: "}${resource.title}`, source: resource.source || resource.objective || resource.pedagogicalUse, href: resource.href, resourceId: resource.id }));
+    return [...bridges, ...calloutBlocks, ...images, ...(materials.length ? [{ id: newId("c-materials-", week, idBase), type: "materiais", props: { title: "Recurso para usar nesta seção", items: materials } }] : [])];
+  };
+  const calloutBlock = (callout, sectionIndex, position) => {
+    const id = newId(`c-${callout.kind}-`, week, sectionIndex * 100 + position);
+    if (callout.kind === "reflexao") return { id, type: "reflexao", props: { title: callout.title || "Para refletir", question: html(callout.body), body: "", tone: "lavender", icon: "" } };
+    if (callout.kind === "atencao") return { id, type: "atencao", props: { title: callout.title || "Atenção", body: richHtml(callout.body), tone: "coral", icon: "" } };
+    return { id, type: "destaque", props: { title: callout.title || "Em uma frase", body: richHtml(callout.body), tone: "sage", icon: "" } };
   };
   plan.contentSections.forEach((section, sectionIndex) => {
     children.push({ id: newId("c-title-", week, sectionIndex + 2), type: "titulo", props: { text: `${section.number} ${section.title}`, level: "h2" } });
+    const callouts = Array.isArray(section.callouts) ? section.callouts : [];
+    const subNumbers = new Set(section.subsections.map((sub) => text(sub.number)));
+    const calloutsAt = (anchor) => callouts.map((callout, position) => ({ callout, position })).filter(({ callout }) => text(callout.anchor) === anchor || (!subNumbers.has(text(callout.anchor)) && anchor === text(section.number)));
     if (section.body) children.push({ id: newId("c-prose-", week, sectionIndex + 20), type: "prose", props: { body: richHtml(section.body), dropcap: sectionIndex === 0, dropcapTone: "terracotta" } });
-    children.push(...resourceChildren([...(section.resources || []), ...allResources], sectionIndex));
+    children.push(...resourceChildren([...(section.resources || []), ...allResources], sectionIndex, { skipNumbers: subNumbers }));
     children.push(...(plan.composition?.blocksBySection?.[sectionIndex] || []));
-    section.subsections.forEach((sub, subIndex) => { children.push({ id: newId("c-subtitle-", week, sectionIndex * 10 + subIndex + 1), type: "titulo", props: { text: `${sub.number} ${sub.title}`, level: "h3" } }); if (sub.body) children.push({ id: newId("c-subprose-", week, sectionIndex * 10 + subIndex + 3), type: "prose", props: { body: richHtml(sub.body), dropcap: false, dropcapTone: "terracotta" } }); });
-    if (section.reflection?.question) children.push({ id: newId("c-reflection-", week, sectionIndex + 1), type: "reflexao", props: { title: "Para refletir", question: html(section.reflection.question), body: html(section.reflection.body), tone: "lavender", icon: "" } });
+    children.push(...calloutsAt(text(section.number)).map(({ callout, position }) => calloutBlock(callout, sectionIndex, position)));
+    section.subsections.forEach((sub, subIndex) => {
+      children.push({ id: newId("c-subtitle-", week, sectionIndex * 10 + subIndex + 1), type: "titulo", props: { text: `${sub.number} ${sub.title}`, level: "h3" } });
+      if (sub.body) children.push({ id: newId("c-subprose-", week, sectionIndex * 10 + subIndex + 3), type: "prose", props: { body: richHtml(sub.body), dropcap: false, dropcapTone: "terracotta" } });
+      children.push(...resourceChildren([...(section.resources || []), ...allResources], sectionIndex, { exactNumber: text(sub.number), idBase: 1000 + sectionIndex * 100 + subIndex * 10 }));
+      children.push(...calloutsAt(text(sub.number)).filter(({ callout }) => text(callout.anchor) === text(sub.number)).map(({ callout, position }) => calloutBlock(callout, sectionIndex, position)));
+    });
+    if (section.reflection?.question && !callouts.some((callout) => callout.kind === "reflexao")) children.push({ id: newId("c-reflection-", week, sectionIndex + 1), type: "reflexao", props: { title: "Para refletir", question: html(section.reflection.question), body: html(section.reflection.body), tone: "lavender", icon: "" } });
   });
+  // Glossário como acordeão dentro do tópico, como nas aulas de referência (modo de prosa).
+  if (plan.writer === "prose" && plan.glossary.length >= 3) {
+    children.push({ id: newId("c-glossary-", week, 1), type: "titulo", props: { text: "Glossário rápido desta semana", level: "h2" } });
+    children.push({ id: newId("c-accordion-", week, 1), type: "accordion", props: { items: plan.glossary.map((entry) => ({ title: entry.term, body: richHtml(entry.definition), children: [] })) } });
+  }
   blocks.push({ id: newId("b-topic-", week, 1), type: "topic", bg: "neutral-default", pad: "normal", props: { children } });
   if (plan.synthesis) blocks.push({ id: newId("b-synthesis-", week, 0), type: "sintese", bg: "sage-deep", pad: "airy", props: { eyebrow: "Síntese", title: "A ideia que fecha a semana", body: synthesisBlockBody(plan) } });
   if (plan.references.length) blocks.push({ id: newId("b-references-", week, 0), type: "referencias", bg: "neutral-default", pad: "normal", props: { title: "Referências", items: plan.references.map((item) => ({ html: html(item.citation || item.title || item.href), href: item.href || "", credit: item.publisher || item.authors?.join(", ") || "" })) } });
@@ -844,6 +894,8 @@ export function normalizeLesson(raw, input, index) {
     repairReason: Array.isArray(source.generationMeta.repairReason) ? source.generationMeta.repairReason.map((item) => text(item)).filter(Boolean).slice(0, 8) : [],
     nextAction: text(source.generationMeta.nextAction),
     resourcesPending: Boolean(source.generationMeta.resourcesPending),
+    derivativesPending: Boolean(source.generationMeta.derivativesPending),
+    writer: text(source.generationMeta.writer),
     resourceError: text(source.generationMeta.resourceError),
     initialQuality: object(source.generationMeta.initialQuality),
     finalQuality: object(source.generationMeta.finalQuality)

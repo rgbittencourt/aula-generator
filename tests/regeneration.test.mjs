@@ -1,3 +1,5 @@
+// Estes testes exercitam o modo JSON; o modo de prosa tem testes próprios (writer.test.mjs).
+process.env.AULA_WRITER = "json";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { assistBriefing, generateOneWeek, regenerateWeekWithAI } from "../src/ai.js";
