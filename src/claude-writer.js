@@ -21,7 +21,7 @@ import { measureLessonQuality, qualityTargets } from "./content-quality.js";
 import { applyCompositionInstruction } from "./composition.js";
 import { normalizeLesson, practiceScheduledForWeek, resourcePlanForWeek } from "./aula-schema.js";
 import { closingRequirement, formatBridgeContext } from "./bridge.js";
-import { WRITER_SYSTEM_PROMPT } from "./writer-voice.js";
+import { writerSystemPrompt } from "./writer-voice.js";
 import { parseWeekMarkdown, planToMarkdown, plain } from "./writer-markdown.js";
 import { applyFactCheck } from "./fact-check.js";
 import { compactBriefingPractice, compactWeekInput, enforceWeekFocus } from "./ai.js";
@@ -268,10 +268,10 @@ export async function generateWeekProse(input, index, options = {}) {
   const progression = options.progression || buildCourseProgression(input);
   const targets = qualityTargets(input);
   const messages = [
-    { role: "system", content: WRITER_SYSTEM_PROMPT },
+    { role: "system", content: writerSystemPrompt() },
     { role: "user", content: buildWriterPrompt(input, index, { progression, previousWeeks: options.previousWeeks, bridges: options.bridges }) }
   ];
-  const draft = await writeMarkdown(messages, { temperature: 0.6, maxTokens: writerTokenBudget(targets) });
+  const draft = await writeMarkdown(messages, { temperature: 0.6, maxTokens: writerTokenBudget(targets), ignoreRequestBudget: true });
   const composed = await composeWeek(input, index, draft.text, { progression, deferDerivatives: options.deferDerivatives, startedAt, previousWeeks: options.previousWeeks });
   return finish(input, index, composed, { truncated: draft.truncated, mode: "prose-writer", previousWeeks: options.previousWeeks, deferRepair: options.deferRepair });
 }
@@ -283,10 +283,10 @@ export async function regenerateWeekProse(input, index, currentWeek, instruction
   const targets = qualityTargets(input);
   const current = currentWeek?.lessonPlan || currentWeek || {};
   const messages = [
-    { role: "system", content: WRITER_SYSTEM_PROMPT },
+    { role: "system", content: writerSystemPrompt() },
     { role: "user", content: buildWriterPrompt(input, index, { progression, previousWeeks: options.previousWeeks, bridges: options.bridges, current, instruction }) }
   ];
-  const draft = await writeMarkdown(messages, { temperature: 0.5, maxTokens: writerTokenBudget(targets) });
+  const draft = await writeMarkdown(messages, { temperature: 0.5, maxTokens: writerTokenBudget(targets), ignoreRequestBudget: true });
   const composed = await composeWeek(input, index, draft.text, { progression, deferDerivatives: options.deferDerivatives, startedAt, previousWeeks: options.previousWeeks });
   return finish(input, index, composed, { truncated: draft.truncated, mode: "prose-regenerate", previousWeeks: options.previousWeeks, deferRepair: false });
 }

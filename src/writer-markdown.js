@@ -43,19 +43,33 @@ function tokenize(markdown) {
   let paragraph = [];
   let quote = [];
   let list = null;
+  let table = null;
   const flushParagraph = () => { if (paragraph.length) { tokens.push({ type: "p", text: paragraph.join(" ").trim() }); paragraph = []; } };
   const flushQuote = () => { if (quote.length) { tokens.push({ type: "quote", text: quote.join(" ").trim() }); quote = []; } };
-  const flushList = () => { if (list) { tokens.push({ type: "list", items: list }); list = null; } };
-  const flushAll = () => { flushParagraph(); flushQuote(); flushList(); };
+  const flushList = () => { if (list) { tokens.push({ type: "list", items: list, ordered: Boolean(list.ordered) }); list = null; } };
+  const flushTable = () => { if (table) { tokens.push({ type: "table", rows: table }); table = null; } };
+  const flushAll = () => { flushParagraph(); flushQuote(); flushList(); flushTable(); };
   for (const rawLine of lines) {
     const line = rawLine.trimEnd();
     if (!line.trim()) { flushAll(); continue; }
     if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { flushAll(); continue; }
     const heading = line.match(/^(#{1,4})\s+(.+?)\s*#*$/);
     if (heading) { flushAll(); tokens.push({ type: "h", level: heading[1].length, text: heading[2].trim() }); continue; }
+    if (/^\s*\|.*\|\s*$/.test(line)) {
+      flushParagraph(); flushQuote(); flushList();
+      const cells = line.trim().replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim());
+      if (!cells.every((cell) => /^:?-{2,}:?$/.test(cell))) (table ||= []).push(cells);
+      continue;
+    }
+    flushTable();
     if (/^\s*>/.test(line)) { flushParagraph(); flushList(); quote.push(line.replace(/^\s*>\s?/, "")); continue; }
     const item = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
-    if (item) { flushParagraph(); flushQuote(); (list ||= []).push(item[1].trim()); continue; }
+    if (item) {
+      flushParagraph(); flushQuote();
+      if (!list) { list = []; list.ordered = /^\s*\d+[.)]/.test(line); }
+      list.push(item[1].trim());
+      continue;
+    }
     flushQuote(); flushList();
     paragraph.push(line.trim());
   }
@@ -80,7 +94,12 @@ function classifyH2(title) {
 function blocksToHtml(tokens) {
   return tokens.map((token) => {
     if (token.type === "p") return `<p>${inlineHtml(token.text)}</p>`;
-    if (token.type === "list") return `<ul>${token.items.map((item) => `<li>${inlineHtml(item)}</li>`).join("")}</ul>`;
+    if (token.type === "list") { const tag = token.ordered ? "ol" : "ul"; return `<${tag}>${token.items.map((item) => `<li>${inlineHtml(item)}</li>`).join("")}</${tag}>`; }
+    if (token.type === "table") {
+      const [head, ...rows] = token.rows;
+      const cells = (row, tag) => row.map((cell) => `<${tag}>${inlineHtml(cell)}</${tag}>`).join("");
+      return `<table><thead><tr>${cells(head, "th")}</tr></thead><tbody>${rows.map((row) => `<tr>${cells(row, "td")}</tr>`).join("")}</tbody></table>`;
+    }
     if (token.type === "quote") return `<blockquote>${inlineHtml(token.text)}</blockquote>`;
     return "";
   }).filter(Boolean).join("");
@@ -293,6 +312,13 @@ export function parseWeekMarkdown(markdown, options = {}) {
 
 export function htmlToMarkdown(html) {
   return String(html ?? "")
+    .replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, (_m, inner) => {
+      const rows = [...inner.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)].map((row) => [...row[1].matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi)].map((cell) => cell[1].replace(/<(strong|b)>([\s\S]*?)<\/\1>/gi, "**$2**").replace(/<(em|i)>([\s\S]*?)<\/\1>/gi, "*$2*").replace(/<[^>]+>/g, "").trim()));
+      if (!rows.length) return "";
+      const line = (cells) => `| ${cells.join(" | ")} |`;
+      return `\n\n${[line(rows[0]), line(rows[0].map(() => "---")), ...rows.slice(1).map(line)].join("\n")}\n\n`;
+    })
+    .replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (_m, inner) => { let n = 0; return `\n${inner.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_x, item) => `${++n}. ${item}\n`)}\n`; })
     .replace(/<a\s+[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, "[$2]($1)")
     .replace(/<(strong|b)>([\s\S]*?)<\/\1>/gi, "**$2**")
     .replace(/<(em|i)>([\s\S]*?)<\/\1>/gi, "*$2*")

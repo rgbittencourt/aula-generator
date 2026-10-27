@@ -350,7 +350,10 @@ export async function callText(messages, options = {}) {
   }
   const maxAttempts = Math.max(1, getAITokenSettings().maxRetries);
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const maxTokens = boundedOutputTokens(messages, configuredMaxTokens(options));
+    // Na Anthropic a redação leva um guia longo (em cache) e não deve ter a saída cortada
+    // pela "margem local" de tokens, pensada para o limite por minuto da OpenAI.
+    const requested = configuredMaxTokens(options);
+    const maxTokens = options.ignoreRequestBudget && getAIProvider() === "anthropic" ? requested : boundedOutputTokens(messages, requested);
     const request = buildRequest(messages, { ...options, plainText: true }, maxTokens);
     const response = await fetch(request.url, { method: "POST", headers: request.headers, body: JSON.stringify(request.body) });
     const payload = await response.json().catch(() => ({}));

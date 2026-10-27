@@ -4,7 +4,8 @@ import { generateOneWeek, regenerateWeekWithAI } from "../src/ai.js";
 import { normalizeCourseInput, normalizeLesson } from "../src/aula-schema.js";
 import { summarizeWeekBridge } from "../src/bridge.js";
 import { inlineHtml, parseWeekMarkdown, planToMarkdown } from "../src/writer-markdown.js";
-import { WRITER_SYSTEM_PROMPT } from "../src/writer-voice.js";
+import { REFERENCE_WEEK_ONE, REFERENCE_EXCERPTS } from "../src/reference-weeks.js";
+import { WRITER_SYSTEM_PROMPT, writerSystemPrompt, writerModelsMode } from "../src/writer-voice.js";
 
 const input = normalizeCourseInput({
   title: "Tecnologias para Gestão Educacional", weeks: 3, hoursPerWeek: 10, audience: "Servidores da educação profissional", level: "pós-graduação",
@@ -327,4 +328,74 @@ test("se a redação demora demais, os derivados são adiados para a requisiçã
   } finally {
     delete process.env.AULA_WRITER_DERIVATIVES_AFTER_MS;
   }
+});
+
+test("parser: tabelas viram <table>, listas numeradas viram <ol> e voltam ao Markdown na refação", () => {
+  const md = `# Semana 1 — Tema
+
+## Boas-vindas
+
+Olá.
+
+## 1. Seção
+
+Três movimentos acontecem juntos:
+
+1. **Digitalização** — papel vira digital;
+2. **Integração** — sistemas conversam;
+
+| Dimensão | Impacto |
+|---|---|
+| **Pedagógica** | AVA e analytics |
+| **Financeira** | Bolsas e orçamento |
+
+Fecha o parágrafo.
+`;
+  const { lessonPlan } = parseWeekMarkdown(md, { weekNumber: 1 });
+  const body = lessonPlan.contentSections[0].body;
+  assert.match(body, /<ol><li><strong>Digitalização<\/strong>/);
+  assert.match(body, /<table><thead><tr><th>Dimensão<\/th><th>Impacto<\/th><\/tr><\/thead><tbody><tr><td><strong>Pedagógica<\/strong>/);
+  const back = planToMarkdown(lessonPlan);
+  assert.match(back, /1\. \*\*Digitalização\*\*/);
+  assert.match(back, /\| Dimensão \| Impacto \|\n\| --- \| --- \|\n\| \*\*Pedagógica\*\* \| AVA e analytics \|/);
+});
+
+test("modelos de referência: compacto na Anthropic, mínimo na OpenAI, e a semana modelo entra inteira", () => {
+  const compact = writerSystemPrompt("compact");
+  assert.match(compact, /<semana-modelo>/);
+  assert.match(compact, /Busca Ativa Escolar/, "semana 1 aprovada vai no prompt");
+  assert.match(compact, /<trecho semana="6"/);
+  assert.doesNotMatch(REFERENCE_WEEK_ONE + JSON.stringify(REFERENCE_EXCERPTS), /https?:\/\//, "os modelos não carregam URLs para o modelo copiar");
+  assert.doesNotMatch(writerSystemPrompt("minimal"), /<semana-modelo>/);
+  assert.equal(writerModelsMode("anthropic"), "compact");
+  assert.equal(writerModelsMode("openai"), "minimal");
+});
+
+test("tabelas em prosa viram blocos tabela no material final", () => {
+  const md = `# Semana 1 — Tema
+
+## Boas-vindas
+
+Olá.
+
+## 1. Seção
+
+Antes da tabela.
+
+| Dimensão | Impacto |
+|---|---|
+| **Pedagógica** | AVA e analytics |
+| **Financeira** | Bolsas |
+
+Depois da tabela.
+`;
+  const input = normalizeCourseInput({ title: "Curso", weeks: 1, hoursPerWeek: 4, year: 2026, author: "A" });
+  const { lessonPlan } = parseWeekMarkdown(md, { weekNumber: 1 });
+  const lesson = normalizeLesson({ lessonPlan }, input, 0);
+  const topic = lesson.blocks.find((b) => b.type === "topic");
+  const tabela = topic.props.children.find((c) => c.type === "tabela");
+  assert.ok(tabela, "bloco tabela existe");
+  assert.deepEqual(tabela.props.headers, ["Dimensão", "Impacto"]);
+  assert.deepEqual(tabela.props.rows[0], ["Pedagógica", "AVA e analytics"]);
+  assert.ok(!topic.props.children.some((c) => c.type === "prose" && /<table/.test(c.props.body)), "sem <table> solto em prosa");
 });

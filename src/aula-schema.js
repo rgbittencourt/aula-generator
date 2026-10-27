@@ -778,6 +778,30 @@ function fallbackLessonPlan(input, index) {
   }, input, index);
 }
 
+// Tabelas escritas em prosa viram blocos "tabela" (como nas aulas aprovadas), não HTML solto.
+function tableBlocksFromHtml(body, idPrefix) {
+  const out = []; let last = 0; let n = 0;
+  const flush = (chunk) => { const t = chunk.trim(); if (t.replace(/<[^>]+>/g, "").trim()) out.push({ type: "prose", props: { body: t } }); };
+  const strip = (value) => value.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
+  const re = /<table[^>]*>([\s\S]*?)<\/table>/gi; let m;
+  while ((m = re.exec(body))) {
+    flush(body.slice(last, m.index)); last = re.lastIndex;
+    const rows = [...m[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)].map((r) => [...r[1].matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi)].map((c) => strip(c[1])));
+    if (rows.length < 2) continue;
+    out.push({ id: `${idPrefix}-t${n++}`, type: "tabela", props: { caption: "", fonte: "", striped: true, destacarPrimeira: true, compact: false, headers: rows[0], rows: rows.slice(1) } });
+  }
+  flush(body.slice(last));
+  return out;
+}
+function expandTables(children) {
+  return children.flatMap((block) => {
+    if (block.type !== "prose" || !/<table\b/i.test(block.props?.body || "")) return [block];
+    const parts = tableBlocksFromHtml(block.props.body, block.id || "c-prose");
+    let i = 0;
+    return parts.map((part) => part.type === "prose" ? { ...block, id: `${block.id}-p${i++}`, props: { ...block.props, ...part.props, dropcap: i === 1 ? block.props.dropcap : false } } : part);
+  });
+}
+
 function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
   const week = index + 1; const calendar = weekCalendar(input, index); const objective = plan.learningObjectives[0] || `Compreender os fundamentos de ${input.title}.`;
   const blocks = [{ id: newId("b-hero-", week, 0), type: "hero", bg: "neutral-default", pad: "normal", props: { eyebrow: calendar.label.toUpperCase(), title: `${plan.theme}: ${calendar.label}`, lead: objective, author: input.author || "Autor", authorImage: "", readTime: `${input.hoursPerWeek} h de estudo`, date: input.year } }];
@@ -834,7 +858,7 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
     children.push({ id: newId("c-glossary-", week, 1), type: "titulo", props: { text: "Glossário rápido desta semana", level: "h2" } });
     children.push({ id: newId("c-accordion-", week, 1), type: "accordion", props: { items: plan.glossary.map((entry) => ({ title: entry.term, body: richHtml(entry.definition), children: [] })) } });
   }
-  blocks.push({ id: newId("b-topic-", week, 1), type: "topic", bg: "neutral-default", pad: "normal", props: { children } });
+  blocks.push({ id: newId("b-topic-", week, 1), type: "topic", bg: "neutral-default", pad: "normal", props: { children: expandTables(children) } });
   if (plan.synthesis) blocks.push({ id: newId("b-synthesis-", week, 0), type: "sintese", bg: "sage-deep", pad: "airy", props: { eyebrow: "Síntese", title: "A ideia que fecha a semana", body: synthesisBlockBody(plan) } });
   if (plan.references.length) blocks.push({ id: newId("b-references-", week, 0), type: "referencias", bg: "neutral-default", pad: "normal", props: { title: "Referências", items: plan.references.map((item) => ({ html: html(item.citation || item.title || item.href), href: item.href || "", credit: item.publisher || item.authors?.join(", ") || "" })) } });
   if (plan.assessment.questions.length) blocks.push({ id: newId("b-quiz-", week, 0), type: "quiz", bg: "neutral-subtle", pad: "normal", props: { title: plan.assessment.title, intro: plan.assessment.format, avaliativo: true, passMark: plan.assessment.passMark, questions: plan.assessment.questions } });
