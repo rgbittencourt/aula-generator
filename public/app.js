@@ -2269,15 +2269,19 @@ async function generate() {
     if (incomplete) { showError("Cada webprática precisa de um título e de uma semana ou data de ocorrência. Ela não será alocada automaticamente."); return; }
   }
   const generation = state.generation;
-  const resumeGeneration = generation?.status === "partial"
-    && generation.formSignature === formSignature
+  const continuable = generation?.status === "partial"
     && Number(generation.total) === input.weeks
     && Number(generation.nextWeekIndex) === state.weeks.length
-    && state.weeks.length <= input.weeks;
+    && state.weeks.length < input.weeks;
+  let resumeGeneration = continuable && generation.formSignature === formSignature;
+  // O briefing mudou (por exemplo, "Preencher vazios com IA" ou um ajuste de objetivos) depois
+  // das semanas geradas: o padrão é MANTER as semanas e seguir para a próxima; apagar tudo
+  // só acontece se o professor escolher recomeçar.
+  if (!resumeGeneration && continuable && window.confirm(`O briefing mudou desde a última semana gerada.\n\nOK = manter as ${state.weeks.length} semana(s) já geradas e gerar a semana ${state.weeks.length + 1} com o briefing atual.\nCancelar = mais opções (recomeçar do zero ou não fazer nada).`)) resumeGeneration = true;
   const startIndex = resumeGeneration ? state.weeks.length : 0;
   // Semanas já escritas não são apagadas em silêncio: se o briefing mudou depois delas,
   // recomeçar exige confirmação explícita.
-  if (!resumeGeneration && state.weeks.length && !window.confirm(`O briefing mudou desde a última semana gerada. Recomeçar vai apagar as ${state.weeks.length} semana(s) já geradas deste planejamento. Continuar mesmo assim?`)) return;
+  if (!resumeGeneration && state.weeks.length && !window.confirm(`Recomeçar do zero vai APAGAR as ${state.weeks.length} semana(s) já geradas deste planejamento. Apagar e recomeçar mesmo assim?\n\n(Cancelar mantém tudo como está.)`)) return;
   if (resumeGeneration && !canGenerateNext(state.flow, startIndex, stepModeEnabled())) {
     showError(`Aprove a semana ${startIndex} (ou refaça-a) antes de gerar a próxima. Desative “Aprovar cada semana antes de gerar a próxima” para gerar em sequência.`);
     openLessonPreview(startIndex - 1);
