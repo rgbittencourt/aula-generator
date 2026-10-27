@@ -23,6 +23,7 @@ import { normalizeLesson, practiceScheduledForWeek, resourcePlanForWeek } from "
 import { closingRequirement, formatBridgeContext } from "./bridge.js";
 import { WRITER_SYSTEM_PROMPT } from "./writer-voice.js";
 import { parseWeekMarkdown, planToMarkdown, plain } from "./writer-markdown.js";
+import { applyFactCheck } from "./fact-check.js";
 import { compactBriefingPractice, compactWeekInput, enforceWeekFocus } from "./ai.js";
 
 export function writerMode() {
@@ -200,10 +201,11 @@ async function composeWeek(input, index, markdown, options = {}) {
   const weekFocus = progressionForWeek(input, index, progression);
   const resourcePlan = resourcePlanForWeek(input, index);
   const { lessonPlan: parsed, stats } = parseWeekMarkdown(markdown, { allowedUrls: urlsIn({ videoLinks: input.videoLinks, imageLinks: input.imageLinks, materials: input.materials, references: input.references }), requiredReadings: resourcePlan.requiredReadingsPerWeek, weekNumber });
+  const factCheck = applyFactCheck(parsed, { input, previousWeeks: options.previousWeeks });
   const { data: derivatives, error: derivativesError } = deferDerivatives ? { data: {}, error: "" } : await buildDerivatives(input, index, { ...parsed, theme: parsed.theme || weekFocus.theme });
   const raw = { lessonPlan: mergeDerivatives(parsed, derivatives), teacherGuide: derivatives.teacherGuide && typeof derivatives.teacherGuide === "object" ? derivatives.teacherGuide : {} };
   enforceWeekFocus(raw, weekFocus, weekNumber);
-  return { raw, stats, derivativesError, weekFocus, derivativesPending: deferDerivatives };
+  return { raw, stats: { ...stats, factCheck }, derivativesError, weekFocus, derivativesPending: deferDerivatives };
 }
 
 function academicStub(input, index, weekFocus) {
@@ -260,7 +262,7 @@ export async function generateWeekProse(input, index, options = {}) {
     { role: "user", content: buildWriterPrompt(input, index, { progression, previousWeeks: options.previousWeeks, bridges: options.bridges }) }
   ];
   const draft = await writeMarkdown(messages, { temperature: 0.6, maxTokens: writerTokenBudget(targets) });
-  const composed = await composeWeek(input, index, draft.text, { progression, deferDerivatives: options.deferDerivatives, startedAt });
+  const composed = await composeWeek(input, index, draft.text, { progression, deferDerivatives: options.deferDerivatives, startedAt, previousWeeks: options.previousWeeks });
   return finish(input, index, composed, { truncated: draft.truncated, mode: "prose-writer", previousWeeks: options.previousWeeks, deferRepair: options.deferRepair });
 }
 
@@ -275,7 +277,7 @@ export async function regenerateWeekProse(input, index, currentWeek, instruction
     { role: "user", content: buildWriterPrompt(input, index, { progression, previousWeeks: options.previousWeeks, bridges: options.bridges, current, instruction }) }
   ];
   const draft = await writeMarkdown(messages, { temperature: 0.5, maxTokens: writerTokenBudget(targets) });
-  const composed = await composeWeek(input, index, draft.text, { progression, deferDerivatives: options.deferDerivatives, startedAt });
+  const composed = await composeWeek(input, index, draft.text, { progression, deferDerivatives: options.deferDerivatives, startedAt, previousWeeks: options.previousWeeks });
   return finish(input, index, composed, { truncated: draft.truncated, mode: "prose-regenerate", previousWeeks: options.previousWeeks, deferRepair: false });
 }
 

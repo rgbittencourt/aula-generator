@@ -224,6 +224,10 @@ Os blocos são contextualizados pela IA e posicionados na seção indicada, depo
 
 Os quatro checklists exibem todos os itens disponíveis e iniciam marcados os que a análise automática aprovou. Clique no **texto do item** — pedagógico, acadêmico, de recursos/acessibilidade ou de qualidade/liberação — para abrir um painel com **o que verificar**, critérios de aceite e um **prompt estruturado** específico para refazer a semana. A **caixa de seleção** tem somente a função de marcar ou desmarcar o item. O prompt pode ser copiado ou carregado diretamente na prévia da semana pelo botão **Abrir refação da semana**. Ao desmarcar um item, ele passa a representar uma conferência/refação manual. As listas mantêm a posição de rolagem e o foco após cada marcação, inclusive quando o item está distante do início; as marcações de recursos, revisão acadêmica e qualidade também entram no salvamento local e no backup.
 
+### Verificação automática de números e citações
+
+Depois de escrever a semana, o gerador procura no texto valores em R$, percentuais, anos, quantidades, leis/portarias e citações diretas e confere se o número aparece no briefing ou nas semanas já geradas. O que não aparece em nenhum lugar entra em **evidências a conferir** (`claimEvidence`, status `needs-human-review`), com a frase, a seção e o motivo, além do que o próprio autor listou em "Pontos a conferir". É uma checagem local, sem custo de IA, feita em `src/fact-check.js`. Ela não prova que o número é falso; só avisa que ele não veio de uma fonte que você forneceu.
+
 ## Separação aluno e professor
 
 A aplicação produz duas camadas diferentes:
