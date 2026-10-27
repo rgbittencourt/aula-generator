@@ -132,9 +132,11 @@ function buildRequest(messages, options, maxTokens) {
   const body = {
     model: options.model || getAIModel(),
     max_tokens: maxTokens,
-    temperature: options.temperature ?? 0.45,
     messages: providerMessages(messages.filter((message) => message?.role !== "system"))
   };
+  // Modelos Claude recentes recusam `temperature` ("deprecated for this model", HTTP 400).
+  // Por isso ele não é enviado à Anthropic, a menos que ANTHROPIC_SEND_TEMPERATURE=true.
+  if (process.env.ANTHROPIC_SEND_TEMPERATURE === "true") body.temperature = options.temperature ?? 0.45;
   // O guia de voz e os exemplos são idênticos em todas as semanas: o cache de
   // prompt da Anthropic evita reprocessá-los (e cobra menos por eles) a cada chamada.
   if (system) body.system = options.cacheSystem ? [{ type: "text", text: system, cache_control: { type: "ephemeral" } }] : system;

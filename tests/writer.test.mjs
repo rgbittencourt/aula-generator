@@ -211,6 +211,7 @@ test("modo de prosa na Anthropic usa cache de prompt no system e temperatura de 
       await generateOneWeek(input, 1, { deferRepair: true, singlePass: true });
       assert.equal(calls.length, 2);
       assert.equal(calls[0].body.system[0].cache_control.type, "ephemeral");
+      assert.ok(calls.every((call) => !("temperature" in call.body)), "Anthropic recusa temperature em modelos recentes");
       assert.match(calls[0].body.system[0].text, /EXEMPLO DE VOZ/);
       assert.ok(calls[0].body.max_tokens >= 6000);
     } finally {
