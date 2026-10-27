@@ -111,12 +111,103 @@ async function writeMarkdown(messages, options) {
     const continuation = await callText([
       ...messages,
       { role: "assistant", content: text },
-      { role: "user", content: "Sua resposta foi cortada pelo limite de saída. Continue exatamente de onde parou, sem repetir nada do que já escreveu, e termine o documento com todas as seções que faltam (Síntese conceitual, O que vem por aí, Glossário rápido desta semana, Referências desta semana e Pontos a conferir)." }
+      { role: "user", content: options.continuation || "Sua resposta foi cortada pelo limite de saída. Continue exatamente de onde parou, sem repetir nada do que já escreveu, e termine o documento com todas as seções que faltam (Síntese conceitual, O que vem por aí, Glossário rápido desta semana, Referências desta semana e Pontos a conferir)." }
     ], { ...options, cacheSystem: true });
     text = `${text.trimEnd()}\n\n${continuation.text.trimStart()}`;
     truncated = continuation.truncated;
   }
   return { text, truncated };
+}
+
+// ---------------------------------------------------------------------------
+// Redação em partes paralelas
+//
+// Uma semana de ~4.000 palavras são ~10 mil tokens de saída: em uma única chamada isso
+// leva mais de 300 s e estoura o limite da função na Vercel. Por isso: (1) uma chamada
+// curta produz o roteiro (seções, caso/dado de cada uma); (2) 2–3 chamadas escrevem, ao
+// mesmo tempo, cada qual um bloco de seções; (3) o texto é unido na ordem. O guia de
+// voz e a semana modelo ficam em cache de prompt, então as chamadas paralelas o reaproveitam.
+// ---------------------------------------------------------------------------
+const writerParallelEnabled = () => String(process.env.AULA_WRITER_PARALLEL || "true").toLowerCase() !== "false";
+
+export function parseOutline(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const sections = [];
+  let title = "";
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!title && /^#\s+\S/.test(line)) { title = line; continue; }
+    const match = line.match(/^(?:##\s*)?(\d{1,2})\.\s+\S/);
+    if (match && Number(match[1]) === sections.length + 1) sections.push(line.replace(/^##\s*/, ""));
+  }
+  return { title, sections };
+}
+
+export function splitSectionRanges(count) {
+  if (count < 4) return [];
+  const parts = count >= 6 ? 3 : 2;
+  const base = Math.floor(count / parts);
+  const extra = count % parts;
+  const ranges = [];
+  let start = 1;
+  for (let k = 0; k < parts; k += 1) {
+    const size = base + (k < extra ? 1 : 0);
+    ranges.push([start, start + size - 1]);
+    start += size;
+  }
+  return ranges;
+}
+
+function partInstruction({ part, total, range, outline, weekNumber, targets, closing }) {
+  const [from, to] = range;
+  const scope = [
+    part === 1 ? `começa com a linha de título do roteiro ("# Semana ${weekNumber} — …"), depois "## Boas-vindas", "## Objetivos de aprendizagem" e então as seções ${from} a ${to}` : `contém somente as seções ${from} a ${to}`,
+    closing ? 'e termina com "## Síntese conceitual", "## O que vem por aí", "## Glossário rápido desta semana", "## Referências desta semana" e "## Pontos a conferir"' : ""
+  ].filter(Boolean).join(" ");
+  return `ROTEIRO DA SEMANA (já definido; siga os números, os títulos e os casos de cada seção):
+${outline}
+
+SUA TAREFA AGORA: a semana será escrita em ${total} partes simultâneas, unidas depois na ordem. Você escreve somente a PARTE ${part} de ${total}: ela ${scope}.
+- Use os cabeçalhos "## n. Título" exatamente como estão no roteiro; subseções "### n.1 …" quando o conceito pedir.
+- Não escreva nada das outras partes e não repita o caso ou o dado que o roteiro atribui a outra seção. Nada de introdução ou conclusão própria da parte: comece direto no Markdown e, ${closing ? "ao chegar à síntese, retome os casos do roteiro, o contraponto e os conceitos novos" : "na última seção desta parte, deixe uma tensão que a seção seguinte do roteiro resolve"}.
+- Cada seção com cerca de ${targets.sectionTargetWords} palavras (mínimo ${targets.sectionMinimumWords}); os callouts 🔎, 💭, 💡 e ⚠️ ficam nas seções desta parte, conforme o roteiro.
+- Esta instrução vale mais do que qualquer outra que peça o documento inteiro.`;
+}
+
+async function writeWeekMarkdown(input, index, { progression, previousWeeks, bridges, current, instruction, temperature, targets }) {
+  const system = { role: "system", content: writerSystemPrompt() };
+  const base = buildWriterPrompt(input, index, { progression, previousWeeks, bridges, current, instruction });
+  const single = () => writeMarkdown([system, { role: "user", content: base }], { temperature, maxTokens: writerTokenBudget(targets), ignoreRequestBudget: true });
+  if (!writerParallelEnabled()) return single();
+
+  const weekNumber = index + 1;
+  const outlineAsk = `${base}
+
+ANTES DE ESCREVER, faça o ROTEIRO da semana. Responda somente com ele, neste formato, sem texto antes ou depois:
+# Semana ${weekNumber} — Título da semana
+1. Título da seção | cobre: o que a seção explica | caso ou dado concreto: instituição, ano, número, norma ou autor reais (marque "conferir" se não tiver certeza) | callouts: 🔎/💭/💡/⚠️ que entram
+2. …
+Uma linha por seção numerada, no mínimo ${targets.requiredSectionCount} seções, na ordem didática (problema, conceito, caso, lição, limite; contraponto crítico perto do fim). Casos e dados não podem se repetir entre seções. Subseções e demais partes (boas-vindas, síntese, glossário) não entram no roteiro.`;
+  const outlineDraft = await callText([system, { role: "user", content: outlineAsk }], { temperature, maxTokens: 2500, ignoreRequestBudget: true, cacheSystem: true });
+  const outline = String(outlineDraft.text || "").trim();
+  const { sections } = parseOutline(outline);
+  const ranges = splitSectionRanges(sections.length);
+  if (!ranges.length) return single();
+
+  const jobs = ranges.map((range, position) => {
+    const part = position + 1;
+    const closing = part === ranges.length;
+    const count = range[1] - range[0] + 1;
+    const words = count * targets.sectionTargetWords + (part === 1 ? 350 : 0) + (closing ? 1100 : 0);
+    const maxTokens = Math.min(12000, Math.max(3000, Math.ceil(words * 2.3) + 1200));
+    const user = `${base}\n\n${partInstruction({ part, total: ranges.length, range, outline, weekNumber, targets, closing })}`;
+    return writeMarkdown([system, { role: "user", content: user }], { temperature, maxTokens, ignoreRequestBudget: true, continuation: "Sua resposta foi cortada pelo limite de saída. Continue exatamente de onde parou, sem repetir nada, e termine somente o que cabe a esta parte." });
+  });
+  const settled = await Promise.allSettled(jobs);
+  const failed = settled.find((item) => item.status === "rejected");
+  if (failed) throw failed.reason;
+  const texts = settled.map((item) => item.value.text.trim());
+  return { text: texts.join("\n\n"), truncated: settled.some((item) => item.value.truncated) };
 }
 
 const DERIVATIVES_SYSTEM = `Você é designer instrucional de um curso de pós-graduação a distância. Recebe uma semana de material didático já escrita e produz, em JSON válido, as peças que dependem dela: avaliação, atividades, verificações formativas e mensagens de mediação. Tudo precisa ser respondível e verificável a partir do texto recebido; nunca cobre algo que o texto não ensinou. Escreva em português do Brasil, no mesmo tom do texto.`;
@@ -267,11 +358,7 @@ export async function generateWeekProse(input, index, options = {}) {
   const startedAt = Date.now();
   const progression = options.progression || buildCourseProgression(input);
   const targets = qualityTargets(input);
-  const messages = [
-    { role: "system", content: writerSystemPrompt() },
-    { role: "user", content: buildWriterPrompt(input, index, { progression, previousWeeks: options.previousWeeks, bridges: options.bridges }) }
-  ];
-  const draft = await writeMarkdown(messages, { temperature: 0.6, maxTokens: writerTokenBudget(targets), ignoreRequestBudget: true });
+  const draft = await writeWeekMarkdown(input, index, { progression, previousWeeks: options.previousWeeks, bridges: options.bridges, temperature: 0.6, targets });
   const composed = await composeWeek(input, index, draft.text, { progression, deferDerivatives: options.deferDerivatives, startedAt, previousWeeks: options.previousWeeks });
   return finish(input, index, composed, { truncated: draft.truncated, mode: "prose-writer", previousWeeks: options.previousWeeks, deferRepair: options.deferRepair });
 }
@@ -282,11 +369,7 @@ export async function regenerateWeekProse(input, index, currentWeek, instruction
   const progression = options.progression || buildCourseProgression(input);
   const targets = qualityTargets(input);
   const current = currentWeek?.lessonPlan || currentWeek || {};
-  const messages = [
-    { role: "system", content: writerSystemPrompt() },
-    { role: "user", content: buildWriterPrompt(input, index, { progression, previousWeeks: options.previousWeeks, bridges: options.bridges, current, instruction }) }
-  ];
-  const draft = await writeMarkdown(messages, { temperature: 0.5, maxTokens: writerTokenBudget(targets), ignoreRequestBudget: true });
+  const draft = await writeWeekMarkdown(input, index, { progression, previousWeeks: options.previousWeeks, bridges: options.bridges, current, instruction, temperature: 0.5, targets });
   const composed = await composeWeek(input, index, draft.text, { progression, deferDerivatives: options.deferDerivatives, startedAt, previousWeeks: options.previousWeeks });
   return finish(input, index, composed, { truncated: draft.truncated, mode: "prose-regenerate", previousWeeks: options.previousWeeks, deferRepair: false });
 }

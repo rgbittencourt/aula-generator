@@ -5,6 +5,7 @@ import { normalizeCourseInput, normalizeLesson } from "../src/aula-schema.js";
 import { summarizeWeekBridge } from "../src/bridge.js";
 import { inlineHtml, parseWeekMarkdown, planToMarkdown } from "../src/writer-markdown.js";
 import { REFERENCE_WEEK_ONE, REFERENCE_EXCERPTS } from "../src/reference-weeks.js";
+import { parseOutline, splitSectionRanges } from "../src/claude-writer.js";
 import { WRITER_SYSTEM_PROMPT, writerSystemPrompt, writerModelsMode } from "../src/writer-voice.js";
 
 const input = normalizeCourseInput({
@@ -106,6 +107,9 @@ function withFetch(handler, run) {
   };
   return Promise.resolve(run(calls)).finally(restore);
 }
+
+// Os testes abaixo cobrem a redação em uma chamada; o modo em partes paralelas tem testes próprios mais adiante.
+process.env.AULA_WRITER_PARALLEL = "false";
 
 const reply = (content, finish = "stop") => ({ choices: [{ finish_reason: finish, message: { content } }] });
 const isDerivatives = (body) => body.messages.some((message) => message.role === "system" && /Recebe uma semana de material didático/.test(message.content));
@@ -412,4 +416,60 @@ test("api/regenerate-week escreve o texto e deixa a avaliação para /api/deriva
     assert.equal(calls.length, 1, "só a redação; avaliação e mediação saem em /api/derivatives");
     assert.equal(result.body.week.generationMeta.derivativesPending, true);
   });
+});
+
+const OUTLINE = `# Semana 2 — Dados e decisão
+1. Problema | cobre: a pergunta | caso ou dado concreto: Caso A | callouts: 🔎
+2. Conceito | cobre: o conceito | caso ou dado concreto: Caso B | callouts: 💭
+3. Caso | cobre: o caso | caso ou dado concreto: Caso C | callouts: 💡
+4. Lição | cobre: a lição | caso ou dado concreto: Caso D | callouts: ⚠️
+5. Limite | cobre: o limite | caso ou dado concreto: Caso E | callouts: 💭
+6. Contraponto | cobre: o custo | caso ou dado concreto: Caso F | callouts: 🔎`;
+
+test("roteiro: parseOutline conta seções numeradas e splitSectionRanges divide em 2 ou 3 partes", () => {
+  const { title, sections } = parseOutline(OUTLINE);
+  assert.match(title, /^# Semana 2/);
+  assert.equal(sections.length, 6);
+  assert.deepEqual(splitSectionRanges(6), [[1, 2], [3, 4], [5, 6]]);
+  assert.deepEqual(splitSectionRanges(8), [[1, 3], [4, 6], [7, 8]]);
+  assert.deepEqual(splitSectionRanges(4), [[1, 2], [3, 4]]);
+  assert.deepEqual(splitSectionRanges(3), []);
+  assert.equal(parseOutline("sem lista nenhuma").sections.length, 0);
+});
+
+test("redação em partes: um roteiro curto e três partes escritas ao mesmo tempo, unidas em ordem", async () => {
+  process.env.AULA_WRITER_PARALLEL = "true";
+  try {
+    await withFetch((body) => {
+      const user = body.messages.filter((message) => message.role === "user").map((message) => message.content).join("\n");
+      if (isDerivatives(body)) return reply(JSON.stringify(DERIVATIVES));
+      if (/ANTES DE ESCREVER/.test(user)) return reply(OUTLINE);
+      const part = Number((user.match(/PARTE (\d) de 3/) || [])[1]);
+      if (part === 1) return reply("# Semana 2 — Dados e decisão\n\n## Boas-vindas\n\nOlá.\n\n## Objetivos de aprendizagem\n- Explicar X.\n\n## 1. Problema\n\nTexto 1.\n\n## 2. Conceito\n\nTexto 2.");
+      if (part === 2) return reply("## 3. Caso\n\nTexto 3.\n\n## 4. Lição\n\nTexto 4.");
+      return reply("## 5. Limite\n\nTexto 5.\n\n## 6. Contraponto\n\nTexto 6.\n\n## Síntese conceitual\n\nFecha.\n\n## O que vem por aí\n\nSemana 3.\n\n## Glossário rápido desta semana\n- **Termo**: definição.\n\n## Referências desta semana\n- Ref.\n\n## Pontos a conferir\n- [seção 1] Algo.");
+    }, async (calls) => {
+      const raw = await generateOneWeek(input, 1, { deferDerivatives: true });
+      assert.equal(calls.length, 4, "roteiro + 3 partes");
+      const sections = raw.lessonPlan.contentSections.map((section) => section.title);
+      assert.deepEqual(sections, ["Problema", "Conceito", "Caso", "Lição", "Limite", "Contraponto"]);
+      assert.equal(raw.lessonPlan.contentSections.length, 6);
+      assert.ok(raw.lessonPlan.synthesis);
+    });
+  } finally {
+    process.env.AULA_WRITER_PARALLEL = "false";
+  }
+});
+
+test("redação em partes: roteiro inaproveitável volta para uma chamada só", async () => {
+  process.env.AULA_WRITER_PARALLEL = "true";
+  try {
+    await withFetch((body) => isDerivatives(body) ? reply(JSON.stringify(DERIVATIVES)) : reply(MARKDOWN), async (calls) => {
+      const raw = await generateOneWeek(input, 1, { deferDerivatives: true });
+      assert.equal(calls.length, 2, "roteiro inútil + redação inteira");
+      assert.ok(raw.lessonPlan.contentSections.length >= 2);
+    });
+  } finally {
+    process.env.AULA_WRITER_PARALLEL = "false";
+  }
 });

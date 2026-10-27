@@ -186,6 +186,7 @@ O analisador `src/writer-markdown.js` converte o Markdown em `lessonPlan` sem us
 - **Links.** O modelo nunca escreve URL: cada 🔎 traz uma `busca`, que a pesquisa de recursos resolve depois. Só links que o professor colocou no briefing podem aparecer, e URL inventada é descartada.
 - **Refazer a semana** envia ao modelo o texto atual e o pedido do professor, com a instrução de manter praticamente idênticos os trechos que ele não mencionou. Os derivados são refeitos junto, para a avaliação não ficar falando de um caso que saiu do texto. Cada refação custa duas chamadas.
 - **Cota de composição.** Destaques, atenções e reflexões já escritos no texto contam para a cota; só blocos marcados como `required` e ainda ausentes são completados. Blocos genéricos de reserva não são mais inseridos.
+- A redação do texto sai em partes paralelas (roteiro curto + 2 ou 3 blocos de seções escritos ao mesmo tempo, unidos na ordem), porque uma única chamada de ~10 mil tokens passa dos 300 s da Vercel. `AULA_WRITER_PARALLEL=false` volta à chamada única. Os modelos de semana (`AULA_WRITER_MODELS`) ficam em cache de prompt e valem para todas as partes.
 - `AULA_WRITER=json` volta ao modo anterior. `AULA_WRITER_MAX_TOKENS` ajusta o limite de saída da redação (padrão calculado a partir da meta de palavras, até 16000).
 
 ### Geração semana a semana, com aprovação
