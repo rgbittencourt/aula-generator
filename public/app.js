@@ -2427,7 +2427,7 @@ async function loadHealth() {
       const data = await response.json();
       if (!data || data.ok === false) throw new Error("health inválido");
       aiConfigured = Boolean(data.aiConfigured);
-      status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · acesso protegido" : "IA configurada") : "modo exemplo · chave pendente"}${data.aiConfigured && data.resourceResearch && !data.youtubeConfigured ? " · vídeos aguardando chave" : ""}`;
+      status.innerHTML = `<span class="status-dot ${data.aiConfigured ? "online" : "warning"}"></span>${data.aiConfigured ? (data.accessRequired ? "IA configurada · acesso protegido" : "IA configurada") : `modo exemplo · chave pendente${data.missingKey ? ` (${data.missingKey}${data.environment ? ` não definida no ambiente ${data.environment}` : ""})` : ""}`}${data.aiConfigured && data.resourceResearch && !data.youtubeConfigured ? " · vídeos aguardando chave" : ""}`;
       if (!data.aiConfigured) {
         setButtonLabel($("#assist-button"), "IA pendente");
         setButtonLabel($("#generate-button"), "IA pendente");

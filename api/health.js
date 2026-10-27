@@ -1,5 +1,5 @@
 import { accessRequired } from "../src/access.js";
-import { getAIModel, getAIProvider, getAITokenSettings, isAIConfigured } from "../src/ai-client.js";
+import { aiConfigStatus, getAIModel, getAIProvider, getAITokenSettings, isAIConfigured } from "../src/ai-client.js";
 
 export default function handler(_request, response) {
   response.setHeader("Cache-Control", "no-store");
@@ -8,6 +8,8 @@ export default function handler(_request, response) {
     ok: true,
     aiConfigured: isAIConfigured(),
     provider: getAIProvider(),
+    missingKey: aiConfigStatus().missingKey,
+    environment: aiConfigStatus().environment,
     accessRequired: accessRequired(),
     resourceResearch: process.env.AULA_RESOURCE_RESEARCH !== "false",
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),

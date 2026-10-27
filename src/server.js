@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "./calculations.js";
 import { buildFallbackLesson, normalizeCourseInput, normalizeLesson, normalizeWeeklyOutput, slugify, validateLesson } from "./aula-schema.js";
 import { assistBriefing, generateOneWeek, generateWithAI, regenerateMediationMessageWithAI, regenerateWeekWithAI } from "./ai.js";
-import { getAIModel, getAIProvider, getAITokenSettings, isAIConfigured } from "./ai-client.js";
+import { aiConfigStatus, getAIModel, getAIProvider, getAITokenSettings, isAIConfigured } from "./ai-client.js";
 import { enrichLessonsWithResources } from "./research.js";
 import { createWeeksZip } from "./zip.js";
 import { accessRequired, hasValidAccess } from "./access.js";
@@ -36,6 +36,8 @@ app.get("/api/health", (_req, res) => {
     ok: true,
     aiConfigured: isAIConfigured(),
     provider: getAIProvider(),
+    missingKey: aiConfigStatus().missingKey,
+    environment: aiConfigStatus().environment,
     accessRequired: accessRequired(),
     resourceResearch: process.env.AULA_RESOURCE_RESEARCH !== "false",
     youtubeConfigured: Boolean(process.env.YOUTUBE_API_KEY),

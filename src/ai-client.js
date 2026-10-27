@@ -17,6 +17,13 @@ export function isAIConfigured() {
   return Boolean(getAIProvider() === "anthropic" ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY);
 }
 
+// Diagnóstico sem segredos: qual variável falta e em que ambiente da Vercel o servidor está rodando.
+export function aiConfigStatus() {
+  const provider = getAIProvider();
+  const keyName = provider === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY";
+  return { provider, keyName, configured: Boolean(process.env[keyName]), missingKey: process.env[keyName] ? null : keyName, environment: process.env.VERCEL_ENV || (process.env.VERCEL ? "vercel" : "local") };
+}
+
 function providerNumberSetting(name, fallback) {
   const providerKey = getAIProvider() === "anthropic" ? `ANTHROPIC_${name}` : `OPENAI_${name}`;
   return Number(process.env[`AI_${name}`] || process.env[providerKey] || process.env[`OPENAI_${name}`] || fallback);
