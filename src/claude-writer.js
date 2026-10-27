@@ -121,7 +121,7 @@ async function writeMarkdown(messages, options) {
 
 const DERIVATIVES_SYSTEM = `Você é designer instrucional de um curso de pós-graduação a distância. Recebe uma semana de material didático já escrita e produz, em JSON válido, as peças que dependem dela: avaliação, atividades, verificações formativas e mensagens de mediação. Tudo precisa ser respondível e verificável a partir do texto recebido; nunca cobre algo que o texto não ensinou. Escreva em português do Brasil, no mesmo tom do texto.`;
 
-function derivativesPrompt(input, index, plan, scheduledPractices) {
+export function derivativesPrompt(input, index, plan, scheduledPractices, part = "all") {
   const weekNumber = index + 1;
   const sections = (plan.contentSections || []).map((section) => `### ${section.number}. ${section.title}\n${plain(String(section.body || "").replace(/<[^>]+>/g, " "))}\n${(section.subsections || []).map((sub) => `#### ${sub.number} ${sub.title}\n${plain(String(sub.body || "").replace(/<[^>]+>/g, " "))}`).join("\n")}`).join("\n\n");
   const text = `${plain(String(plan.welcome || "").replace(/<[^>]+>/g, " "))}\n\n${sections}\n\nSÍNTESE: ${plain(String(plan.synthesis || "").replace(/<[^>]+>/g, " "))}`.slice(0, 40000);
@@ -134,14 +134,13 @@ ${listText(plan.learningObjectives)}
 
 Devolva somente este objeto JSON:
 {
-  "assessment": {
+${part === "guide" ? "" : `  "assessment": {
     "title": "Atividade avaliativa — Semana ${weekNumber}",
     "format": "6 questões objetivas de múltipla escolha, com 5 alternativas e feedback em todas elas",
     "questions": [
       { "type": "multiple-choice", "objective": "objetivo observável coberto", "q": "enunciado", "options": ["A","B","C","D","E"], "answer": 0, "explanation": "por que a correta está certa, citando o texto", "feedbackByOption": ["feedback da alternativa A","...B","...C","...D","...E"] }
     ]
-  },
-  "diagnostic": { "prompt": "pergunta de entrada ligada ao dia a dia do estudante", "expectedEvidence": "...", "feedback": "..." },
+  }`}${part === "all" ? ",\n" : ""}${part === "assessment" ? "" : `  "diagnostic": { "prompt": "pergunta de entrada ligada ao dia a dia do estudante", "expectedEvidence": "...", "feedback": "..." },
   "formativeChecks": [ { "moment": "Depois da seção N", "prompt": "pergunta", "expectedEvidence": "...", "feedback": "...", "action": "o que fazer se errar" } ],
   "activities": [ { "type": "fórum", "title": "...", "instructions": "...", "durationMinutes": 40, "evidence": "...", "evidenceType": "...", "feedback": "...", "criteria": ["..."], "required": true } ],
   "selfAssessment": { "title": "Autoavaliação", "prompts": ["..."], "scale": ["..."], "feedback": "..." },
@@ -152,35 +151,46 @@ Devolva somente este objeto JSON:
       "whatsapp": [ { "relatedId": "stop-1", "relatedType": "abertura", "timing": "...", "purpose": "...", "studentNeed": "...", "teacherIntent": "...", "tone": "próximo, com humor leve", "text": "mensagem curta, humana" } ],
       "moodle": [ { "relatedId": "stop-1", "relatedType": "abertura", "timing": "...", "purpose": "...", "studentNeed": "...", "teacherIntent": "...", "tone": "claro e organizado", "text": "aviso de curso organizado" } ]
     }${scheduledPractices.length ? ',\n    "webPracticeProjects": [ { "title": "...", "problem": "...", "context": "...", "studentRole": "...", "challenge": "...", "deliverable": "...", "steps": [ { "minutes": 10, "instructions": "...", "evidence": "..." } ], "criteria": ["..."], "fallbackPlan": "..." } ]' : ""}
-  }
+  }`}
 }
 
-REGRAS DA AVALIAÇÃO
+${part === "guide" ? "" : `REGRAS DA AVALIAÇÃO
 - Exatamente 6 questões, todas de múltipla escolha com EXATAMENTE 5 alternativas e uma única correta, cobrindo todos os objetivos. Não use verdadeiro/falso. "answer" é o índice (começando em 0, de 0 a 4) da alternativa correta; varie a posição da correta entre as questões.
 - Enunciados diretos, sem "todas as anteriores" e sem pegadinha de redação. As alternativas erradas devem ser plausíveis: erros reais de leitura do conceito, não absurdos.
 - "feedbackByOption" tem EXATAMENTE 5 entradas, na mesma ordem das alternativas, todas preenchidas: a da correta explica por que está certa (citando o texto); cada uma das 4 erradas explica o equívoco de leitura em uma ou duas frases e aponta a seção que o corrige (por exemplo, "releia a seção 3"). Nenhum feedback pode ser vazio ou genérico ("errado").
 - Nada de números, nomes ou datas que o texto não tenha dito.
 
-REGRAS DO MATERIAL DE MEDIAÇÃO
+`}${part === "assessment" ? "" : `REGRAS DO MATERIAL DE MEDIAÇÃO
 - Uma parada para a abertura, uma para cada verificação formativa ou atividade e uma para o fechamento. Para cada parada, uma mensagem de WhatsApp e uma de Moodle, de teor equivalente, mas não cópia: o WhatsApp é mais próximo e pode ter humor leve; o Moodle, mais organizado.
 - As mensagens explicam por que vale a pena fazer a etapa, reconhecem a dificuldade e convidam a uma ação concreta. Não invente data, link nem obrigação que não esteja no briefing.
 ${scheduledPractices.length ? `- Há webprática agendada para esta semana: desenvolva o projeto completo apenas em teacherGuide.webPracticeProjects (nunca no texto do aluno). Briefing da prática: ${JSON.stringify(scheduledPractices.map((practice, practiceIndex) => compactBriefingPractice(practice, practiceIndex)))}\n` : ""}
-Responda somente JSON válido.`;
+`}Responda somente JSON válido.`;
 }
 
+// A avaliação (6 questões × 5 alternativas × 5 feedbacks) e o material de mediação
+// somam mais saída do que cabe em uma só resposta. São duas chamadas em paralelo,
+// cada uma com o seu limite de saída; se uma falha, a outra não se perde na repetição
+// (o erro é da etapa inteira e a repetição refaz as duas).
 async function buildDerivatives(input, index, plan) {
   const scheduled = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index));
+  const call = (part, maxTokens) => callJson([
+    { role: "system", content: DERIVATIVES_SYSTEM },
+    { role: "user", content: derivativesPrompt(input, index, plan, scheduled, part) }
+  ], {
+    temperature: 0.35,
+    maxTokens,
+    cacheSystem: true,
+    formatRetryInstruction: `A resposta anterior foi truncada ou inválida. Devolva novamente somente o objeto JSON pedido (${part === "assessment" ? "assessment" : "diagnostic, formativeChecks, activities, selfAssessment, teacherGuide"}), sempre com JSON válido e completo.`
+  });
   try {
-    const data = await callJson([
-      { role: "system", content: DERIVATIVES_SYSTEM },
-      { role: "user", content: derivativesPrompt(input, index, plan, scheduled) }
-    ], {
-      temperature: 0.35,
-      maxTokens: 9000,
-      cacheSystem: true,
-      formatRetryInstruction: "A resposta anterior foi truncada ou inválida. Devolva novamente somente o objeto JSON (assessment, diagnostic, formativeChecks, activities, selfAssessment, teacherGuide), em versão mais compacta e sempre com JSON válido."
-    });
-    return { data: data && typeof data === "object" ? data : {}, error: "" };
+    // allSettled: não deixa uma chamada solta rodando (e gastando tokens) depois que a outra falhou.
+    const [assessmentResult, guideResult] = await Promise.allSettled([call("assessment", 8000), call("guide", 12000)]);
+    if (assessmentResult.status === "rejected") throw assessmentResult.reason;
+    if (guideResult.status === "rejected") throw guideResult.reason;
+    const assessment = assessmentResult.value;
+    const guide = guideResult.value;
+    const data = { ...(guide && typeof guide === "object" ? guide : {}), ...(assessment && typeof assessment === "object" && assessment.assessment ? { assessment: assessment.assessment } : {}) };
+    return { data, error: "" };
   } catch (error) {
     return { data: {}, error: error?.message || "Falha ao gerar a avaliação e o Material de Mediação." };
   }
