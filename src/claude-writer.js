@@ -78,7 +78,7 @@ Como revisar: reescreva o documento inteiro já com o pedido incorporado. O que 
 PÚBLICO E NÍVEL: ${input.audience || "estudantes de pós-graduação"} (${input.level || "pós-graduação"}), em ${input.language || "português do Brasil"}.
 
 MAPA DESTA SEMANA (obrigatório):
-- Título da semana: ${focus.theme}
+- Título da semana: escreva um título específico e curto (até 9 palavras, como o de um capítulo), tirado do assunto e dos objetivos abaixo; NÃO copie esta linha, que é só o rótulo interno do plano: ${focus.theme}
 - Pergunta central: ${focus.centralQuestion}
 - Objetivos (use estes, com estas palavras, na seção "Objetivos de aprendizagem"):
 ${listText(focus.objectives)}
@@ -162,7 +162,7 @@ function partInstruction({ part, total, range, outline, weekNumber, targets, clo
   const [from, to] = range;
   const scope = [
     part === 1 ? `começa com a linha de título do roteiro ("# Semana ${weekNumber} — …"), depois "## Boas-vindas", "## Objetivos de aprendizagem" e então as seções ${from} a ${to}` : `contém somente as seções ${from} a ${to}`,
-    closing ? 'e termina com "## Síntese conceitual", "## O que vem por aí", "## Glossário rápido desta semana", "## Referências desta semana" e "## Pontos a conferir"' : ""
+    closing ? `e termina com "## Síntese conceitual" (retoma o fio da semana, mínimo 120 palavras), "## O que vem por aí", "## Glossário rápido desta semana" (de 6 a 10 termos), "## Referências desta semana" (no mínimo ${targets.minimumReferences || 6} referências completas, das quais ao menos ${Math.max(2, targets.primarySourcesRequired || 2)} acadêmicas ou oficiais que você conhece com segurança: livros, artigos, normas, documentação) e "## Pontos a conferir"` : ""
   ].filter(Boolean).join(" ");
   return `ROTEIRO DA SEMANA (já definido; siga os números, os títulos e os casos de cada seção):
 ${outline}
@@ -189,9 +189,15 @@ ANTES DE ESCREVER, faça o ROTEIRO da semana. Responda somente com ele, neste fo
 1. Título da seção | cobre: o que a seção explica | caso ou dado concreto: instituição, ano, número, norma ou autor reais (marque "conferir" se não tiver certeza) | callouts: 🔎/💭/💡/⚠️ que entram
 2. …
 Uma linha por seção numerada, no mínimo ${targets.requiredSectionCount} seções, na ordem didática (problema, conceito, caso, lição, limite; contraponto crítico perto do fim). Casos e dados não podem se repetir entre seções. Distribua pelas seções, na coluna callouts, EXATAMENTE ${resources.videosPerWeek} callout(s) 🔎 de vídeo e ${resources.articlesPerWeek} de artigo, cada um na seção em que realmente ajuda, e diga o que o recurso mostra. Subseções e demais partes (boas-vindas, síntese, glossário) não entram no roteiro.`;
-  const outlineDraft = await callText([system, { role: "user", content: outlineAsk }], { temperature, maxTokens: 2500, ignoreRequestBudget: true, cacheSystem: true });
-  const outline = String(outlineDraft.text || "").trim();
-  const { sections } = parseOutline(outline);
+  const askOutline = (text) => callText([system, { role: "user", content: text }], { temperature, maxTokens: 3000, ignoreRequestBudget: true, cacheSystem: true });
+  let outline = String((await askOutline(outlineAsk)).text || "").trim();
+  let { sections } = parseOutline(outline);
+  if (sections.length < targets.requiredSectionCount) {
+    // Um roteiro curto vira uma semana curta: pede de novo, uma vez, com a exigência explícita.
+    const retry = String((await askOutline(`${outlineAsk}\n\nATENÇÃO: o roteiro anterior tinha só ${sections.length} seção(ões) e foi recusado. Entregue um roteiro com pelo menos ${targets.requiredSectionCount} seções numeradas, uma por linha.`)).text || "").trim();
+    const again = parseOutline(retry);
+    if (again.sections.length > sections.length) { outline = retry; sections = again.sections; }
+  }
   const ranges = splitSectionRanges(sections.length);
   if (!ranges.length) return single();
 
@@ -200,15 +206,23 @@ Uma linha por seção numerada, no mínimo ${targets.requiredSectionCount} seç�
     const closing = part === ranges.length;
     const count = range[1] - range[0] + 1;
     const words = count * targets.sectionTargetWords + (part === 1 ? 350 : 0) + (closing ? 1100 : 0);
-    const maxTokens = Math.min(12000, Math.max(3000, Math.ceil(words * 2.3) + 1200));
+    const maxTokens = Math.min(14000, Math.max(4000, Math.ceil(words * 2.6) + 1800));
     const user = `${base}\n\n${partInstruction({ part, total: ranges.length, range, outline, weekNumber, targets, closing })}`;
     return writeMarkdown([system, { role: "user", content: user }], { temperature, maxTokens, ignoreRequestBudget: true, continuation: "Sua resposta foi cortada pelo limite de saída. Continue exatamente de onde parou, sem repetir nada, e termine somente o que cabe a esta parte." });
   });
   const settled = await Promise.allSettled(jobs);
   const failed = settled.find((item) => item.status === "rejected");
   if (failed) throw failed.reason;
-  const texts = settled.map((item) => item.value.text.trim());
-  return { text: texts.join("\n\n"), truncated: settled.some((item) => item.value.truncated) };
+  let text = settled.map((item) => item.value.text.trim()).join("\n\n");
+  let truncated = settled.some((item) => item.value.truncated);
+  // Rede de segurança: se o fechamento veio cortado ou incompleto, pede só o que falta.
+  const missing = ["Síntese conceitual", "O que vem por aí", "Glossário rápido desta semana", "Referências desta semana", "Pontos a conferir"].filter((heading) => !new RegExp(`^##\\s*${heading}`, "im").test(text));
+  if (missing.length) {
+    const closing = await callText([system, { role: "user", content: `${base}\n\nROTEIRO DA SEMANA:\n${outline}\n\nTEXTO JÁ ESCRITO (não reescreva nada dele):\n<<<\n${text.slice(-30000)}\n>>>\n\nSUA TAREFA: escreva SOMENTE as seções que faltam, nesta ordem e com estes cabeçalhos: ${missing.map((heading) => `"## ${heading}"`).join(", ")}. Referências: no mínimo ${targets.minimumReferences || 6}, completas e que você conhece com segurança. Comece direto no Markdown.` }], { temperature, maxTokens: 6000, ignoreRequestBudget: true, cacheSystem: true });
+    text = `${text}\n\n${closing.text.trim()}`;
+    truncated = Boolean(closing.truncated);
+  }
+  return { text, truncated };
 }
 
 const DERIVATIVES_SYSTEM = `Você é designer instrucional de um curso de pós-graduação a distância. Recebe uma semana de material didático já escrita e produz, em JSON válido, as peças que dependem dela: avaliação, atividades, verificações formativas e mensagens de mediação. Tudo precisa ser respondível e verificável a partir do texto recebido; nunca cobre algo que o texto não ensinou. Escreva em português do Brasil, no mesmo tom do texto.`;

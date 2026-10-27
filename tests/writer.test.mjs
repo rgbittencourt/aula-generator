@@ -425,12 +425,14 @@ const OUTLINE = `# Semana 2 — Dados e decisão
 3. Caso | cobre: o caso | caso ou dado concreto: Caso C | callouts: 💡
 4. Lição | cobre: a lição | caso ou dado concreto: Caso D | callouts: ⚠️
 5. Limite | cobre: o limite | caso ou dado concreto: Caso E | callouts: 💭
-6. Contraponto | cobre: o custo | caso ou dado concreto: Caso F | callouts: 🔎`;
+6. Contraponto | cobre: o custo | caso ou dado concreto: Caso F | callouts: 🔎
+7. Aplicação | cobre: o uso | caso ou dado concreto: Caso G | callouts: 💡`;
+const OUTLINE_SHORT = OUTLINE.split("\n").slice(0, 5).join("\n");
 
 test("roteiro: parseOutline conta seções numeradas e splitSectionRanges divide em 2 ou 3 partes", () => {
   const { title, sections } = parseOutline(OUTLINE);
   assert.match(title, /^# Semana 2/);
-  assert.equal(sections.length, 6);
+  assert.equal(sections.length, 7);
   assert.deepEqual(splitSectionRanges(6), [[1, 2], [3, 4], [5, 6]]);
   assert.deepEqual(splitSectionRanges(8), [[1, 3], [4, 6], [7, 8]]);
   assert.deepEqual(splitSectionRanges(4), [[1, 2], [3, 4]]);
@@ -446,15 +448,15 @@ test("redação em partes: um roteiro curto e três partes escritas ao mesmo tem
       if (isDerivatives(body)) return reply(JSON.stringify(DERIVATIVES));
       if (/ANTES DE ESCREVER/.test(user)) return reply(OUTLINE);
       const part = Number((user.match(/PARTE (\d) de 3/) || [])[1]);
-      if (part === 1) return reply("# Semana 2 — Dados e decisão\n\n## Boas-vindas\n\nOlá.\n\n## Objetivos de aprendizagem\n- Explicar X.\n\n## 1. Problema\n\nTexto 1.\n\n## 2. Conceito\n\nTexto 2.");
-      if (part === 2) return reply("## 3. Caso\n\nTexto 3.\n\n## 4. Lição\n\nTexto 4.");
-      return reply("## 5. Limite\n\nTexto 5.\n\n## 6. Contraponto\n\nTexto 6.\n\n## Síntese conceitual\n\nFecha.\n\n## O que vem por aí\n\nSemana 3.\n\n## Glossário rápido desta semana\n- **Termo**: definição.\n\n## Referências desta semana\n- Ref.\n\n## Pontos a conferir\n- [seção 1] Algo.");
+      if (part === 1) return reply("# Semana 2 — Dados e decisão\n\n## Boas-vindas\n\nOlá.\n\n## Objetivos de aprendizagem\n- Explicar X.\n\n## 1. Problema\n\nTexto 1.\n\n## 2. Conceito\n\nTexto 2.\n\n## 3. Caso\n\nTexto 3.");
+      if (part === 2) return reply("## 4. Lição\n\nTexto 4.\n\n## 5. Limite\n\nTexto 5.");
+      return reply("## 6. Contraponto\n\nTexto 6.\n\n## 7. Aplicação\n\nTexto 7.\n\n## Síntese conceitual\n\nFecha.\n\n## O que vem por aí\n\nSemana 3.\n\n## Glossário rápido desta semana\n- **Termo**: definição.\n\n## Referências desta semana\n- Ref.\n\n## Pontos a conferir\n- [seção 1] Algo.");
     }, async (calls) => {
       const raw = await generateOneWeek(input, 1, { deferDerivatives: true });
       assert.equal(calls.length, 4, "roteiro + 3 partes");
       const sections = raw.lessonPlan.contentSections.map((section) => section.title);
-      assert.deepEqual(sections, ["Problema", "Conceito", "Caso", "Lição", "Limite", "Contraponto"]);
-      assert.equal(raw.lessonPlan.contentSections.length, 6);
+      assert.deepEqual(sections, ["Problema", "Conceito", "Caso", "Lição", "Limite", "Contraponto", "Aplicação"]);
+      assert.equal(raw.lessonPlan.contentSections.length, 7);
       assert.ok(raw.lessonPlan.synthesis);
     });
   } finally {
@@ -467,8 +469,34 @@ test("redação em partes: roteiro inaproveitável volta para uma chamada só", 
   try {
     await withFetch((body) => isDerivatives(body) ? reply(JSON.stringify(DERIVATIVES)) : reply(MARKDOWN), async (calls) => {
       const raw = await generateOneWeek(input, 1, { deferDerivatives: true });
-      assert.equal(calls.length, 2, "roteiro inútil + redação inteira");
+      assert.equal(calls.length, 3, "roteiro inútil, nova tentativa do roteiro e redação inteira");
       assert.ok(raw.lessonPlan.contentSections.length >= 2);
+    });
+  } finally {
+    process.env.AULA_WRITER_PARALLEL = "false";
+  }
+});
+
+test("redação em partes: roteiro curto demais é pedido de novo uma vez", async () => {
+  process.env.AULA_WRITER_PARALLEL = "true";
+  try {
+    let outlineCalls = 0;
+    await withFetch((body) => {
+      const user = body.messages.filter((message) => message.role === "user").map((message) => message.content).join("\n");
+      if (isDerivatives(body)) return reply(JSON.stringify(DERIVATIVES));
+      if (/ANTES DE ESCREVER/.test(user)) { outlineCalls += 1; return reply(outlineCalls === 1 ? OUTLINE_SHORT : OUTLINE); }
+      const part = Number((user.match(/PARTE (\d) de 3/) || [])[1]);
+      if (part === 1) return reply("# Semana 2 — Dados e decisão\n\n## Boas-vindas\n\nOlá.\n\n## Objetivos de aprendizagem\n- Explicar X.\n\n## 1. Problema\n\nT1.\n\n## 2. Conceito\n\nT2.\n\n## 3. Caso\n\nT3.");
+      if (part === 2) return reply("## 4. Lição\n\nT4.\n\n## 5. Limite\n\nT5.");
+      // Fechamento sem referências nem pontos a conferir: a rede de segurança pede só o que falta.
+      if (part === 3) return reply("## 6. Contraponto\n\nT6.\n\n## 7. Aplicação\n\nT7.\n\n## Síntese conceitual\n\nFecha.\n\n## O que vem por aí\n\nSemana 3.\n\n## Glossário rápido desta semana\n- **Termo**: definição.");
+      return reply("## Referências desta semana\n- Ref A.\n\n## Pontos a conferir\n- [seção 1] Algo.");
+    }, async (calls) => {
+      const raw = await generateOneWeek(input, 1, { deferDerivatives: true });
+      assert.equal(outlineCalls, 2);
+      assert.equal(raw.lessonPlan.contentSections.length, 7);
+      assert.ok(raw.lessonPlan.references.length >= 1, "referências vieram do complemento de fechamento");
+      assert.equal(calls.length, 6, "2 roteiros + 3 partes + 1 complemento");
     });
   } finally {
     process.env.AULA_WRITER_PARALLEL = "false";
