@@ -170,7 +170,7 @@ ${outline}
 SUA TAREFA AGORA: a semana será escrita em ${total} partes simultâneas, unidas depois na ordem. Você escreve somente a PARTE ${part} de ${total}: ela ${scope}.
 - Use os cabeçalhos "## n. Título" exatamente como estão no roteiro; subseções "### n.1 …" quando o conceito pedir.
 - Não escreva nada das outras partes e não repita o caso ou o dado que o roteiro atribui a outra seção. Nada de introdução ou conclusão própria da parte: comece direto no Markdown e, ${closing ? "ao chegar à síntese, retome os casos do roteiro, o contraponto e os conceitos novos" : "na última seção desta parte, deixe uma tensão que a seção seguinte do roteiro resolve"}.
-- Cada seção com cerca de ${targets.sectionTargetWords} palavras (mínimo ${targets.sectionMinimumWords}); os callouts 🔎, 💭, 💡 e ⚠️ ficam nas seções desta parte, conforme o roteiro.
+- Cada seção com cerca de ${targets.sectionTargetWords} palavras (mínimo ${targets.sectionMinimumWords}); inclua em cada seção desta parte TODOS os callouts 🔎 (vídeo, artigo) que o roteiro lhe atribui, no parágrafo exato em que ajudam, mais os 💭, 💡 e ⚠️ conforme o roteiro. Sem esses 🔎 a semana fica sem recursos.
 - Esta instrução vale mais do que qualquer outra que peça o documento inteiro.`;
 }
 
@@ -181,13 +181,14 @@ async function writeWeekMarkdown(input, index, { progression, previousWeeks, bri
   if (!writerParallelEnabled()) return single();
 
   const weekNumber = index + 1;
+  const resources = resourcePlanForWeek(input, index);
   const outlineAsk = `${base}
 
 ANTES DE ESCREVER, faça o ROTEIRO da semana. Responda somente com ele, neste formato, sem texto antes ou depois:
 # Semana ${weekNumber} — Título da semana
 1. Título da seção | cobre: o que a seção explica | caso ou dado concreto: instituição, ano, número, norma ou autor reais (marque "conferir" se não tiver certeza) | callouts: 🔎/💭/💡/⚠️ que entram
 2. …
-Uma linha por seção numerada, no mínimo ${targets.requiredSectionCount} seções, na ordem didática (problema, conceito, caso, lição, limite; contraponto crítico perto do fim). Casos e dados não podem se repetir entre seções. Subseções e demais partes (boas-vindas, síntese, glossário) não entram no roteiro.`;
+Uma linha por seção numerada, no mínimo ${targets.requiredSectionCount} seções, na ordem didática (problema, conceito, caso, lição, limite; contraponto crítico perto do fim). Casos e dados não podem se repetir entre seções. Distribua pelas seções, na coluna callouts, EXATAMENTE ${resources.videosPerWeek} callout(s) 🔎 de vídeo e ${resources.articlesPerWeek} de artigo, cada um na seção em que realmente ajuda, e diga o que o recurso mostra. Subseções e demais partes (boas-vindas, síntese, glossário) não entram no roteiro.`;
   const outlineDraft = await callText([system, { role: "user", content: outlineAsk }], { temperature, maxTokens: 2500, ignoreRequestBudget: true, cacheSystem: true });
   const outline = String(outlineDraft.text || "").trim();
   const { sections } = parseOutline(outline);
@@ -216,6 +217,44 @@ export function derivativesPrompt(input, index, plan, scheduledPractices, part =
   const weekNumber = index + 1;
   const sections = (plan.contentSections || []).map((section) => `### ${section.number}. ${section.title}\n${plain(String(section.body || "").replace(/<[^>]+>/g, " "))}\n${(section.subsections || []).map((sub) => `#### ${sub.number} ${sub.title}\n${plain(String(sub.body || "").replace(/<[^>]+>/g, " "))}`).join("\n")}`).join("\n\n");
   const text = `${plain(String(plan.welcome || "").replace(/<[^>]+>/g, " "))}\n\n${sections}\n\nSÍNTESE: ${plain(String(plan.synthesis || "").replace(/<[^>]+>/g, " "))}`.slice(0, 40000);
+  const wants = {
+    assessment: ["all", "assessment"].includes(part),
+    activities: ["all", "guide", "activities"].includes(part),
+    mediation: ["all", "guide", "mediation"].includes(part)
+  };
+  const assessmentSpec = `  "assessment": {
+    "title": "Atividade avaliativa — Semana ${weekNumber}",
+    "format": "6 questões objetivas de múltipla escolha, com 5 alternativas e feedback em todas elas",
+    "questions": [
+      { "type": "multiple-choice", "objective": "objetivo observável coberto", "q": "enunciado", "options": ["A","B","C","D","E"], "answer": 0, "explanation": "por que a correta está certa, citando o texto", "feedbackByOption": ["feedback da alternativa A","...B","...C","...D","...E"] }
+    ]
+  }`;
+  const activitiesSpec = `  "diagnostic": { "prompt": "pergunta de entrada ligada ao dia a dia do estudante", "expectedEvidence": "...", "feedback": "..." },
+  "formativeChecks": [ { "moment": "Depois da seção N", "prompt": "pergunta", "expectedEvidence": "...", "feedback": "...", "action": "o que fazer se errar" } ],
+  "activities": [ { "type": "fórum", "title": "...", "instructions": "...", "durationMinutes": 40, "evidence": "...", "evidenceType": "...", "feedback": "...", "criteria": ["..."], "required": true } ],
+  "selfAssessment": { "title": "Autoavaliação", "prompts": ["..."], "scale": ["..."], "feedback": "..." }`;
+  const mediationSpec = `  "teacherGuide": {
+    "resourceNotes": ["orientação ao professor sobre os recursos desta semana"],
+    "mediationStops": [ { "id": "stop-1", "title": "Abertura", "timing": "início da semana", "purpose": "..." } ],
+    "mediationMessages": {
+      "whatsapp": [ { "relatedId": "stop-1", "relatedType": "abertura", "timing": "...", "purpose": "...", "studentNeed": "...", "teacherIntent": "...", "tone": "próximo, com humor leve", "text": "mensagem curta, humana" } ],
+      "moodle": [ { "relatedId": "stop-1", "relatedType": "abertura", "timing": "...", "purpose": "...", "studentNeed": "...", "teacherIntent": "...", "tone": "claro e organizado", "text": "aviso de curso organizado" } ]
+    }${scheduledPractices.length ? ',\n    "webPracticeProjects": [ { "title": "...", "problem": "...", "context": "...", "studentRole": "...", "challenge": "...", "deliverable": "...", "steps": [ { "minutes": 10, "instructions": "...", "evidence": "..." } ], "criteria": ["..."], "fallbackPlan": "..." } ]' : ""}
+  }`;
+  const specs = [wants.assessment && assessmentSpec, wants.activities && activitiesSpec, wants.mediation && mediationSpec].filter(Boolean);
+  const rules = [
+    wants.assessment && `REGRAS DA AVALIAÇÃO
+- Exatamente 6 questões, todas de múltipla escolha com EXATAMENTE 5 alternativas e uma única correta, cobrindo todos os objetivos. Não use verdadeiro/falso. "answer" é o índice (começando em 0, de 0 a 4) da alternativa correta; varie a posição da correta entre as questões.
+- Enunciados diretos, sem "todas as anteriores" e sem pegadinha de redação. As alternativas erradas devem ser plausíveis: erros reais de leitura do conceito, não absurdos.
+- "feedbackByOption" tem EXATAMENTE 5 entradas, na mesma ordem das alternativas, todas preenchidas: a da correta explica por que está certa (citando o texto); cada uma das 4 erradas explica o equívoco de leitura em uma ou duas frases e aponta a seção que o corrige (por exemplo, "releia a seção 3"). Nenhum feedback pode ser vazio ou genérico ("errado").
+- Nada de números, nomes ou datas que o texto não tenha dito.`,
+    wants.activities && `REGRAS DAS ATIVIDADES
+- Diagnóstico de entrada curto; de 2 a 4 verificações formativas ao longo das seções; de 2 a 3 atividades (por exemplo, fórum e um produto curto) com critérios observáveis; autoavaliação com escala. Tudo respondível a partir do texto, sem inventar dados.`,
+    wants.mediation && `REGRAS DO MATERIAL DE MEDIAÇÃO
+- Uma parada para a abertura, uma ao final de cada bloco de duas ou três seções do texto (de 3 a 5 no total) e uma para o fechamento. Para cada parada, uma mensagem de WhatsApp e uma de Moodle, de teor equivalente, mas não cópia: o WhatsApp é mais próximo e pode ter humor leve; o Moodle, mais organizado. Mensagens curtas.
+- As mensagens explicam por que vale a pena fazer a etapa, reconhecem a dificuldade e convidam a uma ação concreta. Não invente data, link nem obrigação que não esteja no briefing.
+${scheduledPractices.length ? `- Há webprática agendada para esta semana: desenvolva o projeto completo apenas em teacherGuide.webPracticeProjects (nunca no texto do aluno). Briefing da prática: ${JSON.stringify(scheduledPractices.map((practice, practiceIndex) => compactBriefingPractice(practice, practiceIndex)))}` : ""}`
+  ].filter(Boolean);
   return `Texto da semana ${weekNumber} ("${plan.theme}") do curso "${input.title}":
 
 ${text}
@@ -225,37 +264,10 @@ ${listText(plan.learningObjectives)}
 
 Devolva somente este objeto JSON:
 {
-${part === "guide" ? "" : `  "assessment": {
-    "title": "Atividade avaliativa — Semana ${weekNumber}",
-    "format": "6 questões objetivas de múltipla escolha, com 5 alternativas e feedback em todas elas",
-    "questions": [
-      { "type": "multiple-choice", "objective": "objetivo observável coberto", "q": "enunciado", "options": ["A","B","C","D","E"], "answer": 0, "explanation": "por que a correta está certa, citando o texto", "feedbackByOption": ["feedback da alternativa A","...B","...C","...D","...E"] }
-    ]
-  }`}${part === "all" ? ",\n" : ""}${part === "assessment" ? "" : `  "diagnostic": { "prompt": "pergunta de entrada ligada ao dia a dia do estudante", "expectedEvidence": "...", "feedback": "..." },
-  "formativeChecks": [ { "moment": "Depois da seção N", "prompt": "pergunta", "expectedEvidence": "...", "feedback": "...", "action": "o que fazer se errar" } ],
-  "activities": [ { "type": "fórum", "title": "...", "instructions": "...", "durationMinutes": 40, "evidence": "...", "evidenceType": "...", "feedback": "...", "criteria": ["..."], "required": true } ],
-  "selfAssessment": { "title": "Autoavaliação", "prompts": ["..."], "scale": ["..."], "feedback": "..." },
-  "teacherGuide": {
-    "resourceNotes": ["orientação ao professor sobre os recursos desta semana"],
-    "mediationStops": [ { "id": "stop-1", "title": "Abertura", "timing": "início da semana", "purpose": "..." } ],
-    "mediationMessages": {
-      "whatsapp": [ { "relatedId": "stop-1", "relatedType": "abertura", "timing": "...", "purpose": "...", "studentNeed": "...", "teacherIntent": "...", "tone": "próximo, com humor leve", "text": "mensagem curta, humana" } ],
-      "moodle": [ { "relatedId": "stop-1", "relatedType": "abertura", "timing": "...", "purpose": "...", "studentNeed": "...", "teacherIntent": "...", "tone": "claro e organizado", "text": "aviso de curso organizado" } ]
-    }${scheduledPractices.length ? ',\n    "webPracticeProjects": [ { "title": "...", "problem": "...", "context": "...", "studentRole": "...", "challenge": "...", "deliverable": "...", "steps": [ { "minutes": 10, "instructions": "...", "evidence": "..." } ], "criteria": ["..."], "fallbackPlan": "..." } ]' : ""}
-  }`}
+${specs.join(",\n")}
 }
 
-${part === "guide" ? "" : `REGRAS DA AVALIAÇÃO
-- Exatamente 6 questões, todas de múltipla escolha com EXATAMENTE 5 alternativas e uma única correta, cobrindo todos os objetivos. Não use verdadeiro/falso. "answer" é o índice (começando em 0, de 0 a 4) da alternativa correta; varie a posição da correta entre as questões.
-- Enunciados diretos, sem "todas as anteriores" e sem pegadinha de redação. As alternativas erradas devem ser plausíveis: erros reais de leitura do conceito, não absurdos.
-- "feedbackByOption" tem EXATAMENTE 5 entradas, na mesma ordem das alternativas, todas preenchidas: a da correta explica por que está certa (citando o texto); cada uma das 4 erradas explica o equívoco de leitura em uma ou duas frases e aponta a seção que o corrige (por exemplo, "releia a seção 3"). Nenhum feedback pode ser vazio ou genérico ("errado").
-- Nada de números, nomes ou datas que o texto não tenha dito.
-
-`}${part === "assessment" ? "" : `REGRAS DO MATERIAL DE MEDIAÇÃO
-- Uma parada para a abertura, uma para cada verificação formativa ou atividade e uma para o fechamento. Para cada parada, uma mensagem de WhatsApp e uma de Moodle, de teor equivalente, mas não cópia: o WhatsApp é mais próximo e pode ter humor leve; o Moodle, mais organizado.
-- As mensagens explicam por que vale a pena fazer a etapa, reconhecem a dificuldade e convidam a uma ação concreta. Não invente data, link nem obrigação que não esteja no briefing.
-${scheduledPractices.length ? `- Há webprática agendada para esta semana: desenvolva o projeto completo apenas em teacherGuide.webPracticeProjects (nunca no texto do aluno). Briefing da prática: ${JSON.stringify(scheduledPractices.map((practice, practiceIndex) => compactBriefingPractice(practice, practiceIndex)))}\n` : ""}
-`}Responda somente JSON válido.`;
+${rules.join("\n\n")}${rules.length ? "\n\n" : ""}Responda somente JSON válido.`;
 }
 
 // A avaliação (6 questões × 5 alternativas × 5 feedbacks) e o material de mediação
@@ -264,6 +276,7 @@ ${scheduledPractices.length ? `- Há webprática agendada para esta semana: dese
 // (o erro é da etapa inteira e a repetição refaz as duas).
 async function buildDerivatives(input, index, plan) {
   const scheduled = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index));
+  const names = { assessment: "assessment", activities: "diagnostic, formativeChecks, activities, selfAssessment", mediation: "teacherGuide" };
   const call = (part, maxTokens) => callJson([
     { role: "system", content: DERIVATIVES_SYSTEM },
     { role: "user", content: derivativesPrompt(input, index, plan, scheduled, part) }
@@ -271,16 +284,16 @@ async function buildDerivatives(input, index, plan) {
     temperature: 0.35,
     maxTokens,
     cacheSystem: true,
-    formatRetryInstruction: `A resposta anterior foi truncada ou inválida. Devolva novamente somente o objeto JSON pedido (${part === "assessment" ? "assessment" : "diagnostic, formativeChecks, activities, selfAssessment, teacherGuide"}), sempre com JSON válido e completo.`
+    formatRetryInstruction: `A resposta anterior foi truncada ou inválida. Devolva novamente somente o objeto JSON pedido (${names[part]}), sempre com JSON válido e completo.`
   });
   try {
     // allSettled: não deixa uma chamada solta rodando (e gastando tokens) depois que a outra falhou.
-    const [assessmentResult, guideResult] = await Promise.allSettled([call("assessment", 8000), call("guide", 12000)]);
-    if (assessmentResult.status === "rejected") throw assessmentResult.reason;
-    if (guideResult.status === "rejected") throw guideResult.reason;
-    const assessment = assessmentResult.value;
-    const guide = guideResult.value;
-    const data = { ...(guide && typeof guide === "object" ? guide : {}), ...(assessment && typeof assessment === "object" && assessment.assessment ? { assessment: assessment.assessment } : {}) };
+    const results = await Promise.allSettled([call("assessment", 8000), call("activities", 6000), call("mediation", 8000)]);
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed) throw failed.reason;
+    const [assessment, activities, mediation] = results.map((result) => result.value);
+    const object = (value) => (value && typeof value === "object" ? value : {});
+    const data = { ...object(activities), ...object(mediation), ...(object(assessment).assessment ? { assessment: assessment.assessment } : {}) };
     return { data, error: "" };
   } catch (error) {
     return { data: {}, error: error?.message || "Falha ao gerar a avaliação e o Material de Mediação." };

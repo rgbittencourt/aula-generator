@@ -1995,7 +1995,7 @@ async function enrichGeneratedWeek(data, input, index, headers, button) {
   setButtonLabel(button, `Pesquisando recursos da semana ${index + 1}…`);
   setAiActivity("Localizando recursos", `A semana ${index + 1} já foi escrita. Pesquisando vídeos, imagens e leituras em uma etapa separada…`, { progress: Math.round(((index + 0.7) / (input.weeks + 1)) * 100) });
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 26000);
+  const timer = setTimeout(() => controller.abort(), 150000);
   try {
     const response = await fetch("/api/enrich-week", {
       method: "POST",

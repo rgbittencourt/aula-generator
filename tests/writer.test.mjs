@@ -172,10 +172,11 @@ test("modo de prosa: duas chamadas (texto e derivados), blocos no formato de ref
   await withFetch((body) => isDerivatives(body) ? reply(JSON.stringify(DERIVATIVES)) : reply(MARKDOWN), async (calls) => {
     const bridge = summarizeWeekBridge({ lessonPlan: { weekNumber: 1, theme: "Fundamentos", nextWeekConnection: "Gancho único QWERTY-77 para a semana seguinte, sobre sistemas.", glossary: [{ term: "DIKW" }] } }, 0);
     const raw = await generateOneWeek(input, 1, { deferRepair: true, singlePass: true, bridges: [bridge] });
-    assert.equal(calls.length, 3, "uma chamada de redação e duas de derivados (avaliação; resto)");
+    assert.equal(calls.length, 4, "uma chamada de redação e três de derivados (avaliação; atividades; mediação)");
     const derivativeCalls = calls.slice(1).map((call) => call.body.messages[1].content);
     assert.equal(derivativeCalls.filter((text) => /REGRAS DA AVALIAÇÃO/.test(text) && !/REGRAS DO MATERIAL DE MEDIAÇÃO/.test(text)).length, 1, "uma chamada só para a avaliação");
     assert.equal(derivativeCalls.filter((text) => /REGRAS DO MATERIAL DE MEDIAÇÃO/.test(text) && !/REGRAS DA AVALIAÇÃO/.test(text)).length, 1, "outra para o material de mediação");
+    assert.equal(derivativeCalls.filter((text) => /REGRAS DAS ATIVIDADES/.test(text)).length, 1, "e outra para as atividades");
     const writerCall = calls[0].body;
     assert.match(writerCall.messages[0].content, /EXEMPLO DE VOZ/, "guia de voz vai no system");
     assert.doesNotMatch(JSON.stringify(writerCall.response_format || ""), /json_object/, "redação em texto livre, sem modo JSON");
@@ -217,7 +218,7 @@ test("modo de prosa na Anthropic usa cache de prompt no system e temperatura de 
     process.env.ANTHROPIC_API_KEY = "k";
     try {
       await generateOneWeek(input, 1, { deferRepair: true, singlePass: true });
-      assert.equal(calls.length, 3);
+      assert.equal(calls.length, 4);
       assert.equal(calls[0].body.system[0].cache_control.type, "ephemeral");
       assert.ok(calls.every((call) => !("temperature" in call.body)), "Anthropic recusa temperature em modelos recentes");
       assert.match(calls[0].body.system[0].text, /EXEMPLO DE VOZ/);
@@ -261,7 +262,7 @@ test("refação em prosa envia o texto atual e o pedido, preserva o resto e refa
   const current = normalizeLesson({ lessonPlan: { ...lessonPlan, ...DERIVATIVES } }, input, 1);
   await withFetch((body) => isDerivatives(body) ? reply(JSON.stringify(DERIVATIVES)) : reply(MARKDOWN.replace("Ifal", "IFG")), async (calls) => {
     const raw = await regenerateWeekWithAI(input, 1, current, "Troque o caso do Ifal pelo do IFG.");
-    assert.equal(calls.length, 3);
+    assert.equal(calls.length, 4);
     const prompt = calls[0].body.messages[1].content;
     assert.match(prompt, /TEXTO ATUAL DA SEMANA/);
     assert.match(prompt, /Troque o caso do Ifal pelo do IFG\./);
@@ -294,7 +295,7 @@ test("com deferDerivatives a redação sai sozinha e os derivados vêm de /api/d
       const response = { headers: {}, statusCode: 200, setHeader() {}, status(code) { this.statusCode = code; return this; }, json(payload) { resolve({ status: this.statusCode, body: payload }); } };
       Promise.resolve(derivativesHandler({ method: "POST", headers: {}, body: { action: "derivatives", input, weekIndex: 1, week, teacherGuide: raw.teacherGuide } }, response)).catch(reject);
     });
-    assert.equal(calls.length, 3, "redação + duas chamadas de derivados");
+    assert.equal(calls.length, 4, "redação + três chamadas de derivados");
     assert.equal(result.status, 200);
     assert.equal(result.body.generation.derivativesPending, false);
     assert.equal(result.body.week.generationMeta.derivativesPending, false);
