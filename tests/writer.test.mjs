@@ -399,3 +399,17 @@ Depois da tabela.
   assert.deepEqual(tabela.props.rows[0], ["Pedagógica", "AVA e analytics"]);
   assert.ok(!topic.props.children.some((c) => c.type === "prose" && /<table/.test(c.props.body)), "sem <table> solto em prosa");
 });
+
+test("api/regenerate-week escreve o texto e deixa a avaliação para /api/derivatives (uma chamada só)", async () => {
+  await withFetch((body) => isDerivatives(body) ? reply(JSON.stringify(DERIVATIVES)) : reply(MARKDOWN), async (calls) => {
+    const { default: regenerate } = await import("../api/regenerate-week.js");
+    const current = normalizeLesson({ lessonPlan: parseWeekMarkdown(MARKDOWN, { weekNumber: 2 }).lessonPlan }, input, 1);
+    const result = await new Promise((resolve, reject) => {
+      const response = { setHeader() {}, statusCode: 200, status(code) { this.statusCode = code; return this; }, json(payload) { resolve({ status: this.statusCode, body: payload }); } };
+      Promise.resolve(regenerate({ method: "POST", headers: {}, body: { input, weekIndex: 1, instruction: "Mais exemplos.", weeks: [current, current] } }, response)).catch(reject);
+    });
+    assert.equal(result.status, 200, result.body?.error);
+    assert.equal(calls.length, 1, "só a redação; avaliação e mediação saem em /api/derivatives");
+    assert.equal(result.body.week.generationMeta.derivativesPending, true);
+  });
+});

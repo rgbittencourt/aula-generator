@@ -1482,7 +1482,8 @@ async function regenerateSelectedWeek() {
     openLessonPreview(index);
     finishAiActivity("Semana refeita", `A semana ${index + 1} foi atualizada. Revise a nova versão antes de exportar.`, "success");
   } catch (error) {
-    $("#regenerate-note").textContent = error.message;
+    $("#regenerate-note").textContent = `A semana NÃO foi alterada: ${error.message}`;
+    $("#regenerate-note").scrollIntoView({ block: "center", behavior: "smooth" });
     finishAiActivity("Semana não refeita", error.message, "error");
   } finally {
     setBusy(button, false, "");

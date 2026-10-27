@@ -29,7 +29,10 @@ export default async function handler(request, response) {
     const currentWeeks = partial
       ? submittedWeeks.map((week, weekIndex) => normalizeLesson(week, input, weekIndex))
       : normalizeWeeklyOutput({ weeks: submittedWeeks }, input);
-    const raw = await regenerateWeekWithAI(input, index, currentWeeks[index], instruction);
+    // A redação e a avaliação saem em requisições separadas (o cliente chama /api/derivatives
+    // em seguida), como na geração: escrever o texto + 2 chamadas de derivados numa só
+    // requisição estourava o limite de 300 s da hospedagem e a semana ficava como estava.
+    const raw = await regenerateWeekWithAI(input, index, currentWeeks[index], instruction, { previousWeeks: currentWeeks.slice(0, index), deferDerivatives: true });
     const normalized = normalizeLesson(raw, input, index);
     const weeks = currentWeeks.map((week, weekIndex) => weekIndex === index ? normalized : week);
     if (partial) {
