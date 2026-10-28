@@ -4,8 +4,8 @@ const text = (value, fallback = "") => String(value ?? "").trim() || fallback;
 // Crédito do aplicativo, presente nos arquivos gerados (meta do ClassAtelier, PDF, Moodle XML, JSON do ClassAuthor).
 export const APP_NAME = "ClassAuthor";
 export const GENERATOR_TOOL = `${APP_NAME} (INOVALAB - IFSC)`;
-export const GENERATOR_CREDIT = `Aula elaborada com ${APP_NAME}, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.`;
-const GENERATOR_CREDIT_HTML = `<p style="text-align:center;font-size:.85em;opacity:.8">Aula elaborada com <strong>${APP_NAME}</strong>, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.</p>`;
+export const GENERATOR_CREDIT = `Conteúdo elaborado com ${APP_NAME}, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.`;
+const GENERATOR_CREDIT_HTML = `<p style="text-align:center;font-size:.85em;opacity:.8">Conteúdo elaborado com <strong>${APP_NAME}</strong>, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.</p>`;
 
 const escapeHtml = (value) => text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -206,7 +206,7 @@ export function toStudentLesson(lesson = {}) {
   };
 }
 
-// Rodapé de autoria no fim da aula, como "Aula elaborada com ...": o último bloco da aula do ClassAtelier.
+// Rodapé de autoria no fim da aula, como "Conteúdo elaborado com ...": o último bloco da aula do ClassAtelier.
 function creditBlock(weekNumber) {
   const week = Number(weekNumber || 0) || 0;
   return { id: `b-credit-${String(week).padStart(2, "0")}`, type: "topic", bg: "neutral-default", pad: "normal", props: { children: [{ id: `c-credit-${String(week).padStart(2, "0")}`, type: "prose", props: { body: GENERATOR_CREDIT_HTML, dropcap: false } }] } };
