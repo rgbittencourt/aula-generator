@@ -288,7 +288,8 @@ O fallback OpenAlex fica ligado por padrão e aparece como `openAlexFallback: tr
 | `POST /api/regenerate-message` | refaz uma mensagem de WhatsApp ou Moodle com tom e instruções próprias |
 | `POST /api/teacher-pdf` | devolve somente o PDF do Material de Mediação |
 | `POST /api/webpractice-docx` | devolve o DOCX editável de uma webprática por `practiceId` ou índice |
-| `POST /api/zip` | devolve o pacote completo, incluindo PDF, DOCX e webpráticas |
+| `POST /api/production` | roteiros de vídeo, slides e narração de uma semana (`scope: "week"`) ou da UC (`scope: "course"`); roda dentro de `api/regenerate-week.js` (`action: "production"`) |
+| `POST /api/zip` | devolve o pacote completo, incluindo PDF, DOCX, webpráticas e a planilha de produção |
 
 ## Uso local com IA
 
@@ -343,7 +344,13 @@ webpraticas/01-tema/guia-e-roteiro.md
 webpraticas/01-tema/pacote.json
 webpraticas/01-tema/roteiro-webpratica.docx
 webpraticas/01-tema/arquivos/*
+producao/planilha-de-producao.xlsx   (se já houver roteiros gerados)
+producao/roteiros-de-video.md
 ```
+
+### Produção audiovisual e planilha de produção
+
+Na prévia de cada semana liberada, **Gerar roteiros e slides desta semana** escreve, a partir do texto aprovado: o vídeo de abertura do Moodle (3–4 min), o vídeo curto de WhatsApp (~30 s, mesmo cenário) e a apresentação de slides com a narração slide a slide para a voz clonada. **Gerar vídeos da UC** cria a apresentação, o WhatsApp e o encerramento da UC. A planilha `.xlsx` (abas Produção, Roteiros, Slides, Narração) acumula tudo, com “Como produzir” (HeyGen, gravação própria, slides + voz clonada) e “Status” em listas suspensas. O estado fica no rascunho salvo e vai no ZIP.
 
 ### Quiz: 5 alternativas, feedback em todas e XML do Moodle
 

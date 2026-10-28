@@ -5,6 +5,7 @@ import { createMediationMaterialPdf } from "./pdf.js";
 import { collectWebPracticeProjects } from "./teacher-guide.js";
 import { toStudentLesson } from "./student-export.js";
 import { createMoodleXml, createCombinedMoodleXml } from "./moodle-xml.js";
+import { createProductionWorkbook, hasProduction, productionMarkdown } from "./production-xlsx.js";
 
 export async function createWeeksZip(input, weeks, generalPlan = null, teacherGuides = [], options = {}) {
   const zip = new JSZip();
@@ -26,5 +27,9 @@ export async function createWeeksZip(input, weeks, generalPlan = null, teacherGu
   createWebPracticeFiles(input, practices).forEach(({ path, content }) => zip.file(path, content));
   const docxFiles = await createWebPracticeDocxFiles(input, practices);
   docxFiles.forEach(({ path, content }) => zip.file(path, content));
+  if (hasProduction(options.production)) {
+    zip.file("producao/planilha-de-producao.xlsx", await createProductionWorkbook(JSZip, options.production, { title: input.title }, "nodebuffer"));
+    zip.file("producao/roteiros-de-video.md", productionMarkdown(options.production, { title: input.title }));
+  }
   return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
 }

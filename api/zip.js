@@ -20,7 +20,8 @@ export default async function handler(request, response) {
     const scopedPlan = scopeGeneralPlan({ ...generalPlan, validation }, scoped.releasedIndexes, scoped.explicit);
     const buffer = await createWeeksZip(input, enrichedWeeks, scopedPlan, scoped.releasedGuides, {
       explicitScope: scoped.explicit,
-      releasedWeekIndexes: scoped.releasedIndexes
+      releasedWeekIndexes: scoped.releasedIndexes,
+      production: request.body?.production
     });
     response.setHeader("Content-Type", "application/zip");
     response.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-semanas.zip"`);

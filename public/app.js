@@ -1,10 +1,11 @@
 import { toStudentLesson } from "./student-export.js";
+import { createProductionWorkbook, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
 import { applyAdjustment, applyRewrite, approveWeek, bridgesBefore, canGenerateNext, dismissIssue, emptyFlow, normalizeFlow, recordGenerated, weekFlowStatus } from "./step-flow.js";
 
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
 const createReviewMarks = () => ({ resources: {}, checks: {}, academic: {}, quality: {} });
-const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, activeReviewGuidance: null, generation: null, flow: emptyFlow() };
+const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, activeReviewGuidance: null, generation: null, flow: emptyFlow(), production: emptyProduction() };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
 const DRAFT_MAX_AGE_DAYS = 30;
@@ -369,6 +370,7 @@ function resetDisciplineForm(preserveSession = true) {
   state.validation = null;
   state.reviewMarks = createReviewMarks();
   state.weekApprovals = {};
+  state.production = emptyProduction();
   state.flow = emptyFlow();
   state.activeReviewGuidance = null;
   state.generation = null;
@@ -454,6 +456,7 @@ function currentSnapshot() {
       validation: state.validation,
       reviewMarks: state.reviewMarks,
       weekApprovals: state.weekApprovals,
+      production: state.production,
       stepFlow: state.flow,
       generation: state.generation,
       weeks: state.weeks
@@ -672,6 +675,7 @@ function restoreSnapshot(snapshot) {
   applyInputToForm(snapshot.form);
   state.reviewMarks = snapshot.results?.reviewMarks || snapshot.reviewMarks || createReviewMarks();
   state.weekApprovals = snapshot.results?.weekApprovals || snapshot.weekApprovals || {};
+  state.production = normalizeProductionState(snapshot.results?.production);
   state.flow = normalizeFlow(snapshot.results?.stepFlow);
   state.generation = snapshot.results?.generation || snapshot.generation || null;
   if (["running", "consolidating"].includes(state.generation?.status)) state.generation = { ...state.generation, status: "partial" };
@@ -1420,9 +1424,13 @@ function renderLessonPreview(lesson, index) {
   const mediation = mediationMessagesMarkup(guide.mediationMessages, plan.theme || lesson?.meta?.title || `a semana ${index + 1}`, index + 1);
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
-  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}`;
+  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
   renderFlowPanel(index);
   $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
+  $("#production-week-button")?.addEventListener("click", () => generateProductionWeek(index));
+  $("#production-course-button")?.addEventListener("click", () => generateProductionCourse(index));
+  $("#production-sheet-button-card")?.addEventListener("click", downloadProductionSheet);
+  $("#production-md-button")?.addEventListener("click", downloadProductionMarkdown);
   $("#lesson-reader").querySelectorAll(".mediation-regenerate").forEach((button) => button.addEventListener("click", () => regenerateMediationMessage(button)));
   $("#lesson-reader").querySelectorAll(".mediation-message-card").forEach((card) => {
     const channel = card.dataset.messageChannel;
@@ -1890,6 +1898,7 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   if (teacherPdfButton) teacherPdfButton.disabled = aiActionBusy || !data.weeks.length;
   const zipButton = $("#zip-button");
   if (zipButton) zipButton.disabled = !complete;
+  updateProductionSheetButton();
   updateMediationExportHint();
   refreshAiButtonAvailability();
   const approvedWeeks = data.weeks.filter((_, index) => Boolean(state.weekApprovals?.[index])).length;
@@ -2372,6 +2381,7 @@ async function generate() {
   }
   state.reviewMarks = resumeGeneration ? state.reviewMarks : createReviewMarks();
   state.weekApprovals = resumeGeneration ? state.weekApprovals : {};
+  if (!resumeGeneration) state.production = emptyProduction();
   const button = $("#generate-button");
   if (!beginAiAction(button)) return;
   button.dataset.label = resumeGeneration ? `Continuar da semana ${startIndex + 1}` : "Gerar com IA";
@@ -2419,6 +2429,109 @@ async function generate() {
   }
 }
 
+// ---------- Produção audiovisual: roteiros, slides, narração e planilha ----------
+
+function emptyProduction() { return { course: null, weeks: {} }; }
+function normalizeProductionState(value) {
+  const data = value && typeof value === "object" ? value : {};
+  return { course: data.course && typeof data.course === "object" ? data.course : null, weeks: data.weeks && typeof data.weeks === "object" ? data.weeks : {} };
+}
+
+function updateProductionSheetButton() {
+  const button = $("#production-sheet-button");
+  if (button) button.disabled = !hasProduction(state.production);
+}
+
+function productionMarkup(index, released) {
+  const production = state.production?.weeks?.[index];
+  const course = state.production?.course;
+  const videos = productionVideos({ course: null, weeks: { [index]: production || {} } });
+  const summary = production ? `<ul>${videos.map((video) => `<li><strong>${escapeHtml(video.kind)}</strong> · ${escapeHtml(video.title || "")} — ${formatDuration(video.seconds)} · ${escapeHtml(video.mode)}</li>`).join("")}</ul>${production.slides?.slides?.length ? `<small>Apresentação: ${production.slides.slides.length} slides · narração de ${production.slides.wordCount} palavras (~${production.slides.estimatedMinutes} min).</small>` : ""}${(production.missing || []).length ? `<p class="reader-note"><strong>Faltou gerar:</strong> ${escapeHtml(production.missing.join(", "))}. Clique em “Gerar de novo”.</p>` : ""}` : "";
+  const courseSummary = course?.videos?.length ? `<small>Vídeos da UC gerados: ${course.videos.map((video) => escapeHtml(video.title)).join(" · ")}.</small>` : "";
+  const gate = released ? "" : `<p class="reader-note">Disponível depois que a semana for conferida e liberada (botão “Liberar após conferência”, na grade das semanas): o roteiro parte do texto aprovado.</p>`;
+  const any = hasProduction(state.production);
+  return `<section class="reader-production"><h3>Produção audiovisual (roteiros, slides e narração)</h3><p>A partir do texto desta semana, gera o vídeo de abertura do Moodle, o vídeo curto de WhatsApp e a apresentação de slides com a narração para a sua voz clonada. Tudo entra na planilha de produção.</p>${summary}${gate}<div class="reader-actions"><button type="button" class="secondary" id="production-week-button" ${released ? "" : "disabled"}>${production ? "Gerar de novo os roteiros desta semana" : "Gerar roteiros e slides desta semana"}</button><button type="button" class="secondary" id="production-course-button">${course?.videos?.length ? "Gerar de novo os vídeos da UC" : "Gerar vídeos da UC"}</button><button type="button" class="secondary" id="production-sheet-button-card" ${any ? "" : "disabled"}>Baixar planilha de produção (.xlsx)</button><button type="button" class="secondary" id="production-md-button" ${any ? "" : "disabled"}>Roteiros (.md)</button></div>${courseSummary}<p id="production-note" class="reader-note" aria-live="polite"></p></section>`;
+}
+
+function productionHeaders() {
+  const input = formInput();
+  const accessCode = input.accessCode || $("#access-code")?.value || "";
+  delete input.accessCode;
+  const headers = { "Content-Type": "application/json" };
+  if (accessCode) headers["x-aula-access-code"] = accessCode;
+  return { input, headers };
+}
+
+async function generateProductionWeek(index) {
+  if (aiActionBusy) return;
+  const button = $("#production-week-button");
+  if (!beginAiAction(button)) return;
+  setBusy(button, true, "Gerando…");
+  setAiActivity("Roteiros e slides", `Escrevendo os roteiros de vídeo e a apresentação com narração da semana ${index + 1}…`);
+  try {
+    const { input, headers } = productionHeaders();
+    const theme = (week) => week?.lessonPlan?.theme || week?.meta?.title || "";
+    const response = await fetch("/api/production", { method: "POST", headers, signal: AbortSignal.timeout(280000), body: JSON.stringify({ action: "production", scope: "week", input, weekIndex: index, week: state.weeks[index], previousTheme: index > 0 ? theme(state.weeks[index - 1]) : "", nextTheme: theme(state.weeks[index + 1]) }) });
+    const done = await readApiResponse(response, `Não foi possível gerar os roteiros da semana ${index + 1}.`);
+    state.production = normalizeProductionState(state.production);
+    state.production.weeks[index] = done.production;
+    saveDraft("producao-gerada");
+    updateProductionSheetButton();
+    openLessonPreview(index);
+    const missing = done.production.missing?.length ? ` Faltou: ${done.production.missing.join(", ")}.` : "";
+    finishAiActivity("Roteiros gerados", `A semana ${index + 1} entrou na planilha de produção.${missing}`, done.production.missing?.length ? "error" : "success");
+  } catch (error) {
+    finishAiActivity("Roteiros não gerados", error.message, "error");
+    const note = $("#production-note");
+    if (note) note.textContent = `Os roteiros NÃO foram gerados: ${error.message}`;
+  } finally {
+    setBusy(button, false, "");
+    endAiAction();
+  }
+}
+
+async function generateProductionCourse(index) {
+  if (aiActionBusy) return;
+  const button = $("#production-course-button");
+  if (!beginAiAction(button)) return;
+  setBusy(button, true, "Gerando…");
+  setAiActivity("Vídeos da UC", "Escrevendo a apresentação, o vídeo de WhatsApp e o encerramento da UC…");
+  try {
+    const { input, headers } = productionHeaders();
+    const response = await fetch("/api/production", { method: "POST", headers, signal: AbortSignal.timeout(280000), body: JSON.stringify({ action: "production", scope: "course", input, weeks: state.weeks }) });
+    const done = await readApiResponse(response, "Não foi possível gerar os vídeos da UC.");
+    state.production = normalizeProductionState(state.production);
+    state.production.course = done.production;
+    saveDraft("producao-uc-gerada");
+    updateProductionSheetButton();
+    if (state.previewIndex != null) openLessonPreview(state.previewIndex ?? index);
+    finishAiActivity("Vídeos da UC gerados", "Apresentação, WhatsApp e encerramento da UC entraram na planilha de produção.", "success");
+  } catch (error) {
+    finishAiActivity("Vídeos da UC não gerados", error.message, "error");
+    const note = $("#production-note");
+    if (note) note.textContent = `Os vídeos da UC NÃO foram gerados: ${error.message}`;
+  } finally {
+    setBusy(button, false, "");
+    endAiAction();
+  }
+}
+
+async function downloadProductionSheet() {
+  if (!hasProduction(state.production)) { showError("Gere primeiro os roteiros de pelo menos uma semana (ou da UC) para montar a planilha."); return; }
+  try {
+    if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
+    const title = state.input?.title || formInput().title;
+    const blob = await createProductionWorkbook(window.JSZip, state.production, { title }, "blob");
+    downloadBlob(blob, `${slugify(title)}-planilha-de-producao.xlsx`);
+  } catch (error) { showError(error.message); }
+}
+
+function downloadProductionMarkdown() {
+  if (!hasProduction(state.production)) return;
+  const title = state.input?.title || formInput().title;
+  downloadBlob(new Blob([productionMarkdown(state.production, { title })], { type: "text/markdown;charset=utf-8" }), `${slugify(title)}-roteiros-de-video.md`);
+}
+
 async function downloadZip() {
   if (!state.weeks.length) return;
   const button = $("#zip-button");
@@ -2434,7 +2547,7 @@ async function downloadZip() {
       downloadBlob(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), `${slugify(currentInput.title)}-semanas.zip`);
       return;
     }
-    const response = await fetch("/api/zip", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: currentInput, weeks: state.weeks, teacherGuides: state.teacherGuides, weekApprovals: state.weekApprovals }) });
+    const response = await fetch("/api/zip", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: currentInput, weeks: state.weeks, teacherGuides: state.teacherGuides, weekApprovals: state.weekApprovals, production: state.production }) });
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível montar o ZIP."); }
     downloadBlob(await response.blob(), `${slugify(currentInput.title)}-semanas.zip`);
   } catch (error) { showError(error.message); }
@@ -2548,6 +2661,7 @@ $("#course-form").addEventListener("submit", (event) => { event.preventDefault()
 initStepMode();
 $("#assist-button").addEventListener("click", assistBriefing);
 $("#zip-button").addEventListener("click", downloadZip);
+$("#production-sheet-button")?.addEventListener("click", downloadProductionSheet);
 $("#teacher-pdf-button").addEventListener("click", downloadTeacherPdf);
 $("#recalculate-button").addEventListener("click", recalculateQuality);
 $("#close-lesson-modal").addEventListener("click", closeLessonPreview);

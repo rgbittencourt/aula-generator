@@ -546,3 +546,10 @@ body.welcome-active .recovery-dock{display:none!important}
 
 .reader-figure{width:min(100%,760px);margin:12px 0;padding:0;border:1px solid #dfe4ea;border-radius:10px;overflow:hidden;background:#fbf9f4}.reader-figure img{display:block;width:100%;height:auto;background:#fbf9f4}.reader-figure figcaption{padding:8px 12px;font-size:12px;line-height:1.5;color:#4a5d64;border-top:1px solid #ece5dc}
 .reader-quiz-options{list-style:none;margin:6px 0 8px;padding:0;display:grid;gap:6px}.reader-quiz-options li{padding:8px 10px;border:1px solid #e1e6ea;border-radius:8px;background:#fff}.reader-quiz-options li.is-correct{border-color:#5b8a72;background:#f1f8f4}.reader-quiz-options small{display:block;margin-top:4px;color:#4a5d64}.reader-assessment button{margin-top:6px}
+
+/* Produção audiovisual (prévia da semana) */
+.reader-production { margin-top: 28px; padding: 18px 20px; border: 1px solid var(--line, #d9d4c7); border-radius: 12px; background: var(--surface-soft, #faf8f2); }
+.reader-production h3 { margin-top: 0; }
+.reader-production ul { margin: 10px 0; padding-left: 20px; }
+.reader-production .reader-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.reader-note { margin: 10px 0 0; font-size: 0.92rem; color: #8a4b1f; }
