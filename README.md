@@ -245,7 +245,7 @@ A aplicação produz duas camadas diferentes:
 - O **Material de Mediação** é um guia de acompanhamento que cresce a cada semana gerada: o PDF traz capa com a situação (liberadas, rascunhos, a gerar), sumário com páginas, mapa da UC, ritmo de acompanhamento e sinais de alerta, os vídeos da UC e, para cada semana já gerada (marcada como **Liberada** ou **Rascunho em revisão**), a semana em uma página, as ideias-chave, o roteiro antes/durante/depois com as mensagens de WhatsApp e Moodle nos pontos certos, perguntas prováveis dos alunos, equívocos comuns, sinais de alerta e intervenções, atividades, gabarito comentado, recursos, pontos a conferir antes de publicar, vídeos da semana, ponte, trilhas, acessibilidade, webprática e um anexo técnico. As semanas ainda não geradas aparecem no fim com o tema previsto. Seções sem conteúdo não aparecem. As explicações para o professor (resumo, perguntas dos alunos, equívocos, intervenções) vêm da parte `explain` dos derivados; em semanas antigas, o botão **Completar explicações do Material de Mediação** na prévia gera só essa parte, sem tocar no texto. Emojis e símbolos que a fonte do PDF não tem são omitidos.
 - **Roteiro de webprática:** cada sessão prática agendada é mantida em `teacherGuide.webPracticeProjects` e exportada como DOCX editável próprio, sem ser inserida no texto-base semanal.
 
-Na tela de resultados, **Baixar JSON do aluno** baixa somente a semana selecionada. O painel separado **Webpráticas programadas** mostra a agenda e oferece **Baixar DOCX** para cada sessão. **Material de Mediação PDF** baixa o documento de mediação. **Pacote completo ZIP** reúne os JSONs, o Planejamento Geral, o Material de Mediação em PDF e os projetos de webprática em Markdown, JSON, arquivos auxiliares e DOCX.
+Na tela de resultados, Cada semana tem três downloads, com o destino no nome: **JSON Studio** (`semana-NN-titulo-studio.aula.json`, para abrir no Aula Studio, sem o quiz; as referências saem como texto), **JSON Gerador** (`semana-NN-titulo-gerador.json`, a semana completa com quiz, feedbacks e guia do professor) e **Quiz XML** (`semana-NN-titulo-quiz.xml`, para importar no banco de questões do Moodle). O painel separado **Webpráticas programadas** mostra a agenda e oferece **Baixar DOCX** para cada sessão. **Material de Mediação PDF** baixa o documento de mediação. **Pacote completo ZIP** reúne os JSONs, o Planejamento Geral, o Material de Mediação em PDF e os projetos de webprática em Markdown, JSON, arquivos auxiliares e DOCX.
 
 ## Webpráticas como projetos independentes
 
@@ -339,10 +339,12 @@ A chave é usada apenas pelo backend e nunca é enviada ao navegador.
 ## Saída do ZIP
 
 ```text
-semanas/semana-01-titulo.aula.json
-semanas/semana-02-titulo.aula.json
-moodle/semana-01-quiz.xml
-moodle/semana-02-quiz.xml
+semanas/semana-01-titulo-studio.aula.json
+semanas/semana-02-titulo-studio.aula.json
+gerador/semana-01-titulo-gerador.json
+gerador/semana-02-titulo-gerador.json
+moodle/semana-01-titulo-quiz.xml
+moodle/semana-02-titulo-quiz.xml
 moodle/todas-as-semanas-quiz.xml
 planejamento-geral.json
 professor/material-de-mediacao.pdf
@@ -362,7 +364,7 @@ Na prévia de cada semana liberada, **Gerar roteiros e slides desta semana** esc
 
 Cada semana traz 6 questões de múltipla escolha com **5 alternativas** e **feedback em todas elas**, certas ou erradas (a certa explica por quê; cada errada aponta o equívoco e a seção a reler). Verdadeiro/falso não é mais usado.
 
-O quiz continua dentro do `.aula.json` (bloco `quiz` do Aula Studio) **e** sai em arquivo separado, em **Moodle XML**, na pasta `moodle/`: um arquivo por semana e um `todas-as-semanas-quiz.xml`, com uma categoria `$course$/top/<Curso>/Semana N` por semana. Para importar: Moodle → Banco de questões → Importar → formato **Moodle XML**. As questões são de resposta única, com alternativas embaralhadas e feedback por alternativa.
+O quiz **não vai** no `.aula.json` do Aula Studio: sai em **Moodle XML**, na pasta `moodle/` (e fica completo no JSON do Gerador, com feedback em todas as alternativas): um arquivo por semana e um `todas-as-semanas-quiz.xml`, com uma categoria `$course$/top/<Curso>/Semana N` por semana. Para importar: Moodle → Banco de questões → Importar → formato **Moodle XML**. As questões são de resposta única, com alternativas embaralhadas e feedback por alternativa.
 
 Depois de revisar o JSON no Aula Studio, use **Exportar → Pacote SCORM (.zip)** para enviar a aula ao Moodle. O Gerador de Aulas prepara a autoria e o planejamento; a publicação SCORM continua sendo feita no Aula Studio.
 

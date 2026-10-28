@@ -1,4 +1,5 @@
-import { toStudentLesson } from "./student-export.js";
+import { toStudentLesson, toGeneratorWeek } from "./student-export.js";
+import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
 import { createProductionWorkbook, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
 import { applyAdjustment, applyRewrite, approveWeek, bridgesBefore, canGenerateNext, dismissIssue, emptyFlow, normalizeFlow, recordGenerated, weekFlowStatus } from "./step-flow.js";
 
@@ -2025,13 +2026,15 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
     const qualityLabel = manuallyApproved ? "conferida e liberada por você" : ({ ready: "conteúdo pronto", complete: "conteúdo completo", blocked: "bloqueada: pendência crítica", review: "revisão recomendada", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[automaticStatus] || "qualidade não medida");
     const approvalButton = automaticStatus !== "ready" && automaticStatus !== "complete" ? `<button class="week-approve ${manuallyApproved ? "is-approved" : ""}" data-index="${index}" type="button">${manuallyApproved ? "Desfazer liberação" : "Liberar após conferência"}</button>` : "";
     const statusDetail = reasons.length ? `<small class="week-status-detail">${escapeHtml(manuallyApproved ? `Diagnóstico automático: ${reasons.join(" · ")}` : reasons.join(" · "))}</small>` : "";
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button">Baixar JSON <span>↓</span></button>${approvalButton}</div></article>`;
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no Aula Studio (sem o quiz)">JSON Studio <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do Gerador de Aula, com quiz, feedbacks e guia do professor">JSON Gerador <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button>${approvalButton}</div></article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
   const weeksNote = $("#weeks-sector-note");
   if (weeksNote) weeksNote.textContent = partial ? `${data.weeks.length} de ${totalWeeks} semana(s) preservada(s); a geração pode ser retomada pela próxima semana.` : `${data.weeks.length} semana(s) gerada(s); abra cada cartão para revisar o conteúdo do aluno.`;
   $("#week-grid").querySelectorAll(".week-preview").forEach((button) => button.addEventListener("click", () => openLessonPreview(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-download").forEach((button) => button.addEventListener("click", () => downloadWeek(Number(button.dataset.index))));
+  $("#week-grid").querySelectorAll(".week-download-full").forEach((button) => button.addEventListener("click", () => downloadWeekFull(Number(button.dataset.index))));
+  $("#week-grid").querySelectorAll(".week-download-quiz").forEach((button) => button.addEventListener("click", () => downloadWeekQuiz(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-approve").forEach((button) => button.addEventListener("click", () => toggleWeekApproval(Number(button.dataset.index))));
   renderGeneralPlan(data.generalPlan);
   renderWorkload(data.workload);
@@ -2040,11 +2043,32 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   if (scrollToResults) scrollFormTo("#results-section");
 }
 
+// Três arquivos por semana, com o destino no nome:
+//  - semana-NN-titulo-studio.aula.json: o que abre no Aula Studio (sem o quiz);
+//  - semana-NN-titulo-gerador.json: a semana completa, com quiz, feedbacks e guia do professor;
+//  - semana-NN-titulo-quiz.xml: o quiz em Moodle XML, com feedback em todas as alternativas.
+function weekFileName(lesson, index, suffix) {
+  return `semana-${String(index + 1).padStart(2, "0")}-${slugify(lesson.meta?.title)}-${suffix}`;
+}
+
 function downloadWeek(index) {
   const lesson = state.weeks[index];
   if (!lesson) return;
-  const number = String(index + 1).padStart(2, "0");
-  downloadBlob(new Blob([JSON.stringify(toStudentLesson(lesson), null, 2)], { type: "application/json" }), `semana-${number}-${slugify(lesson.meta?.title)}.aula.json`);
+  downloadBlob(new Blob([JSON.stringify(toStudentLesson(lesson), null, 2)], { type: "application/json" }), weekFileName(lesson, index, "studio.aula.json"));
+}
+
+function downloadWeekFull(index) {
+  const lesson = state.weeks[index];
+  if (!lesson) return;
+  downloadBlob(new Blob([JSON.stringify(toGeneratorWeek(lesson, state.teacherGuides?.[index]), null, 2)], { type: "application/json" }), weekFileName(lesson, index, "gerador.json"));
+}
+
+function downloadWeekQuiz(index) {
+  const lesson = state.weeks[index];
+  if (!lesson) return;
+  const xml = createMoodleXml(lesson, { courseTitle: state.input?.title || formInput().title, weekNumber: index + 1 });
+  if (!xml) { showError(`A semana ${index + 1} ainda não tem questões para exportar. Gere as questões primeiro.`); return; }
+  downloadBlob(new Blob([xml], { type: "application/xml;charset=utf-8" }), weekFileName(lesson, index, "quiz.xml"));
 }
 
 function apiHeaders() {
@@ -2665,7 +2689,7 @@ async function downloadZip() {
     if (isGitHubPages) {
       if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
       const zip = new window.JSZip();
-      state.weeks.forEach((lesson, index) => { const number = String(index + 1).padStart(2, "0"); zip.file(`semanas/semana-${number}-${slugify(lesson.meta?.title)}.aula.json`, JSON.stringify(toStudentLesson(lesson), null, 2)); });
+      state.weeks.forEach((lesson, index) => { const number = String(index + 1).padStart(2, "0"); zip.file(`semanas/semana-${number}-${slugify(lesson.meta?.title)}-studio.aula.json`, JSON.stringify(toStudentLesson(lesson), null, 2)); zip.file(`gerador/semana-${number}-${slugify(lesson.meta?.title)}-gerador.json`, JSON.stringify(toGeneratorWeek(lesson, state.teacherGuides?.[index]), null, 2)); const xml = createMoodleXml(lesson, { courseTitle: currentInput.title, weekNumber: index + 1 }); if (xml) zip.file(`moodle/semana-${number}-${slugify(lesson.meta?.title)}-quiz.xml`, xml); });
       if (state.generalPlan) zip.file("planejamento-geral.json", JSON.stringify(state.generalPlan, null, 2));
       zip.file("professor/LEIA-ME.txt", "O Material de Mediação em PDF é gerado na versão Vercel com backend. Este modo público contém apenas o exemplo do aluno.");
       downloadBlob(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), `${slugify(currentInput.title)}-semanas.zip`);

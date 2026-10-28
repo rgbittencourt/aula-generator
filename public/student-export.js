@@ -1,10 +1,26 @@
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const text = (value, fallback = "") => String(value ?? "").trim() || fallback;
 
+const escapeHtml = (value) => text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+// O bloco "referencias" do Aula Studio recebe cada item como texto HTML (um objeto aparece como
+// "[object Object]"). O link, quando existe, vai dentro da própria linha. Aceita também o formato
+// antigo ({ html, href }), que está salvo nas semanas geradas antes desta correção.
+export function referenceItemHtml(item) {
+  const entry = typeof item === "string" ? { citation: item } : object(item);
+  const body = entry.html != null && text(entry.html) ? text(entry.html) : escapeHtml(entry.citation || entry.title || entry.href);
+  const href = text(entry.href);
+  const safeHref = /^https?:\/\//i.test(href) ? href.replace(/"/g, "%22") : "";
+  const hasLink = safeHref && !body.includes(escapeHtml(href)) && !body.includes(safeHref);
+  return hasLink ? `${body} <a href="${safeHref}" target="_blank" rel="noopener noreferrer">${escapeHtml(href)}</a>` : body;
+}
+
+// O quiz não vai para o Aula Studio: sai em Moodle XML (feedback em todas as alternativas), e a
+// versão completa fica no JSON do Gerador.
 const STUDENT_PLAN_KEYS = [
   "weekNumber", "theme", "welcome", "learningObjectives", "prerequisites", "contentDensity",
   "contentSections", "activities", "diagnostic", "formativeChecks", "differentiation",
-  "selfAssessment", "synthesis", "nextWeekConnection", "glossary", "references", "assessment"
+  "selfAssessment", "synthesis", "nextWeekConnection", "glossary", "references"
 ];
 
 function studentSection(section = {}) {
@@ -35,6 +51,7 @@ function studentSection(section = {}) {
 function sanitizeBlock(block = {}) {
   const source = object(block);
   const props = object(source.props);
+  if (source.type === "quiz") return null;
   const children = Array.isArray(props.children) ? props.children.map(sanitizeBlock).filter(Boolean) : null;
   const nextProps = { ...props };
   delete nextProps.resourceId;
@@ -71,6 +88,10 @@ function sanitizeBlock(block = {}) {
       credit: text(props.inlineVideo.credit),
       start: text(props.inlineVideo.start)
     };
+  }
+  if (source.type === "referencias" && Array.isArray(props.items)) {
+    nextProps.items = props.items.map(referenceItemHtml).filter(Boolean);
+    if (!nextProps.items.length) return null;
   }
   if (source.type === "materiais" && Array.isArray(props.items)) {
     nextProps.items = props.items.map((item) => ({
@@ -131,7 +152,6 @@ function studentPlan(plan = {}) {
   } : { support: [], standard: [], extension: [], rationale: "" };
   result.diagnostic = source.diagnostic || {};
   result.selfAssessment = source.selfAssessment || {};
-  result.assessment = source.assessment || { questions: [] };
   result.references = Array.isArray(source.references) ? source.references.map((reference) => {
     if (typeof reference === "string") return { id: "", citation: text(reference), type: "", authors: [], year: "", publisher: "", doi: "", href: "" };
     return {
@@ -179,4 +199,19 @@ export function toStudentLesson(lesson = {}) {
 
 export function toStudentLessons(lessons = []) {
   return Array.isArray(lessons) ? lessons.map(toStudentLesson) : [];
+}
+
+/**
+ * Versão completa da semana, para o Gerador de Aula (reimportar, revisar, arquivar):
+ * a aula inteira, com quiz, feedbacks, revisões, cálculo de tempo e o guia do professor.
+ */
+export function toGeneratorWeek(lesson = {}, teacherGuide = null, extra = {}) {
+  return {
+    generator: "aula-generator",
+    format: "gerador-semana",
+    version: 1,
+    exportedAt: extra.exportedAt || new Date().toISOString(),
+    week: lesson,
+    teacherGuide: teacherGuide || lesson?.teacherGuide || null
+  };
 }

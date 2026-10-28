@@ -57,8 +57,37 @@ test("ZIP separa o quiz Moodle XML do .aula.json", async () => {
   const buffer = await createWeeksZip(input, [lesson(), lesson(1)], null, []);
   const zip = await JSZip.loadAsync(buffer);
   const names = Object.keys(zip.files);
-  assert.ok(names.includes("moodle/semana-01-quiz.xml"));
-  assert.ok(names.includes("moodle/semana-02-quiz.xml"));
+  assert.equal(names.filter((name) => /^moodle\/semana-0[12]-.*-quiz\.xml$/.test(name)).length, 2);
   assert.ok(names.includes("moodle/todas-as-semanas-quiz.xml"));
   await wellFormed(await zip.files["moodle/todas-as-semanas-quiz.xml"].async("string"));
+});
+
+test("public/moodle-xml.js e public/student-export.js são cópias dos arquivos de src", async () => {
+  const fs = await import("node:fs");
+  for (const name of ["moodle-xml.js", "student-export.js"]) {
+    assert.equal(fs.readFileSync(new URL(`../public/${name}`, import.meta.url), "utf8"), fs.readFileSync(new URL(`../src/${name}`, import.meta.url), "utf8"));
+  }
+});
+
+test("ZIP: o JSON do Studio não leva o quiz e o do Gerador leva a semana completa; referências saem como texto", async () => {
+  const input = { title: "Curso Q", weeks: 1, webPractices: [], hoursPerWeek: 1 };
+  const week = lesson();
+  week.blocks = [...(week.blocks || []), { id: "q1", type: "quiz", props: { questions: week.lessonPlan.assessment.questions } }, { id: "r1", type: "referencias", props: { title: "Referências", items: [{ html: "AUTOR. Título.", href: "https://doi.org/10/x", credit: "" }] } }];
+  const zip = await JSZip.loadAsync(await createWeeksZip(input, [week], null, [{ resourceNotes: ["x"] }]));
+  const names = Object.keys(zip.files);
+  const studio = names.find((name) => name.endsWith("-studio.aula.json"));
+  const generator = names.find((name) => name.startsWith("gerador/") && name.endsWith("-gerador.json"));
+  assert.ok(studio && generator);
+  const studioJson = JSON.parse(await zip.files[studio].async("string"));
+  assert.ok(!studioJson.blocks.some((block) => block.type === "quiz"));
+  assert.equal(studioJson.lessonPlan.assessment, undefined);
+  const refs = studioJson.blocks.find((block) => block.type === "referencias");
+  refs.props.items.forEach((item) => assert.equal(typeof item, "string"));
+  assert.match(refs.props.items[0], /AUTOR\. Título\./);
+  assert.match(refs.props.items[0], /href="https:\/\/doi\.org\/10\/x"/);
+  const full = JSON.parse(await zip.files[generator].async("string"));
+  assert.equal(full.format, "gerador-semana");
+  assert.ok(full.week.blocks.some((block) => block.type === "quiz"));
+  assert.equal(full.week.lessonPlan.assessment.questions[0].feedbackByOption.length, 5);
+  assert.deepEqual(full.teacherGuide, { resourceNotes: ["x"] });
 });

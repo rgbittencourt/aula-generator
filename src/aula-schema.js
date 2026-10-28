@@ -4,6 +4,7 @@ import { normalizeAcademicProfile } from "./academic.js";
 import { progressionForWeek } from "./curriculum.js";
 import { figureBlock, figuresOf } from "./figures.js";
 import { compositionPlanForWeek, materializeComposition, normalizeCompositionPlan } from "./composition.js";
+import { referenceItemHtml } from "./student-export.js";
 
 export const DEFAULT_LICENSE = "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br";
 
@@ -740,17 +741,6 @@ export function weekMeta(input, index) {
   return { title: `${input.title} — ${calendar.label}`, courseTitle: input.title, weekNumber: calendar.weekNumber, weekLabel: calendar.label, calendarStartDate: calendar.startDate, calendarEndDate: calendar.endDate, studyHours: input.hoursPerWeek, author: input.author, role: input.role, institution: input.institution, year: input.year, aiTool: "", aiUse: "", license: input.license };
 }
 
-// O bloco "referencias" do Aula Studio recebe cada item como texto HTML (um objeto aparece como
-// "[object Object]"). O link, quando existe, vai dentro da própria linha.
-function referenceItemHtml(item) {
-  const entry = typeof item === "string" ? { citation: item } : (item || {});
-  const citation = html(entry.citation || entry.title || entry.href);
-  const href = text(entry.href);
-  const safeHref = /^https?:\/\//i.test(href) ? href.replace(/"/g, "%22") : "";
-  const hasLink = safeHref && !citation.includes(html(href));
-  return hasLink ? `${citation} <a href="${safeHref}" target="_blank" rel="noopener noreferrer">${html(href)}</a>` : citation;
-}
-
 function html(value) { return text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 export function richHtml(value) {
   const source = text(value);
@@ -875,7 +865,7 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
   }
   blocks.push({ id: newId("b-topic-", week, 1), type: "topic", bg: "neutral-default", pad: "normal", props: { children: expandTables(children) } });
   if (plan.synthesis) blocks.push({ id: newId("b-synthesis-", week, 0), type: "sintese", bg: "sage-deep", pad: "airy", props: { eyebrow: "Síntese", title: "A ideia que fecha a semana", body: synthesisBlockBody(plan) } });
-  if (plan.references.length) blocks.push({ id: newId("b-references-", week, 0), type: "referencias", bg: "neutral-default", pad: "normal", props: { title: "Referências", items: plan.references.map(referenceItemHtml) } });
+  if (plan.references.length) blocks.push({ id: newId("b-references-", week, 0), type: "referencias", bg: "neutral-default", pad: "normal", props: { title: "Referências", items: plan.references.map(referenceItemHtml).filter(Boolean) } });
   if (plan.assessment.questions.length) blocks.push({ id: newId("b-quiz-", week, 0), type: "quiz", bg: "neutral-subtle", pad: "normal", props: { title: plan.assessment.title, intro: plan.assessment.format, avaliativo: true, passMark: plan.assessment.passMark, questions: plan.assessment.questions } });
   return blocks;
 }

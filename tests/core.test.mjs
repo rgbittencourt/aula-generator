@@ -115,9 +115,8 @@ test("repara itens genéricos de composição com conteúdo específico da seç�
   assert.ok(accordion?.props?.items?.every((item) => !/Item contextualizado/i.test(item.title) && /Governança de dados/i.test(item.title)));
   assert.equal(quiz?.props?.questions?.length, 5);
   assert.ok(quiz?.props?.questions?.every((question) => !/Item contextualizado/i.test(question.q) && /Governança de dados/i.test(question.q)));
-  const exportedQuiz = findBlock(toStudentLesson(lesson).blocks, "quiz");
-  assert.ok(exportedQuiz?.props?.questions?.length >= 1);
-  assert.ok(exportedQuiz.props.questions.every((question) => question.q && question.options?.length >= 2 && Number.isInteger(question.answer) && question.explanation));
+  // O quiz sai em Moodle XML e no JSON do Gerador; o JSON do Aula Studio não o leva.
+  assert.equal(findBlock(toStudentLesson(lesson).blocks, "quiz"), null);
 });
 
 test("agenda webprática por data ou semana ocorre uma única vez", () => {
@@ -440,7 +439,7 @@ test("ZIP contém JSON do aluno e roteiro DOCX de webprática em pasta separada"
   const enriched = attachWorkloadToLessons(weeks, workload);
   const buffer = await createWeeksZip(input, enriched, buildGeneralPlan(input, workload, enriched));
   const zip = await JSZip.loadAsync(buffer);
-  const names = Object.keys(zip.files).filter((name) => name.endsWith(".aula.json"));
+  const names = Object.keys(zip.files).filter((name) => name.endsWith("-studio.aula.json"));
   assert.equal(names.length, 2);
   assert.ok(names.every((name) => name.startsWith("semanas/semana-")));
   assert.ok(zip.files["planejamento-geral.json"]);
