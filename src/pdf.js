@@ -13,6 +13,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { DIDACTIC_PHASE_LABELS } from "./pedagogy.js";
 import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
 import { formatDuration, productionVideos } from "./production-xlsx.js";
+import { GENERATOR_CREDIT } from "./student-export.js";
 
 // ---------- texto seguro para as fontes padrão do PDF (WinAnsi) ----------
 
@@ -294,6 +295,9 @@ export async function createMediationMaterialPdf(input, teacherGuides = [], gene
   page.drawText("Material de Mediação", { x: margin, y, size: 29, font: bold, color: navy });
   y -= 38;
   paragraph(input.title || "Curso sem título", { font: italic, size: 14, color: coral, after: 8 });
+  const authorship = [display(input.author), display(input.role), display(input.institution)].filter(Boolean).join(" · ");
+  if (authorship) paragraph(`Autoria: ${authorship}`, { size: 9.4, color: ink, after: 2 });
+  paragraph(GENERATOR_CREDIT, { size: 8.6, color: muted, after: 6 });
   paragraph(`Público: ${display(input.audience) || "não informado"}  ·  Nível: ${display(input.level) || "não informado"}  ·  Atualizado em ${dateLabel}`, { size: 9, color: muted, after: 14 });
 
   const cards = [[String(teacherGuides.length), `semana(s) neste material`], [String(releasedCount), explicitScope ? "liberada(s)" : "incluída(s)"], [String(draftCount), "rascunho(s) em revisão"], [String(pendingCount), "ainda a gerar"]];

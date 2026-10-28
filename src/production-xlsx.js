@@ -90,6 +90,7 @@ export function productionSheets(production, meta = {}) {
     rows: [
       [`UC: ${text(meta.title) || "—"}`],
       [`Gerada em ${new Date().toLocaleDateString("pt-BR")} pelo Gerador de Aulas. Cada semana liberada acrescenta linhas; baixe de novo a planilha depois de gerar a próxima.`],
+      ["Conteúdo gerado no Gerador de Aulas, desenvolvido por Rogério Bittencourt, INOVALAB - IFSC"],
       [""],
       ["ABA «Produção»: uma linha por vídeo (UC e cada semana). Escolha em «Como produzir» se será avatar HeyGen, gravação própria ou slides com a voz clonada; acompanhe o andamento em «Status». A fala completa está na coluna I, pronta para colar no HeyGen ou ler no teleprompter."],
       ["ABA «Roteiros»: o mesmo roteiro quebrado em cenas, com tempo, direção de cena, fala e texto na tela."],
@@ -277,5 +278,6 @@ export function productionMarkdown(production, meta = {}) {
       }
     });
   });
+  out.push("", "_Conteúdo gerado no Gerador de Aulas, desenvolvido por Rogério Bittencourt, INOVALAB - IFSC_");
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
 }

@@ -5,6 +5,8 @@
 // alternativas (certa ou errada), feedback geral (a explicação) e feedbacks
 // de acerto/erro. Importar em: Banco de questões > Importar > Formato Moodle XML.
 
+import { GENERATOR_CREDIT } from "./student-export.js";
+
 const CHOICES_NUMBERING = "abc";
 
 function escapeXml(value) {
@@ -73,7 +75,7 @@ function weekBody(lesson, { courseTitle, weekNumber }) {
   if (!questions.length) return "";
   const head = `  <question type="category">
     <category><text>${escapeXml(categoryName(courseTitle, weekNumber))}</text></category>
-    <info format="html"><text>${escapeXml(`Quiz da Semana ${weekNumber}`)}</text></info>
+    <info format="html"><text>${escapeXml(`Quiz da Semana ${weekNumber}. ${GENERATOR_CREDIT}`)}</text></info>
   </question>`;
   return [head, ...questions.map((question, index) => questionXml(question, { weekNumber, index }))].join("\n");
 }

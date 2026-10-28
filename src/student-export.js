@@ -1,6 +1,10 @@
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const text = (value, fallback = "") => String(value ?? "").trim() || fallback;
 
+// Crédito do aplicativo, presente nos arquivos gerados (meta do Aula Studio, PDF, Moodle XML, JSON do Gerador).
+export const GENERATOR_TOOL = "Gerador de Aulas (INOVALAB - IFSC)";
+export const GENERATOR_CREDIT = "Conteúdo gerado no Gerador de Aulas, desenvolvido por Rogério Bittencourt, INOVALAB - IFSC";
+
 const escapeHtml = (value) => text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 // O bloco "referencias" do Aula Studio recebe cada item como texto HTML (um objeto aparece como
@@ -190,7 +194,10 @@ export function toStudentLesson(lesson = {}) {
       role: text(meta.role),
       institution: text(meta.institution),
       year: text(meta.year),
-      license: text(meta.license)
+      license: text(meta.license),
+      aiTool: text(meta.aiTool, GENERATOR_TOOL),
+      aiUse: text(meta.aiUse, GENERATOR_CREDIT),
+      generatedBy: GENERATOR_CREDIT
     },
     lessonPlan: studentPlan(source.lessonPlan),
     blocks: Array.isArray(source.blocks) ? source.blocks.map(sanitizeBlock).filter(Boolean) : []
@@ -211,6 +218,7 @@ export function toGeneratorWeek(lesson = {}, teacherGuide = null, extra = {}) {
     format: "gerador-semana",
     version: 1,
     exportedAt: extra.exportedAt || new Date().toISOString(),
+    credit: GENERATOR_CREDIT,
     week: lesson,
     teacherGuide: teacherGuide || lesson?.teacherGuide || null
   };

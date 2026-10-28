@@ -73,3 +73,22 @@ test("bloco de referências do Aula Studio leva cada referência como texto, nun
   assert.match(refBlock.props.items[0], /href="https:\/\/doi\.org\/10\.1\/x"/);
   assert.doesNotMatch(JSON.stringify(refBlock), /\[object Object\]/);
 });
+
+test("crédito do Gerador de Aulas e autoria presentes no Studio, no Gerador, no XML e no PDF", async () => {
+  const { GENERATOR_CREDIT } = await import("../src/student-export.js");
+  const { createMoodleXml } = await import("../src/moodle-xml.js");
+  const { toGeneratorWeek } = await import("../src/student-export.js");
+  assert.equal(GENERATOR_CREDIT, "Conteúdo gerado no Gerador de Aulas, desenvolvido por Rogério Bittencourt, INOVALAB - IFSC");
+  const input = normalizeCourseInput({ title: "Curso crédito", weeks: 1, objectives: ["Aplicar"], author: "Prof. Fulana", institution: "IFSC" });
+  const lesson = buildFallbackLesson(input, 0);
+  const studio = toStudentLesson(lesson);
+  assert.equal(studio.meta.aiUse, GENERATOR_CREDIT);
+  assert.equal(studio.meta.generatedBy, GENERATOR_CREDIT);
+  assert.equal(studio.meta.author, "Prof. Fulana");
+  assert.equal(toGeneratorWeek(lesson).credit, GENERATOR_CREDIT);
+  const xml = createMoodleXml(lesson, { courseTitle: "Curso crédito", weekNumber: 1 });
+  if (xml) assert.ok(xml.includes(GENERATOR_CREDIT));
+  const guides = buildTeacherGuides(input, [lesson], [{}]);
+  const text = pdfText(await createMediationMaterialPdf(input, guides, null, {}));
+  if (text != null) { assert.match(text, /Autoria: Prof\. Fulana/); assert.match(text, /desenvolvido por Rogério Bittencourt, INOVALAB - IFSC/); }
+});
