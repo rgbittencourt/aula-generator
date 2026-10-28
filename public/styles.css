@@ -589,3 +589,17 @@ button.studio-top-link{font-family:inherit;cursor:pointer}
 .studio-toast.hidden{display:none}
 @media(max-width:860px){.studio-week-pick{display:none}}
 .studio-top-link img{flex:none;display:block;min-width:23px}
+
+/* Botão Abrir ClassAtelier: azul-marinho, com Class em negrito e Atelier em itálico */
+button.studio-top-link{height:36px;padding:0 13px 0 9px;border-color:var(--navy);background:var(--navy);color:#e8edf6;font-size:12px;font-weight:500}
+button.studio-top-link:hover{border-color:#22375f;background:#1b2d52;box-shadow:0 8px 20px rgba(20,33,61,.28)}
+button.studio-top-link img{width:24px;height:24px;border-radius:7px}
+.studio-open-label{display:inline-flex;align-items:baseline;gap:5px}
+.studio-top-link .wordmark{font-size:15px;line-height:1;letter-spacing:0}
+.studio-top-link .wordmark b{color:#fff}
+.studio-top-link .wordmark i{color:var(--gold)}
+.studio-open-arrow{color:var(--gold);font-style:normal;font-size:15px;line-height:1}
+.week-actions .week-open-studio .wordmark{font-size:13px;line-height:1}
+.week-actions .week-open-studio .wordmark b{color:var(--navy)}
+.week-actions .week-open-studio .wordmark i{color:var(--coral-dark)}
+@media(max-width:620px){button.studio-top-link{width:36px;padding:0}.studio-open-arrow{display:none}}
