@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title>ClassAuthor</title>
+  <desc>Capa do ClassAuthor, ferramenta de planejamento pedagógico do INOVALAB - IFSC.</desc>
+  <rect width="1200" height="630" fill="#14213D"/>
+  <g transform="translate(120 150) scale(1.7)"><rect x="0" y="0" width="120" height="120" rx="28" fill="#0F1A31"/><g transform="translate(-4 -4)"><path d="M30 104V58A34 34 0 0 1 98 58V104Z" fill="#FFF8ED"/>
+  <path d="M64 24V104M30 68H98" stroke="#14213D" stroke-width="4.5"/>
+  <path d="M64 68H98V104H64Z" fill="#E76F51"/></g></g>
+  <text x="360" y="268" fill="#FFFFFF" font-family="'DM Sans', Inter, Arial, sans-serif" font-size="128" font-weight="800" letter-spacing="-6">Class</text>
+  <text x="372" y="388" fill="#F4B942" font-family="Newsreader, Georgia, 'Times New Roman', serif" font-style="italic" font-size="128" letter-spacing="-3">Author</text>
+  <text x="124" y="530" fill="#C4CDDC" font-family="'DM Sans', Inter, Arial, sans-serif" font-size="30">Planejamento pedagógico, semana a semana · INOVALAB - IFSC</text>
+</svg>

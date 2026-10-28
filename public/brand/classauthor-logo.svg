@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 160" role="img" aria-labelledby="title desc">
+  <title>ClassAuthor</title>
+  <desc>Logo do ClassAuthor, ferramenta de planejamento pedagógico.</desc>
+  <g transform="translate(8 8) scale(1.1875)">
+  <rect x="0" y="0" width="120" height="120" rx="28" fill="#14213D"/>
+  <g transform="translate(-4 -4)"><path d="M30 104V58A34 34 0 0 1 98 58V104Z" fill="#FFF8ED"/>
+  <path d="M64 24V104M30 68H98" stroke="#14213D" stroke-width="4.5"/>
+  <path d="M64 68H98V104H64Z" fill="#E76F51"/></g>
+  </g>
+  <text x="180" y="94" fill="#14213D" font-family="'DM Sans', Inter, Arial, sans-serif" font-size="68" font-weight="800" letter-spacing="-3">Class<tspan fill="#BF4C34" font-family="Newsreader, Georgia, 'Times New Roman', serif" font-style="italic" font-weight="400" letter-spacing="-1">Author</tspan></text>
+  <text x="182" y="126" fill="#657084" font-family="'DM Mono', 'Courier New', monospace" font-size="15" letter-spacing="3.2">PLANEJAMENTO PEDAGÓGICO</text>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title>Marca do ClassAuthor</title>
+  <desc>Janela de ateliê em arco, com um vidro aceso: a semana em construção.</desc>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14213D"/><stop offset="1" stop-color="#22375F"/></linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#g)"/>
+  <path d="M30 104V58A34 34 0 0 1 98 58V104Z" fill="#FFF8ED"/>
+  <path d="M64 24V104M30 68H98" stroke="#14213D" stroke-width="4.5"/>
+  <path d="M64 68H98V104H64Z" fill="#E76F51"/>
+</svg>

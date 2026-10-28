@@ -563,3 +563,11 @@ body.welcome-active .recovery-dock{display:none!important}
 .production-uc ul{margin:10px 0;padding-left:20px}
 .production-uc .reader-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
 .production-uc-status{font-weight:600;color:#8a4b1f}.production-uc-status.is-ready{color:#2f6b4f}
+
+/* Logotipo: Class em negrito, Author em itálico (G sobre fundo escuro: Author dourado). */
+.wordmark b{font-family:var(--sans);font-weight:800;letter-spacing:-.045em}
+.wordmark i{font-family:var(--serif);font-style:italic;font-weight:400;letter-spacing:-.02em;color:var(--coral-dark)}
+.brand .wordmark{font-size:22px;line-height:1}
+.welcome-brand .wordmark{font-size:34px;line-height:1;letter-spacing:0}
+.welcome-brand .wordmark b{color:#fff}
+.welcome-brand .wordmark i{color:var(--gold)}

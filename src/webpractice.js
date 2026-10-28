@@ -208,10 +208,10 @@ export async function createWebPracticeDocx(input, practice, index = 0) {
   children.push(...bodyParagraphs(practice.fallbackPlan || "Se o upload falhar, permita colar uma amostra dos dados; se a internet cair, use o build de referência do professor; se o grupo atrasar, entregue primeiro o produto mínimo viável."));
   children.push(...bodyParagraphs(practice.accessibility || "Ofereça alternativa de baixa conexão, instruções em etapas curtas, arquivos leves e descrição textual das imagens ou diagramas."));
   children.push(paragraph(`Continuidade: ${practice.continuation || "Registre como o produto será retomado no percurso do curso."}`));
-  children.push(paragraph("Documento gerado pelo ClassAteliê. Revise ferramentas, links, licenças, acessibilidade e adequação da sessão antes de compartilhar com a turma.", { italics: true, color: "4F6475", before: 320 }));
+  children.push(paragraph("Documento gerado pelo ClassAuthor. Revise ferramentas, links, licenças, acessibilidade e adequação da sessão antes de compartilhar com a turma.", { italics: true, color: "4F6475", before: 320 }));
 
   const document = new Document({
-    creator: "ClassAteliê",
+    creator: "ClassAuthor",
     title: `Webprática — ${text(practice.title || `Sessão ${index + 1}`)}`,
     subject: "Roteiro de sessão síncrona e laboratório prático",
     description: "Roteiro editável de webprática gerado a partir do planejamento pedagógico.",
@@ -223,7 +223,7 @@ export async function createWebPracticeDocx(input, practice, index = 0) {
         { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", run: { font: "Aptos", size: 24, bold: true, color: "4F6475" }, paragraph: { spacing: { before: 180, after: 100 } } }
       ]
     },
-    sections: [{ properties: { page: { margin: { top: 900, right: 900, bottom: 900, left: 900 } } }, footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "ClassAteliê · Página ", size: 18, color: "6B7280" }), new TextRun({ children: [PageNumber.CURRENT], size: 18, color: "6B7280" })] })] }) }, children }]
+    sections: [{ properties: { page: { margin: { top: 900, right: 900, bottom: 900, left: 900 } } }, footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "ClassAuthor · Página ", size: 18, color: "6B7280" }), new TextRun({ children: [PageNumber.CURRENT], size: 18, color: "6B7280" })] })] }) }, children }]
   });
   return Packer.toBuffer(document);
 }

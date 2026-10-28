@@ -2,10 +2,10 @@ const object = (value) => value && typeof value === "object" && !Array.isArray(v
 const text = (value, fallback = "") => String(value ?? "").trim() || fallback;
 
 // Crédito do aplicativo, presente nos arquivos gerados (meta do Aula Studio, PDF, Moodle XML, JSON do Gerador).
-export const APP_NAME = "ClassAteliê";
+export const APP_NAME = "ClassAuthor";
 export const GENERATOR_TOOL = `${APP_NAME} (INOVALAB - IFSC)`;
-export const GENERATOR_CREDIT = `Construído com ${APP_NAME}, uma ferramenta de autoria de aulas desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.`;
-const GENERATOR_CREDIT_HTML = `<p style="text-align:center;font-size:.85em;opacity:.8">Construído com <strong>${APP_NAME}</strong>, uma ferramenta de autoria de aulas desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.</p>`;
+export const GENERATOR_CREDIT = `Construído com ${APP_NAME}, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.`;
+const GENERATOR_CREDIT_HTML = `<p style="text-align:center;font-size:.85em;opacity:.8">Construído com <strong>${APP_NAME}</strong>, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.</p>`;
 
 const escapeHtml = (value) => text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -217,7 +217,7 @@ export function toStudentLessons(lessons = []) {
 }
 
 /**
- * Versão completa da semana, para o ClassAteliê (reimportar, revisar, arquivar):
+ * Versão completa da semana, para o ClassAuthor (reimportar, revisar, arquivar):
  * a aula inteira, com quiz, feedbacks, revisões, cálculo de tempo e o guia do professor.
  */
 export function toGeneratorWeek(lesson = {}, teacherGuide = null, extra = {}) {
