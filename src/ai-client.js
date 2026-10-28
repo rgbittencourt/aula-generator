@@ -310,6 +310,8 @@ export async function callJson(messages, options = {}) {
         await wait(250);
         continue;
       }
+      // Diagnóstico: qual chamada estourou, com quantos tokens pedidos e quanto a API contou de saída.
+      console.error("output truncated", { label: options.label || "", maxTokens, usage: payload?.usage || null, stop: payload?.stop_reason || payload?.choices?.[0]?.finish_reason || "" });
       const truncatedError = new Error("A resposta da IA atingiu o limite de saída antes de concluir a aula.");
       truncatedError.code = "AI_OUTPUT_TRUNCATED";
       truncatedError.retryable = true;

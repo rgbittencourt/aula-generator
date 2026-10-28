@@ -502,3 +502,27 @@ test("redação em partes: roteiro curto demais é pedido de novo uma vez", asyn
     process.env.AULA_WRITER_PARALLEL = "false";
   }
 });
+
+test("derivados: com webprática agendada o projeto sai numa chamada própria (4 chamadas) e entra no guia", async () => {
+  const withPractice = normalizeCourseInput({
+    title: "Tecnologias para Gestão Educacional", weeks: 3, hoursPerWeek: 10, audience: "Servidores", level: "pós-graduação",
+    objectives: ["Compreender sistemas"], webPractice: { enabled: true },
+    webPractices: [{ title: "Prática ao vivo", weekNumber: 2, type: "síncrona", modality: "síncrona", objective: "Aplicar" }]
+  });
+  const plan = parseWeekMarkdown(MARKDOWN, { weekNumber: 2 }).lessonPlan;
+  const week = normalizeLesson({ lessonPlan: plan }, withPractice, 1);
+  await withFetch((body) => {
+    const user = body.messages.filter((message) => message.role === "user").map((message) => message.content).join("\n");
+    if (/REGRAS DA WEBPRÁTICA/.test(user)) return reply(JSON.stringify({ teacherGuide: { webPracticeProjects: [{ title: "Projeto X", steps: [] }] } }));
+    if (/REGRAS DO MATERIAL DE MEDIAÇÃO/.test(user)) return reply(JSON.stringify({ teacherGuide: DERIVATIVES.teacherGuide }));
+    if (/REGRAS DA AVALIAÇÃO/.test(user)) return reply(JSON.stringify({ assessment: DERIVATIVES.assessment }));
+    return reply(JSON.stringify({ diagnostic: DERIVATIVES.diagnostic, formativeChecks: DERIVATIVES.formativeChecks, activities: DERIVATIVES.activities, selfAssessment: DERIVATIVES.selfAssessment }));
+  }, async (calls) => {
+    const { completeWeekDerivatives } = await import("../src/claude-writer.js");
+    const result = await completeWeekDerivatives(withPractice, 1, week, {});
+    assert.equal(calls.length, 4);
+    assert.ok(result.week.lessonPlan.assessment.questions.length >= 1);
+    assert.equal(result.teacherGuide.webPracticeProjects[0].title, "Projeto X");
+    assert.ok(result.teacherGuide.mediationMessages, "mediação preservada ao lado do projeto");
+  });
+});

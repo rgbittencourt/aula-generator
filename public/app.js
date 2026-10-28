@@ -1394,7 +1394,17 @@ function renderLessonPreview(lesson, index) {
   const references = (plan.references || []).length
     ? `<section class="reader-references"><h3>Referências bibliográficas (${plan.references.length})</h3><p><small>Escritas pelo modelo a partir do que ele conhece: confira cada uma (autor, ano, edição, link) antes de liberar a semana.</small></p><ol>${plan.references.map((item) => { const citation = item.citation || item.title || item.href || "Referência"; const status = referenceStatus[item.verificationStatus] || "conferir antes de publicar"; const link = item.href ? ` <a href="${escapeHtml(item.href)}" target="_blank" rel="noreferrer">abrir</a>` : ""; return `<li>${escapeHtml(citation)}${link} <small>· ${escapeHtml(status)}</small></li>`; }).join("")}</ol></section>`
     : `<section class="reader-warning"><h3>Referências bibliográficas</h3><p>Esta semana ainda não tem referências. Use “Refazer esta semana com IA” para gerá-las.</p></section>`;
-  const assessment = (plan.assessment?.questions || []).length ? `<section><h3>${escapeHtml(plan.assessment.title || "Atividade avaliativa")}</h3><p>${escapeHtml(plan.assessment.format || "Questões alinhadas aos objetivos")}</p><ol>${plan.assessment.questions.map((q) => `<li>${escapeHtml(q.q || q.question || "")}${q.explanation ? `<small>${escapeHtml(q.explanation)}</small>` : ""}</li>`).join("")}</ol></section>` : "";
+  const letters = ["A", "B", "C", "D", "E", "F"];
+  const questionMarkup = (q, position) => {
+    const options = Array.isArray(q.options) ? q.options : [];
+    const feedback = Array.isArray(q.feedbackByOption) ? q.feedbackByOption : [];
+    const correct = Number.isInteger(q.answer) ? q.answer : -1;
+    const optionsMarkup = options.length ? `<ul class="reader-quiz-options">${options.map((option, optionIndex) => `<li class="${optionIndex === correct ? "is-correct" : ""}"><strong>${letters[optionIndex] || optionIndex + 1})</strong> ${escapeHtml(option)}${optionIndex === correct ? " <em>(correta)</em>" : ""}${feedback[optionIndex] ? `<small>Feedback: ${escapeHtml(feedback[optionIndex])}</small>` : ""}</li>`).join("")}</ul>` : "";
+    return `<li><strong>${escapeHtml(q.q || q.question || "")}</strong>${optionsMarkup}${q.explanation ? `<small>${escapeHtml(q.explanation)}</small>` : ""}</li>`;
+  };
+  const assessment = (plan.assessment?.questions || []).length
+    ? `<section class="reader-assessment"><h3>${escapeHtml(plan.assessment.title || "Atividade avaliativa")} (${plan.assessment.questions.length} questões)</h3><p>${escapeHtml(plan.assessment.format || "Questões alinhadas aos objetivos")}</p><ol>${plan.assessment.questions.map(questionMarkup).join("")}</ol></section>`
+    : `<section class="reader-warning reader-assessment"><h3>Atividade avaliativa (questões)</h3><p>${lesson?.generationMeta?.derivativesPending ? "As questões, as atividades e o Material de Mediação ainda não foram gerados para esta semana (o texto está salvo)." : "Esta semana ainda não tem questões."}</p><button type="button" class="secondary" id="retry-derivatives-button">Gerar questões, atividades e mediação agora</button></section>`;
   const arc = plan.didacticArc || guide.didacticArc || {};
   const phaseSummary = arc.phasePlan ? Object.entries(arc.phasePlan).filter(([key, value]) => key !== "labels" && key !== "omitted" && value === true).map(([key]) => arc.phasePlan.labels?.[key] || key).join(" · ") : (arc.sequence || []).join(" · ");
   const diagnostic = plan.diagnostic?.prompt ? `<section class="reader-callout"><h3>Antes de começar</h3>${paragraphsMarkup(plan.diagnostic.prompt)}${plan.diagnostic.expectedEvidence ? `<small>O que será observado: ${escapeHtml(plan.diagnostic.expectedEvidence)}</small>` : ""}</section>` : "";
@@ -1412,6 +1422,7 @@ function renderLessonPreview(lesson, index) {
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
   $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}`;
   renderFlowPanel(index);
+  $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
   $("#lesson-reader").querySelectorAll(".mediation-regenerate").forEach((button) => button.addEventListener("click", () => regenerateMediationMessage(button)));
   $("#lesson-reader").querySelectorAll(".mediation-message-card").forEach((card) => {
     const channel = card.dataset.messageChannel;
@@ -1450,6 +1461,36 @@ function closeLessonPreview() {
   $("#lesson-modal").setAttribute("aria-hidden", "true");
   document.body.style.overflow = "";
   state.previewIndex = null;
+}
+
+// Gera só a avaliação, as atividades e a mediação de uma semana cujo texto já está salvo.
+async function retryDerivatives(index) {
+  if (aiActionBusy) return;
+  const button = $("#retry-derivatives-button");
+  if (!beginAiAction(button)) return;
+  setBusy(button, true, "Gerando…");
+  setAiActivity("Questões e mediação", `Gerando as questões (com feedback por alternativa), as atividades e as mensagens da semana ${index + 1} a partir do texto salvo…`);
+  try {
+    const input = formInput();
+    const accessCode = input.accessCode || $("#access-code")?.value || "";
+    delete input.accessCode;
+    const headers = { "Content-Type": "application/json" };
+    if (accessCode) headers["x-aula-access-code"] = accessCode;
+    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input, weekIndex: index, week: state.weeks[index], teacherGuide: state.teacherGuides[index] }) });
+    const done = await readApiResponse(response, `Não foi possível gerar as questões da semana ${index + 1}.`);
+    state.weeks[index] = done.week;
+    state.teacherGuides[index] = done.teacherGuide || state.teacherGuides[index];
+    saveDraft("derivados-gerados");
+    openLessonPreview(index);
+    finishAiActivity("Questões geradas", `A semana ${index + 1} agora tem questões, atividades e mediação. Revise e aprove.`, "success");
+  } catch (error) {
+    finishAiActivity("Questões não geradas", error.message, "error");
+    const note = $("#regenerate-note");
+    if (note) note.textContent = `As questões NÃO foram geradas: ${error.message}`;
+  } finally {
+    setBusy(button, false, "");
+    endAiAction();
+  }
 }
 
 async function regenerateSelectedWeek() {

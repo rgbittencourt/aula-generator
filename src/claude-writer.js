@@ -234,8 +234,11 @@ export function derivativesPrompt(input, index, plan, scheduledPractices, part =
   const wants = {
     assessment: ["all", "assessment"].includes(part),
     activities: ["all", "guide", "activities"].includes(part),
-    mediation: ["all", "guide", "mediation"].includes(part)
+    mediation: ["all", "guide", "mediation"].includes(part),
+    webpractice: ["all", "guide", "webpractice"].includes(part) && scheduledPractices.length > 0
   };
+  // Com webprática, o projeto completo sai numa chamada própria (é a parte mais longa do guia).
+  const separateWebpractice = part === "mediation" || part === "webpractice";
   const assessmentSpec = `  "assessment": {
     "title": "Atividade avaliativa — Semana ${weekNumber}",
     "format": "6 questões objetivas de múltipla escolha, com 5 alternativas e feedback em todas elas",
@@ -253,9 +256,12 @@ export function derivativesPrompt(input, index, plan, scheduledPractices, part =
     "mediationMessages": {
       "whatsapp": [ { "relatedId": "stop-1", "relatedType": "abertura", "timing": "...", "purpose": "...", "studentNeed": "...", "teacherIntent": "...", "tone": "próximo, com humor leve", "text": "mensagem curta, humana" } ],
       "moodle": [ { "relatedId": "stop-1", "relatedType": "abertura", "timing": "...", "purpose": "...", "studentNeed": "...", "teacherIntent": "...", "tone": "claro e organizado", "text": "aviso de curso organizado" } ]
-    }${scheduledPractices.length ? ',\n    "webPracticeProjects": [ { "title": "...", "problem": "...", "context": "...", "studentRole": "...", "challenge": "...", "deliverable": "...", "steps": [ { "minutes": 10, "instructions": "...", "evidence": "..." } ], "criteria": ["..."], "fallbackPlan": "..." } ]' : ""}
+    }${scheduledPractices.length && !separateWebpractice ? ',\n    "webPracticeProjects": [ { "title": "...", "problem": "...", "context": "...", "studentRole": "...", "challenge": "...", "deliverable": "...", "steps": [ { "minutes": 10, "instructions": "...", "evidence": "..." } ], "criteria": ["..."], "fallbackPlan": "..." } ]' : ""}
   }`;
-  const specs = [wants.assessment && assessmentSpec, wants.activities && activitiesSpec, wants.mediation && mediationSpec].filter(Boolean);
+  const webpracticeSpec = `  "teacherGuide": {
+    "webPracticeProjects": [ { "title": "...", "problem": "...", "context": "...", "studentRole": "...", "challenge": "...", "deliverable": "...", "steps": [ { "minutes": 10, "instructions": "...", "evidence": "..." } ], "criteria": ["..."], "fallbackPlan": "..." } ]
+  }`;
+  const specs = [wants.assessment && assessmentSpec, wants.activities && activitiesSpec, wants.mediation && mediationSpec, part === "webpractice" && wants.webpractice && webpracticeSpec].filter(Boolean);
   const rules = [
     wants.assessment && `REGRAS DA AVALIAÇÃO
 - Exatamente 6 questões, todas de múltipla escolha com EXATAMENTE 5 alternativas e uma única correta, cobrindo todos os objetivos. Não use verdadeiro/falso. "answer" é o índice (começando em 0, de 0 a 4) da alternativa correta; varie a posição da correta entre as questões.
@@ -267,7 +273,9 @@ export function derivativesPrompt(input, index, plan, scheduledPractices, part =
     wants.mediation && `REGRAS DO MATERIAL DE MEDIAÇÃO
 - Uma parada para a abertura, uma ao final de cada bloco de duas ou três seções do texto (de 3 a 5 no total) e uma para o fechamento. Para cada parada, uma mensagem de WhatsApp e uma de Moodle, de teor equivalente, mas não cópia: o WhatsApp é mais próximo e pode ter humor leve; o Moodle, mais organizado. Mensagens curtas.
 - As mensagens explicam por que vale a pena fazer a etapa, reconhecem a dificuldade e convidam a uma ação concreta. Não invente data, link nem obrigação que não esteja no briefing.
-${scheduledPractices.length ? `- Há webprática agendada para esta semana: desenvolva o projeto completo apenas em teacherGuide.webPracticeProjects (nunca no texto do aluno). Briefing da prática: ${JSON.stringify(scheduledPractices.map((practice, practiceIndex) => compactBriefingPractice(practice, practiceIndex)))}` : ""}`
+${scheduledPractices.length && !separateWebpractice ? `- Há webprática agendada para esta semana: desenvolva o projeto completo apenas em teacherGuide.webPracticeProjects (nunca no texto do aluno). Briefing da prática: ${JSON.stringify(scheduledPractices.map((practice, practiceIndex) => compactBriefingPractice(practice, practiceIndex)))}` : ""}`,
+    part === "webpractice" && wants.webpractice && `REGRAS DA WEBPRÁTICA
+- Desenvolva o projeto completo de cada webprática agendada para esta semana, só em teacherGuide.webPracticeProjects (nunca no texto do aluno), ligado ao que o texto ensinou. Briefing da prática: ${JSON.stringify(scheduledPractices.map((practice, practiceIndex) => compactBriefingPractice(practice, practiceIndex)))}`
   ].filter(Boolean);
   return `Texto da semana ${weekNumber} ("${plan.theme}") do curso "${input.title}":
 
@@ -290,24 +298,29 @@ ${rules.join("\n\n")}${rules.length ? "\n\n" : ""}Responda somente JSON válido.
 // (o erro é da etapa inteira e a repetição refaz as duas).
 async function buildDerivatives(input, index, plan) {
   const scheduled = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index));
-  const names = { assessment: "assessment", activities: "diagnostic, formativeChecks, activities, selfAssessment", mediation: "teacherGuide" };
+  const names = { assessment: "assessment", activities: "diagnostic, formativeChecks, activities, selfAssessment", mediation: "teacherGuide", webpractice: "teacherGuide.webPracticeProjects" };
   const call = (part, maxTokens) => callJson([
     { role: "system", content: DERIVATIVES_SYSTEM },
     { role: "user", content: derivativesPrompt(input, index, plan, scheduled, part) }
   ], {
     temperature: 0.35,
     maxTokens,
+    retryMaxTokens: maxTokens,
+    label: `derivatives:${part}`,
     cacheSystem: true,
     formatRetryInstruction: `A resposta anterior foi truncada ou inválida. Devolva novamente somente o objeto JSON pedido (${names[part]}), sempre com JSON válido e completo.`
   });
   try {
     // allSettled: não deixa uma chamada solta rodando (e gastando tokens) depois que a outra falhou.
-    const results = await Promise.allSettled([call("assessment", 8000), call("activities", 6000), call("mediation", 8000)]);
+    const calls = [call("assessment", 12000), call("activities", 9000), call("mediation", 12000)];
+    if (scheduled.length) calls.push(call("webpractice", 12000));
+    const results = await Promise.allSettled(calls);
     const failed = results.find((result) => result.status === "rejected");
     if (failed) throw failed.reason;
-    const [assessment, activities, mediation] = results.map((result) => result.value);
+    const [assessment, activities, mediation, webpractice] = results.map((result) => result.value);
     const object = (value) => (value && typeof value === "object" ? value : {});
-    const data = { ...object(activities), ...object(mediation), ...(object(assessment).assessment ? { assessment: assessment.assessment } : {}) };
+    const teacherGuide = { ...object(object(mediation).teacherGuide), ...(object(object(webpractice).teacherGuide).webPracticeProjects ? { webPracticeProjects: webpractice.teacherGuide.webPracticeProjects } : {}) };
+    const data = { ...object(activities), ...(Object.keys(teacherGuide).length ? { teacherGuide } : {}), ...(object(assessment).assessment ? { assessment: assessment.assessment } : {}) };
     return { data, error: "" };
   } catch (error) {
     return { data: {}, error: error?.message || "Falha ao gerar a avaliação e o Material de Mediação." };
