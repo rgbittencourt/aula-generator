@@ -170,7 +170,7 @@ ${outline}
 SUA TAREFA AGORA: a semana será escrita em ${total} partes simultâneas, unidas depois na ordem. Você escreve somente a PARTE ${part} de ${total}: ela ${scope}.
 - Use os cabeçalhos "## n. Título" exatamente como estão no roteiro; subseções "### n.1 …" quando o conceito pedir.
 - Não escreva nada das outras partes e não repita o caso ou o dado que o roteiro atribui a outra seção. Nada de introdução ou conclusão própria da parte: comece direto no Markdown e, ${closing ? "ao chegar à síntese, retome os casos do roteiro, o contraponto e os conceitos novos" : "na última seção desta parte, deixe uma tensão que a seção seguinte do roteiro resolve"}.
-- Cada seção com cerca de ${targets.sectionTargetWords} palavras (mínimo ${targets.sectionMinimumWords}); inclua em cada seção desta parte TODOS os callouts 🔎 (vídeo, artigo) que o roteiro lhe atribui, no parágrafo exato em que ajudam, mais os 💭, 💡 e ⚠️ conforme o roteiro. Sem esses 🔎 a semana fica sem recursos.
+- Cada seção com cerca de ${targets.sectionTargetWords} palavras (mínimo ${targets.sectionMinimumWords}); inclua em cada seção desta parte TODOS os callouts 🔎 (vídeo, artigo) e as figuras 🖼️ (no formato do guia: > 🖼️ **Figura** [diagrama | descrição: "…"]: legenda) que o roteiro lhe atribui, no parágrafo exato em que ajudam, mais os 💭, 💡 e ⚠️ conforme o roteiro. Sem esses 🔎 a semana fica sem recursos.
 - Esta instrução vale mais do que qualquer outra que peça o documento inteiro.`;
 }
 
@@ -186,9 +186,9 @@ async function writeWeekMarkdown(input, index, { progression, previousWeeks, bri
 
 ANTES DE ESCREVER, faça o ROTEIRO da semana. Responda somente com ele, neste formato, sem texto antes ou depois:
 # Semana ${weekNumber} — Título da semana
-1. Título da seção | cobre: o que a seção explica | caso ou dado concreto: instituição, ano, número, norma ou autor reais (marque "conferir" se não tiver certeza) | callouts: 🔎/💭/💡/⚠️ que entram
+1. Título da seção | cobre: o que a seção explica | caso ou dado concreto: instituição, ano, número, norma ou autor reais (marque "conferir" se não tiver certeza) | callouts: 🔎/💭/💡/⚠️/🖼️ que entram
 2. …
-Uma linha por seção numerada, no mínimo ${targets.requiredSectionCount} seções, na ordem didática (problema, conceito, caso, lição, limite; contraponto crítico perto do fim). Casos e dados não podem se repetir entre seções. Distribua pelas seções, na coluna callouts, EXATAMENTE ${resources.videosPerWeek} callout(s) 🔎 de vídeo e ${resources.articlesPerWeek} de artigo, cada um na seção em que realmente ajuda, e diga o que o recurso mostra. Subseções e demais partes (boas-vindas, síntese, glossário) não entram no roteiro.`;
+Uma linha por seção numerada, no mínimo ${targets.requiredSectionCount} seções, na ordem didática (problema, conceito, caso, lição, limite; contraponto crítico perto do fim). Casos e dados não podem se repetir entre seções. Distribua pelas seções, na coluna callouts, EXATAMENTE ${resources.videosPerWeek} callout(s) 🔎 de vídeo e ${resources.articlesPerWeek} de artigo, cada um na seção em que realmente ajuda, e diga o que o recurso mostra. Marque também 1 ou 2 seções com 🖼️ (figura: diagrama que explica melhor que o texto) e escreva ao lado, em "figura:", o que o desenho mostra. Subseções e demais partes (boas-vindas, síntese, glossário) não entram no roteiro.`;
   const askOutline = (text) => callText([system, { role: "user", content: text }], { temperature, maxTokens: 3000, ignoreRequestBudget: true, cacheSystem: true });
   let outline = String((await askOutline(outlineAsk)).text || "").trim();
   let { sections } = parseOutline(outline);

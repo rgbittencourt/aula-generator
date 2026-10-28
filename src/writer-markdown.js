@@ -113,9 +113,15 @@ function resourceKind(label) {
 
 function parseCallout(raw) {
   const source = text(raw);
-  const emoji = (source.match(/^\s*(🔎|💭|💡|⚠️|⚠|📌)/u) || [])[1] || "";
+  const emoji = (source.match(/^\s*(🔎|💭|💡|⚠️|⚠|📌|🖼️|🖼)/u) || [])[1] || "";
   if (!emoji) return null;
-  const rest = source.replace(/^\s*(🔎|💭|💡|⚠️|⚠|📌)\s*/u, "");
+  const rest = source.replace(/^\s*(🔎|💭|💡|⚠️|⚠|📌|🖼️|🖼)\s*/u, "");
+  if (emoji === "🖼️" || emoji === "🖼") {
+    const match = rest.match(/^(?:\*\*[^*]*\*\*|[^\[:]*)\s*\[([^\]]*)\]\s*:?\s*([\s\S]*)$/);
+    const attrs = match ? match[1].split("|").map((part) => part.trim()) : [];
+    const description = (attrs.find((part) => /^descri[cç][aã]o\s*:/i.test(part)) || "").replace(/^descri[cç][aã]o\s*:\s*/i, "").replace(/^["“”']|["“”']$/g, "").trim();
+    return { type: "figure", description, body: plain(match ? match[2] : rest.replace(/^\*\*[^*]*\*\*\s*:?\s*/, "")) };
+  }
   if (emoji === "🔎") {
     const match = rest.match(/^(?:\*\*[^*]*\*\*|[^\[:]*)\s*\[([^\]]*)\]\s*:?\s*([\s\S]*)$/);
     const attrs = match ? match[1].split("|").map((part) => part.trim()) : [];
@@ -177,6 +183,7 @@ export function parseWeekMarkdown(markdown, options = {}) {
   let section = null;
   let sub = null;
   let resourceCounter = 0;
+  let figureCounter = 0;
   let sectionCounter = 0;
   const raw = { synthesis: [], next: [], welcome: [] };
 
@@ -211,7 +218,7 @@ export function parseWeekMarkdown(markdown, options = {}) {
       if (zone === "section") {
         sectionCounter += 1;
         const numbered = plain(token.text).match(/^(\d+)\s*[.)\-–—:]?\s*(.+)$/);
-        section = { number: numbered ? numbered[1] : String(sectionCounter), title: numbered ? numbered[2].trim() : plain(token.text), didacticRole: "", body: "", subsections: [], callouts: [], resources: [], keyTerms: [], caseStudy: null, reflection: null, md: [] };
+        section = { number: numbered ? numbered[1] : String(sectionCounter), title: numbered ? numbered[2].trim() : plain(token.text), didacticRole: "", body: "", subsections: [], callouts: [], resources: [], figures: [], keyTerms: [], caseStudy: null, reflection: null, md: [] };
       }
       continue;
     }
@@ -229,6 +236,11 @@ export function parseWeekMarkdown(markdown, options = {}) {
         const callout = parseCallout(token.text);
         if (!callout) { addProse([token]); continue; }
         const anchor = sub ? sub.number : section.number;
+        if (callout.type === "figure") {
+          figureCounter += 1;
+          if (callout.description) section.figures.push({ id: `w${weekNumber}-f${figureCounter}`, kind: "diagrama", description: callout.description, caption: callout.body, sectionNumber: anchor });
+          continue;
+        }
         if (callout.type === "resource") {
           resourceCounter += 1;
           const kind = callout.kind;
@@ -341,6 +353,7 @@ function resourceCallout(resource) {
   return `> 🔎 **Veja mais aqui** [${attrs.join(" | ")}]${note}: ${plain(resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || "")}`;
 }
 
+const figureCallout = (figure) => `> 🖼️ **Figura** [${figure.kind || "diagrama"} | descrição: "${plain(figure.description).replace(/"/g, "'")}"]: ${plain(figure.caption || "")}`;
 const CALLOUT_EMOJI = { reflexao: ["💭", "Para refletir (não vale nota)"], destaque: ["💡", "Em uma frase"], atencao: ["⚠️", "Atenção"] };
 const calloutLine = (callout) => { const [emoji, label] = CALLOUT_EMOJI[callout.kind] || CALLOUT_EMOJI.destaque; return `> ${emoji} **${callout.title || label}**: ${callout.body}`; };
 
@@ -357,6 +370,7 @@ export function planToMarkdown(plan = {}) {
     const resourcesFor = (anchor, own) => (section.resources || []).filter((resource) => own ? String(resource.sectionNumber) === anchor : !subNumbers.has(String(resource.sectionNumber)));
     if (section.body) out.push(htmlToMarkdown(section.body));
     for (const resource of resourcesFor(String(section.number), false)) out.push(resourceCallout(resource));
+    for (const figure of (section.figures || [])) out.push(figureCallout(figure));
     for (const callout of callouts.filter((item) => !subNumbers.has(String(item.anchor)))) out.push(calloutLine(callout));
     for (const sub of section.subsections || []) {
       out.push(`### ${sub.number} ${plain(sub.title)}`);

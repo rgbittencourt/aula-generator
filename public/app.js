@@ -1385,7 +1385,8 @@ function renderLessonPreview(lesson, index) {
     const reflection = section.reflection?.question ? `<div class="reader-callout"><strong>Para refletir</strong><p>${escapeHtml(section.reflection.question)}</p>${paragraphsMarkup(section.reflection.body || "")}</div>` : "";
     const composition = (plan.composition?.entries || []).filter((entry) => Number(entry.sectionNumber) === Number(section.number) || (!entry.sectionNumber && section.number === "1")).map(compositionPreview).join("");
     const resources = [...(section.resources || [])].map(resourcePreview).join("");
-    return `<section><h3>${escapeHtml(`${section.number || ""} ${section.title || "Seção"}`.trim())}</h3>${paragraphsMarkup(section.body)}${composition}${resources}${subs}${caseMarkup}${reflection}</section>`;
+    const figures = (section.figures || []).map((figure) => figure.src ? `<figure class="reader-figure"><img src="${escapeHtml(figure.src)}" alt="${escapeHtml(figure.description || figure.caption || "Figura")}" loading="lazy" /><figcaption>${escapeHtml((figure.caption || figure.description || "").replace(/[.\s]+$/, ""))}. <em>Ilustração criada por IA · revisar antes de publicar.</em></figcaption></figure>` : `<p class="reader-resource-pending">Figura prevista (ainda sem ilustração): ${escapeHtml(figure.description)}</p>`).join("");
+    return `<section><h3>${escapeHtml(`${section.number || ""} ${section.title || "Seção"}`.trim())}</h3>${paragraphsMarkup(section.body)}${figures}${composition}${resources}${subs}${caseMarkup}${reflection}</section>`;
   }).join("");
   const globalResources = Object.values(allResources).flat().filter((resource) => resource && !sections.some((section) => (section.resources || []).some((item) => item.id && item.id === resource.id))).slice(0, 12).map(resourcePreview).join("");
   const glossary = (plan.glossary || []).length ? `<section><h3>Glossário</h3><ul>${plan.glossary.map((item) => `<li><strong>${escapeHtml(item.term || "Termo")}</strong>: ${escapeHtml(item.definition || "")}</li>`).join("")}</ul></section>` : "";
@@ -1476,7 +1477,7 @@ async function regenerateSelectedWeek() {
     state.teacherGuides = data.teacherGuides || state.teacherGuides;
     saveDraft("semana-refeita");
     const completed = await completeDerivativesStep({ ...data, week: data.weeks?.[index], teacherGuide: data.teacherGuides?.[index], resourcesDeferred: true }, input, index, headers, button);
-    const enriched = await enrichGeneratedWeek(completed, input, index, headers, button);
+    const enriched = await illustrateGeneratedWeek(await enrichGeneratedWeek(completed, input, index, headers, button), input, index, headers, button);
     if (enriched.week) data.weeks[index] = enriched.week;
     if (enriched.teacherGuide) data.teacherGuides[index] = enriched.teacherGuide;
     data.resourcesPending = enriched.resourcesPending;
@@ -1995,6 +1996,29 @@ async function completeDerivativesStep(data, input, index, headers, button) {
   }
 }
 
+// Figuras (diagramas SVG) criadas por IA: etapa própria, depois do texto e dos recursos.
+function weekHasPendingFigures(week) {
+  return (week?.lessonPlan?.contentSections || []).some((section) => (section.figures || []).some((figure) => !figure.src));
+}
+
+async function illustrateGeneratedWeek(data, input, index, headers, button) {
+  if (!data?.week || !weekHasPendingFigures(data.week)) return data;
+  setButtonLabel(button, `Criando as figuras da semana ${index + 1}…`);
+  setAiActivity("Criando figuras", `Desenhando os diagramas da semana ${index + 1} (SVG, com legenda “criada por IA”)…`, { progress: Math.round(((index + 0.85) / (input.weeks + 1)) * 100) });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 170000);
+  try {
+    const response = await fetch("/api/illustrate", { method: "POST", headers, signal: controller.signal, body: JSON.stringify({ action: "illustrate", input, weekIndex: index, week: data.week }) });
+    const done = await readApiResponse(response, `Não foi possível criar as figuras da semana ${index + 1}.`);
+    return { ...data, week: done.week, figuresFailed: done.failed || 0 };
+  } catch (error) {
+    console.warn(`Figuras da semana ${index + 1} adiadas:`, error);
+    return { ...data, figuresError: error.message || "As figuras não foram concluídas." };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function enrichGeneratedWeek(data, input, index, headers, button) {
   if (!data?.resourcesDeferred || !data.week) return data;
   setButtonLabel(button, `Pesquisando recursos da semana ${index + 1}…`);
@@ -2223,6 +2247,7 @@ async function generateDistributed(input, accessCode, button, options = {}) {
     renderWeeks({ ok: true, partial: true, provider: "ai-distributed-partial", model: data.model, input, weeks: state.weeks, teacherGuides: state.teacherGuides, generation: state.generation }, { scrollToResults: false });
     data = await completeDerivativesStep(data, input, index, headers, button);
     data = await enrichGeneratedWeek(data, input, index, headers, button);
+    data = await illustrateGeneratedWeek(data, input, index, headers, button);
     weeks[index] = data.week;
     teacherGuides[index] = data.teacherGuide;
     state.weeks = weeks.filter(Boolean);

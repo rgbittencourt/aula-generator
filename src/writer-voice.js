@@ -78,6 +78,7 @@ CALLOUTS (uma linha de citação iniciada por ">", logo depois do parágrafo a q
 - Ideia-chave que merece destaque: > 💡 **Em uma frase**: a ideia, em uma frase.
 - Cuidado ou erro comum: > ⚠️ **Atenção**: o erro e por que ele acontece.
 - Estudo de caso: use "### Caso: título" e conte o caso em prosa, com contexto, dados e uma pergunta final em um callout 💭.
+- Figura (diagrama que um professor desenharia no quadro): > 🖼️ **Figura** [diagrama | descrição: "o que o desenho mostra, com os elementos e rótulos exatos: p. ex. árvore de álgebra relacional da consulta X, com π, σ e ⨝ e as relações nas folhas"]: legenda de uma frase. Use de 1 a 2 por semana, só quando o desenho explica melhor que o texto (estruturas, fluxos, comparações, arquiteturas, árvores); o desenho será criado depois por IA, então a descrição precisa ser completa e correta. Não use figura para fotos, pessoas ou cenas.
 Não crie galeria de links no final. Cada recurso entra dentro da seção em que é usado.`;
 
 const VOICE_BLOCK = `EXEMPLO DE VOZ

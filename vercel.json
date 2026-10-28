@@ -9,6 +9,7 @@
   "routes": [
     { "src": "/api/bridge", "dest": "/api/regenerate-week" },
     { "src": "/api/derivatives", "dest": "/api/regenerate-week" },
+    { "src": "/api/illustrate", "dest": "/api/regenerate-week" },
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/", "dest": "/public/index.html" },
     { "src": "/(.*)", "dest": "/public/$1" }

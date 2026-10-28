@@ -2,6 +2,7 @@ import { normalizeDidacticArc, buildAlignmentMatrix, buildProgression, pedagogic
 import { measureLessonQuality } from "./content-quality.js";
 import { normalizeAcademicProfile } from "./academic.js";
 import { progressionForWeek } from "./curriculum.js";
+import { figureBlock, figuresOf } from "./figures.js";
 import { compositionPlanForWeek, materializeComposition, normalizeCompositionPlan } from "./composition.js";
 
 export const DEFAULT_LICENSE = "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br";
@@ -343,6 +344,8 @@ function normalizeSection(value = {}, index = 0) {
     counterpoint: text(section.counterpoint || section.limit || section.alternativeInterpretation),
     didacticRole: text(section.didacticRole || section.role),
     resources: normalizeResources(section.resources, "section-resource"),
+    // Figuras (diagramas) criadas por IA: descrição para o modelo e, depois de ilustradas, o SVG em src.
+    figures: Array.isArray(section.figures) ? section.figures.map((figure, figureIndex) => ({ id: text(figure?.id, `fig-${index + 1}-${figureIndex + 1}`), kind: text(figure?.kind, "diagrama"), description: text(figure?.description), caption: text(figure?.caption), sectionNumber: text(figure?.sectionNumber, section.number), src: text(figure?.src), aiGenerated: Boolean(figure?.src) })).filter((figure) => figure.description) : [],
     // Callouts escritos no ponto do texto (modo de prosa): destaque, atenção e reflexão.
     callouts: Array.isArray(section.callouts) ? section.callouts.map((callout) => ({
       kind: ["destaque", "atencao", "reflexao"].includes(callout?.kind) ? callout.kind : "destaque",
@@ -842,6 +845,7 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
     const subNumbers = new Set(section.subsections.map((sub) => text(sub.number)));
     const calloutsAt = (anchor) => callouts.map((callout, position) => ({ callout, position })).filter(({ callout }) => text(callout.anchor) === anchor || (!subNumbers.has(text(callout.anchor)) && anchor === text(section.number)));
     if (section.body) children.push({ id: newId("c-prose-", week, sectionIndex + 20), type: "prose", props: { body: richHtml(section.body), dropcap: sectionIndex === 0, dropcapTone: "terracotta" } });
+    figuresOf(section).forEach((figure) => children.push(figureBlock(figure)));
     children.push(...resourceChildren([...(section.resources || []), ...allResources], sectionIndex, { skipNumbers: subNumbers }));
     children.push(...(plan.composition?.blocksBySection?.[sectionIndex] || []));
     children.push(...calloutsAt(text(section.number)).map(({ callout, position }) => calloutBlock(callout, sectionIndex, position)));
