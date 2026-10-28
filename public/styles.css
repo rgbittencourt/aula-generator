@@ -571,3 +571,9 @@ body.welcome-active .recovery-dock{display:none!important}
 .welcome-brand .wordmark{font-size:34px;line-height:1;letter-spacing:0}
 .welcome-brand .wordmark b{color:#fff}
 .welcome-brand .wordmark i{color:var(--gold)}
+
+/* Tagline discreta sob o nome: cursiva pequena, sem competir com o logotipo */
+.welcome-brand small,.brand small{font-family:var(--serif);font-style:italic;font-weight:400;font-size:15px;letter-spacing:.01em;text-transform:none;line-height:1.1;color:#e9b9aa;opacity:.9}
+.brand small{font-size:12px;color:var(--muted);opacity:1}
+@media(max-width:860px){.welcome-brand small{font-size:14px;letter-spacing:.01em}}
+@media(max-width:620px){.welcome-brand small{font-size:13px;letter-spacing:.01em}}
