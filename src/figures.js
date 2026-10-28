@@ -4,7 +4,7 @@
 //   > 🖼️ **Figura** [diagrama | descrição: "árvore de álgebra relacional da consulta X"]: legenda
 // Uma etapa própria (/api/illustrate) pede ao modelo o SVG de cada figura; aqui ficam as
 // partes puras: limpeza do SVG (nada de script nem recurso externo), URI de dados e o bloco
-// "imagem" do Aula Studio, sempre com a legenda "Ilustração criada por IA".
+// "imagem" do ClassAtelier, sempre com a legenda "Ilustração criada por IA".
 
 export const AI_FIGURE_CREDIT = "Ilustração criada por IA (Claude, Anthropic) · revisar antes de publicar";
 

@@ -1,5 +1,5 @@
 // Exporta o quiz da semana em Moodle XML (formato de importação do banco de
-// questões), separado do .aula.json do Aula Studio.
+// questões), separado do .aula.json do ClassAtelier.
 //
 // Cada questão é "multichoice" de resposta única, com feedback em TODAS as
 // alternativas (certa ou errada), feedback geral (a explicação) e feedbacks

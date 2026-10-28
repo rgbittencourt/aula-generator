@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title>Marca do ClassAtelier</title>
+  <desc>Janela de ateliê em arco, com o vidro dividido em quatro e um painel aceso.</desc>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#fff8ed"/>
+  <g transform="translate(17.07 17.07) scale(1.0667)"><path d="M16 88V44A32 32 0 0 1 80 44V88Z" fill="#14213D"/><path d="M48 12V88M16 52H80" stroke="#fff8ed" stroke-width="4"/><path d="M48 52H80V88H48Z" fill="#e76f51"/></g>
+</svg>

@@ -439,9 +439,9 @@ test("ZIP contém JSON do aluno e roteiro DOCX de webprática em pasta separada"
   const enriched = attachWorkloadToLessons(weeks, workload);
   const buffer = await createWeeksZip(input, enriched, buildGeneralPlan(input, workload, enriched));
   const zip = await JSZip.loadAsync(buffer);
-  const names = Object.keys(zip.files).filter((name) => name.endsWith("-studio.aula.json"));
+  const names = Object.keys(zip.files).filter((name) => name.endsWith("-classatelier.json"));
   assert.equal(names.length, 2);
-  assert.ok(names.every((name) => name.startsWith("semanas/semana-")));
+  assert.ok(names.every((name) => name.startsWith("classatelier/semana-")));
   assert.ok(zip.files["planejamento-geral.json"]);
   assert.ok(zip.files["professor/material-de-mediacao.pdf"]);
   assert.ok(Object.keys(zip.files).some((name) => name.includes("webpraticas/") && name.endsWith("guia-e-roteiro.md")));

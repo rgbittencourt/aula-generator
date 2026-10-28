@@ -399,7 +399,7 @@ COMPOSIÇÃO EDITORIAL DO AULA STUDIO — a saída deve conter uma propriedade s
 - cada item de "composition" deve ter "type", "sectionNumber" e conteúdo específico para esta semana. Tipos válidos: ${BLOCK_TYPES};
 - use "destaque" para uma ideia-chave, "atencao" para erro/limite, "reflexao" para pergunta aberta, "citacao" somente com citação fornecida ou claramente marcada para conferência, "imagem"/"parallax"/"textoimagem" com src apenas se houver recurso real, "cases" para comparação de situações, "feature" para sinais/ideias, "tabela" para comparação estruturada, "accordion" para perguntas e respostas, "flashcards" para recuperação ativa, "slider" para procedimento, "linhadotempo" para evolução, "columns" para contrastes, "quiz" para checagem formativa e "externalembed" somente com embed real;
 - quando um bloco exigir itens, forneça "items", "cards", "steps", "questions", "eras", "columns", "features" ou "rows" completos conforme o tipo. O conteúdo deve ser específico, não use “Item 1” ou “Pergunta 1” sem completar o conceito;
-- a quantidade solicitada é por semana e pode ser zero. Não conte títulos, parágrafos, recursos, webpráticas ou a avaliação final como composição. O servidor materializará a composição em blocos Aula Studio dentro do tópico.
+- a quantidade solicitada é por semana e pode ser zero. Não conte títulos, parágrafos, recursos, webpráticas ou a avaliação final como composição. O servidor materializará a composição em blocos ClassAtelier dentro do tópico.
 
 Semanas já geradas (use somente para continuidade; não copie seus títulos, objetivos ou seções):
 ${JSON.stringify(previousSummaries, null, 2)}
@@ -408,7 +408,7 @@ ${formatBridgeContext(bridges, weekNumber)}
 
 ${closingRequirement()}
 
-Retorne somente este objeto de alto nível: { "lessonPlan": { ... }, "teacherGuide": { "webPracticeProjects": [...], "mediationMessages": { "whatsapp": [...], "moodle": [...] } } }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do Aula Studio depois da validação. O lessonPlan é a prioridade absoluta. teacherGuide não deve duplicar o texto-base do aluno; mantenha nele as orientações internas do professor, projetos de webprática quando houver sessão agendada e mensagens de acompanhamento.
+Retorne somente este objeto de alto nível: { "lessonPlan": { ... }, "teacherGuide": { "webPracticeProjects": [...], "mediationMessages": { "whatsapp": [...], "moodle": [...] } } }. Não gere blocks: o servidor transformará o lessonPlan em blocos editáveis do ClassAtelier depois da validação. O lessonPlan é a prioridade absoluta. teacherGuide não deve duplicar o texto-base do aluno; mantenha nele as orientações internas do professor, projetos de webprática quando houver sessão agendada e mensagens de acompanhamento.
 
 lessonPlan obrigatório:
 - weekNumber, theme (título específico e informativo, nunca "Conteúdo da semana"), welcome (80–160 palavras, contextualizada e ligada ao percurso), didacticArc com sequence, phasePlan e omissionReasons, composition (array de blocos editoriais conforme o plano acima). A phasePlan pode omitir etapas, mas deve justificar a omissão;
@@ -462,7 +462,7 @@ Retorne JSON completo, sem omitir propriedades obrigatórias.`;
 }
 
 export function buildGenerationPrompt(input) {
-  return `Gere ${input.weeks} semanas, uma por objeto, seguindo o contrato de buildWeekGenerationPrompt e o academicProfile recebido. O processo esperado é planejamento acadêmico, redação completa, revisão crítica e reescrita condicional. Varie o arco didático conforme o conteúdo; lessonPlan.webPractices deve ser sempre []; não inclua webprática no texto-base ou em semanas não programadas; desenvolva sessões agendadas somente em teacherGuide.webPracticeProjects; gere também mediationMessages com versões distintas para WhatsApp e Moodle; misture recursos no ponto de uso; mantenha teacherGuide separado e produza blocks exclusivamente para o aluno no Aula Studio. A carga horária será calculada depois do conteúdo.\n\n${JSON.stringify(input, null, 2)}`;
+  return `Gere ${input.weeks} semanas, uma por objeto, seguindo o contrato de buildWeekGenerationPrompt e o academicProfile recebido. O processo esperado é planejamento acadêmico, redação completa, revisão crítica e reescrita condicional. Varie o arco didático conforme o conteúdo; lessonPlan.webPractices deve ser sempre []; não inclua webprática no texto-base ou em semanas não programadas; desenvolva sessões agendadas somente em teacherGuide.webPracticeProjects; gere também mediationMessages com versões distintas para WhatsApp e Moodle; misture recursos no ponto de uso; mantenha teacherGuide separado e produza blocks exclusivamente para o aluno no ClassAtelier. A carga horária será calculada depois do conteúdo.\n\n${JSON.stringify(input, null, 2)}`;
 }
 
 async function repairWeekWithAI(input, index, raw, quality, academicPlan = {}, academicReview = {}) {
@@ -758,7 +758,7 @@ Esta é uma correção de insuficiência textual. Não faça um acréscimo margi
 Faça uma revisão acadêmica explícita: corrija afirmações sem suporte, diferencie fato e interpretação, acrescente contraponto quando exigido, preserve o mapa de evidências e não invente fontes. ${normalizeAcademicProfile(input.academicProfile, input).sourcePolicy}
 
   Retorne somente { "lessonPlan": { ... } }. Não gere blocks nem teacherGuide; o servidor preservará/reconstruirá o Material de Mediação. O lessonPlan deve manter título específico, welcome, objetivos observáveis, pelo menos ${textBudget.requiredSectionCount} seções conforme o orçamento, exemplos/caso/contraponto quando pertinente, síntese, próxima semana, glossário, referências estruturadas, claimEvidence, avaliação e timePlan. lessonPlan.webPractices deve ser sempre []; não inclua qualquer descrição ou instrução da sessão prática no texto-base. Não invente URLs ou fontes verificadas. A prioridade desta resposta é o texto substancial do aluno; não reduza o corpo para economizar tokens.
-  COMPOSIÇÃO OBRIGATÓRIA DA SEMANA: ${compositionTargets.length ? compositionTargets.join("; ") : "nenhum bloco adicional solicitado"}. Se a solicitação do professor pedir acrescentar, remover ou alterar um bloco (por exemplo, “acrescente 1 quiz”), cumpra isso explicitamente e retorne lessonPlan.composition com entradas completas e específicas para a semana. Quando houver uma quantidade configurada maior que zero, não omita silenciosamente o bloco: o servidor o materializará no JSON do Aula Studio.
+  COMPOSIÇÃO OBRIGATÓRIA DA SEMANA: ${compositionTargets.length ? compositionTargets.join("; ") : "nenhum bloco adicional solicitado"}. Se a solicitação do professor pedir acrescentar, remover ou alterar um bloco (por exemplo, “acrescente 1 quiz”), cumpra isso explicitamente e retorne lessonPlan.composition com entradas completas e específicas para a semana. Quando houver uma quantidade configurada maior que zero, não omita silenciosamente o bloco: o servidor o materializará no JSON do ClassAtelier.
 
 Briefing essencial do curso:
 ${JSON.stringify(compactInput, null, 2)}

@@ -1,7 +1,7 @@
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const text = (value, fallback = "") => String(value ?? "").trim() || fallback;
 
-// Crédito do aplicativo, presente nos arquivos gerados (meta do Aula Studio, PDF, Moodle XML, JSON do ClassAuthor).
+// Crédito do aplicativo, presente nos arquivos gerados (meta do ClassAtelier, PDF, Moodle XML, JSON do ClassAuthor).
 export const APP_NAME = "ClassAuthor";
 export const GENERATOR_TOOL = `${APP_NAME} (INOVALAB - IFSC)`;
 export const GENERATOR_CREDIT = `Construído com ${APP_NAME}, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.`;
@@ -9,7 +9,7 @@ const GENERATOR_CREDIT_HTML = `<p style="text-align:center;font-size:.85em;opaci
 
 const escapeHtml = (value) => text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-// O bloco "referencias" do Aula Studio recebe cada item como texto HTML (um objeto aparece como
+// O bloco "referencias" do ClassAtelier recebe cada item como texto HTML (um objeto aparece como
 // "[object Object]"). O link, quando existe, vai dentro da própria linha. Aceita também o formato
 // antigo ({ html, href }), que está salvo nas semanas geradas antes desta correção.
 export function referenceItemHtml(item) {
@@ -21,7 +21,7 @@ export function referenceItemHtml(item) {
   return hasLink ? `${body} <a href="${safeHref}" target="_blank" rel="noopener noreferrer">${escapeHtml(href)}</a>` : body;
 }
 
-// O quiz não vai para o Aula Studio: sai em Moodle XML (feedback em todas as alternativas), e a
+// O quiz não vai para o ClassAtelier: sai em Moodle XML (feedback em todas as alternativas), e a
 // versão completa fica no JSON do ClassAuthor.
 const STUDENT_PLAN_KEYS = [
   "weekNumber", "theme", "welcome", "learningObjectives", "prerequisites", "contentDensity",
@@ -75,7 +75,7 @@ function sanitizeBlock(block = {}) {
   if (children) nextProps.children = children;
 
   // Sugestões sem URL ficam disponíveis para a mediação docente, mas não são
-  // uma experiência utilizável pelo estudante no Aula Studio.
+  // uma experiência utilizável pelo estudante no ClassAtelier.
   if (source.type === "imagem" && !text(props.src || props.href)) return null;
   if (source.type === "video" && !text(props.id || props.videoId)) return null;
   if (source.type === "audio" && !text(props.src || props.href || props.spotify)) return null;
@@ -175,7 +175,7 @@ function studentPlan(plan = {}) {
 }
 
 /**
- * Gera a versão que pode ser aberta no Aula Studio.
+ * Gera a versão que pode ser aberta no ClassAtelier.
  *
  * A aula interna permanece rica para revisão, mas a camada do estudante não
  * recebe alinhamento pedagógico, cálculo de tempo, ajustes de carga, mapa de
@@ -206,7 +206,7 @@ export function toStudentLesson(lesson = {}) {
   };
 }
 
-// Rodapé de autoria no fim da aula, como "Construído com ...": o último bloco da aula do Aula Studio.
+// Rodapé de autoria no fim da aula, como "Construído com ...": o último bloco da aula do ClassAtelier.
 function creditBlock(weekNumber) {
   const week = Number(weekNumber || 0) || 0;
   return { id: `b-credit-${String(week).padStart(2, "0")}`, type: "topic", bg: "neutral-default", pad: "normal", props: { children: [{ id: `c-credit-${String(week).padStart(2, "0")}`, type: "prose", props: { body: GENERATOR_CREDIT_HTML, dropcap: false } }] } };

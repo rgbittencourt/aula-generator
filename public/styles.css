@@ -578,7 +578,7 @@ body.welcome-active .recovery-dock{display:none!important}
 @media(max-width:860px){.welcome-brand small{font-size:14px;letter-spacing:.01em}}
 @media(max-width:620px){.welcome-brand small{font-size:13px;letter-spacing:.01em}}
 
-/* Abrir ClassAteliê: botão + escolha da semana */
+/* Abrir ClassAtelier: botão + escolha da semana */
 .studio-launch{display:inline-flex;align-items:center;gap:6px}
 button.studio-top-link{font-family:inherit;cursor:pointer}
 .studio-week-pick{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 10px;border:1px solid #cfe1df;border-radius:9px;background:#fff;color:#657084;font-size:11px}

@@ -69,13 +69,13 @@ test("public/moodle-xml.js e public/student-export.js são cópias dos arquivos 
   }
 });
 
-test("ZIP: o JSON do ClassAteliê não leva o quiz e o do ClassAuthor leva a semana completa; referências saem como texto", async () => {
+test("ZIP: o JSON do ClassAtelier não leva o quiz e o do ClassAuthor leva a semana completa; referências saem como texto", async () => {
   const input = { title: "Curso Q", weeks: 1, webPractices: [], hoursPerWeek: 1 };
   const week = lesson();
   week.blocks = [...(week.blocks || []), { id: "q1", type: "quiz", props: { questions: week.lessonPlan.assessment.questions } }, { id: "r1", type: "referencias", props: { title: "Referências", items: [{ html: "AUTOR. Título.", href: "https://doi.org/10/x", credit: "" }] } }];
   const zip = await JSZip.loadAsync(await createWeeksZip(input, [week], null, [{ resourceNotes: ["x"] }]));
   const names = Object.keys(zip.files);
-  const studio = names.find((name) => name.endsWith("-studio.aula.json"));
+  const studio = names.find((name) => name.endsWith("-classatelier.json"));
   const generator = names.find((name) => name.startsWith("classauthor/") && name.endsWith("-classauthor.json"));
   assert.ok(studio && generator);
   const studioJson = JSON.parse(await zip.files[studio].async("string"));

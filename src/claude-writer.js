@@ -11,7 +11,7 @@
 //                  Mediação (WhatsApp/Moodle).
 //
 // O analisador (writer-markdown.js) converte o Markdown em lessonPlan, sem IA, e o
-// restante do sistema (blocos do Aula Studio, qualidade, ponte entre semanas,
+// restante do sistema (blocos do ClassAtelier, qualidade, ponte entre semanas,
 // pesquisa de recursos) segue igual. AULA_WRITER=json volta ao modo antigo.
 
 import { callJson, callText, getAIModel } from "./ai-client.js";
