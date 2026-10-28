@@ -4,7 +4,7 @@ import { normalizeAcademicProfile } from "./academic.js";
 import { progressionForWeek } from "./curriculum.js";
 import { figureBlock, figuresOf } from "./figures.js";
 import { compositionPlanForWeek, materializeComposition, normalizeCompositionPlan } from "./composition.js";
-import { referenceItemHtml, GENERATOR_TOOL, GENERATOR_CREDIT } from "./student-export.js";
+import { referenceItemHtml, GENERATOR_TOOL, GENERATOR_CREDIT, GENERATOR_AI_USE } from "./student-export.js";
 
 export const DEFAULT_LICENSE = "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br";
 
@@ -738,7 +738,7 @@ function integrateRootResources(blocks, weekNumber, plan = {}) {
 
 export function weekMeta(input, index) {
   const calendar = weekCalendar(input, index);
-  return { title: `${input.title} — ${calendar.label}`, courseTitle: input.title, weekNumber: calendar.weekNumber, weekLabel: calendar.label, calendarStartDate: calendar.startDate, calendarEndDate: calendar.endDate, studyHours: input.hoursPerWeek, author: input.author, role: input.role, institution: input.institution, year: input.year, aiTool: GENERATOR_TOOL, aiUse: GENERATOR_CREDIT, generatedBy: GENERATOR_CREDIT, license: input.license };
+  return { title: `${input.title} — ${calendar.label}`, courseTitle: input.title, weekNumber: calendar.weekNumber, weekLabel: calendar.label, calendarStartDate: calendar.startDate, calendarEndDate: calendar.endDate, studyHours: input.hoursPerWeek, author: input.author, role: input.role, institution: input.institution, year: input.year, aiTool: GENERATOR_TOOL, aiUse: GENERATOR_AI_USE, generatedBy: GENERATOR_CREDIT, license: input.license };
 }
 
 function html(value) { return text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }

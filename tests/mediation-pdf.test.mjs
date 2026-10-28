@@ -75,14 +75,15 @@ test("bloco de referências do Aula Studio leva cada referência como texto, nun
 });
 
 test("crédito do ClassAuthor e autoria presentes no Studio, no ClassAuthor, no XML e no PDF", async () => {
-  const { GENERATOR_CREDIT } = await import("../src/student-export.js");
+  const { GENERATOR_CREDIT, GENERATOR_AI_USE } = await import("../src/student-export.js");
   const { createMoodleXml } = await import("../src/moodle-xml.js");
   const { toGeneratorWeek } = await import("../src/student-export.js");
   assert.equal(GENERATOR_CREDIT, "Conteúdo elaborado com ClassAuthor, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.");
   const input = normalizeCourseInput({ title: "Curso crédito", weeks: 1, objectives: ["Aplicar"], author: "Prof. Fulana", institution: "IFSC" });
   const lesson = buildFallbackLesson(input, 0);
   const studio = toStudentLesson(lesson);
-  assert.equal(studio.meta.aiUse, GENERATOR_CREDIT);
+  assert.equal(studio.meta.aiUse, GENERATOR_AI_USE);
+  assert.match(studio.meta.aiUse, /\.$/);
   assert.equal(studio.meta.generatedBy, GENERATOR_CREDIT);
   assert.equal(studio.meta.author, "Prof. Fulana");
   assert.equal(toGeneratorWeek(lesson).credit, GENERATOR_CREDIT);
