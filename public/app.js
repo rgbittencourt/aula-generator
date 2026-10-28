@@ -1424,11 +1424,10 @@ function renderLessonPreview(lesson, index) {
   const mediation = mediationMessagesMarkup(guide.mediationMessages, plan.theme || lesson?.meta?.title || `a semana ${index + 1}`, index + 1);
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
-  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
+  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
   renderFlowPanel(index);
   $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
   $("#production-week-button")?.addEventListener("click", () => generateProductionWeek(index));
-  $("#production-course-button")?.addEventListener("click", () => generateProductionCourse(index));
   $("#production-sheet-button-card")?.addEventListener("click", downloadProductionSheet);
   $("#production-md-button")?.addEventListener("click", downloadProductionMarkdown);
   $("#lesson-reader").querySelectorAll(".mediation-regenerate").forEach((button) => button.addEventListener("click", () => regenerateMediationMessage(button)));
@@ -1749,16 +1748,20 @@ function reviewActionFor(kind, item, lesson) {
     "summative-alignment": { scope: "derivatives", parts: ["assessment"], title: "Como verificar a avaliação final", checks: ["As 6 questões cobrem todos os objetivos, têm 5 alternativas e feedback em todas.", "A explicação da correta cita o texto da semana."], ask: "Gerar de novo apenas as questões da atividade avaliativa (6 questões, 5 alternativas, feedback em todas).", accept: "Questões alinhadas aos objetivos, com feedback por alternativa." },
     "practice-complete": { scope: "derivatives", parts: [scheduledPractice ? "webpractice" : "mediation"], title: "Como verificar a webprática", checks: ["A webprática tem produto, etapas, critérios e plano B."], ask: scheduledPractice ? "Gerar de novo apenas o projeto da webprática (produto, etapas, critérios e plano B)." : "Gerar de novo apenas o Material de Mediação.", accept: "Webprática com produto, etapas, critérios e plano B." },
     "self-assessment": { scope: "derivatives", parts: ["activities"], title: "Como verificar a autoavaliação", checks: ["O estudante recebe perguntas de autoavaliação com escala, ou uma reflexão final."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "Autoavaliação presente." },
-    "resource-context": { scope: "manual", title: "Como verificar a função dos recursos", checks: ["Em cada recurso “Veja mais aqui”, o parágrafo diz o que observar e por que vale abrir.", "Se faltar, edite o recurso na prévia da semana (é um campo do recurso, não do texto)."] },
-    accessibility: { scope: "manual", title: "Como verificar a acessibilidade", checks: ["Imagens têm texto alternativo e crédito; vídeos têm legenda ou transcrição.", "É conferência humana antes de publicar."] },
-    differentiation: { scope: "manual", title: "Como verificar as trilhas", checks: ["Há trilha essencial, padrão e de aprofundamento.", "É conferência humana; as trilhas não são geradas pelo texto."] }
+    "resource-context": { scope: "edit", title: "Como verificar a função dos recursos", checks: ["Em cada recurso “Veja mais aqui”, o parágrafo diz o que observar e por que vale abrir.", "A função pedagógica cabe em uma frase e aponta o objetivo atendido."], ask: "Para os recursos que estão sem parágrafo de ligação ou sem função pedagógica, escreva a ligação (o que observar e por que vale abrir, em duas ou três frases, no ponto do texto em que o recurso aparece) e a função pedagógica (uma frase). Mude somente esses dois campos, só nos recursos que estiverem vazios ou genéricos; não troque links nem mexa no texto das seções.", accept: "Todo recurso com ligação e função pedagógica específicas; links e texto inalterados." },
+    accessibility: { scope: "edit", title: "Como verificar a acessibilidade", checks: ["Imagens e figuras têm texto alternativo que descreve o que importa, em uma frase.", "Vídeos e áudios: legenda ou transcrição é conferência humana na fonte; a IA não consegue garantir isso."], ask: "Escreva o texto alternativo (uma frase descritiva, sem “imagem de”) SOMENTE das imagens, figuras e recursos visuais que estão sem ele. Não altere links, títulos nem o texto das seções. Para vídeos e áudios, não invente informação sobre legenda ou transcrição.", accept: "Todo recurso visual com texto alternativo; o restante inalterado." },
+    differentiation: { scope: "edit", title: "Como verificar as trilhas", checks: ["Há trilha essencial, padrão e de aprofundamento, cada uma com 2 a 3 ações curtas.", "As ações apontam para seções, atividades ou recursos que existem na semana."], ask: "Escreva SOMENTE as três trilhas de estudo — essencial, padrão e aprofundamento —, com 2 a 3 ações curtas cada, ligadas às seções, atividades e recursos que já existem nesta semana. Não altere mais nada.", accept: "Três trilhas preenchidas e coerentes com o conteúdo; o resto igual." }
   };
   if (kind === "checks" && pedagogical[id]) return pedagogical[id];
   if (kind === "academic") {
     if (id.startsWith("academic-issue")) return { scope: "edit", title: "Como verificar esta pendência acadêmica", checks: ["Localize o trecho citado e confirme se a pendência procede.", "Confirme que a correção não introduziu fato, número ou fonte novos sem base."], ask: `Corrija SOMENTE esta pendência: “${item.label || ""}”. ${detail}. Altere apenas as frases envolvidas.`, accept: "A pendência deixa de existir; o resto do texto igual." };
     return { scope: "edit", title: "Como verificar o rigor acadêmico", checks: ["Identifique as afirmações centrais e confirme se cada uma tem fonte adequada e verificável.", "Confira autores, datas, números e generalizações; onde faltar base, qualifique a frase."], ask: "Revise SOMENTE as afirmações centrais que a revisão acadêmica sinalizou: onde faltar base, qualifique a frase (“segundo…”, “em geral…”) ou retire a precisão indevida. Não invente fonte, número nem caso; não mexa no restante.", accept: "Afirmações sem base qualificadas ou retiradas; o restante inalterado." };
   }
-  if (kind === "resources") return { scope: "manual", title: "Como verificar este recurso", checks: ["Abra o link e confirme que funciona, corresponde ao título e é adequado ao público.", "Confira duração/páginas, classificação obrigatória ou complementar, idioma e atualidade.", "Confirme legenda, transcrição, crédito e licença antes de publicar."] };
+  if (kind === "resources") {
+    const title = item.label || item.title || "recurso";
+    if (id === "resources-ok") return { scope: "edit", title: "Como verificar os recursos", checks: ["Abra cada link e confirme que funciona, corresponde ao título e é adequado ao público.", "Confira duração/páginas, classificação obrigatória ou complementar, idioma e atualidade.", "Confirme legenda, transcrição, crédito e licença na fonte, antes de publicar."], ask: "Revise SOMENTE os parágrafos de ligação dos recursos: onde o parágrafo não disser o que observar e por que vale abrir, reescreva-o em duas ou três frases. Não troque links nem mexa no texto das seções.", accept: "Todo recurso com ligação clara; links e texto inalterados." };
+    return { scope: "edit", title: "Como verificar este recurso", checks: ["Abra o link e confirme que funciona, corresponde ao título e é adequado ao público.", "Confira duração/páginas, classificação obrigatória ou complementar, idioma e atualidade.", "Confirme legenda, transcrição, crédito e licença na fonte, antes de publicar."], ask: `O recurso “${title}” está pendente (${detail || "sem verificação"}). Link para usar no lugar: [COLE AQUI O LINK QUE VOCÊ ESCOLHEU — ou apague esta linha para manter o recurso atual]. Se houver link acima, troque SOMENTE o link desse recurso por ele (exatamente como escrito); em qualquer caso, reescreva só o parágrafo de ligação e a função pedagógica desse recurso para o ponto do texto em que ele aparece. Não invente nem complete links.`, accept: "Recurso com o link que você escolheu (se informado), ligação e função pedagógica claras; nada mais alterado." };
+  }
   if (kind === "quality") {
     const insufficient = /insuficiente/i.test(detail);
     return { scope: insufficient ? "full" : "edit", title: "Como verificar qualidade e liberação", checks: ["Leia a semana e confirme se cada pendência listada procede.", "Só libere depois de resolver as pendências críticas."], ask: insufficient ? `O conteúdo está insuficiente (${detail}). Amplie e aprofunde o texto, mantendo o que já está bom.` : `Resolva SOMENTE as pendências apontadas: ${detail || "as indicadas no diagnóstico"}.`, accept: "Pendências apontadas resolvidas; o resto igual." };
@@ -1985,6 +1988,7 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   const zipButton = $("#zip-button");
   if (zipButton) zipButton.disabled = !complete;
   updateProductionSheetButton();
+  renderProductionUcCard();
   updateMediationExportHint();
   refreshAiButtonAvailability();
   const approvedWeeks = data.weeks.filter((_, index) => Boolean(state.weekApprovals?.[index])).length;
@@ -2530,13 +2534,11 @@ function updateProductionSheetButton() {
 
 function productionMarkup(index, released) {
   const production = state.production?.weeks?.[index];
-  const course = state.production?.course;
   const videos = productionVideos({ course: null, weeks: { [index]: production || {} } });
   const summary = production ? `<ul>${videos.map((video) => `<li><strong>${escapeHtml(video.kind)}</strong> · ${escapeHtml(video.title || "")} — ${formatDuration(video.seconds)} · ${escapeHtml(video.mode)}</li>`).join("")}</ul>${production.slides?.slides?.length ? `<small>Apresentação: ${production.slides.slides.length} slides · narração de ${production.slides.wordCount} palavras (~${production.slides.estimatedMinutes} min).</small>` : ""}${(production.missing || []).length ? `<p class="reader-note"><strong>Faltou gerar:</strong> ${escapeHtml(production.missing.join(", "))}. Clique em “Gerar de novo”.</p>` : ""}` : "";
-  const courseSummary = course?.videos?.length ? `<small>Vídeos da UC gerados: ${course.videos.map((video) => escapeHtml(video.title)).join(" · ")}.</small>` : "";
   const gate = released ? "" : `<p class="reader-note">Disponível depois que a semana for conferida e liberada (botão “Liberar após conferência”, na grade das semanas): o roteiro parte do texto aprovado.</p>`;
   const any = hasProduction(state.production);
-  return `<section class="reader-production"><h3>Produção audiovisual (roteiros, slides e narração)</h3><p>A partir do texto desta semana, gera o vídeo de abertura do Moodle, o vídeo curto de WhatsApp e a apresentação de slides com a narração para a sua voz clonada. Tudo entra na planilha de produção.</p>${summary}${gate}<div class="reader-actions"><button type="button" class="secondary" id="production-week-button" ${released ? "" : "disabled"}>${production ? "Gerar de novo os roteiros desta semana" : "Gerar roteiros e slides desta semana"}</button><button type="button" class="secondary" id="production-course-button">${course?.videos?.length ? "Gerar de novo os vídeos da UC" : "Gerar vídeos da UC"}</button><button type="button" class="secondary" id="production-sheet-button-card" ${any ? "" : "disabled"}>Baixar planilha de produção (.xlsx)</button><button type="button" class="secondary" id="production-md-button" ${any ? "" : "disabled"}>Roteiros (.md)</button></div>${courseSummary}<p id="production-note" class="reader-note" aria-live="polite"></p></section>`;
+  return `<section class="reader-production"><h3>Produção audiovisual (roteiros, slides e narração)</h3><p>A partir do texto desta semana, gera o vídeo de abertura do Moodle, o vídeo curto de WhatsApp e a apresentação de slides com a narração para a sua voz clonada. Tudo entra na planilha de produção.</p>${summary}${gate}<div class="reader-actions"><button type="button" class="secondary" id="production-week-button" ${released ? "" : "disabled"}>${production ? "Gerar de novo os roteiros desta semana" : "Gerar roteiros e slides desta semana"}</button><button type="button" class="secondary" id="production-sheet-button-card" ${any ? "" : "disabled"}>Baixar planilha de produção (.xlsx)</button><button type="button" class="secondary" id="production-md-button" ${any ? "" : "disabled"}>Roteiros (.md)</button></div><small>Os vídeos da UC (abertura da sala, aviso no WhatsApp e encerramento) ficam no quadro “Vídeos da UC”, no fim dos resultados, e só são liberados depois da última semana.</small><p id="production-note" class="reader-note" aria-live="polite"></p></section>`;
 }
 
 function productionHeaders() {
@@ -2563,6 +2565,7 @@ async function generateProductionWeek(index) {
     state.production.weeks[index] = done.production;
     saveDraft("producao-gerada");
     updateProductionSheetButton();
+    renderProductionUcCard();
     openLessonPreview(index);
     const missing = done.production.missing?.length ? ` Faltou: ${done.production.missing.join(", ")}.` : "";
     finishAiActivity("Roteiros gerados", `A semana ${index + 1} entrou na planilha de produção.${missing}`, done.production.missing?.length ? "error" : "success");
@@ -2576,12 +2579,44 @@ async function generateProductionWeek(index) {
   }
 }
 
-async function generateProductionCourse(index) {
+// Semana liberada = aprovada no fluxo semana a semana, liberada por você após conferência ou aprovada pela análise automática.
+function weekReleased(index) {
+  if (state.weekApprovals?.[index] || state.flow?.approved?.[index]) return true;
+  const status = state.validation?.weeks?.[index]?.status || state.weeks?.[index]?.contentQuality?.status || "review";
+  return ["ready", "complete"].includes(status);
+}
+
+function productionCourseGate() {
+  const total = Number(state.input?.weeks) || state.weeks.length;
+  const missing = Math.max(0, total - state.weeks.length);
+  const pending = state.weeks.map((_, index) => index).filter((index) => !weekReleased(index)).map((index) => index + 1);
+  return { total, missing, pending, ready: Boolean(total) && !missing && !pending.length };
+}
+
+function renderProductionUcCard() {
+  const card = $("#production-uc-card");
+  if (!card) return;
+  if (!state.weeks.length) { card.classList.add("hidden"); card.innerHTML = ""; return; }
+  const gate = productionCourseGate();
+  const course = state.production?.course;
+  const status = gate.ready ? "Todas as semanas estão liberadas: já dá para gerar." : gate.missing ? `Ainda faltam ${gate.missing} semana(s) para serem geradas.` : `Falta liberar a(s) semana(s) ${gate.pending.join(", ")}.`;
+  const videos = course?.videos?.length ? `<ul>${course.videos.map((video) => `<li><strong>${escapeHtml(video.title || "")}</strong> · ${escapeHtml(video.platform || "")} — ${formatDuration(video.durationSeconds)}</li>`).join("")}</ul>` : "";
+  card.classList.remove("hidden");
+  card.innerHTML = `<p class="eyebrow">PRODUÇÃO AUDIOVISUAL</p><h3>Vídeos da UC</h3><p>Abertura da sala no Moodle, aviso no WhatsApp de que a UC já está no ar e encerramento. São gerados só depois que a última semana estiver planejada, revisada e liberada, porque os roteiros apresentam o percurso inteiro.</p><p class="production-uc-status ${gate.ready ? "is-ready" : ""}">${escapeHtml(status)}</p>${videos}<div class="reader-actions"><button type="button" class="button button-secondary" id="production-course-button" ${gate.ready ? "" : "disabled"}>${course?.videos?.length ? "Gerar de novo os vídeos da UC" : "Gerar vídeos da UC"}</button><button type="button" class="button button-secondary" id="production-uc-sheet-button" ${hasProduction(state.production) ? "" : "disabled"}>Baixar planilha de produção (.xlsx)</button><button type="button" class="button button-secondary" id="production-uc-md-button" ${hasProduction(state.production) ? "" : "disabled"}>Roteiros (.md)</button></div><p id="production-uc-note" class="reader-note" aria-live="polite"></p>`;
+  $("#production-course-button")?.addEventListener("click", generateProductionCourse);
+  $("#production-uc-sheet-button")?.addEventListener("click", downloadProductionSheet);
+  $("#production-uc-md-button")?.addEventListener("click", downloadProductionMarkdown);
+}
+
+async function generateProductionCourse() {
   if (aiActionBusy) return;
+  const gate = productionCourseGate();
+  const note = $("#production-uc-note");
+  if (!gate.ready) { if (note) note.textContent = "Gere e libere todas as semanas antes de gerar os vídeos da UC."; return; }
   const button = $("#production-course-button");
   if (!beginAiAction(button)) return;
   setBusy(button, true, "Gerando…");
-  setAiActivity("Vídeos da UC", "Escrevendo a apresentação, o vídeo de WhatsApp e o encerramento da UC…");
+  setAiActivity("Vídeos da UC", "Escrevendo a abertura da sala, o aviso de WhatsApp e o encerramento da UC a partir das semanas liberadas…");
   try {
     const { input, headers } = productionHeaders();
     const response = await fetch("/api/production", { method: "POST", headers, signal: AbortSignal.timeout(280000), body: JSON.stringify({ action: "production", scope: "course", input, weeks: state.weeks }) });
@@ -2590,14 +2625,14 @@ async function generateProductionCourse(index) {
     state.production.course = done.production;
     saveDraft("producao-uc-gerada");
     updateProductionSheetButton();
-    if (state.previewIndex != null) openLessonPreview(state.previewIndex ?? index);
-    finishAiActivity("Vídeos da UC gerados", "Apresentação, WhatsApp e encerramento da UC entraram na planilha de produção.", "success");
+    renderProductionUcCard();
+    finishAiActivity("Vídeos da UC gerados", "Abertura, WhatsApp e encerramento da UC entraram na planilha de produção.", "success");
   } catch (error) {
     finishAiActivity("Vídeos da UC não gerados", error.message, "error");
-    const note = $("#production-note");
-    if (note) note.textContent = `Os vídeos da UC NÃO foram gerados: ${error.message}`;
+    const failure = $("#production-uc-note");
+    if (failure) failure.textContent = `Os vídeos da UC NÃO foram gerados: ${error.message}`;
   } finally {
-    setBusy(button, false, "");
+    setBusy($("#production-course-button"), false, "");
     endAiAction();
   }
 }

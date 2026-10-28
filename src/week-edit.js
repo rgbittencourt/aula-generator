@@ -2,7 +2,9 @@
 // (e perder questões, recursos e figuras que o professor já conferiu), a IA devolve só
 // as mudanças pedidas e elas são aplicadas por cima do texto atual.
 //   scope "title" -> só o título (tema) da semana
-//   scope "edit"  -> parágrafos/títulos de seção, boas-vindas, síntese e ponte para a próxima
+//   scope "edit"  -> parágrafos/títulos de seção, boas-vindas, síntese, ponte para a próxima, objetivos,
+//                    trilhas de estudo e, em cada recurso, ligação, função pedagógica, texto alternativo e
+//                    link (o link só entra se o professor o colou no pedido)
 // Tudo o que não foi tocado (questões, atividades, mediação, recursos, figuras, glossário,
 // referências) permanece como estava.
 
@@ -12,6 +14,7 @@ import { htmlToMarkdown, parseWeekMarkdown, plain } from "./writer-markdown.js";
 
 const text = (value) => String(value ?? "").trim();
 const list = (value) => (Array.isArray(value) ? value : []);
+const object = (value) => (value && typeof value === "object" && !Array.isArray(value) ? value : {});
 
 const SYSTEM = `Você é o editor do material didático de uma pós-graduação a distância. O professor já aprovou o texto da semana; ele pede uma alteração PONTUAL. Mude somente o que o pedido exige, no mesmo tom e estilo do texto, e deixe todo o resto intacto. Não acrescente fatos, números ou casos que não estejam no texto atual, a menos que o professor tenha fornecido esses fatos no pedido. Responda somente com o objeto JSON pedido, válido, sem texto fora dele.`;
 
@@ -37,6 +40,22 @@ export function markdownToHtml(markdown) {
   return lessonPlan.contentSections[0]?.body || "";
 }
 
+const RESOURCE_TEXT_FIELDS = ["bridgeParagraph", "pedagogicalUse", "altText"];
+// Campos que vêm da busca/pesquisa do recurso e deixam de valer quando o link é trocado.
+const RESOURCE_DERIVED_RESET = { thumbnail: "", embedHref: "", provider: "", sourcePage: "", credit: "", license: "", licenseUrl: "", candidateId: "", researchRequestId: "", selectionReason: "", researchStatus: "provided", humanApproval: "pending", verificationStatus: "provided-needs-review", requiresVerification: true, embeddable: true };
+
+// Todos os recursos da semana por id (o mesmo recurso existe nas listas da semana e na seção em que aparece).
+function collectResources(plan) {
+  const groups = new Map();
+  const add = (resource) => { if (resource && typeof resource === "object" && resource.id) groups.set(resource.id, [...(groups.get(resource.id) || []), resource]); };
+  Object.values(plan.resources || {}).forEach((items) => list(items).forEach(add));
+  list(plan.contentSections).forEach((section) => {
+    list(section.resources).forEach(add);
+    list(section.subsections).forEach((sub) => list(sub.resources).forEach(add));
+  });
+  return groups;
+}
+
 // Cria um "mapa" editável da semana: id -> bloco, e o texto numerado enviado ao modelo.
 function buildMap(plan) {
   const areas = []; // { key, label, get(), set(blocks) }
@@ -49,6 +68,7 @@ function buildMap(plan) {
   });
   addArea("synthesis", "Síntese", plan.synthesis, (html) => { plan.synthesis = html; });
   addArea("next", "Ligação com a próxima semana", plan.nextWeekConnection, (html) => { plan.nextWeekConnection = html; });
+  const resources = collectResources(plan);
   const index = new Map();
   let prompt = `Objetivos de aprendizagem atuais: ${list(plan.learningObjectives).map((item) => `“${text(item)}”`).join(" · ") || "(nenhum)"}\n`;
   areas.forEach((area) => {
@@ -64,13 +84,25 @@ function buildMap(plan) {
       prompt += `[${part.id}] ${part.placeholder ? "(vazio)" : htmlToMarkdown(part.html).replace(/\n{2,}/g, "\n")}\n`;
     });
   });
-  return { areas, index, prompt };
+  const differentiation = plan.differentiation || {};
+  const trail = (items) => list(items).map((item) => text(typeof item === "string" ? item : item?.title || item?.instructions)).filter(Boolean).join(" | ") || "(vazia)";
+  prompt += `\nTrilhas de estudo atuais — essencial: ${trail(differentiation.support)}; padrão: ${trail(differentiation.standard)}; aprofundamento: ${trail(differentiation.extension)}\n`;
+  if (resources.size) {
+    prompt += "\n### Recursos (id · tipo · título · link · ligação com o texto · função pedagógica · texto alternativo)\n";
+    resources.forEach((group, id) => {
+      const resource = group[0];
+      prompt += `[r:${id}] ${text(resource.kind)} · ${text(resource.title)} · ${text(resource.href) || "(sem link)"} · ligação: ${plain(text(resource.bridgeParagraph)) || "(vazia)"} · função: ${text(resource.pedagogicalUse) || "(vazia)"} · alt: ${text(resource.altText) || "(vazio)"}\n`;
+    });
+  }
+  return { areas, index, prompt, resources, plan };
 }
 
 const INSTRUCTION_FORMAT = `Devolva este JSON (listas vazias quando não houver o que mudar):
 {
   "title": null,
   "objectives": null,
+  "differentiation": null,
+  "resources": [{"id": "w1-r1", "bridgeParagraph": "novo parágrafo de ligação", "pedagogicalUse": "função pedagógica em uma frase", "altText": "texto alternativo", "href": "https://…"}],
   "sectionTitles": [{"number": "3", "title": "novo título da seção"}],
   "changes": [
     {"id": "3:p2", "action": "replace", "markdown": "novo texto do bloco (Markdown simples: parágrafo, lista ou tabela)"},
@@ -79,7 +111,7 @@ const INSTRUCTION_FORMAT = `Devolva este JSON (listas vazias quando não houver 
   ],
   "summary": "uma frase dizendo o que foi alterado"
 }
-Regras: use apenas ids que existem no texto; ao substituir, mantenha negritos e links do bloco que não precisam mudar; não escreva títulos (#) nem callouts (> 🔎, > 💭 ...) nos blocos; em "title", devolva o novo título da semana somente se o professor pediu para mudá-lo (caso contrário, null); em "objectives", devolva a lista completa dos novos objetivos de aprendizagem somente se o pedido for sobre os objetivos (caso contrário, null); blocos marcados “(vazio)” podem ser preenchidos com "replace".`;
+Regras: use apenas ids que existem no texto; ao substituir, mantenha negritos e links do bloco que não precisam mudar; não escreva títulos (#) nem callouts (> 🔎, > 💭 ...) nos blocos; em "title", devolva o novo título da semana somente se o professor pediu para mudá-lo (caso contrário, null); em "objectives", devolva a lista completa dos novos objetivos de aprendizagem somente se o pedido for sobre os objetivos (caso contrário, null); blocos marcados “(vazio)” podem ser preenchidos com "replace". Em "differentiation", devolva {"support": [...], "standard": [...], "extension": [...]} (2 a 3 ações curtas por trilha, ligadas às seções do texto) somente se o pedido for sobre as trilhas. Em "resources", devolva só os recursos pedidos, com apenas os campos que mudam (bridgeParagraph, pedagogicalUse, altText); "href" só se o professor escreveu esse link no pedido, exatamente como escrito — nunca invente ou complete links.`;
 
 function titleContext(plan, ctx) {
   const sections = list(plan.contentSections).map((section) => `${text(section.number)}. ${text(section.title)}`).join(" | ");
@@ -107,7 +139,7 @@ async function proposeEdits(input, plan, instruction, ctx, ask) {
 }
 
 // Aplica as mudanças aos blocos; devolve quantas foram aplicadas e as que não puderam ser.
-export function applyEdits(map, result) {
+export function applyEdits(map, result, instruction = "") {
   let applied = 0;
   const skipped = [];
   const inserted = new Map(); // id -> html[]
@@ -131,6 +163,23 @@ export function applyEdits(map, result) {
       applied += 1;
     }
   });
+  // Recursos: ligação, função pedagógica, texto alternativo e (só se colado pelo professor) o link.
+  list(result.resources).forEach((change) => {
+    const group = map.resources.get(text(change?.id));
+    if (!group) { skipped.push(text(change?.id)); return; }
+    const patch = {};
+    RESOURCE_TEXT_FIELDS.forEach((field) => { if (text(change[field])) patch[field] = text(change[field]); });
+    const href = text(change.href);
+    if (/^https?:\/\/\S+$/i.test(href) && String(instruction).includes(href)) Object.assign(patch, { href }, RESOURCE_DERIVED_RESET);
+    if (!Object.keys(patch).length) { skipped.push(text(change.id)); return; }
+    group.forEach((resource) => Object.assign(resource, patch));
+    applied += 1;
+  });
+  const trails = object(result.differentiation);
+  if (["support", "standard", "extension"].every((key) => list(trails[key]).map(text).filter(Boolean).length)) {
+    map.plan.differentiation = { ...object(map.plan.differentiation), support: list(trails.support).map(text).filter(Boolean), standard: list(trails.standard).map(text).filter(Boolean), extension: list(trails.extension).map(text).filter(Boolean) };
+    applied += 1;
+  }
   map.areas.forEach((area) => {
     area.assign(area.parts.map((part) => part.html + (part.id && inserted.has(part.id) ? inserted.get(part.id).join("") : "")).join(""));
   });
@@ -155,7 +204,7 @@ export async function editWeek(input, index, week, instruction, scope = "edit", 
     summary = `Título alterado para “${title}”.`;
   } else {
     const { map, result } = await proposeEdits(input, plan, order, ctx, ask);
-    ({ applied, skipped } = applyEdits(map, result));
+    ({ applied, skipped } = applyEdits(map, result, order));
     list(result.sectionTitles).forEach((item) => {
       const section = plan.contentSections.find((candidate) => text(candidate.number) === text(item?.number));
       if (section && text(item.title)) { section.title = text(item.title); applied += 1; }

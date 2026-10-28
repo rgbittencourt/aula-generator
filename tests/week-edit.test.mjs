@@ -63,3 +63,27 @@ test("ajuste pontual sem nada aplicável falha com mensagem clara", async () => 
   await assert.rejects(editWeek(input, 0, week, "x", "edit", {}, async () => ({ changes: [] })), (error) => error.code === "EDIT_NO_RESULT");
   await assert.rejects(editWeek(input, 0, { lessonPlan: {} }, "x", "edit", {}, async () => ({})), (error) => error.code === "EDIT_WEEK_MISSING");
 });
+
+test("recursos: ajusta ligação e alt; o link só muda se foi colado no pedido; trilhas são trocadas", async () => {
+  const withResources = normalizeLesson({ lessonPlan: { ...plan, resources: { videos: [{ id: "w1-r1", kind: "video", title: "Vídeo X", href: "https://youtu.be/x", bridgeParagraph: "", thumbnail: "t.jpg" }], readingsRequired: [], readingsExtra: [], images: [], podcasts: [], datasets: [] } } }, input, 0);
+  const section = withResources.lessonPlan.contentSections[0];
+  section.resources = [{ id: "w1-r1", kind: "video", title: "Vídeo X", href: "https://youtu.be/x", sectionNumber: "1", thumbnail: "t.jpg" }];
+  const ask = async (messages) => {
+    assert.match(messages[1].content, /\[r:w1-r1\] video · Vídeo X · https:\/\/youtu\.be\/x/);
+    return { resources: [{ id: "w1-r1", bridgeParagraph: "Observe como o vídeo compara os sistemas.", pedagogicalUse: "Fixar a comparação.", altText: "Quadro comparativo", href: "https://youtu.be/novo" }, { id: "nao-existe", bridgeParagraph: "x" }], differentiation: { support: ["Releia a seção 1"], standard: ["Faça a atividade"], extension: ["Leia o artigo extra"] } };
+  };
+  const result = await editWeek(input, 0, withResources, "ligue o recurso ao texto", "edit", {}, ask);
+  const video = result.week.lessonPlan.resources.videos[0];
+  assert.equal(video.bridgeParagraph, "Observe como o vídeo compara os sistemas.");
+  assert.equal(video.pedagogicalUse, "Fixar a comparação.");
+  assert.equal(video.href, "https://youtu.be/x", "link não colado no pedido não é trocado");
+  assert.equal(video.thumbnail, "t.jpg");
+  assert.equal(result.week.lessonPlan.contentSections[0].resources[0].bridgeParagraph, "Observe como o vídeo compara os sistemas.");
+  assert.deepEqual(result.skipped, ["nao-existe"]);
+  assert.equal(result.week.lessonPlan.differentiation.support[0].title, "Releia a seção 1");
+  const swapped = await editWeek(input, 0, withResources, "troque pelo link https://youtu.be/novo", "edit", {}, ask);
+  const replaced = swapped.week.lessonPlan.resources.videos[0];
+  assert.equal(replaced.href, "https://youtu.be/novo");
+  assert.equal(replaced.thumbnail, "");
+  assert.equal(replaced.verificationStatus, "provided-needs-review");
+});

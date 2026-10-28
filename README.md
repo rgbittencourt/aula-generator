@@ -210,7 +210,7 @@ Se você refizer uma semana já escrita, o sistema compara a ponte nova com a an
 
 Na prévia, o seletor **O que alterar** oferece três modos: *Só o título da semana*; *Ajuste pontual no texto* (padrão: a IA devolve só os blocos a trocar, apagar ou inserir e eles são aplicados por cima do texto, preservando questões, recursos, figuras, glossário, referências e mediação); e *Refazer a semana inteira* (reescreve tudo, como antes). Os dois primeiros rodam em `/api/regenerate-week` com `action: "edit"` (`src/week-edit.js`).
 
-Os **checklists** seguem a mesma regra: cada item tem uma ação restrita ao que aponta — prompt específico no modo pontual (título, objetivos, pendência acadêmica…), botão que gera de novo só a parte indicada (questões, atividades/paradas ou mediação, via `parts` em `/api/derivatives`) ou conferência manual (acessibilidade, recursos). Nenhum item pede mais a “semana completa”.
+Os **checklists** seguem a mesma regra: cada item tem uma ação restrita ao que aponta — prompt específico no modo pontual (título, objetivos, pendência acadêmica…), botão que gera de novo só a parte indicada (questões, atividades/paradas ou mediação, via `parts` em `/api/derivatives`) e, nos recursos, o ajuste pontual também edita a ligação, a função pedagógica, o texto alternativo e o link de cada recurso (o link só é trocado se você o colar no pedido). Nenhum item pede mais a “semana completa”.
 
 ### Como a ordem funciona
 
@@ -356,7 +356,7 @@ producao/roteiros-de-video.md
 
 ### Produção audiovisual e planilha de produção
 
-Na prévia de cada semana liberada, **Gerar roteiros e slides desta semana** escreve, a partir do texto aprovado: o vídeo de abertura do Moodle (3–4 min), o vídeo curto de WhatsApp (~30 s, mesmo cenário) e a apresentação de slides com a narração slide a slide para a voz clonada. **Gerar vídeos da UC** cria a apresentação, o WhatsApp e o encerramento da UC. A planilha `.xlsx` (abas Produção, Roteiros, Slides, Narração) acumula tudo, com “Como produzir” (HeyGen, gravação própria, slides + voz clonada) e “Status” em listas suspensas. O estado fica no rascunho salvo e vai no ZIP.
+Na prévia de cada semana liberada, **Gerar roteiros e slides desta semana** escreve, a partir do texto aprovado: o vídeo de abertura do Moodle (3–4 min), o vídeo curto de WhatsApp (~30 s, mesmo cenário) e a apresentação de slides com a narração slide a slide para a voz clonada. Os **vídeos da UC** (abertura da sala no Moodle, aviso de WhatsApp e encerramento) têm um quadro próprio no fim dos resultados e só são liberados depois que todas as semanas estiverem liberadas. A planilha `.xlsx` (abas Produção, Roteiros, Slides, Narração) acumula tudo, com “Como produzir” (HeyGen, gravação própria, slides + voz clonada) e “Status” em listas suspensas. O estado fica no rascunho salvo e vai no ZIP.
 
 ### Quiz: 5 alternativas, feedback em todas e XML do Moodle
 

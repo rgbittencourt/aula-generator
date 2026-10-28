@@ -121,7 +121,10 @@ test("handler: dispatch por api/regenerate-week, erros claros sem chave e sem se
     const noWeek = await run({ action: "production", scope: "week", input, weekIndex: 0, week: { lessonPlan: {} } });
     assert.equal(noWeek.code, 400);
     assert.equal(noWeek.payload.code, "PRODUCTION_WEEK_MISSING");
-    const noKey = await run({ action: "production", scope: "course", input, weeks: [week] });
+    const incomplete = await run({ action: "production", scope: "course", input, weeks: [week] });
+    assert.equal(incomplete.code, 400);
+    assert.equal(incomplete.payload.code, "PRODUCTION_COURSE_INCOMPLETE");
+    const noKey = await run({ action: "production", scope: "course", input, weeks: [week, week, week] });
     assert.equal(noKey.code, 503);
     assert.equal(noKey.payload.code, "AI_KEY_MISSING");
   } finally {

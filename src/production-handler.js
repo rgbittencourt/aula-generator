@@ -15,7 +15,9 @@ export default async function productionHandler(request, response) {
     const input = normalizeCourseInput(request.body?.input || {});
     const meta = { ok: true, provider: "ai-production", aiProvider: getAIProvider(), model: getAIModel() };
     if (request.body?.scope === "course") {
-      const production = await produceCourse(input, Array.isArray(request.body?.weeks) ? request.body.weeks : []);
+      const weeks = Array.isArray(request.body?.weeks) ? request.body.weeks : [];
+      if (weeks.length < input.weeks) return response.status(400).json({ ok: false, code: "PRODUCTION_COURSE_INCOMPLETE", error: `Os vídeos da UC só podem ser gerados depois que as ${input.weeks} semanas estiverem escritas e liberadas (há ${weeks.length}).` });
+      const production = await produceCourse(input, weeks);
       return response.status(200).json({ ...meta, scope: "course", production });
     }
     const index = Math.max(0, Math.min(input.weeks - 1, Number.parseInt(request.body?.weekIndex, 10) || 0));
