@@ -74,7 +74,7 @@ test("bloco de referências do Aula Studio leva cada referência como texto, nun
   assert.doesNotMatch(JSON.stringify(refBlock), /\[object Object\]/);
 });
 
-test("crédito do Gerador de Aulas e autoria presentes no Studio, no Gerador, no XML e no PDF", async () => {
+test("crédito do ClassAuthor e autoria presentes no Studio, no ClassAuthor, no XML e no PDF", async () => {
   const { GENERATOR_CREDIT } = await import("../src/student-export.js");
   const { createMoodleXml } = await import("../src/moodle-xml.js");
   const { toGeneratorWeek } = await import("../src/student-export.js");

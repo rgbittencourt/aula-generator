@@ -577,3 +577,15 @@ body.welcome-active .recovery-dock{display:none!important}
 .brand small{font-size:12px;color:var(--muted);opacity:1}
 @media(max-width:860px){.welcome-brand small{font-size:14px;letter-spacing:.01em}}
 @media(max-width:620px){.welcome-brand small{font-size:13px;letter-spacing:.01em}}
+
+/* Abrir ClassAteliê: botão + escolha da semana */
+.studio-launch{display:inline-flex;align-items:center;gap:6px}
+button.studio-top-link{font-family:inherit;cursor:pointer}
+.studio-week-pick{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 10px;border:1px solid #cfe1df;border-radius:9px;background:#fff;color:#657084;font-size:11px}
+.studio-week-pick.hidden{display:none}
+.studio-week-pick select{max-width:170px;height:26px;border:0;background:transparent;color:#1b625a;font:inherit;font-weight:700;cursor:pointer;text-overflow:ellipsis}
+.week-actions .week-open-studio{flex:1 0 100%;height:40px;font-size:11px;gap:6px;border-color:#cfe1df;background:#f2faf8;color:#1b625a}
+.studio-toast{position:fixed;right:22px;bottom:22px;z-index:60;max-width:380px;padding:13px 16px;border-radius:12px;background:var(--navy);color:#fff;font-size:13px;line-height:1.5;box-shadow:0 18px 44px rgba(20,33,61,.28)}
+.studio-toast.hidden{display:none}
+@media(max-width:860px){.studio-week-pick{display:none}}
+.studio-top-link img{flex:none;display:block;min-width:23px}

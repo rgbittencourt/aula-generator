@@ -16,7 +16,7 @@ const KIND_ALIASES = [
 const text = (value) => String(value ?? "").trim();
 const escapeHtml = (value) => text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-// Texto sem marcação (para campos que o gerador escapa depois).
+// Texto sem marcação (para campos que o ClassAuthor escapa depois).
 export function plain(markdown) {
   return text(markdown)
     .replace(/<(https?:\/\/[^>\s]+)>/g, "$1")

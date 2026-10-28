@@ -1,7 +1,7 @@
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 const text = (value, fallback = "") => String(value ?? "").trim() || fallback;
 
-// Crédito do aplicativo, presente nos arquivos gerados (meta do Aula Studio, PDF, Moodle XML, JSON do Gerador).
+// Crédito do aplicativo, presente nos arquivos gerados (meta do Aula Studio, PDF, Moodle XML, JSON do ClassAuthor).
 export const APP_NAME = "ClassAuthor";
 export const GENERATOR_TOOL = `${APP_NAME} (INOVALAB - IFSC)`;
 export const GENERATOR_CREDIT = `Construído com ${APP_NAME}, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.`;
@@ -22,7 +22,7 @@ export function referenceItemHtml(item) {
 }
 
 // O quiz não vai para o Aula Studio: sai em Moodle XML (feedback em todas as alternativas), e a
-// versão completa fica no JSON do Gerador.
+// versão completa fica no JSON do ClassAuthor.
 const STUDENT_PLAN_KEYS = [
   "weekNumber", "theme", "welcome", "learningObjectives", "prerequisites", "contentDensity",
   "contentSections", "activities", "diagnostic", "formativeChecks", "differentiation",
@@ -223,7 +223,7 @@ export function toStudentLessons(lessons = []) {
 export function toGeneratorWeek(lesson = {}, teacherGuide = null, extra = {}) {
   return {
     generator: "aula-generator",
-    format: "gerador-semana",
+    format: "classauthor-semana",
     version: 1,
     exportedAt: extra.exportedAt || new Date().toISOString(),
     credit: GENERATOR_CREDIT,

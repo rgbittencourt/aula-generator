@@ -364,7 +364,7 @@ function resetDisciplineForm(preserveSession = true) {
     $("#access-code").value = "";
   }
   state.input = null;
-  state.weeks = [];
+  state.weeks = []; refreshStudioWeekSelect();
   state.workload = null;
   state.generalPlan = null;
   state.teacherGuides = [];
@@ -668,7 +668,7 @@ function renderCompositionPlanWeeks(plan = {}) {
     const rowPlan = byWeek.get(weekNumber) || {};
     return `<details class="composition-week" data-composition-week="${weekNumber}"><summary>Semana ${weekNumber}<small>Deixe vazio para herdar o padrão</small></summary><div class="composition-week-grid">${compositionCatalog.map(([key, label, group, defaultCount, itemsPerBlock]) => { const row = rowPlan[key] || {}; return `<label class="composition-week-cell"><span>${escapeHtml(label)}</span><input data-composition-week-count="${key}" type="number" min="0" max="12" step="1" value="${row.count ?? ""}" placeholder="padrão" />${itemsPerBlock > 1 ? `<input data-composition-week-items="${key}" type="number" min="1" max="12" value="${row.itemsPerBlock || ""}" placeholder="${itemsPerBlock} itens" />` : ""}<select data-composition-week-policy="${key}"><option value="">padrão</option><option value="prefer" ${row.policy === "prefer" ? "selected" : ""}>preferir</option><option value="required" ${row.policy === "required" ? "selected" : ""}>obrigatório</option><option value="none" ${row.policy === "none" ? "selected" : ""}>não usar</option></select></label>`; }).join("")}</div></details>`;
   }).join("");
-  container.innerHTML = `<div class="composition-defaults"><div class="composition-table-head"><strong>Bloco do Aula Studio</strong><span>Qtd. padrão</span><span>Política</span><span>Itens/bloco</span></div>${defaultRows}</div><div class="composition-week-heading"><strong>Exceções por semana</strong><small>Use apenas quando uma semana precisar de composição diferente.</small></div><div class="composition-week-list">${weekMarkup}</div>`;
+  container.innerHTML = `<div class="composition-defaults"><div class="composition-table-head"><strong>Bloco do ClassAteliê</strong><span>Qtd. padrão</span><span>Política</span><span>Itens/bloco</span></div>${defaultRows}</div><div class="composition-week-heading"><strong>Exceções por semana</strong><small>Use apenas quando uma semana precisar de composição diferente.</small></div><div class="composition-week-list">${weekMarkup}</div>`;
 }
 
 function restoreSnapshot(snapshot) {
@@ -1253,7 +1253,7 @@ function resourcePreview(resource) {
 function compositionPreview(entry = {}) {
   const type = String(entry.type || entry.kind || "bloco").toLowerCase();
   const labels = { destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", citacao: "Citação", imagem: "Imagem", accordion: "Acordeão", flashcards: "Flashcards", quiz: "Quiz formativo", cases: "Casos", feature: "Pontos-chave", tabela: "Tabela comparativa", slider: "Passo a passo", linhadotempo: "Linha do tempo", columns: "Colunas", externalembed: "Conteúdo externo", pitaco: "Comentário (pitaco)", audio: "Áudio / podcast", parallax: "Imagem parallax", textoimagem: "Texto + imagem", filmstrip: "Carrossel" };
-  const title = entry.title || entry.label || labels[type] || "Bloco do Aula Studio";
+  const title = entry.title || entry.label || labels[type] || "Bloco do ClassAteliê";
   const body = entry.body || entry.question || entry.intro || entry.description || entry.quote || "";
   const collection = entry.items || entry.cards || entry.steps || entry.questions || entry.features || entry.eras || entry.columns || entry.rows;
   const itemLabel = (item) => Array.isArray(item)
@@ -1262,7 +1262,7 @@ function compositionPreview(entry = {}) {
   const rows = Array.isArray(collection) ? collection.slice(0, 6).map((item) => `<li>${escapeHtml(itemLabel(item))}</li>`).join("") : "";
   const hasMedia = Boolean(entry.src || entry.href);
   const media = hasMedia ? `<img src="${escapeHtml(entry.src || entry.href)}" alt="${escapeHtml(entry.caption || title)}" loading="lazy" />` : (["imagem", "parallax", "textoimagem"].includes(type) ? `<p class="reader-resource-pending">Espaço reservado para a imagem: ainda não há arquivo. Este bloco só entra no material do aluno quando tiver imagem.</p>` : "");
-  return `<div class="reader-composition reader-composition-${escapeHtml(type)}"><div class="reader-composition-kicker">${escapeHtml(labels[type] || "Bloco Aula Studio")}</div><strong>${escapeHtml(title)}</strong>${paragraphsMarkup(body)}${media}${rows ? `<ul>${rows}</ul>` : ""}</div>`;
+  return `<div class="reader-composition reader-composition-${escapeHtml(type)}"><div class="reader-composition-kicker">${escapeHtml(labels[type] || "Bloco ClassAteliê")}</div><strong>${escapeHtml(title)}</strong>${paragraphsMarkup(body)}${media}${rows ? `<ul>${rows}</ul>` : ""}</div>`;
 }
 
 const compositionCardLabels = { destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", citacao: "Citação", imagem: "Imagem", parallax: "Parallax", textoimagem: "Texto + imagem", cases: "Casos", feature: "Pontos-chave", tabela: "Tabela", filmstrip: "Carrossel", audio: "Áudio", accordion: "Acordeão", flashcards: "Flashcards", slider: "Passo a passo", linhadotempo: "Linha do tempo", columns: "Colunas", quiz: "Quiz formativo", externalembed: "Conteúdo externo" };
@@ -1694,7 +1694,7 @@ function workloadItemLabel(item = {}) {
   if (item.category === "review") return "Síntese e revisão";
   if (item.category === "image") return "Imagem/diagrama";
   if (item.category === "audio") return "Áudio/podcast";
-  if (item.category === "interactive") return "Interativo Aula Studio";
+  if (item.category === "interactive") return "Interativo ClassAteliê";
   if (item.category === "project") return "Projeto/produção";
   return "Outra atividade";
 }
@@ -1707,7 +1707,7 @@ const breakdownLabels = {
   extraVideoMinutes: "Vídeos complementares",
   imageMinutes: "Imagens/diagramas",
   audioMinutes: "Áudios/podcasts",
-  interactiveMinutes: "Interativos Aula Studio",
+  interactiveMinutes: "Interativos ClassAteliê",
   quizMinutes: "Quiz/avaliação",
   forumMinutes: "Fórum/discussão",
   practiceMinutes: "Webprática",
@@ -2026,7 +2026,7 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
     const qualityLabel = manuallyApproved ? "conferida e liberada por você" : ({ ready: "conteúdo pronto", complete: "conteúdo completo", blocked: "bloqueada: pendência crítica", review: "revisão recomendada", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[automaticStatus] || "qualidade não medida");
     const approvalButton = automaticStatus !== "ready" && automaticStatus !== "complete" ? `<button class="week-approve ${manuallyApproved ? "is-approved" : ""}" data-index="${index}" type="button">${manuallyApproved ? "Desfazer liberação" : "Liberar após conferência"}</button>` : "";
     const statusDetail = reasons.length ? `<small class="week-status-detail">${escapeHtml(manuallyApproved ? `Diagnóstico automático: ${reasons.join(" · ")}` : reasons.join(" · "))}</small>` : "";
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no Aula Studio (sem o quiz)">JSON Studio <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do Gerador de Aula, com quiz, feedbacks e guia do professor">JSON Gerador <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button>${approvalButton}</div></article>`;
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no ClassAteliê (sem o quiz)">JSON ClassAteliê <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do ClassAuthor, com quiz, feedbacks e guia do professor">JSON ClassAuthor <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button><button class="button button-secondary week-open-studio" data-index="${index}" type="button" title="Abre o ClassAteliê em outra aba já com esta semana carregada">Abrir esta semana no ClassAteliê <span>↗</span></button>${approvalButton}</div></article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
   const weeksNote = $("#weeks-sector-note");
@@ -2034,18 +2034,20 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   $("#week-grid").querySelectorAll(".week-preview").forEach((button) => button.addEventListener("click", () => openLessonPreview(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-download").forEach((button) => button.addEventListener("click", () => downloadWeek(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-download-full").forEach((button) => button.addEventListener("click", () => downloadWeekFull(Number(button.dataset.index))));
+  $("#week-grid").querySelectorAll(".week-open-studio").forEach((button) => button.addEventListener("click", () => openInStudio(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-download-quiz").forEach((button) => button.addEventListener("click", () => downloadWeekQuiz(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-approve").forEach((button) => button.addEventListener("click", () => toggleWeekApproval(Number(button.dataset.index))));
   renderGeneralPlan(data.generalPlan);
   renderWorkload(data.workload);
+  refreshStudioWeekSelect();
   saveDraft("resultado");
   if (partial) $("#results-section").open = true;
   if (scrollToResults) scrollFormTo("#results-section");
 }
 
 // Três arquivos por semana, com o destino no nome:
-//  - semana-NN-titulo-studio.aula.json: o que abre no Aula Studio (sem o quiz);
-//  - semana-NN-titulo-gerador.json: a semana completa, com quiz, feedbacks e guia do professor;
+//  - semana-NN-titulo-studio.aula.json: o que abre no ClassAteliê (sem o quiz);
+//  - semana-NN-titulo-classauthor.json: a semana completa, com quiz, feedbacks e guia do professor;
 //  - semana-NN-titulo-quiz.xml: o quiz em Moodle XML, com feedback em todas as alternativas.
 function weekFileName(lesson, index, suffix) {
   return `semana-${String(index + 1).padStart(2, "0")}-${slugify(lesson.meta?.title)}-${suffix}`;
@@ -2060,7 +2062,58 @@ function downloadWeek(index) {
 function downloadWeekFull(index) {
   const lesson = state.weeks[index];
   if (!lesson) return;
-  downloadBlob(new Blob([JSON.stringify(toGeneratorWeek(lesson, state.teacherGuides?.[index]), null, 2)], { type: "application/json" }), weekFileName(lesson, index, "gerador.json"));
+  downloadBlob(new Blob([JSON.stringify(toGeneratorWeek(lesson, state.teacherGuides?.[index]), null, 2)], { type: "application/json" }), weekFileName(lesson, index, "classauthor.json"));
+}
+
+// ClassAteliê (o editor, hoje ainda publicado como ClassAteliê) recebe a semana por postMessage.
+const STUDIO_URL = "https://rgbittencourt.github.io/aula-studio/";
+const STUDIO_ORIGIN = new URL(STUDIO_URL).origin;
+let studioToastTimer = null;
+
+function showStudioToast(message) {
+  let toast = $("#studio-toast");
+  if (!toast) { toast = document.createElement("div"); toast.id = "studio-toast"; toast.className = "studio-toast hidden"; toast.setAttribute("role", "status"); document.body.appendChild(toast); }
+  toast.textContent = message;
+  toast.classList.remove("hidden");
+  clearTimeout(studioToastTimer);
+  studioToastTimer = setTimeout(() => toast.classList.add("hidden"), 9000);
+}
+
+function refreshStudioWeekSelect() {
+  const pick = $("#studio-week-pick");
+  const select = $("#studio-week-select");
+  if (!pick || !select) return;
+  const weeks = state.weeks || [];
+  pick.classList.toggle("hidden", !weeks.length);
+  if (!weeks.length) { select.innerHTML = ""; return; }
+  const chosen = select.value;
+  select.innerHTML = [`<option value="">editor em branco</option>`, ...weeks.map((lesson, index) => `<option value="${index}">Semana ${index + 1} · ${escapeHtml(String(lesson.lessonPlan?.theme || lesson.meta?.title || "").slice(0, 38))}</option>`)].join("");
+  select.value = chosen !== "" && Number(chosen) < weeks.length ? chosen : String(weeks.length - 1);
+}
+
+function openInStudio(index) {
+  const lesson = Number.isInteger(index) ? state.weeks[index] : null;
+  const win = window.open(STUDIO_URL, "aula-studio-editor");
+  if (!win) { showStudioToast("O navegador bloqueou a nova aba. Libere pop-ups para este site e tente de novo."); return; }
+  if (!lesson) return;
+  const payload = toStudentLesson(lesson);
+  const fileName = weekFileName(lesson, index, "studio.aula.json");
+  let settled = false;
+  const finish = () => { settled = true; window.removeEventListener("message", onMessage); clearTimeout(fallbackTimer); };
+  const onMessage = (event) => {
+    if (event.source !== win || event.origin !== STUDIO_ORIGIN || !event.data) return;
+    if (event.data.type === "aulastudio:ready") { win.postMessage({ type: "classauthor:lesson", lesson: payload, fileName }, STUDIO_ORIGIN); return; }
+    if (event.data.type === "aulastudio:loaded") { finish(); showStudioToast(`Semana ${index + 1} aberta no ClassAteliê.`); }
+    else if (event.data.type === "aulastudio:declined") { finish(); showStudioToast("Você manteve o projeto que já estava aberto no editor."); }
+    else if (event.data.type === "aulastudio:error") { finish(); showStudioToast(`O editor não conseguiu abrir a semana: ${event.data.message || "arquivo inválido"}. Baixe o JSON Studio e use "Abrir projeto".`); }
+  };
+  window.addEventListener("message", onMessage);
+  const fallbackTimer = setTimeout(() => {
+    if (settled) return;
+    finish();
+    downloadBlob(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }), fileName);
+    showStudioToast("O editor não respondeu a tempo. Baixei o arquivo da semana: use \"Abrir projeto\" lá dentro.");
+  }, 25000);
 }
 
 function downloadWeekQuiz(index) {
@@ -2486,7 +2539,7 @@ async function generate() {
   }
   if (!resumeGeneration) {
     state.flow = emptyFlow();
-    state.weeks = [];
+    state.weeks = []; refreshStudioWeekSelect();
     state.teacherGuides = [];
     state.workload = null;
     state.generalPlan = null;
@@ -2508,7 +2561,7 @@ async function generate() {
   $("#result-alert").classList.add("hidden");
   try {
     if (isGitHubPages) {
-      throw new Error("A IA está disponível na URL Vercel, onde o backend protegido pode ser acessado. Abra o Gerador pela versão publicada com IA.");
+      throw new Error("A IA está disponível na URL Vercel, onde o backend protegido pode ser acessado. Abra o ClassAuthor pela versão publicada com IA.");
     }
     const data = await generateDistributed(input, accessCode, button, { startIndex, initialWeeks: resumeGeneration ? state.weeks : [], initialTeacherGuides: resumeGeneration ? state.teacherGuides : [], formSignature, stepMode: stepModeEnabled() });
     if (data?.stepPaused) {
@@ -2689,7 +2742,7 @@ async function downloadZip() {
     if (isGitHubPages) {
       if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
       const zip = new window.JSZip();
-      state.weeks.forEach((lesson, index) => { const number = String(index + 1).padStart(2, "0"); zip.file(`semanas/semana-${number}-${slugify(lesson.meta?.title)}-studio.aula.json`, JSON.stringify(toStudentLesson(lesson), null, 2)); zip.file(`gerador/semana-${number}-${slugify(lesson.meta?.title)}-gerador.json`, JSON.stringify(toGeneratorWeek(lesson, state.teacherGuides?.[index]), null, 2)); const xml = createMoodleXml(lesson, { courseTitle: currentInput.title, weekNumber: index + 1 }); if (xml) zip.file(`moodle/semana-${number}-${slugify(lesson.meta?.title)}-quiz.xml`, xml); });
+      state.weeks.forEach((lesson, index) => { const number = String(index + 1).padStart(2, "0"); zip.file(`semanas/semana-${number}-${slugify(lesson.meta?.title)}-studio.aula.json`, JSON.stringify(toStudentLesson(lesson), null, 2)); zip.file(`classauthor/semana-${number}-${slugify(lesson.meta?.title)}-classauthor.json`, JSON.stringify(toGeneratorWeek(lesson, state.teacherGuides?.[index]), null, 2)); const xml = createMoodleXml(lesson, { courseTitle: currentInput.title, weekNumber: index + 1 }); if (xml) zip.file(`moodle/semana-${number}-${slugify(lesson.meta?.title)}-quiz.xml`, xml); });
       if (state.generalPlan) zip.file("planejamento-geral.json", JSON.stringify(state.generalPlan, null, 2));
       zip.file("professor/LEIA-ME.txt", "O Material de Mediação em PDF é gerado na versão Vercel com backend. Este modo público contém apenas o exemplo do aluno.");
       downloadBlob(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), `${slugify(currentInput.title)}-semanas.zip`);
@@ -2805,6 +2858,7 @@ addMaterial();
 $("#welcome-form").addEventListener("submit", enterFromWelcome);
 $("#new-project-link").addEventListener("click", startNewProject);
 $("#exit-session-button").addEventListener("click", exitSession);
+$("#studio-open-button").addEventListener("click", () => { const chosen = $("#studio-week-select").value; openInStudio(chosen === "" ? null : Number(chosen)); });
 $("#course-form").addEventListener("submit", (event) => { event.preventDefault(); generate(); });
 initStepMode();
 $("#assist-button").addEventListener("click", assistBriefing);

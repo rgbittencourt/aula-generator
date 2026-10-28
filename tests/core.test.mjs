@@ -115,7 +115,7 @@ test("repara itens genéricos de composição com conteúdo específico da seç�
   assert.ok(accordion?.props?.items?.every((item) => !/Item contextualizado/i.test(item.title) && /Governança de dados/i.test(item.title)));
   assert.equal(quiz?.props?.questions?.length, 5);
   assert.ok(quiz?.props?.questions?.every((question) => !/Item contextualizado/i.test(question.q) && /Governança de dados/i.test(question.q)));
-  // O quiz sai em Moodle XML e no JSON do Gerador; o JSON do Aula Studio não o leva.
+  // O quiz sai em Moodle XML e no JSON do ClassAuthor; o JSON do Aula Studio não o leva.
   assert.equal(findBlock(toStudentLesson(lesson).blocks, "quiz"), null);
 });
 

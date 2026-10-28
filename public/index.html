@@ -54,7 +54,7 @@
           <label class="welcome-field"><span>Nome <b>*</b></span><input id="welcome-author" type="text" autocomplete="name" required placeholder="Nome do autor" /></label>
           <label class="welcome-field"><span>Instituição <b>*</b></span><input id="welcome-institution" type="text" autocomplete="organization" required placeholder="Nome da instituição" /></label>
           <label class="welcome-field"><span>Código de acesso de IA <b>*</b></span><input id="welcome-access-code" type="password" autocomplete="current-password" required placeholder="Código definido para esta versão" /><small>Este não é o segredo da OpenAI. O código nunca é salvo no backup local.</small></label>
-          <button class="button button-primary welcome-submit" type="submit"><span>Entrar no Gerador</span><span class="button-arrow">→</span></button>
+          <button class="button button-primary welcome-submit" type="submit"><span>Entrar no ClassAuthor</span><span class="button-arrow">→</span></button>
         </form>
         <p class="welcome-auth-note"><span>✦</span> Seus dados de autoria serão usados nos arquivos gerados e no Material de Mediação.</p>
       </div>
@@ -65,7 +65,7 @@
       <img src="./brand/classauthor-mark.svg" alt="" width="38" height="38" />
       <span><strong class="wordmark"><b>Class</b><i>Author</i></strong><small>planejamento pedagógico</small></span>
     </a>
-    <div class="header-tools"><button class="session-exit-link" type="button" id="exit-session-button" title="Voltar à capa e trocar o usuário, a instituição ou o código">Trocar acesso</button><a class="studio-top-link" href="https://rgbittencourt.github.io/aula-studio/" target="_blank" rel="noopener noreferrer"><img src="./brand/aula-studio-logo.svg" alt="" width="23" height="23" /><span>Abrir Aula Studio</span><b aria-hidden="true">↗</b></a><div class="header-status" id="api-status"><span class="status-dot"></span> verificando ambiente…</div></div>
+    <div class="header-tools"><button class="session-exit-link" type="button" id="exit-session-button" title="Voltar à capa e trocar o usuário, a instituição ou o código">Trocar acesso</button><div class="studio-launch"><button class="studio-top-link" id="studio-open-button" type="button" title="Abre o ClassAteliê (editor das aulas) em outra aba e já carrega a semana escolhida"><img src="./brand/aula-studio-mark.svg" alt="" width="23" height="23" /><span>Abrir ClassAteliê</span><b aria-hidden="true">↗</b></button><label class="studio-week-pick hidden" id="studio-week-pick"><span>com</span><select id="studio-week-select" aria-label="Semana a abrir no ClassAteliê"></select></label></div><div class="header-status" id="api-status"><span class="status-dot"></span> verificando ambiente…</div></div>
     <div class="header-progress" aria-hidden="true"><span id="briefing-progress"></span></div>
   </header>
 
@@ -91,7 +91,7 @@
     <section class="intro">
       <p class="eyebrow">PLANEJAMENTO PEDAGÓGICO</p>
       <h1>Do tema geral a uma trilha de aulas semanais.</h1>
-      <p class="intro-copy">Descreva o curso, defina o tempo de estudo e deixe a IA construir um percurso próprio para cada semana. A aula do aluno vai para o Aula Studio; o Material de Mediação fica em PDF.</p>
+      <p class="intro-copy">Descreva o curso, defina o tempo de estudo e deixe a IA construir um percurso próprio para cada semana. A aula do aluno vai para o ClassAteliê; o Material de Mediação fica em PDF.</p>
     </section>
 
     <form id="course-form" novalidate>
@@ -138,8 +138,8 @@
           </section>
 
           <section class="panel">
-            <div class="panel-heading"><div><span class="step">04</span><div><h2>Composição da aula no Aula Studio</h2><p>Escolha estruturas, destaques, mídia e interativos por semana.</p></div></div><span class="material-mark">▦</span></div>
-            <p class="hint composition-intro">O texto-base continua sendo desenvolvido nas seções. Esta área define blocos editoriais que a IA contextualiza e o Gerador materializa no JSON do aluno: acordeões, flashcards, citações, alertas, imagens com legenda, tabelas, casos, sliders, linha do tempo, quiz e outros componentes compatíveis com o Aula Studio.</p>
+            <div class="panel-heading"><div><span class="step">04</span><div><h2>Composição da aula no ClassAteliê</h2><p>Escolha estruturas, destaques, mídia e interativos por semana.</p></div></div><span class="material-mark">▦</span></div>
+            <p class="hint composition-intro">O texto-base continua sendo desenvolvido nas seções. Esta área define blocos editoriais que a IA contextualiza e o ClassAuthor materializa no JSON do aluno: acordeões, flashcards, citações, alertas, imagens com legenda, tabelas, casos, sliders, linha do tempo, quiz e outros componentes compatíveis com o ClassAteliê.</p>
             <div id="composition-plan" class="composition-plan"></div>
           </section>
 
@@ -194,7 +194,7 @@
               <div><dt>Carga total</dt><dd id="summary-total">16 h</dd></div>
               <div><dt>Calendário</dt><dd id="summary-calendar">Por numeração</dd></div>
               <div><dt>Recursos por semana</dt><dd id="summary-resources">1 vídeo · 1 artigo</dd></div>
-              <div><dt>Composição Aula Studio</dt><dd id="summary-composition">4 blocos</dd></div>
+              <div><dt>Composição ClassAteliê</dt><dd id="summary-composition">4 blocos</dd></div>
               <div><dt>Webpráticas</dt><dd id="summary-practice">Não</dd></div>
             </dl>
             <div class="formula-note"><span>ƒx</span><p><strong>Perfil interno de dimensionamento</strong> Leituras, artigos, vídeos, fóruns, práticas e avaliações são dimensionados depois que a semana é escrita.</p></div>
@@ -225,7 +225,7 @@
 
     <section class="empty-state" id="empty-state"><span class="empty-mark">01</span><p>Preencha o briefing para montar a primeira trilha semanal.</p></section>
   </main>
-  <footer class="site-footer"><span>ClassAuthor · desenvolvido por Rogério Bittencourt, INOVALAB - IFSC</span><span>Saída compatível com Aula Studio · revisão humana antes da publicação</span></footer>
+  <footer class="site-footer"><span>ClassAuthor · desenvolvido por Rogério Bittencourt, INOVALAB - IFSC</span><span>Saída compatível com ClassAteliê · revisão humana antes da publicação</span></footer>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script type="module" src="/app.js?v=ai-provider-retry-20261014-1"></script>
 </body>

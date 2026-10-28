@@ -1,4 +1,4 @@
-# Gerador de Aulas
+# ClassAuthor
 
 Aplicação para transformar um briefing de curso em uma trilha semanal de aulas compatível com o **Aula Studio**. A interface combina uma área de planejamento editorial com uma prévia organizada por semanas. A linguagem visual se inspira na clareza do Aula Studio — papel, tipografia editorial, barra de progresso, blocos e sumário — sem copiar a aplicação.
 
@@ -38,10 +38,10 @@ O autosave local protege contra atualização da página, fechamento acidental, 
 
 ## Passo a passo: criar a chave da API OpenAI
 
-A assinatura do ChatGPT e o uso da API são gerenciados em áreas diferentes da OpenAI. Para o gerador, é necessária uma **API key** da plataforma de desenvolvedores.
+A assinatura do ChatGPT e o uso da API são gerenciados em áreas diferentes da OpenAI. Para o ClassAuthor, é necessária uma **API key** da plataforma de desenvolvedores.
 
 1. Abra <https://platform.openai.com/> e entre na sua conta.
-2. Selecione ou crie o projeto que usará o gerador.
+2. Selecione ou crie o projeto que usará o ClassAuthor.
 3. Abra **API keys** — normalmente em <https://platform.openai.com/api-keys>.
 4. Clique em **Create new secret key**.
 5. Dê um nome identificável, como `aula-generator-vercel`.
@@ -52,9 +52,9 @@ Se a plataforma solicitar configuração de cobrança ou limites de uso, faça e
 
 ## Provedor alternativo: Anthropic Claude
 
-O Gerador agora mantém uma camada compatível com OpenAI e Anthropic. A OpenAI continua sendo o padrão para não interromper a implantação atual. Para testar Claude, crie uma chave em <https://console.anthropic.com/settings/keys> e cadastre, na Vercel, `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY` e `ANTHROPIC_MODEL=claude-sonnet-5-5`. O código nunca coloca a chave no navegador ou no GitHub.
+O ClassAuthor agora mantém uma camada compatível com OpenAI e Anthropic. A OpenAI continua sendo o padrão para não interromper a implantação atual. Para testar Claude, crie uma chave em <https://console.anthropic.com/settings/keys> e cadastre, na Vercel, `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY` e `ANTHROPIC_MODEL=claude-sonnet-5-5`. O código nunca coloca a chave no navegador ou no GitHub.
 
-Depois do Redeploy, o endpoint `/api/health` mostrará `provider: "anthropic"` e o modelo efetivo. A geração semanal, a assistência do briefing, a refação e as mensagens de mediação continuam usando o mesmo contrato JSON do Gerador. A troca é reversível: remova `AI_PROVIDER` ou use `AI_PROVIDER=openai` para voltar à OpenAI.
+Depois do Redeploy, o endpoint `/api/health` mostrará `provider: "anthropic"` e o modelo efetivo. A geração semanal, a assistência do briefing, a refação e as mensagens de mediação continuam usando o mesmo contrato JSON do ClassAuthor. A troca é reversível: remova `AI_PROVIDER` ou use `AI_PROVIDER=openai` para voltar à OpenAI.
 
 Claude pode ser melhor para coerência e redação longa em alguns testes, mas não é uma garantia automática. A Anthropic também aplica limites de RPM, tokens de entrada/saída por minuto e gasto mensal. Por isso, a comparação correta deve ser feita com o mesmo briefing, mesma quantidade de semanas e uma avaliação das semanas geradas, não apenas pela ausência de um erro de limite.
 
@@ -85,7 +85,7 @@ Claude pode ser melhor para coerência e redação longa em alguns testes, mas n
 | `ANTHROPIC_MODEL` | `claude-sonnet-5-5` | Production, Preview e Development |
 | `ANTHROPIC_MAX_TOKENS` | `16000` | Production, Preview e Development |
 | `ANTHROPIC_ASSIST_MAX_TOKENS` | `6000` | Production, Preview e Development |
-| `ANTHROPIC_REQUEST_TOKEN_BUDGET` | `28000` como margem local do Gerador | Production, Preview e Development |
+| `ANTHROPIC_REQUEST_TOKEN_BUDGET` | `28000` como margem local do ClassAuthor | Production, Preview e Development |
 | `ANTHROPIC_REGEN_MAX_TOKENS` | `10000` | Production, Preview e Development |
 | `ANTHROPIC_MAX_RETRIES` | `3` | Production, Preview e Development |
 | `AULA_AI_BATCH_SIZE` | `1` | Production, Preview e Development |
@@ -134,7 +134,7 @@ Na interface, a capa exige o preenchimento de **Nome**, **Instituição** e **C�
 
 Em monitores largos, o workspace amplia sua largura útil: os menus laterais permanecem com largura fixa e a coluna central recebe todo o espaço restante para leitura, formulários e resultados. Em tablets e telas menores, o layout passa para a disposição vertical responsiva.
 
-Durante o uso, clicar no logo **Gerador de Aulas** inicia um **novo projeto de disciplina** sem voltar à capa: limpa somente os formulários e resultados em edição, mantém Nome, Instituição e código na sessão atual e preserva o planejamento salvo, o botão **Retomar planejamento** e as opções de backup. Para encerrar a sessão e pedir novos dados de acesso, use o botão **Trocar acesso** no cabeçalho; ele limpa o planejamento local e retorna à capa vazia.
+Durante o uso, clicar no logo **ClassAuthor** inicia um **novo projeto de disciplina** sem voltar à capa: limpa somente os formulários e resultados em edição, mantém Nome, Instituição e código na sessão atual e preserva o planejamento salvo, o botão **Retomar planejamento** e as opções de backup. Para encerrar a sessão e pedir novos dados de acesso, use o botão **Trocar acesso** no cabeçalho; ele limpa o planejamento local e retorna à capa vazia.
 
 A semana produzida é uma unidade completa: abertura, conteúdo desenvolvido, seções e subseções, exemplos, reflexões, recursos no ponto de uso, síntese, avaliação, conexão com a semana seguinte e cálculo posterior da carga. Vídeos, imagens, diagramas e leituras ficam associados ao trecho ou conceito que motivou seu uso. Cada recurso leva `sectionNumber` e um `bridgeParagraph`: um parágrafo que explica a ligação com o conceito naquele ponto, o que o estudante deve observar e por que o recurso é pertinente. A leitura do aluno não termina com uma galeria de links separada.
 
@@ -142,7 +142,7 @@ O botão de assistência completa somente campos vazios do briefing. A geração
 
 ### Controle de qualidade textual
 
-Antes de considerar uma semana pronta, o gerador verifica título específico, abertura, pelo menos quatro objetivos, seções desenvolvidas, síntese, avaliação, blocos compatíveis com o Aula Studio e alinhamento entre objetivo, atividade, evidência e avaliação. A meta configurada no Perfil acadêmico é tratada como **piso de palavras úteis**: uma meta de 3.000 exige pelo menos 3.000 palavras na medição da aula. O prompt distribui esse volume por seções e a tela mostra palavras, seções, objetivos, nota estrutural e pendências. **Conteúdo insuficiente** fica reservado para texto realmente curto ou estrutura didática ausente; pendências de referências, recursos ou revisão pedagógica aparecem como **revisão recomendada**, não como se a aula tivesse poucas palavras. Na rota distribuída, a versão inicial é salva antes de qualquer reparo: se houver pendência textual, ela aparece como **reparo textual pendente** e pode ser corrigida pela prévia sem colocar em risco as semanas anteriores.
+Antes de considerar uma semana pronta, o ClassAuthor verifica título específico, abertura, pelo menos quatro objetivos, seções desenvolvidas, síntese, avaliação, blocos compatíveis com o Aula Studio e alinhamento entre objetivo, atividade, evidência e avaliação. A meta configurada no Perfil acadêmico é tratada como **piso de palavras úteis**: uma meta de 3.000 exige pelo menos 3.000 palavras na medição da aula. O prompt distribui esse volume por seções e a tela mostra palavras, seções, objetivos, nota estrutural e pendências. **Conteúdo insuficiente** fica reservado para texto realmente curto ou estrutura didática ausente; pendências de referências, recursos ou revisão pedagógica aparecem como **revisão recomendada**, não como se a aula tivesse poucas palavras. Na rota distribuída, a versão inicial é salva antes de qualquer reparo: se houver pendência textual, ela aparece como **reparo textual pendente** e pode ser corrigida pela prévia sem colocar em risco as semanas anteriores.
 
 Na seção **Webpráticas síncronas**, informe a quantidade desejada e clique em **Criar sessões**. Os cartões existentes são preservados; depois, use **Preencher vazios com IA** para completar cada item individualmente. A IA recebe a quantidade exata e não pode reduzir uma lista de duas ou mais práticas a apenas uma. No Planejamento geral, os recursos pendentes e os itens do checklist possuem caixas de seleção de **conferência manual**. Os itens que a IA já aprovou aparecem marcados inicialmente; desmarque um item aprovado quando quiser refazê-lo ou revisá-lo novamente. A marcação fica no salvamento local/backup e não substitui a correção de uma pendência pedagógica.
 
@@ -234,7 +234,7 @@ Os quatro checklists exibem todos os itens disponíveis e iniciam marcados os qu
 
 ### Verificação automática de números e citações
 
-Depois de escrever a semana, o gerador procura no texto valores em R$, percentuais, anos, quantidades, leis/portarias e citações diretas e confere se o número aparece no briefing ou nas semanas já geradas. O que não aparece em nenhum lugar entra em **evidências a conferir** (`claimEvidence`, status `needs-human-review`), com a frase, a seção e o motivo, além do que o próprio autor listou em "Pontos a conferir". É uma checagem local, sem custo de IA, feita em `src/fact-check.js`. Ela não prova que o número é falso; só avisa que ele não veio de uma fonte que você forneceu.
+Depois de escrever a semana, o ClassAuthor procura no texto valores em R$, percentuais, anos, quantidades, leis/portarias e citações diretas e confere se o número aparece no briefing ou nas semanas já geradas. O que não aparece em nenhum lugar entra em **evidências a conferir** (`claimEvidence`, status `needs-human-review`), com a frase, a seção e o motivo, além do que o próprio autor listou em "Pontos a conferir". É uma checagem local, sem custo de IA, feita em `src/fact-check.js`. Ela não prova que o número é falso; só avisa que ele não veio de uma fonte que você forneceu.
 
 ## Separação aluno e professor
 
@@ -245,7 +245,9 @@ A aplicação produz duas camadas diferentes:
 - O **Material de Mediação** é um guia de acompanhamento que cresce a cada semana gerada: o PDF traz capa com a situação (liberadas, rascunhos, a gerar), sumário com páginas, mapa da UC, ritmo de acompanhamento e sinais de alerta, os vídeos da UC e, para cada semana já gerada (marcada como **Liberada** ou **Rascunho em revisão**), a semana em uma página, as ideias-chave, o roteiro antes/durante/depois com as mensagens de WhatsApp e Moodle nos pontos certos, perguntas prováveis dos alunos, equívocos comuns, sinais de alerta e intervenções, atividades, gabarito comentado, recursos, pontos a conferir antes de publicar, vídeos da semana, ponte, trilhas, acessibilidade, webprática e um anexo técnico. As semanas ainda não geradas aparecem no fim com o tema previsto. Seções sem conteúdo não aparecem. As explicações para o professor (resumo, perguntas dos alunos, equívocos, intervenções) vêm da parte `explain` dos derivados; em semanas antigas, o botão **Completar explicações do Material de Mediação** na prévia gera só essa parte, sem tocar no texto. Emojis e símbolos que a fonte do PDF não tem são omitidos.
 - **Roteiro de webprática:** cada sessão prática agendada é mantida em `teacherGuide.webPracticeProjects` e exportada como DOCX editável próprio, sem ser inserida no texto-base semanal.
 
-Na tela de resultados, O app se chama **ClassAuthor**. Todos os arquivos levam o crédito “Construído com ClassAuthor, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.”: como último bloco da aula do Aula Studio (rodapé de autoria), nos campos `aiTool`, `aiUse` e `generatedBy` do `meta`, no JSON do Gerador, na categoria do Moodle XML, na capa do PDF e na planilha de produção, além do nome e da instituição de quem preencheu a capa. Cada semana tem três downloads, com o destino no nome: **JSON Studio** (`semana-NN-titulo-studio.aula.json`, para abrir no Aula Studio, sem o quiz; as referências saem como texto), **JSON Gerador** (`semana-NN-titulo-gerador.json`, a semana completa com quiz, feedbacks e guia do professor) e **Quiz XML** (`semana-NN-titulo-quiz.xml`, para importar no banco de questões do Moodle). O painel separado **Webpráticas programadas** mostra a agenda e oferece **Baixar DOCX** para cada sessão. **Material de Mediação PDF** baixa o documento de mediação. **Pacote completo ZIP** reúne os JSONs, o Planejamento Geral, o Material de Mediação em PDF e os projetos de webprática em Markdown, JSON, arquivos auxiliares e DOCX.
+Na tela de resultados, o app se chama **ClassAuthor**. Todos os arquivos levam o crédito “Construído com ClassAuthor, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.”: como último bloco da aula do Aula Studio (rodapé de autoria), nos campos `aiTool`, `aiUse` e `generatedBy` do `meta`, no JSON do ClassAuthor, na categoria do Moodle XML, na capa do PDF e na planilha de produção, além do nome e da instituição de quem preencheu a capa. Cada semana tem três downloads, com o destino no nome: **JSON ClassAteliê** (`semana-NN-titulo-studio.aula.json`, para abrir no Aula Studio, sem o quiz; as referências saem como texto), **JSON ClassAuthor** (`semana-NN-titulo-classauthor.json`, a semana completa com quiz, feedbacks e guia do professor) e **Quiz XML** (`semana-NN-titulo-quiz.xml`, para importar no banco de questões do Moodle). O painel separado **Webpráticas programadas** mostra a agenda e oferece **Baixar DOCX** para cada sessão. **Material de Mediação PDF** baixa o documento de mediação. **Pacote completo ZIP** reúne os JSONs, o Planejamento Geral, o Material de Mediação em PDF e os projetos de webprática em Markdown, JSON, arquivos auxiliares e DOCX.
+
+**Abrir no ClassAteliê.** O botão **Abrir ClassAteliê**, no cabeçalho, abre o editor (hoje ainda publicado como Aula Studio) em outra aba e, ao lado dele, a lista **com** define qual semana já entra carregada (ou editor em branco). Cada cartão de semana também tem **Abrir esta semana no ClassAteliê**. A semana segue por `postMessage` só para a aba que o ClassAuthor abriu; se já houver um projeto em andamento no editor, ele pergunta antes de substituir (e dá para desfazer com Ctrl+Z). Se o editor não responder em 25 s, o arquivo da semana é baixado para você usar em **Abrir projeto**.
 
 ## Webpráticas como projetos independentes
 
@@ -278,7 +280,7 @@ Os recursos selecionados viram blocos editáveis do Aula Studio: `video`, `image
 7. Faça **Redeploy**.
 8. Confira `/api/health`: o campo `youtubeConfigured` deve aparecer como `true`.
 
-Sem `YOUTUBE_API_KEY`, o gerador continua pesquisando imagens/diagramas e leituras; vídeos sem dados ficam pendentes e não são inventados. `AULA_RESOURCE_RESEARCH=false` desativa o enriquecimento para diagnóstico.
+Sem `YOUTUBE_API_KEY`, o ClassAuthor continua pesquisando imagens/diagramas e leituras; vídeos sem dados ficam pendentes e não são inventados. `AULA_RESOURCE_RESEARCH=false` desativa o enriquecimento para diagnóstico.
 O fallback OpenAlex fica ligado por padrão e aparece como `openAlexFallback: true` em `/api/health`. Ele só é acionado quando o Crossref retorna menos de três candidatos para uma busca. Para desligá-lo, cadastre `AULA_OPENALEX_ENABLED=false` e faça Redeploy.
 
 ## Rotas do backend
@@ -341,8 +343,8 @@ A chave é usada apenas pelo backend e nunca é enviada ao navegador.
 ```text
 semanas/semana-01-titulo-studio.aula.json
 semanas/semana-02-titulo-studio.aula.json
-gerador/semana-01-titulo-gerador.json
-gerador/semana-02-titulo-gerador.json
+classauthor/semana-01-titulo-classauthor.json
+classauthor/semana-02-titulo-classauthor.json
 moodle/semana-01-titulo-quiz.xml
 moodle/semana-02-titulo-quiz.xml
 moodle/todas-as-semanas-quiz.xml
@@ -364,9 +366,9 @@ Na prévia de cada semana liberada, **Gerar roteiros e slides desta semana** esc
 
 Cada semana traz 6 questões de múltipla escolha com **5 alternativas** e **feedback em todas elas**, certas ou erradas (a certa explica por quê; cada errada aponta o equívoco e a seção a reler). Verdadeiro/falso não é mais usado.
 
-O quiz **não vai** no `.aula.json` do Aula Studio: sai em **Moodle XML**, na pasta `moodle/` (e fica completo no JSON do Gerador, com feedback em todas as alternativas): um arquivo por semana e um `todas-as-semanas-quiz.xml`, com uma categoria `$course$/top/<Curso>/Semana N` por semana. Para importar: Moodle → Banco de questões → Importar → formato **Moodle XML**. As questões são de resposta única, com alternativas embaralhadas e feedback por alternativa.
+O quiz **não vai** no `.aula.json` do Aula Studio: sai em **Moodle XML**, na pasta `moodle/` (e fica completo no JSON do ClassAuthor, com feedback em todas as alternativas): um arquivo por semana e um `todas-as-semanas-quiz.xml`, com uma categoria `$course$/top/<Curso>/Semana N` por semana. Para importar: Moodle → Banco de questões → Importar → formato **Moodle XML**. As questões são de resposta única, com alternativas embaralhadas e feedback por alternativa.
 
-Depois de revisar o JSON no Aula Studio, use **Exportar → Pacote SCORM (.zip)** para enviar a aula ao Moodle. O Gerador de Aulas prepara a autoria e o planejamento; a publicação SCORM continua sendo feita no Aula Studio.
+Depois de revisar o JSON no Aula Studio, use **Exportar → Pacote SCORM (.zip)** para enviar a aula ao Moodle. O ClassAuthor prepara a autoria e o planejamento; a publicação SCORM continua sendo feita no Aula Studio.
 
 ## Desenvolvimento e testes
 
