@@ -26,7 +26,7 @@ export async function searchYouTube(request, input) {
   const key = process.env.YOUTUBE_API_KEY;
   if (!key) return { request, provider: "youtube", status: "missing-api-key", candidates: [], note: "Cadastre YOUTUBE_API_KEY para pesquisar vídeos reais." };
   try {
-    const params = new URLSearchParams({ part: "snippet", q: request.query, type: "video", maxResults: "5", order: "relevance", regionCode: input.language === "pt-BR" ? "BR" : "US", relevanceLanguage: input.language === "pt-BR" ? "pt" : "en", safeSearch: "strict", videoEmbeddable: "true", key });
+    const params = new URLSearchParams({ part: "snippet", q: request.query, type: "video", maxResults: "5", order: "relevance", regionCode: input.language === "pt-BR" ? "BR" : "US", relevanceLanguage: input.language === "pt-BR" ? "pt" : "en", safeSearch: "strict", videoEmbeddable: "true", videoSyndicated: "true", key });
     const result = await fetchJson(`https://www.googleapis.com/youtube/v3/search?${params}`);
     const ids = (result.items || []).map((item) => item.id?.videoId).filter(Boolean);
     let details = {};
@@ -39,7 +39,10 @@ export async function searchYouTube(request, input) {
       const id = item.id?.videoId;
       const detail = details[id] || {};
       const snippet = detail.snippet || item.snippet || {};
-      const embeddable = detail.status?.embeddable !== false;
+      const regionBlocked = (detail.contentDetails?.regionRestriction?.blocked || []).includes(input.language === "pt-BR" ? "BR" : "US");
+      const ageRestricted = detail.contentDetails?.contentRating?.ytRating === "ytAgeRestricted";
+      // Só entra o que pode ser tocado dentro de outra página (embed) e no país do estudante.
+      const embeddable = detail.status?.embeddable !== false && detail.status?.privacyStatus !== "private" && !regionBlocked && !ageRestricted;
       return {
         candidateId: `youtube:${request.requestId}:${index + 1}`,
         requestId: request.requestId,

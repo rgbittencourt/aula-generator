@@ -1246,15 +1246,16 @@ function resourcePreview(resource) {
 
 function compositionPreview(entry = {}) {
   const type = String(entry.type || entry.kind || "bloco").toLowerCase();
-  const labels = { destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", citacao: "Citação", imagem: "Imagem", accordion: "Acordeão", flashcards: "Flashcards", quiz: "Quiz formativo", cases: "Casos", feature: "Pontos-chave", tabela: "Tabela comparativa", slider: "Passo a passo", linhadotempo: "Linha do tempo", columns: "Colunas", externalembed: "Conteúdo externo" };
-  const title = entry.title || entry.label || labels[type] || "Bloco editorial";
+  const labels = { destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", citacao: "Citação", imagem: "Imagem", accordion: "Acordeão", flashcards: "Flashcards", quiz: "Quiz formativo", cases: "Casos", feature: "Pontos-chave", tabela: "Tabela comparativa", slider: "Passo a passo", linhadotempo: "Linha do tempo", columns: "Colunas", externalembed: "Conteúdo externo", pitaco: "Comentário (pitaco)", audio: "Áudio / podcast", parallax: "Imagem parallax", textoimagem: "Texto + imagem", filmstrip: "Carrossel" };
+  const title = entry.title || entry.label || labels[type] || "Bloco do Aula Studio";
   const body = entry.body || entry.question || entry.intro || entry.description || entry.quote || "";
   const collection = entry.items || entry.cards || entry.steps || entry.questions || entry.features || entry.eras || entry.columns || entry.rows;
   const itemLabel = (item) => Array.isArray(item)
     ? item.join(" · ")
     : item.title || item.front || item.q || item.question || item.prompt || item.text || item.body || item.answer || item.definition || item.label || "Conteúdo específico da seção";
   const rows = Array.isArray(collection) ? collection.slice(0, 6).map((item) => `<li>${escapeHtml(itemLabel(item))}</li>`).join("") : "";
-  const media = entry.src || entry.href ? `<img src="${escapeHtml(entry.src || entry.href)}" alt="${escapeHtml(entry.caption || title)}" loading="lazy" />` : "";
+  const hasMedia = Boolean(entry.src || entry.href);
+  const media = hasMedia ? `<img src="${escapeHtml(entry.src || entry.href)}" alt="${escapeHtml(entry.caption || title)}" loading="lazy" />` : (["imagem", "parallax", "textoimagem"].includes(type) ? `<p class="reader-resource-pending">Espaço reservado para a imagem: ainda não há arquivo. Este bloco só entra no material do aluno quando tiver imagem.</p>` : "");
   return `<div class="reader-composition reader-composition-${escapeHtml(type)}"><div class="reader-composition-kicker">${escapeHtml(labels[type] || "Bloco Aula Studio")}</div><strong>${escapeHtml(title)}</strong>${paragraphsMarkup(body)}${media}${rows ? `<ul>${rows}</ul>` : ""}</div>`;
 }
 
@@ -1388,6 +1389,10 @@ function renderLessonPreview(lesson, index) {
   }).join("");
   const globalResources = Object.values(allResources).flat().filter((resource) => resource && !sections.some((section) => (section.resources || []).some((item) => item.id && item.id === resource.id))).slice(0, 12).map(resourcePreview).join("");
   const glossary = (plan.glossary || []).length ? `<section><h3>Glossário</h3><ul>${plan.glossary.map((item) => `<li><strong>${escapeHtml(item.term || "Termo")}</strong>: ${escapeHtml(item.definition || "")}</li>`).join("")}</ul></section>` : "";
+  const referenceStatus = { verified: "conferida", "provided-needs-review": "link informado · conferir", "needs-human-review": "conferir antes de publicar", "suggested-no-url": "sem link · conferir" };
+  const references = (plan.references || []).length
+    ? `<section class="reader-references"><h3>Referências bibliográficas (${plan.references.length})</h3><p><small>Escritas pelo modelo a partir do que ele conhece: confira cada uma (autor, ano, edição, link) antes de liberar a semana.</small></p><ol>${plan.references.map((item) => { const citation = item.citation || item.title || item.href || "Referência"; const status = referenceStatus[item.verificationStatus] || "conferir antes de publicar"; const link = item.href ? ` <a href="${escapeHtml(item.href)}" target="_blank" rel="noreferrer">abrir</a>` : ""; return `<li>${escapeHtml(citation)}${link} <small>· ${escapeHtml(status)}</small></li>`; }).join("")}</ol></section>`
+    : `<section class="reader-warning"><h3>Referências bibliográficas</h3><p>Esta semana ainda não tem referências. Use “Refazer esta semana com IA” para gerá-las.</p></section>`;
   const assessment = (plan.assessment?.questions || []).length ? `<section><h3>${escapeHtml(plan.assessment.title || "Atividade avaliativa")}</h3><p>${escapeHtml(plan.assessment.format || "Questões alinhadas aos objetivos")}</p><ol>${plan.assessment.questions.map((q) => `<li>${escapeHtml(q.q || q.question || "")}${q.explanation ? `<small>${escapeHtml(q.explanation)}</small>` : ""}</li>`).join("")}</ol></section>` : "";
   const arc = plan.didacticArc || guide.didacticArc || {};
   const phaseSummary = arc.phasePlan ? Object.entries(arc.phasePlan).filter(([key, value]) => key !== "labels" && key !== "omitted" && value === true).map(([key]) => arc.phasePlan.labels?.[key] || key).join(" · ") : (arc.sequence || []).join(" · ");
@@ -1404,7 +1409,7 @@ function renderLessonPreview(lesson, index) {
   const mediation = mediationMessagesMarkup(guide.mediationMessages, plan.theme || lesson?.meta?.title || `a semana ${index + 1}`, index + 1);
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
-  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${assessment}${alignment}${timeMarkup}${workload}${mediation}`;
+  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}`;
   renderFlowPanel(index);
   $("#lesson-reader").querySelectorAll(".mediation-regenerate").forEach((button) => button.addEventListener("click", () => regenerateMediationMessage(button)));
   $("#lesson-reader").querySelectorAll(".mediation-message-card").forEach((card) => {
