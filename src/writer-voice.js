@@ -11,6 +11,7 @@
 // datas) NÃO podem ser reaproveitados: o prompt diz isso explicitamente.
 
 import { REFERENCE_WEEK_ONE, REFERENCE_EXCERPTS } from "./reference-weeks.js";
+import { abntRules } from "./abnt.js";
 
 export const WRITER_EXAMPLE = `## 3. O SUAP: crescimento acelerado e um "primo" nascido também no Rio Grande do Norte
 
@@ -68,7 +69,7 @@ Ao final desta semana, você será capaz de:
 ## Glossário rápido desta semana
 - **Termo**: definição em uma ou duas frases.
 ## Referências desta semana
-- Referência completa, no formato que você conseguir garantir. Se faltar dado, escreva só o que sabe.
+- SOBRENOME, Nome. **Título da obra**: subtítulo. Local: Editora, ano. (ABNT NBR 6023, em ordem alfabética; regras abaixo.)
 ## Pontos a conferir
 - [seção N] afirmação específica que o professor precisa verificar antes de publicar.
 
@@ -106,9 +107,10 @@ export function writerModelsMode(provider = process.env.AI_PROVIDER) {
 }
 
 export function writerSystemPrompt(mode = writerModelsMode()) {
-  if (mode === "off") return BASE_PROMPT;
-  if (mode === "minimal") return `${BASE_PROMPT}\n\n${VOICE_BLOCK}`;
-  return `${BASE_PROMPT}\n\n${MODEL_WEEK_BLOCK}\n\n${EXCERPTS_BLOCK}\n\n${VOICE_BLOCK}`;
+  const abnt = abntRules();
+  if (mode === "off") return `${BASE_PROMPT}\n\n${abnt}`;
+  if (mode === "minimal") return `${BASE_PROMPT}\n\n${VOICE_BLOCK}\n\n${abnt}`;
+  return `${BASE_PROMPT}\n\n${MODEL_WEEK_BLOCK}\n\n${EXCERPTS_BLOCK}\n\n${VOICE_BLOCK}\n\n${abnt}`;
 }
 
 // Compatibilidade: texto do modo "minimal".

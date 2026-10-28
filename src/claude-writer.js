@@ -163,7 +163,7 @@ function partInstruction({ part, total, range, outline, weekNumber, targets, clo
   const [from, to] = range;
   const scope = [
     part === 1 ? `começa com a linha de título do roteiro ("# Semana ${weekNumber} — …"), depois "## Boas-vindas", "## Objetivos de aprendizagem" e então as seções ${from} a ${to}` : `contém somente as seções ${from} a ${to}`,
-    closing ? `e termina com "## Síntese conceitual" (retoma o fio da semana, mínimo 120 palavras), "## O que vem por aí", "## Glossário rápido desta semana" (de 6 a 10 termos), "## Referências desta semana" (no mínimo ${targets.minimumReferences || 6} referências completas, das quais ao menos ${Math.max(2, targets.primarySourcesRequired || 2)} acadêmicas ou oficiais que você conhece com segurança: livros, artigos, normas, documentação) e "## Pontos a conferir"` : ""
+    closing ? `e termina com "## Síntese conceitual" (retoma o fio da semana, mínimo 120 palavras), "## O que vem por aí", "## Glossário rápido desta semana" (de 6 a 10 termos), "## Referências desta semana" (no mínimo ${targets.minimumReferences || 6} referências completas, no padrão ABNT NBR 6023, em ordem alfabética, com o título em **negrito**, das quais ao menos ${Math.max(2, targets.primarySourcesRequired || 2)} acadêmicas ou oficiais que você conhece com segurança: livros, artigos, normas, documentação) e "## Pontos a conferir"` : ""
   ].filter(Boolean).join(" ");
   return `ROTEIRO DA SEMANA (já definido; siga os números, os títulos e os casos de cada seção):
 ${outline}

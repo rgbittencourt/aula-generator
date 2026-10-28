@@ -1,4 +1,5 @@
 import { KNOWN_BLOCK_TYPES, normalizeLesson, normalizeWeeklyOutput, practiceScheduledForWeek, resourcePlanForWeek } from "./aula-schema.js";
+import { abntRules } from "./abnt.js";
 import { measureLessonQuality, qualityPromptGuidance, qualityTargets } from "./content-quality.js";
 import { buildTeacherGuide } from "./teacher-guide.js";
 import { ACADEMIC_SYSTEM_PROMPT, buildAcademicPlanPrompt, buildAcademicReviewPrompt, normalizeAcademicPlan, normalizeAcademicReview, normalizeAcademicProfile } from "./academic.js";
@@ -433,6 +434,8 @@ Regras de escrita:
 - escreva em ${input.language}, com linguagem humana, clara, específica, variada e pedagogicamente provocadora;
 - produza pelo menos ${textBudget.targetWords} palavras úteis no conjunto do texto do aluno. Essa é uma meta mínima operacional, não uma estimativa: conte e amplie antes de devolver o JSON. A aula do aluno tem prioridade absoluta sobre o Material de Mediação;
 - inclua pelo menos ${profile.minimumReferences} referências, sendo ${profile.primarySourcesRequired} acadêmica(s) ou oficial(is), sem inventar dados bibliográficos; use a política: ${profile.sourcePolicy};
+- no campo citation de cada referência, siga o padrão ABNT NBR 6023:2018 e as regras de formato a seguir (a lista precisa estar em ordem alfabética):
+${abntRules()}
 - ${profile.requireCounterarguments ? "inclua pelo menos um contraponto, controvérsia ou limite" : "inclua contraponto apenas quando pertinente"}; ${profile.requireConceptComparison ? "compare conceitos próximos ou abordagens alternativas quando pertinente" : "não force comparação se ela não for pertinente"}; ${profile.requireCaseStudy ? "inclua estudo de caso ou exemplo contextualizado" : "use exemplo contextualizado quando ajudar"};
 - conecte o tema à realidade do público (${input.audience}) e do nível (${input.level}); use os exemplos, recortes regionais e instituições fornecidos no briefing;
 - inclua pelo menos um exemplo concreto, uma situação-problema ou estudo de caso e um contraponto/limite quando forem pertinentes;
@@ -753,7 +756,7 @@ export async function regenerateWeekWithAI(input, index, currentWeek, instructio
 
 "${String(instruction || "").trim()}"
 
-Preserve os fatos, referências e recursos válidos, mas cumpra a solicitação de forma visível. A semana deve continuar sendo uma unidade didática completa, não um resumo. ${qualityPromptGuidance(input)}
+Preserve os fatos, referências e recursos válidos (mantenha cada referência no padrão ABNT NBR 6023, em ordem alfabética, com o título em **negrito**), mas cumpra a solicitação de forma visível. A semana deve continuar sendo uma unidade didática completa, não um resumo. ${qualityPromptGuidance(input)}
 Esta é uma correção de insuficiência textual. Não faça um acréscimo marginal de 20, 30 ou 50 palavras. Reescreva e amplie as seções abaixo do orçamento até atingir o piso de ${textBudget.minimumWords} palavras. Cada seção deve conter explicação conceitual, exemplo ou aplicação, consequência/limite e transição para a próxima. Se o texto atual estiver curto, substitua o corpo curto por um corpo desenvolvido; não apenas acrescente uma frase ao final.
 Faça uma revisão acadêmica explícita: corrija afirmações sem suporte, diferencie fato e interpretação, acrescente contraponto quando exigido, preserve o mapa de evidências e não invente fontes. ${normalizeAcademicProfile(input.academicProfile, input).sourcePolicy}
 

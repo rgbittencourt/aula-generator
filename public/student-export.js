@@ -10,13 +10,15 @@ export const GENERATOR_CREDIT = `Conteúdo elaborado com ${APP_NAME}, uma ferram
 const GENERATOR_CREDIT_HTML = `<p style="text-align:center;font-size:.85em;opacity:.8">Conteúdo elaborado com <strong>${APP_NAME}</strong>, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.</p>`;
 
 const escapeHtml = (value) => text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// Referência ABNT: o título vem marcado com **negrito** e vira <strong> (já escapado).
+const referenceMarkup = (value) => escapeHtml(value).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
 
 // O bloco "referencias" do ClassAtelier recebe cada item como texto HTML (um objeto aparece como
 // "[object Object]"). O link, quando existe, vai dentro da própria linha. Aceita também o formato
 // antigo ({ html, href }), que está salvo nas semanas geradas antes desta correção.
 export function referenceItemHtml(item) {
   const entry = typeof item === "string" ? { citation: item } : object(item);
-  const body = entry.html != null && text(entry.html) ? text(entry.html) : escapeHtml(entry.citation || entry.title || entry.href);
+  const body = entry.html != null && text(entry.html) ? text(entry.html) : referenceMarkup(entry.citation || entry.title || entry.href);
   const href = text(entry.href);
   const safeHref = /^https?:\/\//i.test(href) ? href.replace(/"/g, "%22") : "";
   const hasLink = safeHref && !body.includes(escapeHtml(href)) && !body.includes(safeHref);

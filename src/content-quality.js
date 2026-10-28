@@ -1,4 +1,5 @@
 import { normalizeAcademicProfile } from "./academic.js";
+import { abntReport } from "./abnt.js";
 
 const wordCount = (value) => String(value ?? "").trim().split(/\s+/u).filter(Boolean).length;
 const text = (value) => String(value ?? "").trim();
@@ -132,6 +133,8 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   if (!hasNextWeekConnection) issues.push("conexão com a próxima semana ausente ou curta");
   if (!hasAssessment) issues.push("avaliação alinhada ausente ou incompleta");
   if (!hasMinimumReferences) issues.push(`referências insuficientes: ${references.length}/${target.minimumReferences}`);
+  const abnt = abntReport(references);
+  if (abnt.flagged.length) issues.push(`${abnt.flagged.length} de ${abnt.total} referência(s) fora do padrão ABNT NBR 6023 (ex.: nº ${abnt.flagged[0].index + 1}: ${abnt.flagged[0].issues.join("; ")})`);
   if (!hasPrimarySources) issues.push(`fontes acadêmicas/oficiais insuficientes: ${primaryReferences.length}/${target.primarySourcesRequired}`);
   if (!hasEvidenceMap) issues.push("mapa de evidências incompleto");
   if (!resourcesContextualized) issues.push("vídeos, imagens ou leituras sem ponte pedagógica e posição de uso verificável");

@@ -1,4 +1,5 @@
 import { normalizeDidacticArc, buildAlignmentMatrix, buildProgression, pedagogicalReview } from "./pedagogy.js";
+import { sortReferencesAbnt } from "./abnt.js";
 import { measureLessonQuality } from "./content-quality.js";
 import { normalizeAcademicProfile } from "./academic.js";
 import { progressionForWeek } from "./curriculum.js";
@@ -382,7 +383,7 @@ function normalizeReference(value, index = 0) {
 
 function normalizeReferences(value) {
   if (!Array.isArray(value)) return [];
-  return value.map(normalizeReference).filter((item) => item.citation || item.href || item.doi);
+  return sortReferencesAbnt(value.map(normalizeReference).filter((item) => item.citation || item.href || item.doi));
 }
 
 function normalizeClaimEvidence(value) {

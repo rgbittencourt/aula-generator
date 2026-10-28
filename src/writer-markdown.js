@@ -17,6 +17,17 @@ const text = (value) => String(value ?? "").trim();
 const escapeHtml = (value) => text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 // Texto sem marcação (para campos que o ClassAuthor escapa depois).
+// Como plain(), mas preserva o **negrito** do título: a ABNT pede destaque nele.
+export function plainReference(markdown) {
+  return text(markdown)
+    .replace(/<(https?:\/\/[^>\s]+)>/g, "$1")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "$1")
+    .replace(/__([^_]+)__/g, "**$1**")
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1**$2**")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function plain(markdown) {
   return text(markdown)
     .replace(/<(https?:\/\/[^>\s]+)>/g, "$1")
@@ -284,8 +295,8 @@ export function parseWeekMarkdown(markdown, options = {}) {
       }
       continue;
     }
-    if (zone === "references" && token.type === "list") { plan.references.push(...token.items.map((item) => ({ citation: plain(item), type: "fonte-a-conferir", verificationStatus: "needs-human-review", verified: false }))); continue; }
-    if (zone === "references" && token.type === "p" && token.text.length > 20) { plan.references.push({ citation: plain(token.text), type: "fonte-a-conferir", verificationStatus: "needs-human-review", verified: false }); continue; }
+    if (zone === "references" && token.type === "list") { plan.references.push(...token.items.map((item) => ({ citation: plainReference(item), type: "fonte-a-conferir", verificationStatus: "needs-human-review", verified: false }))); continue; }
+    if (zone === "references" && token.type === "p" && token.text.length > 20) { plan.references.push({ citation: plainReference(token.text), type: "fonte-a-conferir", verificationStatus: "needs-human-review", verified: false }); continue; }
     if (zone === "notes" && token.type === "list") {
       token.items.forEach((item, index) => {
         const match = item.match(/^\[(?:se[cç][aã]o\s*)?([\d.]+)\]\s*(.+)$/i);
@@ -385,7 +396,7 @@ export function planToMarkdown(plan = {}) {
   const glossary = Array.isArray(plan.glossary) ? plan.glossary : [];
   if (glossary.length) out.push("## Glossário rápido desta semana", glossary.map((item) => `- **${plain(item.term)}**: ${plain(item.definition)}`).join("\n"));
   const references = Array.isArray(plan.references) ? plan.references : [];
-  if (references.length) out.push("## Referências desta semana", references.map((item) => `- ${plain(typeof item === "string" ? item : item.citation || item.title || item.href)}`).join("\n"));
+  if (references.length) out.push("## Referências desta semana", references.map((item) => `- ${plainReference(typeof item === "string" ? item : item.citation || item.title || item.href)}`).join("\n"));
   const claims = Array.isArray(plan.claimEvidence) ? plan.claimEvidence : [];
   if (claims.length) out.push("## Pontos a conferir", claims.map((item) => `- ${item.sectionNumber ? `[${item.sectionNumber}] ` : ""}${plain(item.claim)}`).join("\n"));
   return `${out.join("\n\n")}\n`;
