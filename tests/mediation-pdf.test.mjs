@@ -84,6 +84,7 @@ test("crédito do ClassAuthor e autoria presentes no Studio, no ClassAuthor, no 
   const studio = toStudentLesson(lesson);
   assert.equal(studio.meta.aiUse, GENERATOR_AI_USE);
   assert.match(studio.meta.aiUse, /\.$/);
+  assert.equal(`Produzido com apoio de ${studio.meta.aiTool}${studio.meta.aiUse}`, "Produzido com apoio de ClassAuthor (INOVALAB - IFSC), uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt.");
   assert.equal(studio.meta.generatedBy, GENERATOR_CREDIT);
   assert.equal(studio.meta.author, "Prof. Fulana");
   assert.equal(toGeneratorWeek(lesson).credit, GENERATOR_CREDIT);

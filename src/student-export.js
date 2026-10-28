@@ -4,8 +4,8 @@ const text = (value, fallback = "") => String(value ?? "").trim() || fallback;
 // Crédito do aplicativo, presente nos arquivos gerados (meta do ClassAtelier, PDF, Moodle XML, JSON do ClassAuthor).
 export const APP_NAME = "ClassAuthor";
 export const GENERATOR_TOOL = `${APP_NAME} (INOVALAB - IFSC)`;
-// Continua a frase "Produzido com apoio de <ferramenta> …" no bloco Apoio de IA do rodapé das aulas.
-export const GENERATOR_AI_USE = "na elaboração do conteúdo desta aula, a partir do planejamento pedagógico da semana.";
+// Continua a frase "Produzido com apoio de <ferramenta>…" (a vírgula inicial cola no nome da ferramenta) no bloco Apoio de IA do rodapé das aulas.
+export const GENERATOR_AI_USE = ", uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt.";
 export const GENERATOR_CREDIT = `Conteúdo elaborado com ${APP_NAME}, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.`;
 const GENERATOR_CREDIT_HTML = `<p style="text-align:center;font-size:.85em;opacity:.8">Conteúdo elaborado com <strong>${APP_NAME}</strong>, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.</p>`;
 
