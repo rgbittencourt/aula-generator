@@ -245,7 +245,16 @@ export function parseWeekMarkdown(markdown, options = {}) {
       }
       if (token.type === "quote") {
         const callout = parseCallout(token.text);
-        if (!callout) { addProse([token]); continue; }
+        if (!callout) {
+          // Citação em bloco sem autor/obra/ano: entra como pendência para o professor (a fonte é obrigatória).
+          if (!/[—–]\s*\S.*\b(1[5-9]\d{2}|20\d{2})\b|\([^)]*\b(1[5-9]\d{2}|20\d{2})\b[^)]*\)/.test(token.text)) {
+            const snippet = plain(token.text).slice(0, 110);
+            const claim = `Citação sem autor, obra e ano: “${snippet}${snippet.length >= 110 ? "…" : ""}”. Informe a fonte (autor, obra, ano, página) ou remova a citação.`;
+            plan.notes.push(claim);
+            plan.claimEvidence.push({ id: `quote-${String(plan.claimEvidence.length + 1).padStart(2, "0")}`, claim, sectionNumber: (sub ? sub.number : section.number), sourceIds: [], sourceType: "", supportLevel: "insufficient", verificationStatus: "needs-human-review", note: "Citação direta exige fonte completa." });
+          }
+          addProse([token]); continue;
+        }
         const anchor = sub ? sub.number : section.number;
         if (callout.type === "figure") {
           figureCounter += 1;

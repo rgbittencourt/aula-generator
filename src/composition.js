@@ -279,7 +279,7 @@ function fallbackEntry(type, section, sectionIndex, itemIndex, weekPlan) {
     case "destaque": return { title: "Veja bem", body: lead, tone: "sage" };
     case "atencao": return { title: "Atenção", body: `Um erro comum é tratar ${title.toLowerCase()} como uma solução automática. Compare a explicação da seção com as condições concretas do contexto.`, tone: "coral" };
     case "reflexao": return { title: "Para refletir", question: `Que decisão do seu contexto poderia ser diferente se você aplicasse o conceito de ${title.toLowerCase()}?`, body: "" };
-    case "citacao": return { quote: body, author: "Síntese da seção", source: "Aula-base · conferir fonte se for citação literal" };
+    case "citacao": return { quote: body, author: "", source: "" }; // sem autor e obra reais, vira destaque (ver blockFromEntry)
     case "pitaco": return { kicker: "Pitaco", name: "Olhar profissional", role: "Comentário de contexto", body: `<p>${lead}</p>` };
     case "imagem": return { caption: `Imagem ou diagrama para visualizar ${title.toLowerCase()}.`, credit: "Fonte e licença a conferir" };
     case "parallax": return { overlayTitle: title, caption: `Imagem contextual de ${title.toLowerCase()}.`, credit: "Fonte e licença a conferir" };
@@ -306,7 +306,15 @@ function blockFromEntry(type, entry, fallback, weekNumber, sectionIndex, itemInd
   const common = { id, type, sectionNumber: sectionIndex + 1 };
   if (type === "destaque" || type === "atencao") return { ...common, type, props: { title: text(source.title, type === "atencao" ? "Atenção" : "Veja bem"), body: richHtml(source.body), tone: text(source.tone, type === "atencao" ? "coral" : "sage"), icon: text(source.icon) } };
   if (type === "reflexao") return { ...common, type, props: { title: text(source.title, "Para refletir"), question: text(source.question, "Que relação você faz entre esta seção e seu contexto?"), body: richHtml(source.body), tone: text(source.tone, "lavender"), icon: text(source.icon) } };
-  if (type === "citacao") return { ...common, type, props: { quote: text(source.quote, source.body), author: text(source.author, "Autor a conferir"), source: text(source.source, "Fonte a conferir"), showAttribution: source.showAttribution !== false } };
+  if (type === "citacao") {
+    const quote = text(source.quote, source.body);
+    const author = text(source.author);
+    const origin = text(source.source);
+    // Citação só entra como citação se vier com autor e obra/ano. Sem isso, o texto vira destaque da aula,
+    // sem atribuir a ninguém uma frase que ninguém disse.
+    if (!citationHasSource(author, origin)) return { ...common, type: "destaque", props: { title: "Em uma frase", body: richHtml(quote), tone: "sage", icon: "" } };
+    return { ...common, type, props: { quote, author, source: origin, showAttribution: source.showAttribution !== false } };
+  }
   if (type === "pitaco") return { ...common, type, props: { kicker: text(source.kicker, "Pitaco"), name: text(source.name, "Olhar profissional"), role: text(source.role, "Comentário de contexto"), tone: text(source.tone, "coral"), src: text(source.src), slotId: id, body: richHtml(source.body) } };
   if (type === "imagem" || type === "parallax") {
     const resource = Array.isArray(planResources.images) ? planResources.images.find((item) => item.id === source.resourceId) || planResources.images[itemIndex] : null;
@@ -329,6 +337,16 @@ function blockFromEntry(type, entry, fallback, weekNumber, sectionIndex, itemInd
   if (type === "quiz") return { ...common, type, props: { title: text(source.title, "Cheque sua compreensão"), intro: text(source.intro), avaliativo: Boolean(source.avaliativo), passMark: Number(source.passMark) || 6, questions: Array.isArray(source.questions) ? source.questions : [] } };
   if (type === "externalembed") return { ...common, type, props: { title: text(source.title, "Conteúdo externo"), embed: text(source.embed), responsive: source.responsive !== false, useEmbedDimensions: source.useEmbedDimensions !== false, width: text(source.width), height: integer(source.height, 600) } };
   return null;
+}
+
+// Autor e fonte reais: nada de "a conferir", "aula-base" ou os textos-modelo do editor; a fonte traz o ano.
+const PLACEHOLDER_SOURCE = /a conferir|aula-base|s[ií]ntese da se[cç][aã]o|^autor$|^fonte(\s*\/\s*obra)?$|^obra,\s*ano$|desconhecid|an[oô]nim/i;
+export function citationHasSource(author, source) {
+  const a = text(author);
+  const s = text(source);
+  if (a.length < 3 || s.length < 6) return false;
+  if (PLACEHOLDER_SOURCE.test(a) || PLACEHOLDER_SOURCE.test(s)) return false;
+  return /\b(1[5-9]\d{2}|20\d{2})\b/.test(`${a} ${s}`);
 }
 
 export function materializeComposition(plan = {}, weekPlan, weekNumber = 1) {

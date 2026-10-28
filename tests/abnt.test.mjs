@@ -36,3 +36,32 @@ test("ABNT: título em **negrito** vira <strong> no ClassAtelier e sobrevive ao 
   assert.ok(refs.includes("ALVES, Eva. **Livro A**. Recife: Z, 2017."));
   assert.match(planToMarkdown({ references: plan.references, title: "T", weekNumber: 1 }), /\*\*Livro B\*\*/);
 });
+
+test("Citação: só é citação com autor e obra/ano; sem isso vira destaque, nunca atribuída à 'Síntese da seção'", async () => {
+  const { citationHasSource, materializeComposition, compositionPlanForWeek } = await import("../src/composition.js");
+  assert.equal(citationHasSource("Paulo Freire", "Pedagogia da autonomia, 1996, p. 25"), true);
+  assert.equal(citationHasSource("Síntese da seção", "Aula-base · conferir fonte se for citação literal"), false);
+  assert.equal(citationHasSource("Autor", "Obra, ano"), false);
+  assert.equal(citationHasSource("Paulo Freire", "Pedagogia da autonomia"), false);
+  const input = { title: "Curso", weeks: 1, composition: {} };
+  const weekPlan = compositionPlanForWeek({ ...input, compositionCounts: { citacao: 2 } }, 0);
+  const rows = weekPlan.rows;
+  rows.citacao = { ...(rows.citacao || {}), count: 2, policy: "require", itemsPerBlock: 1, label: "Citação" };
+  const plan = { contentSections: [{ title: "Conceito", body: "<p>Texto da seção com ideia central.</p>" }], composition: [{ type: "citacao", quote: "Ensinar não é transferir conhecimento.", author: "Paulo Freire", source: "Pedagogia da autonomia, 1996, p. 47" }] };
+  const { blocksBySection } = materializeComposition(plan, weekPlan, 1);
+  const blocks = blocksBySection.flat();
+  const real = blocks.find((block) => block.type === "citacao");
+  assert.equal(real.props.author, "Paulo Freire");
+  assert.equal(blocks.filter((block) => block.type === "citacao").length, 1);
+  const degraded = blocks.find((block) => block.type === "destaque");
+  assert.ok(degraded);
+  assert.ok(!JSON.stringify(blocks).includes("Síntese da seção"));
+});
+
+test("Citação em bloco sem fonte vira pendência em 'Pontos a conferir'", async () => {
+  const md = "# Semana 1 — T\n\n## 1. Seção\n\nTexto.\n\n> Educar é um ato de amor.\n\n> Ensinar exige rigor. — FREIRE, 1996, p. 29.\n";
+  const { lessonPlan } = parseWeekMarkdown(md, { weekNumber: 1 });
+  const flagged = lessonPlan.claimEvidence.filter((claim) => /Citação sem autor/.test(claim.claim));
+  assert.equal(flagged.length, 1);
+  assert.match(flagged[0].claim, /Educar é um ato de amor/);
+});

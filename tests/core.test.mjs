@@ -87,7 +87,9 @@ test("normaliza composição Aula Studio com padrão e exceção por semana", ()
   assert.equal(lesson.lessonPlan.composition.entries.length, 8);
   assert.ok(hasBlock(lesson, "accordion"));
   assert.ok(hasBlock(lesson, "flashcards"));
-  assert.ok(hasBlock(lesson, "citacao"));
+  // Citação sem autor e obra reais não entra como citação (vira destaque): a fonte é obrigatória.
+  assert.ok(!hasBlock(lesson, "citacao"));
+  assert.ok(!JSON.stringify(lesson).includes("Síntese da seção"));
   assert.ok(buildWeekGenerationPrompt(input, 0).includes("COMPOSIÇÃO EDITORIAL DO AULA STUDIO"));
   assert.ok(buildWeekGenerationPrompt(input, 0).includes('"composition"'));
 });

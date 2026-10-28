@@ -73,6 +73,8 @@ Ao final desta semana, você será capaz de:
 ## Pontos a conferir
 - [seção N] afirmação específica que o professor precisa verificar antes de publicar.
 
+CITAÇÕES (obrigatório): toda citação direta (trecho entre aspas ou em bloco ">") precisa vir com a fonte logo depois: autor, obra, ano e página, no formato "— SOBRENOME, ano, p. 25." (NBR 10520), e a obra completa precisa estar em "## Referências desta semana". Só cite o que você conhece com segurança; se não tiver certeza da frase ou da página, parafraseie e indique a fonte, ou liste em "Pontos a conferir". Nunca atribua uma frase a quem não a disse nem cite sem fonte.
+
 CALLOUTS (uma linha de citação iniciada por ">", logo depois do parágrafo a que se referem)
 - Recurso externo, no ponto exato em que ajuda: > 🔎 **Veja mais aqui** [vídeo | busca: "consulta de busca curta e específica"]: parágrafo de ligação de duas a três frases dizendo o que observar e por quê. Tipos: vídeo, artigo, documento, imagem, podcast. Use "busca" com termos que localizem o recurso certo; NUNCA escreva uma URL, exceto se ela constar no briefing, e então escreva [tipo | url: https://… | busca: "…"]. Os links serão conferidos e inseridos depois.
 - Pergunta para o estudante pensar: > 💭 **Para refletir (não vale nota)**: pergunta aberta, ligada ao dia a dia dele.
