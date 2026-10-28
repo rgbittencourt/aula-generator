@@ -18,7 +18,7 @@ Os assets de marca ficam versionados para uso no cabeçalho, favicon, capas e co
 - `public/brand/ifsc-institutional-mark.png`: marca institucional do IFSC usada na capa;
 - `public/brand/inovalab-signature.png` e `public/brand/inovalab-symbol.png`: assinatura e símbolo do INOVALAB usados no crédito de desenvolvimento da capa.
 
-O ClassAtelier (hoje ainda publicado como Aula Studio) tem a marca da janela em arco, sem a caneta, em `public/brand/classatelier-mark.svg`; ela aparece no botão **Abrir ClassAtelier**. A identidade interna do editor, no repositório dele, ainda é a antiga.
+O ClassAtelier (o antigo Aula Studio, em <https://rgbittencourt.github.io/aula-studio/>, repositório `aula-studio`) tem a marca da janela em arco, sem a caneta, em `public/brand/classatelier-mark.svg`; ela aparece no botão **Abrir ClassAtelier**.
 
 ## Situação atual
 
@@ -247,7 +247,7 @@ A aplicação produz duas camadas diferentes:
 
 Na tela de resultados, o app se chama **ClassAuthor**. Todos os arquivos levam o crédito “Conteúdo elaborado com ClassAuthor, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.”: como último bloco da aula do ClassAtelier (rodapé de autoria), nos campos `aiTool`, `aiUse` e `generatedBy` do `meta`, no JSON do ClassAuthor, na categoria do Moodle XML, na capa do PDF e na planilha de produção, além do nome e da instituição de quem preencheu a capa. Cada semana tem três downloads, com o destino no nome: **JSON ClassAtelier** (`semana-NN-titulo-classatelier.json`, para abrir no ClassAtelier, sem o quiz; as referências saem como texto), **JSON ClassAuthor** (`semana-NN-titulo-classauthor.json`, a semana completa com quiz, feedbacks e guia do professor) e **Quiz XML** (`semana-NN-titulo-quiz.xml`, para importar no banco de questões do Moodle). O painel separado **Webpráticas programadas** mostra a agenda e oferece **Baixar DOCX** para cada sessão. **Material de Mediação PDF** baixa o documento de mediação. **Pacote completo ZIP** reúne os JSONs, o Planejamento Geral, o Material de Mediação em PDF e os projetos de webprática em Markdown, JSON, arquivos auxiliares e DOCX.
 
-**Abrir no ClassAtelier.** O botão **Abrir ClassAtelier**, no cabeçalho, abre o editor (hoje ainda publicado como Aula Studio) em outra aba e, ao lado dele, a lista **com** define qual semana já entra carregada (ou editor em branco). Cada cartão de semana também tem **Abrir esta semana no ClassAtelier**. A semana segue por `postMessage` só para a aba que o ClassAuthor abriu; se já houver um projeto em andamento no editor, ele pergunta antes de substituir (e dá para desfazer com Ctrl+Z). Se o editor não responder em 25 s, o arquivo da semana é baixado para você usar em **Abrir projeto**.
+**Abrir no ClassAtelier.** O botão **Abrir ClassAtelier**, no cabeçalho, abre o editor em outra aba e, ao lado dele, a lista **com** define qual semana já entra carregada (ou editor em branco). Cada cartão de semana também tem **Abrir esta semana no ClassAtelier**. A semana segue por `postMessage` só para a aba que o ClassAuthor abriu; se já houver um projeto em andamento no editor, ele pergunta antes de substituir (e dá para desfazer com Ctrl+Z). Se o editor não responder em 25 s, o arquivo da semana é baixado para você usar em **Abrir projeto**.
 
 ## Webpráticas como projetos independentes
 
