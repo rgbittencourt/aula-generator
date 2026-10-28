@@ -183,7 +183,9 @@ app.post("/api/zip", async (req, res) => {
     const scopedPlan = scopeGeneralPlan({ ...generalPlan, validation }, scoped.releasedIndexes, scoped.explicit);
     const buffer = await createWeeksZip(input, enrichedWeeks, scopedPlan, scoped.releasedGuides, {
       explicitScope: scoped.explicit,
-      releasedWeekIndexes: scoped.releasedIndexes
+      releasedWeekIndexes: scoped.releasedIndexes,
+      mediationGuides: teacherGuides,
+      production: req.body?.production
     });
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-semanas.zip"`);
@@ -204,9 +206,10 @@ app.post("/api/teacher-pdf", async (req, res) => {
     const teacherGuides = buildTeacherGuides(input, enrichedWeeks, req.body?.teacherGuides || []);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
     const scoped = scopeMediationMaterial(enrichedWeeks, teacherGuides, req.body?.weekApprovals);
-    const buffer = await createMediationMaterialPdf(input, scoped.releasedGuides, generalPlan, {
+    const buffer = await createMediationMaterialPdf(input, teacherGuides, generalPlan, {
       explicitScope: scoped.explicit,
-      releasedWeekIndexes: scoped.releasedIndexes
+      releasedWeekIndexes: scoped.releasedIndexes,
+      production: req.body?.production
     });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-material-de-mediacao.pdf"`);

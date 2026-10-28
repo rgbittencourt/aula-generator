@@ -21,7 +21,7 @@ export async function createWeeksZip(input, weeks, generalPlan = null, teacherGu
   const combined = createCombinedMoodleXml(weeks, { courseTitle: input.title });
   if (combined && weeks.length > 1) zip.file("moodle/todas-as-semanas-quiz.xml", combined);
   if (generalPlan) zip.file("planejamento-geral.json", JSON.stringify(generalPlan, null, 2));
-  const pdf = await createMediationMaterialPdf(input, teacherGuides, generalPlan, options);
+  const pdf = await createMediationMaterialPdf(input, options.mediationGuides || teacherGuides, generalPlan, options);
   zip.file("professor/material-de-mediacao.pdf", pdf);
   const practices = collectWebPracticeProjects(input, teacherGuides);
   createWebPracticeFiles(input, practices).forEach(({ path, content }) => zip.file(path, content));

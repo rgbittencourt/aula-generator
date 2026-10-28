@@ -235,6 +235,7 @@ export function derivativesPrompt(input, index, plan, scheduledPractices, part =
     assessment: ["all", "assessment"].includes(part),
     activities: ["all", "guide", "activities"].includes(part),
     mediation: ["all", "guide", "mediation"].includes(part),
+    explain: ["all", "guide", "explain"].includes(part),
     webpractice: ["all", "guide", "webpractice"].includes(part) && scheduledPractices.length > 0
   };
   // Com webprática, o projeto completo sai numa chamada própria (é a parte mais longa do guia).
@@ -258,10 +259,20 @@ export function derivativesPrompt(input, index, plan, scheduledPractices, part =
       "moodle": [ { "relatedId": "stop-1", "relatedType": "abertura", "timing": "...", "purpose": "...", "studentNeed": "...", "teacherIntent": "...", "tone": "claro e organizado", "text": "aviso de curso organizado" } ]
     }${scheduledPractices.length && !separateWebpractice ? ',\n    "webPracticeProjects": [ { "title": "...", "problem": "...", "context": "...", "studentRole": "...", "challenge": "...", "deliverable": "...", "steps": [ { "minutes": 10, "instructions": "...", "evidence": "..." } ], "criteria": ["..."], "fallbackPlan": "..." } ]' : ""}
   }`;
+  const explainSpec = `  "teacherGuide": {
+    "weekSummary": "resumo para o professor em 2 ou 3 parágrafos curtos separados por linha em branco: a ideia central da semana, o caminho do texto seção a seção (uma frase por seção) e o caso ou exemplo âncora",
+    "keyIdeas": ["de 5 a 7 ideias que o estudante precisa levar, uma frase cada, com a seção entre colchetes, por exemplo: [seção 2] ..."],
+    "studentFAQ": [ { "question": "pergunta provável do estudante, na voz dele", "answer": "resposta do professor em 2 a 4 frases, só com o que o texto sustenta", "sectionRef": "2" } ],
+    "commonMisconceptions": [ { "misconception": "o equívoco, como o estudante o diria", "whyItHappens": "por que ele acontece", "howToAddress": "como o professor corrige, em 1 ou 2 frases" } ],
+    "mediationQuestions": ["pergunta aberta para o fórum ou o WhatsApp, que peça o contexto do estudante"],
+    "interventions": [ { "signal": "o que o professor observa (ex.: três dias sem acesso; resposta que só copia o texto)", "action": "o que fazer", "message": "mensagem curta, pronta para enviar" } ],
+    "sensitivePoints": ["afirmação do texto que exige cuidado (número, data, caso) e como falar dela com segurança"],
+    "assessmentNotes": ["como ler o desempenho nas questões: qual combinação de erros indica qual lacuna"]
+  }`;
   const webpracticeSpec = `  "teacherGuide": {
     "webPracticeProjects": [ { "title": "...", "problem": "...", "context": "...", "studentRole": "...", "challenge": "...", "deliverable": "...", "steps": [ { "minutes": 10, "instructions": "...", "evidence": "..." } ], "criteria": ["..."], "fallbackPlan": "..." } ]
   }`;
-  const specs = [wants.assessment && assessmentSpec, wants.activities && activitiesSpec, wants.mediation && mediationSpec, part === "webpractice" && wants.webpractice && webpracticeSpec].filter(Boolean);
+  const specs = [wants.assessment && assessmentSpec, wants.activities && activitiesSpec, wants.mediation && mediationSpec, wants.explain && explainSpec, part === "webpractice" && wants.webpractice && webpracticeSpec].filter(Boolean);
   const rules = [
     wants.assessment && `REGRAS DA AVALIAÇÃO
 - Exatamente 6 questões, todas de múltipla escolha com EXATAMENTE 5 alternativas e uma única correta, cobrindo todos os objetivos. Não use verdadeiro/falso. "answer" é o índice (começando em 0, de 0 a 4) da alternativa correta; varie a posição da correta entre as questões.
@@ -270,6 +281,11 @@ export function derivativesPrompt(input, index, plan, scheduledPractices, part =
 - Nada de números, nomes ou datas que o texto não tenha dito.`,
     wants.activities && `REGRAS DAS ATIVIDADES
 - Diagnóstico de entrada curto; de 2 a 4 verificações formativas ao longo das seções; de 2 a 3 atividades (por exemplo, fórum e um produto curto) com critérios observáveis; autoavaliação com escala. Tudo respondível a partir do texto, sem inventar dados.`,
+    wants.explain && `REGRAS DAS EXPLICAÇÕES PARA O PROFESSOR
+- O leitor é o professor-mediador que vai acompanhar a turma sem ter escrito o texto: ele precisa entender a semana para responder dúvidas com segurança.
+- Use SOMENTE o que o texto diz: nada de número, nome, data ou caso que não esteja nele. Quando a pergunta do estudante for provável mas o texto não a responder, diga na resposta o que o texto sustenta e o que o professor deve conferir antes de afirmar.
+- "studentFAQ": de 6 a 8 perguntas reais de quem estuda (dúvida de conceito, de aplicação ao seu campus, de prazo ou de avaliação), na voz do estudante, cada uma com a seção de referência. "commonMisconceptions": de 3 a 5, pegando as confusões que o próprio texto antecipa. "interventions": de 4 a 6 sinais concretos e observáveis, com ação e mensagem de WhatsApp curta e acolhedora. "sensitivePoints": cuide dos números e casos do texto, dizendo como falar deles. "mediationQuestions": de 5 a 6 perguntas abertas.
+- Tom de colega para colega, direto e prático. Sem jargão pedagógico vazio.`,
     wants.mediation && `REGRAS DO MATERIAL DE MEDIAÇÃO
 - Uma parada para a abertura, uma ao final de cada bloco de duas ou três seções do texto (de 3 a 5 no total) e uma para o fechamento. Para cada parada, uma mensagem de WhatsApp e uma de Moodle, de teor equivalente, mas não cópia: o WhatsApp é mais próximo e pode ter humor leve; o Moodle, mais organizado. Mensagens curtas.
 - As mensagens explicam por que vale a pena fazer a etapa, reconhecem a dificuldade e convidam a uma ação concreta. Não invente data, link nem obrigação que não esteja no briefing.
@@ -298,7 +314,7 @@ ${rules.join("\n\n")}${rules.length ? "\n\n" : ""}Responda somente JSON válido.
 // (o erro é da etapa inteira e a repetição refaz as duas).
 async function buildDerivatives(input, index, plan, only = null) {
   const scheduled = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index));
-  const names = { assessment: "assessment", activities: "diagnostic, formativeChecks, activities, selfAssessment", mediation: "teacherGuide", webpractice: "teacherGuide.webPracticeProjects" };
+  const names = { assessment: "assessment", activities: "diagnostic, formativeChecks, activities, selfAssessment", mediation: "teacherGuide", explain: "teacherGuide (weekSummary, keyIdeas, studentFAQ, ...)", webpractice: "teacherGuide.webPracticeProjects" };
   const call = (part, maxTokens) => callJson([
     { role: "system", content: DERIVATIVES_SYSTEM },
     { role: "user", content: derivativesPrompt(input, index, plan, scheduled, part) }
@@ -315,14 +331,14 @@ async function buildDerivatives(input, index, plan, only = null) {
     // `only` limita a regeneração a partes (ex.: ["assessment"]) quando o professor quer
     // consertar um item específico sem refazer o que já conferiu.
     const wanted = (part) => !Array.isArray(only) || only.includes(part);
-    const plannedParts = [["assessment", 12000], ["activities", 9000], ["mediation", 12000], ...(scheduled.length ? [["webpractice", 12000]] : [])].filter(([part]) => wanted(part));
+    const plannedParts = [["assessment", 12000], ["activities", 9000], ["mediation", 12000], ["explain", 12000], ...(scheduled.length ? [["webpractice", 12000]] : [])].filter(([part]) => wanted(part));
     const results = await Promise.allSettled(plannedParts.map(([part, tokens]) => call(part, tokens)));
     const failed = results.find((result) => result.status === "rejected");
     if (failed) throw failed.reason;
     const byPart = Object.fromEntries(plannedParts.map(([part], position) => [part, results[position].value]));
-    const { assessment, activities, mediation, webpractice } = byPart;
+    const { assessment, activities, mediation, explain, webpractice } = byPart;
     const object = (value) => (value && typeof value === "object" ? value : {});
-    const teacherGuide = { ...object(object(mediation).teacherGuide), ...(object(object(webpractice).teacherGuide).webPracticeProjects ? { webPracticeProjects: webpractice.teacherGuide.webPracticeProjects } : {}) };
+    const teacherGuide = { ...object(object(mediation).teacherGuide), ...object(object(explain).teacherGuide), ...(object(object(webpractice).teacherGuide).webPracticeProjects ? { webPracticeProjects: webpractice.teacherGuide.webPracticeProjects } : {}) };
     const data = { ...object(activities), ...(Object.keys(teacherGuide).length ? { teacherGuide } : {}), ...(object(assessment).assessment ? { assessment: assessment.assessment } : {}) };
     return { data, error: "" };
   } catch (error) {
@@ -420,7 +436,7 @@ export async function regenerateWeekProse(input, index, currentWeek, instruction
 // Segunda etapa do modo de prosa: avaliação, atividades e Material de Mediação a
 // partir do texto que o professor já tem. Recebe a semana normalizada (lessonPlan)
 // e devolve a semana reconstruída, o guia do professor e o novo estado de geração.
-export const DERIVATIVE_PARTS = ["assessment", "activities", "mediation", "webpractice"];
+export const DERIVATIVE_PARTS = ["assessment", "activities", "mediation", "explain", "webpractice"];
 
 export async function completeWeekDerivatives(input, index, week, teacherGuide = {}, options = {}) {
   const plan = week?.lessonPlan || {};

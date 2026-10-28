@@ -16,9 +16,10 @@ export default async function handler(request, response) {
     const teacherGuides = buildTeacherGuides(input, enrichedWeeks, request.body?.teacherGuides || []);
     const generalPlan = buildGeneralPlan(input, workload, enrichedWeeks, teacherGuides);
     const scope = scopeMediationMaterial(enrichedWeeks, teacherGuides, request.body?.weekApprovals);
-    const buffer = await createMediationMaterialPdf(input, scope.releasedGuides, generalPlan, {
+    const buffer = await createMediationMaterialPdf(input, teacherGuides, generalPlan, {
       explicitScope: scope.explicit,
-      releasedWeekIndexes: scope.releasedIndexes
+      releasedWeekIndexes: scope.releasedIndexes,
+      production: request.body?.production
     });
     response.setHeader("Content-Type", "application/pdf");
     response.setHeader("Content-Disposition", `attachment; filename="${slugify(input.title, "curso")}-material-de-mediacao.pdf"`);

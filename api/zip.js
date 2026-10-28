@@ -21,6 +21,7 @@ export default async function handler(request, response) {
     const buffer = await createWeeksZip(input, enrichedWeeks, scopedPlan, scoped.releasedGuides, {
       explicitScope: scoped.explicit,
       releasedWeekIndexes: scoped.releasedIndexes,
+      mediationGuides: teacherGuides,
       production: request.body?.production
     });
     response.setHeader("Content-Type", "application/zip");

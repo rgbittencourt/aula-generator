@@ -5,6 +5,14 @@ const text = (value, fallback = "") => String(value ?? "").trim() || fallback;
 const list = (value) => Array.isArray(value) ? value.map(text).filter(Boolean) : [];
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 
+// Listas de objetos do guia (FAQ, equívocos, intervenções): aceita texto solto e normaliza os campos.
+function records(value, fields, primary) {
+  return (Array.isArray(value) ? value : []).map((item) => {
+    const source = typeof item === "string" ? { [primary]: item } : object(item);
+    return Object.fromEntries(fields.map(([key, ...aliases]) => [key, text([source[key], ...aliases.map((alias) => source[alias])].find((candidate) => text(candidate)))]));
+  }).filter((entry) => entry[primary]);
+}
+
 function resourceNotesForPlan(plan = {}) {
   const sections = Array.isArray(plan.contentSections) ? plan.contentSections : [];
   const root = Object.values(plan.resources || {}).flatMap((items) => Array.isArray(items) ? items : []);
@@ -230,9 +238,14 @@ function normalizeGuide(source = {}, plan = {}, input = {}, index = 0) {
     formativeChecks: Array.isArray(raw.formativeChecks || raw.checkpoints) ? (raw.formativeChecks || raw.checkpoints) : (plan.formativeChecks || []),
     mediationStops: Array.isArray(raw.mediationStops) && raw.mediationStops.length ? raw.mediationStops : mediationStops(plan),
     summativeAssessment: object(raw.summativeAssessment || raw.finalAssessment || plan.assessment),
+    weekSummary: text(raw.weekSummary || raw.summaryForTeacher),
+    keyIdeas: list(raw.keyIdeas),
+    studentFAQ: records(raw.studentFAQ || raw.faq, [["question", "q"], ["answer", "a"], ["sectionRef", "section"]], "question"),
+    sensitivePoints: list(raw.sensitivePoints),
+    activities: Array.isArray(plan.activities) ? plan.activities : [],
     mediationQuestions: list(raw.mediationQuestions || raw.facilitationQuestions),
-    commonMisconceptions: list(raw.commonMisconceptions || raw.misconceptions),
-    interventions: list(raw.interventions || raw.interventionTips),
+    commonMisconceptions: records(raw.commonMisconceptions || raw.misconceptions, [["misconception", "equivoco", "text"], ["whyItHappens", "why"], ["howToAddress", "correction", "howTo"]], "misconception"),
+    interventions: records(raw.interventions || raw.interventionTips, [["signal", "when", "sinal"], ["action", "acao"], ["message", "text"]], "signal"),
     differentiation: normalizeDifferentiation(raw.differentiation || plan.differentiation),
     accessibility: object(raw.accessibility || raw.accessibilityPlan),
     assessmentNotes: list(raw.assessmentNotes || raw.evaluationNotes),

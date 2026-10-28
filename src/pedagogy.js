@@ -1,5 +1,7 @@
 const text = (value) => String(value ?? "").trim();
-const list = (value) => Array.isArray(value) ? value.map((item) => text(item)).filter(Boolean) : [];
+// Itens que chegam como objeto (ex.: verbetes do glossário) viram o seu rótulo, e não "[object Object]".
+const itemText = (item) => item && typeof item === "object" ? text(item.term || item.title || item.label || item.name || item.text || item.description) : text(item);
+const list = (value) => Array.isArray(value) ? value.map(itemText).filter(Boolean) : [];
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 
 export const DIDACTIC_ARCS = Object.freeze([

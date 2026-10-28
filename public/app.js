@@ -229,9 +229,10 @@ function updateMediationExportHint() {
   const button = $("#teacher-pdf-button");
   if (!button) return;
   const count = releasedWeekCount();
-  button.title = count
-    ? `Baixar Material de Mediação atualizado com ${count} semana(s) liberada(s)`
-    : "Baixar Material de Mediação inicial; nenhuma semana foi liberada ainda";
+  const generated = state.weeks?.length || 0;
+  button.title = generated
+    ? `Baixar o Material de Mediação com as ${generated} semana(s) geradas (${count} liberada(s); as demais aparecem como rascunho) e as que ainda faltam`
+    : "Baixar Material de Mediação inicial; nenhuma semana foi gerada ainda";
   button.dataset.releasedWeeks = String(count);
 }
 
@@ -1421,12 +1422,14 @@ function renderLessonPreview(lesson, index) {
   const timeBreakdown = Object.entries(plan.timePlan?.breakdown || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<li><strong>${escapeHtml(breakdownLabels[key] || key)}</strong>: ${formatLoad(value)}</li>`).join("");
   const timeMarkup = timeItems || timeBreakdown ? `<section class="time-breakdown reader-time-breakdown"><h3>Tempo desta semana</h3><p>O cálculo está separado por texto-base, leituras, mídias e atividades. “Obrigatório” indica o que entra na trilha essencial; “complementar” não é obrigatório.</p><ul>${timeItems || timeBreakdown}</ul></section>` : "";
   const alignment = (plan.alignmentMatrix || []).length ? `<section><h3>Alinhamento pedagógico</h3><ul>${plan.alignmentMatrix.map((row) => `<li><strong>${escapeHtml(row.objective || "Objetivo")}</strong>: ${escapeHtml(row.evidence || "evidência a definir")} · avaliação: ${escapeHtml((row.assessmentQuestions || []).join(", ") || "a definir")}</li>`).join("")}</ul></section>` : "";
-  const mediation = mediationMessagesMarkup(guide.mediationMessages, plan.theme || lesson?.meta?.title || `a semana ${index + 1}`, index + 1);
+  const mediation = mediationMessagesMarkup(guide.mediationMessages, plan.theme || lesson?.meta?.title || `a semana ${index + 1}`, index + 1)
+    + (guide.weekSummary && guide.studentFAQ?.length ? "" : `<section class="reader-warning"><h3>Explicações para o professor</h3><p>Esta semana ainda não tem o resumo, as perguntas prováveis dos alunos, os equívocos comuns e os sinais de alerta que entram no Material de Mediação. O texto da semana não é alterado.</p><button type="button" class="secondary" id="retry-explain-button">Completar explicações do Material de Mediação</button></section>`);
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
   $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
   renderFlowPanel(index);
   $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
+  $("#retry-explain-button")?.addEventListener("click", (event) => retryDerivatives(index, { parts: ["explain"], button: event.currentTarget }));
   $("#production-week-button")?.addEventListener("click", () => generateProductionWeek(index));
   $("#production-sheet-button-card")?.addEventListener("click", downloadProductionSheet);
   $("#production-md-button")?.addEventListener("click", downloadProductionMarkdown);
@@ -1730,7 +1733,7 @@ function reviewCheckChecked(item = {}, reviewMarks = state.reviewMarks || create
 //   scope "full"            -> reescrita da semana (só quando o próprio item exige texto novo em grande parte)
 //   scope "manual"          -> conferência humana; não há o que a IA refazer sozinha
 const REVIEW_LIMITS_EDIT = "Altere SOMENTE o que este item exige. Preserve todo o resto da semana: título, objetivos, seções, recursos, figuras, questões e atividades que não estejam envolvidos. Não reordene nem reescreva por estilo. Não invente autores, dados, referências, DOI ou URLs; onde faltar base, marque como “a conferir”.";
-const PARTS_LABEL = { assessment: "as questões", activities: "o diagnóstico, as paradas e as atividades", mediation: "o Material de Mediação", webpractice: "a webprática" };
+const PARTS_LABEL = { explain: "as explicações para o professor", assessment: "as questões", activities: "o diagnóstico, as paradas e as atividades", mediation: "o Material de Mediação", webpractice: "a webprática" };
 
 function reviewActionFor(kind, item, lesson) {
   const id = String(item.id || "");
@@ -2682,7 +2685,7 @@ async function downloadTeacherPdf() {
   button.disabled = true; button.classList.add("is-loading");
   try {
     const currentInput = formInput();
-    const response = await fetch("/api/teacher-pdf", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: currentInput, weeks: state.weeks, teacherGuides: state.teacherGuides, weekApprovals: state.weekApprovals }) });
+    const response = await fetch("/api/teacher-pdf", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: currentInput, weeks: state.weeks, teacherGuides: state.teacherGuides, weekApprovals: state.weekApprovals, production: state.production }) });
     if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível criar o Material de Mediação em PDF."); }
     downloadBlob(await response.blob(), `${slugify(currentInput.title)}-material-de-mediacao.pdf`);
   } catch (error) { showError(error.message); }
