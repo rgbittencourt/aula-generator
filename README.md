@@ -206,6 +206,10 @@ Se você refizer uma semana já escrita, o sistema compara a ponte nova com a an
 
 **Manter como está** dispensa o aviso. O estado (aprovações, resumos e avisos) vai no salvamento local e no backup. O fechamento de cada semana, o gancho para a próxima, agora também aparece no bloco de síntese que o estudante lê (**Na próxima semana:**), e não só no `lessonPlan`.
 
+### Alterar uma semana sem refazê-la
+
+Na prévia, o seletor **O que alterar** oferece três modos: *Só o título da semana*; *Ajuste pontual no texto* (padrão: a IA devolve só os blocos a trocar, apagar ou inserir e eles são aplicados por cima do texto, preservando questões, recursos, figuras, glossário, referências e mediação); e *Refazer a semana inteira* (reescreve tudo, como antes). Os dois primeiros rodam em `/api/regenerate-week` com `action: "edit"` (`src/week-edit.js`).
+
 ### Como a ordem funciona
 
 Não existe uma sequência rígida para todas as semanas. A IA escolhe um arco adequado — descoberta conceitual, caso, oficina, análise de dados, debate ou síntese — e registra quais fases estão ativas: abertura, diagnóstico, explicação, exemplo, prática guiada, prática independente, reflexão, avaliação e síntese. Quando uma fase é omitida, a omissão recebe justificativa. Vídeos, imagens e leituras entram dentro do tópico/conceito que os torna úteis; não são despejados em uma galeria final.

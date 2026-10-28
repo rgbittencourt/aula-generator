@@ -1397,7 +1397,7 @@ function renderLessonPreview(lesson, index) {
   const referenceStatus = { verified: "conferida", "provided-needs-review": "link informado · conferir", "needs-human-review": "conferir antes de publicar", "suggested-no-url": "sem link · conferir" };
   const references = (plan.references || []).length
     ? `<section class="reader-references"><h3>Referências bibliográficas (${plan.references.length})</h3><p><small>Escritas pelo modelo a partir do que ele conhece: confira cada uma (autor, ano, edição, link) antes de liberar a semana.</small></p><ol>${plan.references.map((item) => { const citation = item.citation || item.title || item.href || "Referência"; const status = referenceStatus[item.verificationStatus] || "conferir antes de publicar"; const link = item.href ? ` <a href="${escapeHtml(item.href)}" target="_blank" rel="noreferrer">abrir</a>` : ""; return `<li>${escapeHtml(citation)}${link} <small>· ${escapeHtml(status)}</small></li>`; }).join("")}</ol></section>`
-    : `<section class="reader-warning"><h3>Referências bibliográficas</h3><p>Esta semana ainda não tem referências. Use “Refazer esta semana com IA” para gerá-las.</p></section>`;
+    : `<section class="reader-warning"><h3>Referências bibliográficas</h3><p>Esta semana ainda não tem referências. Escolha “Refazer a semana inteira” na prévia para gerá-las.</p></section>`;
   const letters = ["A", "B", "C", "D", "E", "F"];
   const questionMarkup = (q, position) => {
     const options = Array.isArray(q.options) ? q.options : [];
@@ -1501,15 +1501,52 @@ async function retryDerivatives(index) {
   }
 }
 
+// Alteração pontual (só o título, ou só os trechos pedidos): não reescreve a semana,
+// preserva questões, recursos, figuras e mediação já conferidos.
+async function applyTargetedEdit(index, instruction, scope) {
+  const button = $("#regenerate-week-button");
+  if (!beginAiAction(button)) return;
+  button.dataset.label = "Aplicar alteração com IA";
+  setBusy(button, true, "Alterando…");
+  const label = scope === "title" ? "o título" : "os trechos pedidos";
+  setAiActivity("Alterando a semana", `A IA está ajustando ${label} da semana ${index + 1}, sem reescrever o resto…`);
+  $("#regenerate-note").textContent = `Alterando ${label}; o restante da semana não será tocado…`;
+  try {
+    const input = formInput();
+    const accessCode = input.accessCode || $("#access-code")?.value || "";
+    delete input.accessCode;
+    const headers = { "Content-Type": "application/json" };
+    if (accessCode) headers["x-aula-access-code"] = accessCode;
+    const theme = (week) => week?.lessonPlan?.theme || week?.meta?.title || "";
+    const response = await fetch("/api/regenerate-week", { method: "POST", headers, signal: AbortSignal.timeout(280000), body: JSON.stringify({ action: "edit", scope, input, weekIndex: index, instruction, week: { ...state.weeks[index], teacherGuide: state.teacherGuides[index] }, previousTheme: index > 0 ? theme(state.weeks[index - 1]) : "", nextTheme: theme(state.weeks[index + 1]) }) });
+    const done = await readApiResponse(response, "Não foi possível alterar a semana.");
+    state.weeks[index] = done.week;
+    saveDraft("semana-alterada");
+    renderWeeks({ input: state.input, weeks: state.weeks, workload: state.workload, generalPlan: state.generalPlan, teacherGuides: state.teacherGuides, provider: state.provider, validation: state.validation }, { scrollToResults: false });
+    openLessonPreview(index);
+    const skipped = done.skipped?.length ? ` (${done.skipped.length} alteração(ões) não aplicada(s) por apontarem para um trecho que não existe)` : "";
+    $("#regenerate-note").textContent = `${done.summary || "Alteração aplicada."}${skipped} O resto da semana ficou como estava.`;
+    finishAiActivity("Semana alterada", done.summary || "Alteração aplicada.", "success");
+  } catch (error) {
+    $("#regenerate-note").textContent = `A semana NÃO foi alterada: ${error.message}`;
+    finishAiActivity("Semana não alterada", error.message, "error");
+  } finally {
+    setBusy(button, false, "");
+    endAiAction();
+  }
+}
+
 async function regenerateSelectedWeek() {
   const index = state.previewIndex;
   const instruction = $("#week-revision").value.trim();
   if (index == null || !instruction) { $("#regenerate-note").textContent = "Escreva primeiro o que deseja alterar nesta semana."; return; }
   if (isGitHubPages) { $("#regenerate-note").textContent = "A regeneração por IA fica disponível na URL Vercel com backend protegido."; return; }
   if (aiActionBusy) return;
+  const scope = $("#week-revision-scope")?.value || "edit";
+  if (scope !== "full") return applyTargetedEdit(index, instruction, scope);
   const button = $("#regenerate-week-button");
   if (!beginAiAction(button)) return;
-  button.dataset.label = "Refazer esta semana com IA";
+  button.dataset.label = "Aplicar alteração com IA";
   setBusy(button, true, "Refazendo…");
   setAiActivity("Refazendo semana", `A IA está lendo a semana ${index + 1} e preparando uma nova versão…`);
   $("#regenerate-note").textContent = "A IA está reescrevendo somente esta semana e preservando o restante do curso…";
@@ -1789,8 +1826,10 @@ function useReviewPrompt(weekNumber, prompt) {
   openLessonPreview(index);
   const field = $("#week-revision");
   if (field) field.value = prompt;
+  const scope = $("#week-revision-scope");
+  if (scope) scope.value = "edit";
   const note = $("#regenerate-note");
-  if (note) note.textContent = "Prompt estruturado carregado. Revise-o, complemente se desejar e clique em Refazer esta semana com IA.";
+  if (note) note.textContent = "Prompt estruturado carregado no modo “Ajuste pontual” (mantém o resto da semana). Revise-o e clique em Aplicar alteração com IA; se a mudança exigir reescrever tudo, troque para “Refazer a semana inteira”.";
   field?.focus({ preventScroll: true });
 }
 
