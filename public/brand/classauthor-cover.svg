@@ -2,10 +2,9 @@
   <title>ClassAuthor</title>
   <desc>Capa do ClassAuthor, ferramenta de planejamento pedagógico do INOVALAB - IFSC.</desc>
   <rect width="1200" height="630" fill="#14213D"/>
-  <g transform="translate(120 150) scale(1.7)"><rect x="0" y="0" width="120" height="120" rx="28" fill="#0F1A31"/><g transform="translate(-4 -4)"><path d="M30 104V58A34 34 0 0 1 98 58V104Z" fill="#FFF8ED"/>
-  <path d="M64 24V104M30 68H98" stroke="#14213D" stroke-width="4.5"/>
-  <path d="M64 68H98V104H64Z" fill="#E76F51"/></g></g>
-  <text x="360" y="268" fill="#FFFFFF" font-family="'DM Sans', Inter, Arial, sans-serif" font-size="128" font-weight="800" letter-spacing="-6">Class</text>
-  <text x="372" y="388" fill="#F4B942" font-family="Newsreader, Georgia, 'Times New Roman', serif" font-style="italic" font-size="128" letter-spacing="-3">Author</text>
-  <text x="124" y="530" fill="#C4CDDC" font-family="'DM Sans', Inter, Arial, sans-serif" font-size="30">Planejamento pedagógico, semana a semana · INOVALAB - IFSC</text>
+  <g transform="translate(70 90) scale(3.3)"><path d="M16 88V44A32 32 0 0 1 80 44V88Z" fill="#fff8ed"/><path d="M48 12V88M16 52H80" stroke="#14213D" stroke-width="3"/><path d="M48 52H80V88H48Z" fill="#e76f51"/><g transform="translate(52 44) rotate(35) scale(0.78)"><g fill="#14213D" stroke="#14213D" stroke-width="7" stroke-linejoin="round"><rect x="-7" y="-44" width="14" height="58" rx="5"/><path d="M-6.5 14H6.5L4.5 23H-4.5Z"/><path d="M-4.5 22C-10 30 -8 38 0 48C8 38 10 30 4.5 22Z"/></g><g stroke="#14213d" stroke-width="1.8" stroke-linejoin="round"><rect x="-7" y="-44" width="14" height="58" rx="5" fill="#f4b942"/><rect x="-7" y="-31" width="14" height="5" fill="#e76f51"/><path d="M-6.5 14H6.5L4.5 23H-4.5Z" fill="#14213d"/><path d="M-4.5 22C-10 30 -8 38 0 48C8 38 10 30 4.5 22Z" fill="#fff8ed"/></g><path d="M0 33.5V47" stroke="#14213d" stroke-width="2" stroke-linecap="round"/><circle cx="0" cy="31" r="2.4" fill="#14213d"/></g></g>
+  <text x="440" y="288" fill="#FFFFFF" font-family="'DM Sans', Inter, Arial, sans-serif" font-size="128" font-weight="800" letter-spacing="-6">Class</text>
+  <text x="452" y="408" fill="#F4B942" font-family="Newsreader, Georgia, 'Times New Roman', serif" font-style="italic" font-size="128" letter-spacing="-3">Author</text>
+  <text x="444" y="488" fill="#C4CDDC" font-family="'DM Sans', Inter, Arial, sans-serif" font-size="30">Planejamento pedagógico, semana a semana</text>
+  <text x="444" y="534" fill="#8F9BB3" font-family="'DM Mono', 'Courier New', monospace" font-size="22" letter-spacing="3">INOVALAB · IFSC</text>
 </svg>

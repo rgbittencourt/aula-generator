@@ -1,11 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
   <title>Marca do ClassAuthor</title>
-  <desc>Janela de ateliê em arco, com um vidro aceso: a semana em construção.</desc>
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14213D"/><stop offset="1" stop-color="#22375F"/></linearGradient>
-  </defs>
+  <desc>Janela de ateliê em arco, com o vidro aceso, e uma caneta-tinteiro por cima.</desc>
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14213D"/><stop offset="1" stop-color="#22375F"/></linearGradient></defs>
   <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#g)"/>
-  <path d="M30 104V58A34 34 0 0 1 98 58V104Z" fill="#FFF8ED"/>
-  <path d="M64 24V104M30 68H98" stroke="#14213D" stroke-width="4.5"/>
-  <path d="M64 68H98V104H64Z" fill="#E76F51"/>
+  <g transform="translate(17.07 17.07) scale(1.0667)"><path d="M16 88V44A32 32 0 0 1 80 44V88Z" fill="#fff8ed"/><path d="M48 12V88M16 52H80" stroke="#14213D" stroke-width="3"/><path d="M48 52H80V88H48Z" fill="#e76f51"/><g transform="translate(52 44) rotate(35) scale(0.78)"><g fill="#14213D" stroke="#14213D" stroke-width="7" stroke-linejoin="round"><rect x="-7" y="-44" width="14" height="58" rx="5"/><path d="M-6.5 14H6.5L4.5 23H-4.5Z"/><path d="M-4.5 22C-10 30 -8 38 0 48C8 38 10 30 4.5 22Z"/></g><g stroke="#14213d" stroke-width="1.8" stroke-linejoin="round"><rect x="-7" y="-44" width="14" height="58" rx="5" fill="#f4b942"/><rect x="-7" y="-31" width="14" height="5" fill="#e76f51"/><path d="M-6.5 14H6.5L4.5 23H-4.5Z" fill="#14213d"/><path d="M-4.5 22C-10 30 -8 38 0 48C8 38 10 30 4.5 22Z" fill="#fff8ed"/></g><path d="M0 33.5V47" stroke="#14213d" stroke-width="2" stroke-linecap="round"/><circle cx="0" cy="31" r="2.4" fill="#14213d"/></g></g>
 </svg>
