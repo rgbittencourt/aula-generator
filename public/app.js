@@ -2103,8 +2103,8 @@ function openInStudio(index) {
   const onMessage = (event) => {
     if (event.source !== win || event.origin !== STUDIO_ORIGIN || !event.data) return;
     if (event.data.type === "aulastudio:ready") { win.postMessage({ type: "classauthor:lesson", lesson: payload, fileName }, STUDIO_ORIGIN); return; }
-    if (event.data.type === "aulastudio:loaded") { finish(); showStudioToast(`Semana ${index + 1} aberta no ClassAtelier.`); }
-    else if (event.data.type === "aulastudio:declined") { finish(); showStudioToast("Você manteve o projeto que já estava aberto no editor."); }
+    if (event.data.type === "aulastudio:loaded") { finish(); showStudioToast(`Semana ${index + 1} aberta no ClassAtelier.${event.data.savedPrevious ? " A aula que estava aberta lá ficou na Biblioteca." : ""}`); }
+    else if (event.data.type === "aulastudio:declined") { finish(); showStudioToast("Você manteve a versão que já estava na Biblioteca do ClassAtelier."); }
     else if (event.data.type === "aulastudio:error") { finish(); showStudioToast(`O editor não conseguiu abrir a semana: ${event.data.message || "arquivo inválido"}. Baixe o JSON Studio e use "Abrir projeto".`); }
   };
   window.addEventListener("message", onMessage);
