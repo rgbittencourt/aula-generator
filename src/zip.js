@@ -15,7 +15,7 @@ export async function createWeeksZip(input, weeks, generalPlan = null, teacherGu
     const number = String(index + 1).padStart(2, "0");
     const slug = slugify(lesson.meta?.title || `${input.title}-semana-${number}`, `semana-${number}`);
     // Três arquivos por semana, com o destino no nome: o do Aula Studio (sem o quiz), o completo
-    // do Gerador de Aula (com quiz, feedbacks e guia do professor) e o quiz em Moodle XML.
+    // do ClassAteliê (com quiz, feedbacks e guia do professor) e o quiz em Moodle XML.
     folder.file(`semana-${number}-${slug}-studio.aula.json`, JSON.stringify(toStudentLesson(lesson), null, 2));
     zip.file(`gerador/semana-${number}-${slug}-gerador.json`, JSON.stringify(toGeneratorWeek(lesson, allGuides[index]), null, 2));
     const xml = createMoodleXml(lesson, { courseTitle: input.title, weekNumber: index + 1 });

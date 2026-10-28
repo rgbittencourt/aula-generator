@@ -1,6 +1,6 @@
 {
-  "name": "Gerador de Aulas",
-  "short_name": "Gerador de Aulas",
+  "name": "ClassAteliê",
+  "short_name": "ClassAteliê",
   "description": "Planejamento pedagógico e geração de aulas semanais.",
   "lang": "pt-BR",
   "start_url": "./",

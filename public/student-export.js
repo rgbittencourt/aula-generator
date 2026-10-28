@@ -2,8 +2,10 @@ const object = (value) => value && typeof value === "object" && !Array.isArray(v
 const text = (value, fallback = "") => String(value ?? "").trim() || fallback;
 
 // Crédito do aplicativo, presente nos arquivos gerados (meta do Aula Studio, PDF, Moodle XML, JSON do Gerador).
-export const GENERATOR_TOOL = "Gerador de Aulas (INOVALAB - IFSC)";
-export const GENERATOR_CREDIT = "Conteúdo gerado no Gerador de Aulas, desenvolvido por Rogério Bittencourt, INOVALAB - IFSC";
+export const APP_NAME = "ClassAteliê";
+export const GENERATOR_TOOL = `${APP_NAME} (INOVALAB - IFSC)`;
+export const GENERATOR_CREDIT = `Construído com ${APP_NAME}, uma ferramenta de autoria de aulas desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.`;
+const GENERATOR_CREDIT_HTML = `<p style="text-align:center;font-size:.85em;opacity:.8">Construído com <strong>${APP_NAME}</strong>, uma ferramenta de autoria de aulas desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.</p>`;
 
 const escapeHtml = (value) => text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -200,8 +202,14 @@ export function toStudentLesson(lesson = {}) {
       generatedBy: GENERATOR_CREDIT
     },
     lessonPlan: studentPlan(source.lessonPlan),
-    blocks: Array.isArray(source.blocks) ? source.blocks.map(sanitizeBlock).filter(Boolean) : []
+    blocks: [...(Array.isArray(source.blocks) ? source.blocks.map(sanitizeBlock).filter(Boolean) : []), creditBlock(meta.weekNumber)]
   };
+}
+
+// Rodapé de autoria no fim da aula, como "Construído com ...": o último bloco da aula do Aula Studio.
+function creditBlock(weekNumber) {
+  const week = Number(weekNumber || 0) || 0;
+  return { id: `b-credit-${String(week).padStart(2, "0")}`, type: "topic", bg: "neutral-default", pad: "normal", props: { children: [{ id: `c-credit-${String(week).padStart(2, "0")}`, type: "prose", props: { body: GENERATOR_CREDIT_HTML, dropcap: false } }] } };
 }
 
 export function toStudentLessons(lessons = []) {
@@ -209,7 +217,7 @@ export function toStudentLessons(lessons = []) {
 }
 
 /**
- * Versão completa da semana, para o Gerador de Aula (reimportar, revisar, arquivar):
+ * Versão completa da semana, para o ClassAteliê (reimportar, revisar, arquivar):
  * a aula inteira, com quiz, feedbacks, revisões, cálculo de tempo e o guia do professor.
  */
 export function toGeneratorWeek(lesson = {}, teacherGuide = null, extra = {}) {

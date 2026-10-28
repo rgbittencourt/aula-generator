@@ -78,7 +78,7 @@ test("crédito do Gerador de Aulas e autoria presentes no Studio, no Gerador, no
   const { GENERATOR_CREDIT } = await import("../src/student-export.js");
   const { createMoodleXml } = await import("../src/moodle-xml.js");
   const { toGeneratorWeek } = await import("../src/student-export.js");
-  assert.equal(GENERATOR_CREDIT, "Conteúdo gerado no Gerador de Aulas, desenvolvido por Rogério Bittencourt, INOVALAB - IFSC");
+  assert.equal(GENERATOR_CREDIT, "Construído com ClassAteliê, uma ferramenta de autoria de aulas desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.");
   const input = normalizeCourseInput({ title: "Curso crédito", weeks: 1, objectives: ["Aplicar"], author: "Prof. Fulana", institution: "IFSC" });
   const lesson = buildFallbackLesson(input, 0);
   const studio = toStudentLesson(lesson);
@@ -86,9 +86,13 @@ test("crédito do Gerador de Aulas e autoria presentes no Studio, no Gerador, no
   assert.equal(studio.meta.generatedBy, GENERATOR_CREDIT);
   assert.equal(studio.meta.author, "Prof. Fulana");
   assert.equal(toGeneratorWeek(lesson).credit, GENERATOR_CREDIT);
+  const last = studio.blocks[studio.blocks.length - 1];
+  assert.equal(last.type, "topic");
+  assert.match(last.props.children[0].props.body, /Construído com <strong>ClassAteliê<\/strong>, uma ferramenta de autoria de aulas/);
+  assert.equal(studio.blocks.filter((block) => /^b-credit-/.test(block.id)).length, 1);
   const xml = createMoodleXml(lesson, { courseTitle: "Curso crédito", weekNumber: 1 });
   if (xml) assert.ok(xml.includes(GENERATOR_CREDIT));
   const guides = buildTeacherGuides(input, [lesson], [{}]);
   const text = pdfText(await createMediationMaterialPdf(input, guides, null, {}));
-  if (text != null) { assert.match(text, /Autoria: Prof\. Fulana/); assert.match(text, /desenvolvido por Rogério Bittencourt, INOVALAB - IFSC/); }
+  if (text != null) { assert.match(text, /Autoria: Prof\. Fulana/); assert.match(text.replace(/\s+/g, " "), /Construído com ClassAteliê, uma ferramenta de autoria de aulas desenvolvida por Rogério Bittencourt, INOVALAB - IFSC\./); }
 });

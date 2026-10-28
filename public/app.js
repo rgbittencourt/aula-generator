@@ -717,7 +717,7 @@ function restoreBackupFile(file) {
   reader.onload = () => {
     try {
       const snapshot = JSON.parse(String(reader.result || ""));
-      if (snapshot?.version !== 2 || snapshot?.app !== "aula-generator" || !snapshot.form) throw new Error("Este arquivo não é um backup válido do Gerador de Aulas.");
+      if (snapshot?.version !== 2 || snapshot?.app !== "aula-generator" || !snapshot.form) throw new Error("Este arquivo não é um backup válido do ClassAteliê.");
       safeStorageSet(JSON.stringify(snapshot));
       restoreSnapshot(snapshot);
       enterWorkspace();
