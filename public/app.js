@@ -1471,26 +1471,43 @@ function closeLessonPreview() {
   state.previewIndex = null;
 }
 
+// Depois de uma alteração pontual, atualiza no checklist pedagógico só os itens desta semana
+// (a própria semana já traz a revisão recalculada), sem refazer o curso inteiro.
+function refreshChecklistFromWeek(index) {
+  const plan = state.generalPlan;
+  const checks = state.weeks?.[index]?.lessonPlan?.pedagogicalReview?.checks;
+  if (!plan || !Array.isArray(checks)) return;
+  const weekNumber = index + 1;
+  const others = (plan.pedagogicalChecklist || []).filter((item) => Number(item.weekNumber) !== weekNumber);
+  const fresh = checks.map((check) => ({ ...check, weekNumber }));
+  plan.pedagogicalChecklist = [...others, ...fresh].sort((a, b) => Number(a.weekNumber) - Number(b.weekNumber));
+  renderGeneralPlan(plan);
+}
+
 // Gera só a avaliação, as atividades e a mediação de uma semana cujo texto já está salvo.
-async function retryDerivatives(index) {
+async function retryDerivatives(index, options = {}) {
   if (aiActionBusy) return;
-  const button = $("#retry-derivatives-button");
+  const parts = Array.isArray(options.parts) && options.parts.length ? options.parts : null;
+  const button = options.button || $("#retry-derivatives-button");
   if (!beginAiAction(button)) return;
   setBusy(button, true, "Gerando…");
-  setAiActivity("Questões e mediação", `Gerando as questões (com feedback por alternativa), as atividades e as mensagens da semana ${index + 1} a partir do texto salvo…`);
+  const partsText = parts ? parts.map((part) => PARTS_LABEL[part] || part).join(" e ") : "as questões (com feedback por alternativa), as atividades e as mensagens";
+  setAiActivity("Questões e mediação", `Gerando de novo ${partsText} da semana ${index + 1} a partir do texto salvo; o texto não é alterado…`);
   try {
     const input = formInput();
     const accessCode = input.accessCode || $("#access-code")?.value || "";
     delete input.accessCode;
     const headers = { "Content-Type": "application/json" };
     if (accessCode) headers["x-aula-access-code"] = accessCode;
-    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input, weekIndex: index, week: state.weeks[index], teacherGuide: state.teacherGuides[index] }) });
-    const done = await readApiResponse(response, `Não foi possível gerar as questões da semana ${index + 1}.`);
+    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input, weekIndex: index, week: state.weeks[index], teacherGuide: state.teacherGuides[index], ...(parts ? { parts } : {}) }) });
+    const done = await readApiResponse(response, `Não foi possível gerar ${partsText} da semana ${index + 1}.`);
     state.weeks[index] = done.week;
     state.teacherGuides[index] = done.teacherGuide || state.teacherGuides[index];
     saveDraft("derivados-gerados");
-    openLessonPreview(index);
-    finishAiActivity("Questões geradas", `A semana ${index + 1} agora tem questões, atividades e mediação. Revise e aprove.`, "success");
+    refreshChecklistFromWeek(index);
+    if (parts) renderWeeks({ input: state.input, weeks: state.weeks, workload: state.workload, generalPlan: state.generalPlan, teacherGuides: state.teacherGuides, provider: state.provider, validation: state.validation }, { scrollToResults: false });
+    else openLessonPreview(index);
+    finishAiActivity("Gerado", parts ? `Foram geradas de novo ${partsText} da semana ${index + 1}; o texto ficou como estava. Confira na prévia.` : `A semana ${index + 1} agora tem questões, atividades e mediação. Revise e aprove.`, "success");
   } catch (error) {
     finishAiActivity("Questões não geradas", error.message, "error");
     const note = $("#regenerate-note");
@@ -1522,6 +1539,7 @@ async function applyTargetedEdit(index, instruction, scope) {
     const done = await readApiResponse(response, "Não foi possível alterar a semana.");
     state.weeks[index] = done.week;
     saveDraft("semana-alterada");
+    refreshChecklistFromWeek(index);
     renderWeeks({ input: state.input, weeks: state.weeks, workload: state.workload, generalPlan: state.generalPlan, teacherGuides: state.teacherGuides, provider: state.provider, validation: state.validation }, { scrollToResults: false });
     openLessonPreview(index);
     const skipped = done.skipped?.length ? ` (${done.skipped.length} alteração(ões) não aplicada(s) por apontarem para um trecho que não existe)` : "";
@@ -1707,49 +1725,76 @@ function reviewCheckChecked(item = {}, reviewMarks = state.reviewMarks || create
   return reviewMarkChecked("checks", item, reviewMarks);
 }
 
+// Cada item do checklist tem a sua própria ação, restrita ao que ele aponta:
+//   scope "title" | "edit"  -> alteração pontual do texto (o resto da semana não é tocado)
+//   scope "derivatives"     -> gera de novo só a(s) parte(s) indicada(s): questões, atividades, mediação
+//   scope "full"            -> reescrita da semana (só quando o próprio item exige texto novo em grande parte)
+//   scope "manual"          -> conferência humana; não há o que a IA refazer sozinha
+const REVIEW_LIMITS_EDIT = "Altere SOMENTE o que este item exige. Preserve todo o resto da semana: título, objetivos, seções, recursos, figuras, questões e atividades que não estejam envolvidos. Não reordene nem reescreva por estilo. Não invente autores, dados, referências, DOI ou URLs; onde faltar base, marque como “a conferir”.";
+const PARTS_LABEL = { assessment: "as questões", activities: "o diagnóstico, as paradas e as atividades", mediation: "o Material de Mediação", webpractice: "a webprática" };
+
+function reviewActionFor(kind, item, lesson) {
+  const id = String(item.id || "");
+  const sections = lesson?.lessonPlan?.contentSections || [];
+  const detail = item.detail || item.status || "";
+  const scheduledPractice = (state.generalPlan?.webPracticeSchedule || []).some((practice) => Number(practice.weekNumber) === Number(item.weekNumber));
+  const pedagogical = {
+    "title-present": { scope: "edit", title: "Como verificar título e abertura", checks: ["O título nomeia o problema, o conceito ou o caso central da semana (e não só o assunto geral).", "A abertura contextualiza a semana e retoma a anterior em um ou dois parágrafos."], ask: "Verifique o título e a abertura (boas-vindas). Se o título for genérico, troque por um específico, que nomeie o problema, o conceito ou o caso central da semana, sem “Semana N” e com até 90 caracteres. Se a abertura estiver ausente ou genérica, escreva-a em um ou dois parágrafos que contextualizem a semana e retomem a anterior. Mude só o título e a abertura.", accept: "Título específico e abertura contextualizada; nenhuma outra parte alterada." },
+    "objective-present": { scope: "edit", title: "Como verificar os objetivos", checks: ["Há de 4 a 6 objetivos, cada um com verbo observável (comparar, aplicar, justificar…).", "Cada objetivo é coberto por pelo menos uma seção do texto."], ask: "Reescreva SOMENTE a lista de objetivos de aprendizagem: de 4 a 6 objetivos observáveis (verbo mensurável + objeto + contexto), cada um coberto por uma seção do texto atual. Não altere o texto das seções.", accept: "Lista de objetivos observáveis, coerente com as seções existentes." },
+    "content-present": { scope: sections.length < 5 ? "full" : "edit", title: "Como verificar o desenvolvimento do conteúdo", checks: ["Há pelo menos 5 seções e quatro delas com desenvolvimento real (conceito, exemplo, aplicação).", "Nenhuma seção é só uma introdução de duas linhas."], ask: sections.length < 5 ? "O texto tem menos de 5 seções. Acrescente as seções que faltam para cobrir os objetivos, mantendo as existentes exatamente como estão." : "Desenvolva SOMENTE as seções curtas (menos de 120 caracteres de corpo), inserindo parágrafos de aprofundamento: o conceito, um exemplo concreto e, se couber, um contraponto. Não mexa nas seções que já estão desenvolvidas.", accept: "Todas as seções com desenvolvimento real; as já boas permanecem iguais." },
+    "alignment-complete": { scope: "derivatives", parts: ["assessment", "activities"], title: "Como verificar o alinhamento", checks: ["Cada objetivo aparece no texto, em uma atividade com evidência e em pelo menos uma questão."], ask: "Gerar de novo apenas as questões e as atividades, de modo que cada objetivo tenha conteúdo, atividade, evidência e questão relacionados.", accept: "Matriz de alinhamento completa; o texto da semana não é tocado." },
+    "activity-present": { scope: "derivatives", parts: ["activities"], title: "Como verificar as atividades", checks: ["Existe ao menos uma atividade ativa ou produto observável, com critérios."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "Pelo menos uma atividade com evidência e critérios." },
+    "diagnostic-present": { scope: "derivatives", parts: ["activities"], title: "Como verificar o diagnóstico", checks: ["Há uma pergunta de entrada ligada ao dia a dia do estudante, ou a ausência está justificada."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "Diagnóstico de entrada presente." },
+    "formative-present": { scope: "derivatives", parts: ["activities"], title: "Como verificar as paradas formativas", checks: ["Há de 2 a 4 checagens ao longo das seções, cada uma com o que fazer se o estudante errar."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "De 2 a 4 paradas formativas com ação de correção." },
+    "summative-alignment": { scope: "derivatives", parts: ["assessment"], title: "Como verificar a avaliação final", checks: ["As 6 questões cobrem todos os objetivos, têm 5 alternativas e feedback em todas.", "A explicação da correta cita o texto da semana."], ask: "Gerar de novo apenas as questões da atividade avaliativa (6 questões, 5 alternativas, feedback em todas).", accept: "Questões alinhadas aos objetivos, com feedback por alternativa." },
+    "practice-complete": { scope: "derivatives", parts: [scheduledPractice ? "webpractice" : "mediation"], title: "Como verificar a webprática", checks: ["A webprática tem produto, etapas, critérios e plano B."], ask: scheduledPractice ? "Gerar de novo apenas o projeto da webprática (produto, etapas, critérios e plano B)." : "Gerar de novo apenas o Material de Mediação.", accept: "Webprática com produto, etapas, critérios e plano B." },
+    "self-assessment": { scope: "derivatives", parts: ["activities"], title: "Como verificar a autoavaliação", checks: ["O estudante recebe perguntas de autoavaliação com escala, ou uma reflexão final."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "Autoavaliação presente." },
+    "resource-context": { scope: "manual", title: "Como verificar a função dos recursos", checks: ["Em cada recurso “Veja mais aqui”, o parágrafo diz o que observar e por que vale abrir.", "Se faltar, edite o recurso na prévia da semana (é um campo do recurso, não do texto)."] },
+    accessibility: { scope: "manual", title: "Como verificar a acessibilidade", checks: ["Imagens têm texto alternativo e crédito; vídeos têm legenda ou transcrição.", "É conferência humana antes de publicar."] },
+    differentiation: { scope: "manual", title: "Como verificar as trilhas", checks: ["Há trilha essencial, padrão e de aprofundamento.", "É conferência humana; as trilhas não são geradas pelo texto."] }
+  };
+  if (kind === "checks" && pedagogical[id]) return pedagogical[id];
+  if (kind === "academic") {
+    if (id.startsWith("academic-issue")) return { scope: "edit", title: "Como verificar esta pendência acadêmica", checks: ["Localize o trecho citado e confirme se a pendência procede.", "Confirme que a correção não introduziu fato, número ou fonte novos sem base."], ask: `Corrija SOMENTE esta pendência: “${item.label || ""}”. ${detail}. Altere apenas as frases envolvidas.`, accept: "A pendência deixa de existir; o resto do texto igual." };
+    return { scope: "edit", title: "Como verificar o rigor acadêmico", checks: ["Identifique as afirmações centrais e confirme se cada uma tem fonte adequada e verificável.", "Confira autores, datas, números e generalizações; onde faltar base, qualifique a frase."], ask: "Revise SOMENTE as afirmações centrais que a revisão acadêmica sinalizou: onde faltar base, qualifique a frase (“segundo…”, “em geral…”) ou retire a precisão indevida. Não invente fonte, número nem caso; não mexa no restante.", accept: "Afirmações sem base qualificadas ou retiradas; o restante inalterado." };
+  }
+  if (kind === "resources") return { scope: "manual", title: "Como verificar este recurso", checks: ["Abra o link e confirme que funciona, corresponde ao título e é adequado ao público.", "Confira duração/páginas, classificação obrigatória ou complementar, idioma e atualidade.", "Confirme legenda, transcrição, crédito e licença antes de publicar."] };
+  if (kind === "quality") {
+    const insufficient = /insuficiente/i.test(detail);
+    return { scope: insufficient ? "full" : "edit", title: "Como verificar qualidade e liberação", checks: ["Leia a semana e confirme se cada pendência listada procede.", "Só libere depois de resolver as pendências críticas."], ask: insufficient ? `O conteúdo está insuficiente (${detail}). Amplie e aprofunde o texto, mantendo o que já está bom.` : `Resolva SOMENTE as pendências apontadas: ${detail || "as indicadas no diagnóstico"}.`, accept: "Pendências apontadas resolvidas; o resto igual." };
+  }
+  return { scope: "edit", title: "Como verificar este item", checks: ["Leia a semana e identifique o ponto exato ligado ao item."], ask: `Resolva SOMENTE o que este item aponta: ${detail || item.label || "item sinalizado"}.`, accept: "Item resolvido; o restante inalterado." };
+}
+
 function reviewGuidanceFor(kind, item = {}) {
   const weekNumber = Number(item.weekNumber) || 0;
   const lesson = weekNumber ? state.weeks?.[weekNumber - 1] : null;
   const theme = lesson?.lessonPlan?.theme || lesson?.meta?.title || "tema da semana";
   const courseTitle = state.input?.title || state.generalPlan?.title || "curso";
   const target = weekNumber ? `Semana ${weekNumber} — ${theme}` : "a semana correspondente ao item";
-  const issue = item.detail || item.status || "item sinalizado para conferência";
-  const guidance = {
-    checks: {
-      title: "Como verificar a dimensão pedagógica",
-      checks: ["Confira se a semana tem título específico, abertura contextualizada e objetivos observáveis.", "Verifique se cada objetivo aparece no conteúdo, em uma atividade ou evidência e na avaliação correspondente.", "Confirme que há desenvolvimento conceitual suficiente, exemplo ou aplicação, síntese e conexão com a próxima etapa quando fizer sentido.", "Confira diferenciação, acessibilidade, autoavaliação e webprática independente quando prevista."],
-      focus: "Corrigir a unidade didática e o alinhamento entre objetivo, conteúdo, atividade, evidência e avaliação."
-    },
-    academic: {
-      title: "Como verificar o rigor acadêmico",
-      checks: ["Identifique as afirmações centrais e confirme se cada uma tem fonte adequada, atual e verificável.", "Confira precisão conceitual, autores, datas, conceitos próximos, limites, controvérsias e contrapontos.", "Verifique se exemplos e dados estão contextualizados e se não há generalizações, citações inventadas ou referências sem suporte.", "Confirme que o nível de aprofundamento é compatível com o público e que a argumentação não é apenas descritiva."],
-      focus: "Reescrever o conteúdo com rigor, evidências e análise crítica, preservando somente referências verificáveis."
-    },
-    resources: {
-      title: "Como verificar recursos e acessibilidade",
-      checks: ["Abra o link e confirme que ele funciona, corresponde ao título e é adequado ao público.", "Verifique se o recurso está inserido no ponto correto do texto e se o parágrafo de ligação explica o que observar.", "Confira duração do vídeo, páginas ou palavras da leitura, classificação obrigatória/complementar, idioma e atualidade.", "Confirme texto alternativo, legenda, transcrição, crédito, licença e acessibilidade antes de publicar."],
-      focus: "Corrigir ou substituir o recurso e reescrever a ligação pedagógica no trecho exato em que ele será usado."
-    },
-    quality: {
-      title: "Como verificar qualidade e liberação",
-      checks: ["Confira a quantidade de palavras úteis, número de seções, objetivos, síntese, avaliação e completude da unidade.", "Leia a semana integralmente e identifique trechos genéricos, repetidos, curtos, desconectados ou sem aprofundamento.", "Verifique a coerência entre conteúdo, recursos, atividades, evidências, avaliação e carga calculada.", "Só libere depois de resolver pendências críticas e confirmar que a versão pode ser usada no Aula Studio."],
-      focus: "Corrigir as pendências que impedem a liberação e devolver uma semana completa, substancial e pronta para revisão humana."
-    }
-  }[kind] || {
-    title: "Como verificar este item",
-    checks: ["Leia a semana completa e identifique o ponto exato relacionado ao item.", "Confirme coerência, completude, acessibilidade e possibilidade de revisão humana."],
-    focus: "Corrigir o item sinalizado sem alterar as demais semanas."
-  };
-  const prompt = [`Atue como um(a) professor(a) especialista em planejamento pedagógico e revisão acadêmica.`, `Curso: ${courseTitle}.`, `Alvo: ${target}.`, `Item do checklist: ${item.label || item.title || "item de revisão"}.`, `Diagnóstico atual: ${issue}.`, ``, `Objetivo da refação: ${guidance.focus}`, ``, `Faça obrigatoriamente:`, ...guidance.checks.map((check) => `- ${check}`), ``, `Critérios de aceite:`, `- Entregue uma unidade didática completa, com título, abertura, objetivos observáveis, conteúdo desenvolvido, aplicação/atividade, avaliação, síntese e ligação com o percurso.`, `- Mantenha os recursos dentro do ponto exato do texto e escreva a ligação pedagógica correspondente.`, `- Não invente autores, dados, referências, DOI ou URLs; sinalize o que depender de conferência humana.`, `- Preserve as semanas que não são o alvo e não transforme webprática em texto-base ou conteúdo do JSON do aluno.`, `- Recalcule a carga da semana depois da reescrita, separando texto-base, leituras, vídeos, interativos e atividades.`, ``, `Retorne somente a Semana ${weekNumber || "afetada"} completa, pronta para nova revisão humana.`].join("\n");
-  return { ...guidance, prompt, weekNumber };
+  const issue = item.detail || item.status || (item.pass ? "atendido pela análise automática, mas marcado por você para refazer" : "não atendido na análise automática");
+  const action = reviewActionFor(kind, item, lesson);
+  const limits = action.scope === "full" ? "Mantenha o que já está bom e não altere as outras semanas. Não invente autores, dados, referências, DOI ou URLs; onde faltar base, marque como “a conferir”." : REVIEW_LIMITS_EDIT;
+  const prompt = action.scope === "manual" || action.scope === "derivatives" ? "" : [`Curso: ${courseTitle}.`, `Alvo: ${target}.`, `Item do checklist: ${String(item.label || item.title || "item de revisão").replace(/[.\s]+$/, "")}.`, `Diagnóstico atual: ${String(issue).replace(/[.\s]+$/, "")}.`, ``, `O que fazer: ${action.ask}`, ``, `Limites: ${limits}`, ``, `Critério de aceite: ${action.accept}`].join("\n");
+  const scopeNote = { title: "Aplica só ao título.", edit: "Modo “Ajuste pontual”: só os trechos envolvidos mudam.", full: "Este item exige reescrever boa parte do texto; o prompt pede que se mantenha o que já está bom.", derivatives: "Gera de novo só a parte indicada; o texto da semana não é tocado.", manual: "Conferência humana: não há o que a IA refazer sozinha." }[action.scope] || "";
+  return { ...action, focus: action.ask, prompt, weekNumber, scopeNote };
 }
 
 function reviewGuidanceMarkup(kind, item, key, active) {
   if (!active) return "";
   const guidance = reviewGuidanceFor(kind, item);
   const promptAttribute = escapeHtml(guidance.prompt);
-  const refitButton = guidance.weekNumber ? `<button class="button button-secondary review-use-prompt" type="button" data-review-week="${guidance.weekNumber}" data-review-prompt="${promptAttribute}">Abrir refação da semana</button>` : "";
-  return `<div class="review-guidance"><div class="review-guidance-header"><strong>${escapeHtml(guidance.title)}</strong><div class="review-guidance-actions"><button class="button button-secondary review-copy-prompt" type="button" data-review-prompt="${promptAttribute}">Copiar prompt</button>${refitButton}</div></div><ul>${guidance.checks.map((check) => `<li>${escapeHtml(check)}</li>`).join("")}</ul><label class="review-prompt-field"><span>Prompt estruturado para solicitar a refação</span><textarea readonly rows="10">${escapeHtml(guidance.prompt)}</textarea></label><small class="review-guidance-note">O prompt usa a semana selecionada como alvo. Revise a nova resposta antes de liberá-la para o Aula Studio.</small></div>`;
+  let buttons = "";
+  if (guidance.scope === "derivatives" && guidance.weekNumber) {
+    const names = guidance.parts.map((part) => PARTS_LABEL[part]).join(" e ");
+    buttons = `<button class="button button-secondary review-regenerate-parts" type="button" data-review-week="${guidance.weekNumber}" data-review-parts="${escapeHtml(guidance.parts.join(","))}">Gerar de novo só ${escapeHtml(names)}</button>`;
+  } else if (guidance.prompt) {
+    const open = guidance.weekNumber ? `<button class="button button-secondary review-use-prompt" type="button" data-review-week="${guidance.weekNumber}" data-review-scope="${escapeHtml(guidance.scope)}" data-review-prompt="${promptAttribute}">Abrir alteração da semana</button>` : "";
+    buttons = `<button class="button button-secondary review-copy-prompt" type="button" data-review-prompt="${promptAttribute}">Copiar prompt</button>${open}`;
+  }
+  const promptField = guidance.prompt ? `<label class="review-prompt-field"><span>Prompt para solicitar só esta correção</span><textarea readonly rows="9">${escapeHtml(guidance.prompt)}</textarea></label>` : "";
+  const derivativesAsk = guidance.scope === "derivatives" ? `<p class="review-guidance-ask">${escapeHtml(guidance.ask)}</p>` : "";
+  return `<div class="review-guidance"><div class="review-guidance-header"><strong>${escapeHtml(guidance.title)}</strong><div class="review-guidance-actions">${buttons}</div></div><ul>${guidance.checks.map((check) => `<li>${escapeHtml(check)}</li>`).join("")}</ul>${derivativesAsk}${promptField}<small class="review-guidance-note">${escapeHtml(guidance.scopeNote)} Revise a nova resposta antes de liberar a semana.</small></div>`;
 }
 
 function reviewRowsMarkup(kind, items, reviewMarks) {
@@ -1820,16 +1865,17 @@ async function copyReviewPrompt(prompt, button) {
   window.setTimeout(() => { button.textContent = original; }, 1800);
 }
 
-function useReviewPrompt(weekNumber, prompt) {
+function useReviewPrompt(weekNumber, prompt, scopeName = "edit") {
   const index = Number(weekNumber) - 1;
   if (!Number.isInteger(index) || !state.weeks?.[index]) return;
   openLessonPreview(index);
   const field = $("#week-revision");
   if (field) field.value = prompt;
   const scope = $("#week-revision-scope");
-  if (scope) scope.value = "edit";
+  if (scope) scope.value = ["title", "edit", "full"].includes(scopeName) ? scopeName : "edit";
+  const modeLabel = { title: "“Só o título da semana”", edit: "“Ajuste pontual” (mantém o resto da semana)", full: "“Refazer a semana inteira”" }[scope?.value] || "“Ajuste pontual”";
   const note = $("#regenerate-note");
-  if (note) note.textContent = "Prompt estruturado carregado no modo “Ajuste pontual” (mantém o resto da semana). Revise-o e clique em Aplicar alteração com IA; se a mudança exigir reescrever tudo, troque para “Refazer a semana inteira”.";
+  if (note) note.textContent = `Prompt carregado no modo ${modeLabel}. Revise-o e clique em Aplicar alteração com IA.`;
   field?.focus({ preventScroll: true });
 }
 
@@ -1918,7 +1964,8 @@ function renderGeneralPlan(plan) {
     copy.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") openGuidance(event); });
   });
   container.querySelectorAll(".review-copy-prompt").forEach((button) => button.addEventListener("click", () => copyReviewPrompt(button.dataset.reviewPrompt || "", button)));
-  container.querySelectorAll(".review-use-prompt").forEach((button) => button.addEventListener("click", () => useReviewPrompt(button.dataset.reviewWeek, button.dataset.reviewPrompt || "")));
+  container.querySelectorAll(".review-use-prompt").forEach((button) => button.addEventListener("click", () => useReviewPrompt(button.dataset.reviewWeek, button.dataset.reviewPrompt || "", button.dataset.reviewScope || "edit")));
+  container.querySelectorAll(".review-regenerate-parts").forEach((button) => button.addEventListener("click", () => retryDerivatives(Number(button.dataset.reviewWeek) - 1, { parts: String(button.dataset.reviewParts || "").split(",").filter(Boolean), button })));
   container.querySelectorAll(".webpractice-download").forEach((button) => button.addEventListener("click", () => downloadWebPractice(button.dataset.practiceId)));
   container.classList.remove("hidden");
 }

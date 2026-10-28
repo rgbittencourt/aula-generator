@@ -41,16 +41,19 @@ export function markdownToHtml(markdown) {
 function buildMap(plan) {
   const areas = []; // { key, label, get(), set(blocks) }
   const addArea = (key, label, html, assign) => areas.push({ key, label, parts: splitBlocks(html), assign });
-  if (plan.welcome) addArea("welcome", "Boas-vindas", plan.welcome, (html) => { plan.welcome = html; });
+  // Boas-vindas, síntese e ponte entram mesmo vazias (com um bloco-guia "(vazio)"), para a IA poder escrevê-las.
+  addArea("welcome", "Boas-vindas", plan.welcome, (html) => { plan.welcome = html; });
   list(plan.contentSections).forEach((section) => {
     addArea(`${section.number}`, `Seção ${section.number} — ${text(section.title)}`, section.body, (html) => { section.body = html; });
     list(section.subsections).forEach((sub) => addArea(`${sub.number}`, `Subseção ${sub.number} — ${text(sub.title)}`, sub.body, (html) => { sub.body = html; }));
   });
-  if (plan.synthesis) addArea("synthesis", "Síntese", plan.synthesis, (html) => { plan.synthesis = html; });
-  if (plan.nextWeekConnection) addArea("next", "Ligação com a próxima semana", plan.nextWeekConnection, (html) => { plan.nextWeekConnection = html; });
+  addArea("synthesis", "Síntese", plan.synthesis, (html) => { plan.synthesis = html; });
+  addArea("next", "Ligação com a próxima semana", plan.nextWeekConnection, (html) => { plan.nextWeekConnection = html; });
   const index = new Map();
-  let prompt = "";
+  let prompt = `Objetivos de aprendizagem atuais: ${list(plan.learningObjectives).map((item) => `“${text(item)}”`).join(" · ") || "(nenhum)"}\n`;
   areas.forEach((area) => {
+    // Área sem nenhum bloco (ex.: síntese ainda não escrita): cria um bloco vazio que pode ser substituído.
+    if (!area.parts.some((part) => part.editable)) area.parts.push({ html: "", editable: true, placeholder: true });
     prompt += `\n### ${area.label}\n`;
     let n = 0;
     area.parts.forEach((part) => {
@@ -58,7 +61,7 @@ function buildMap(plan) {
       n += 1;
       part.id = `${area.key}:p${n}`;
       index.set(part.id, { area, part });
-      prompt += `[${part.id}] ${htmlToMarkdown(part.html).replace(/\n{2,}/g, "\n")}\n`;
+      prompt += `[${part.id}] ${part.placeholder ? "(vazio)" : htmlToMarkdown(part.html).replace(/\n{2,}/g, "\n")}\n`;
     });
   });
   return { areas, index, prompt };
@@ -67,6 +70,7 @@ function buildMap(plan) {
 const INSTRUCTION_FORMAT = `Devolva este JSON (listas vazias quando não houver o que mudar):
 {
   "title": null,
+  "objectives": null,
   "sectionTitles": [{"number": "3", "title": "novo título da seção"}],
   "changes": [
     {"id": "3:p2", "action": "replace", "markdown": "novo texto do bloco (Markdown simples: parágrafo, lista ou tabela)"},
@@ -75,7 +79,7 @@ const INSTRUCTION_FORMAT = `Devolva este JSON (listas vazias quando não houver 
   ],
   "summary": "uma frase dizendo o que foi alterado"
 }
-Regras: use apenas ids que existem no texto; ao substituir, mantenha negritos e links do bloco que não precisam mudar; não escreva títulos (#) nem callouts (> 🔎, > 💭 ...) nos blocos; em "title", devolva o novo título da semana somente se o professor pediu para mudá-lo (caso contrário, null).`;
+Regras: use apenas ids que existem no texto; ao substituir, mantenha negritos e links do bloco que não precisam mudar; não escreva títulos (#) nem callouts (> 🔎, > 💭 ...) nos blocos; em "title", devolva o novo título da semana somente se o professor pediu para mudá-lo (caso contrário, null); em "objectives", devolva a lista completa dos novos objetivos de aprendizagem somente se o pedido for sobre os objetivos (caso contrário, null); blocos marcados “(vazio)” podem ser preenchidos com "replace".`;
 
 function titleContext(plan, ctx) {
   const sections = list(plan.contentSections).map((section) => `${text(section.number)}. ${text(section.title)}`).join(" | ");
@@ -157,6 +161,8 @@ export async function editWeek(input, index, week, instruction, scope = "edit", 
       if (section && text(item.title)) { section.title = text(item.title); applied += 1; }
     });
     title = text(result.title).replace(/^semana\s*\d+\s*[—–:.-]\s*/i, "").slice(0, 120);
+    const objectives = list(result.objectives).map((item) => text(item)).filter(Boolean);
+    if (objectives.length >= 2) { plan.learningObjectives = objectives; applied += 1; }
     if (!applied && !title) {
       const error = new Error("A IA não encontrou o que alterar com esse pedido. Descreva o trecho ou a seção e tente de novo.");
       error.code = "EDIT_NO_RESULT";

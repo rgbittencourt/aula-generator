@@ -526,3 +526,21 @@ test("derivados: com webprática agendada o projeto sai numa chamada própria (4
     assert.ok(result.teacherGuide.mediationMessages, "mediação preservada ao lado do projeto");
   });
 });
+
+test("derivados por parte: só a parte pedida é gerada e o restante da semana permanece", async () => {
+  const course = normalizeCourseInput({ title: "Tecnologias para Gestão Educacional", weeks: 3, hoursPerWeek: 10, audience: "Servidores", level: "pós-graduação", objectives: ["Compreender sistemas"] });
+  const plan = parseWeekMarkdown(MARKDOWN, { weekNumber: 2 }).lessonPlan;
+  const week = normalizeLesson({ lessonPlan: { ...plan, activities: [{ type: "fórum", title: "Fórum antigo", instructions: "Já aprovado.", durationMinutes: 30, evidence: "Post", required: true }] } }, course, 1);
+  await withFetch((body) => {
+    const user = body.messages.filter((message) => message.role === "user").map((message) => message.content).join("\n");
+    if (/REGRAS DA AVALIAÇÃO/.test(user)) return reply(JSON.stringify({ assessment: DERIVATIVES.assessment }));
+    throw new Error("chamada fora da parte pedida");
+  }, async (calls) => {
+    const { completeWeekDerivatives } = await import("../src/claude-writer.js");
+    const result = await completeWeekDerivatives(course, 1, week, { resourceNotes: ["mantida"] }, { parts: ["assessment"] });
+    assert.equal(calls.length, 1);
+    assert.ok(result.week.lessonPlan.assessment.questions.length >= 1);
+    assert.equal(result.week.lessonPlan.activities[0].title, "Fórum antigo");
+    assert.deepEqual(result.teacherGuide.resourceNotes, ["mantida"]);
+  });
+});

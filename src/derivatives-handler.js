@@ -14,7 +14,7 @@ export default async function derivativesHandler(request, response) {
   try {
     const input = normalizeCourseInput(request.body?.input || {});
     const index = Math.max(0, Math.min(input.weeks - 1, Number.parseInt(request.body?.weekIndex, 10) || 0));
-    const result = await completeWeekDerivatives(input, index, request.body?.week, request.body?.teacherGuide);
+    const result = await completeWeekDerivatives(input, index, request.body?.week, request.body?.teacherGuide, { parts: Array.isArray(request.body?.parts) ? request.body.parts : null });
     const teacherGuide = buildTeacherGuides(input, [result.week], [result.teacherGuide])[0];
     return response.status(200).json({ ok: true, provider: "ai-derivatives", aiProvider: getAIProvider(), model: getAIModel(), weekIndex: index, week: result.week, teacherGuide, generation: result.generation });
   } catch (error) {

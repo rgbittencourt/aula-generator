@@ -210,6 +210,8 @@ Se você refizer uma semana já escrita, o sistema compara a ponte nova com a an
 
 Na prévia, o seletor **O que alterar** oferece três modos: *Só o título da semana*; *Ajuste pontual no texto* (padrão: a IA devolve só os blocos a trocar, apagar ou inserir e eles são aplicados por cima do texto, preservando questões, recursos, figuras, glossário, referências e mediação); e *Refazer a semana inteira* (reescreve tudo, como antes). Os dois primeiros rodam em `/api/regenerate-week` com `action: "edit"` (`src/week-edit.js`).
 
+Os **checklists** seguem a mesma regra: cada item tem uma ação restrita ao que aponta — prompt específico no modo pontual (título, objetivos, pendência acadêmica…), botão que gera de novo só a parte indicada (questões, atividades/paradas ou mediação, via `parts` em `/api/derivatives`) ou conferência manual (acessibilidade, recursos). Nenhum item pede mais a “semana completa”.
+
 ### Como a ordem funciona
 
 Não existe uma sequência rígida para todas as semanas. A IA escolhe um arco adequado — descoberta conceitual, caso, oficina, análise de dados, debate ou síntese — e registra quais fases estão ativas: abertura, diagnóstico, explicação, exemplo, prática guiada, prática independente, reflexão, avaliação e síntese. Quando uma fase é omitida, a omissão recebe justificativa. Vídeos, imagens e leituras entram dentro do tópico/conceito que os torna úteis; não são despejados em uma galeria final.

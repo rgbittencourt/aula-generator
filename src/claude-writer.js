@@ -296,7 +296,7 @@ ${rules.join("\n\n")}${rules.length ? "\n\n" : ""}Responda somente JSON válido.
 // somam mais saída do que cabe em uma só resposta. São duas chamadas em paralelo,
 // cada uma com o seu limite de saída; se uma falha, a outra não se perde na repetição
 // (o erro é da etapa inteira e a repetição refaz as duas).
-async function buildDerivatives(input, index, plan) {
+async function buildDerivatives(input, index, plan, only = null) {
   const scheduled = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index));
   const names = { assessment: "assessment", activities: "diagnostic, formativeChecks, activities, selfAssessment", mediation: "teacherGuide", webpractice: "teacherGuide.webPracticeProjects" };
   const call = (part, maxTokens) => callJson([
@@ -312,12 +312,15 @@ async function buildDerivatives(input, index, plan) {
   });
   try {
     // allSettled: não deixa uma chamada solta rodando (e gastando tokens) depois que a outra falhou.
-    const calls = [call("assessment", 12000), call("activities", 9000), call("mediation", 12000)];
-    if (scheduled.length) calls.push(call("webpractice", 12000));
-    const results = await Promise.allSettled(calls);
+    // `only` limita a regeneração a partes (ex.: ["assessment"]) quando o professor quer
+    // consertar um item específico sem refazer o que já conferiu.
+    const wanted = (part) => !Array.isArray(only) || only.includes(part);
+    const plannedParts = [["assessment", 12000], ["activities", 9000], ["mediation", 12000], ...(scheduled.length ? [["webpractice", 12000]] : [])].filter(([part]) => wanted(part));
+    const results = await Promise.allSettled(plannedParts.map(([part, tokens]) => call(part, tokens)));
     const failed = results.find((result) => result.status === "rejected");
     if (failed) throw failed.reason;
-    const [assessment, activities, mediation, webpractice] = results.map((result) => result.value);
+    const byPart = Object.fromEntries(plannedParts.map(([part], position) => [part, results[position].value]));
+    const { assessment, activities, mediation, webpractice } = byPart;
     const object = (value) => (value && typeof value === "object" ? value : {});
     const teacherGuide = { ...object(object(mediation).teacherGuide), ...(object(object(webpractice).teacherGuide).webPracticeProjects ? { webPracticeProjects: webpractice.teacherGuide.webPracticeProjects } : {}) };
     const data = { ...object(activities), ...(Object.keys(teacherGuide).length ? { teacherGuide } : {}), ...(object(assessment).assessment ? { assessment: assessment.assessment } : {}) };
@@ -417,14 +420,17 @@ export async function regenerateWeekProse(input, index, currentWeek, instruction
 // Segunda etapa do modo de prosa: avaliação, atividades e Material de Mediação a
 // partir do texto que o professor já tem. Recebe a semana normalizada (lessonPlan)
 // e devolve a semana reconstruída, o guia do professor e o novo estado de geração.
-export async function completeWeekDerivatives(input, index, week, teacherGuide = {}) {
+export const DERIVATIVE_PARTS = ["assessment", "activities", "mediation", "webpractice"];
+
+export async function completeWeekDerivatives(input, index, week, teacherGuide = {}, options = {}) {
   const plan = week?.lessonPlan || {};
   if (!Array.isArray(plan.contentSections) || !plan.contentSections.length) {
     const error = new Error("Envie a semana já escrita para gerar a avaliação e o Material de Mediação.");
     error.code = "DERIVATIVES_WEEK_MISSING";
     throw error;
   }
-  const { data, error } = await buildDerivatives(input, index, plan);
+  const only = Array.isArray(options.parts) && options.parts.length ? options.parts.filter((part) => DERIVATIVE_PARTS.includes(part)) : null;
+  const { data, error } = await buildDerivatives(input, index, plan, only);
   if (error) {
     const failure = new Error(`Não foi possível gerar a avaliação e o Material de Mediação desta semana. O texto foi preservado; tente novamente. (${error})`);
     failure.code = "DERIVATIVES_FAILED";
