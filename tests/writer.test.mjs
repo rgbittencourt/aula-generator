@@ -544,3 +544,27 @@ test("derivados por parte: só a parte pedida é gerada e o restante da semana p
     assert.deepEqual(result.teacherGuide.resourceNotes, ["mantida"]);
   });
 });
+
+test("questões fora do padrão (menos de 5 alternativas ou feedback faltando) são refeitas uma vez", async () => {
+  const course = normalizeCourseInput({ title: "Tecnologias para Gestão Educacional", weeks: 3, hoursPerWeek: 10, audience: "Servidores", level: "pós-graduação", objectives: ["Compreender sistemas"] });
+  const plan = parseWeekMarkdown(MARKDOWN, { weekNumber: 2 }).lessonPlan;
+  const week = normalizeLesson({ lessonPlan: plan }, course, 1);
+  const bad = { assessment: { ...DERIVATIVES.assessment, questions: DERIVATIVES.assessment.questions.map((question) => ({ ...question, options: question.options.slice(0, 4), feedbackByOption: question.feedbackByOption.slice(0, 2) })) } };
+  let attempt = 0;
+  await withFetch((body) => {
+    const user = body.messages.filter((message) => message.role === "user").map((message) => message.content).join("\n");
+    if (!/REGRAS DA AVALIAÇÃO/.test(user)) throw new Error("chamada fora da parte pedida");
+    attempt += 1;
+    if (attempt === 1) return reply(JSON.stringify(bad));
+    assert.match(user, /ATENÇÃO: a versão anterior das questões saiu fora do padrão/);
+    return reply(JSON.stringify({ assessment: DERIVATIVES.assessment }));
+  }, async (calls) => {
+    const { completeWeekDerivatives } = await import("../src/claude-writer.js");
+    const result = await completeWeekDerivatives(course, 1, week, {}, { parts: ["assessment"] });
+    assert.equal(calls.length, 2);
+    result.week.lessonPlan.assessment.questions.forEach((question) => {
+      assert.equal(question.options.length, 5);
+      assert.equal(question.feedbackByOption.filter((item) => item.trim()).length, 5);
+    });
+  });
+});

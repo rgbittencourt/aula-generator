@@ -25,6 +25,7 @@ import { writerSystemPrompt } from "./writer-voice.js";
 import { parseWeekMarkdown, planToMarkdown, plain } from "./writer-markdown.js";
 import { applyFactCheck } from "./fact-check.js";
 import { compactBriefingPractice, compactWeekInput, enforceWeekFocus } from "./ai.js";
+import { QUIZ_OPTION_COUNT, assessmentIssues } from "./pedagogy.js";
 
 export function writerMode() {
   const configured = String(process.env.AULA_WRITER || "").trim().toLowerCase();
@@ -315,9 +316,9 @@ ${rules.join("\n\n")}${rules.length ? "\n\n" : ""}Responda somente JSON válido.
 async function buildDerivatives(input, index, plan, only = null) {
   const scheduled = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index));
   const names = { assessment: "assessment", activities: "diagnostic, formativeChecks, activities, selfAssessment", mediation: "teacherGuide", explain: "teacherGuide (weekSummary, keyIdeas, studentFAQ, ...)", webpractice: "teacherGuide.webPracticeProjects" };
-  const call = (part, maxTokens) => callJson([
+  const call = (part, maxTokens, extra = "") => callJson([
     { role: "system", content: DERIVATIVES_SYSTEM },
-    { role: "user", content: derivativesPrompt(input, index, plan, scheduled, part) }
+    { role: "user", content: `${derivativesPrompt(input, index, plan, scheduled, part)}${extra}` }
   ], {
     temperature: 0.35,
     maxTokens,
@@ -332,7 +333,18 @@ async function buildDerivatives(input, index, plan, only = null) {
     // consertar um item específico sem refazer o que já conferiu.
     const wanted = (part) => !Array.isArray(only) || only.includes(part);
     const plannedParts = [["assessment", 12000], ["activities", 9000], ["mediation", 12000], ["explain", 12000], ...(scheduled.length ? [["webpractice", 12000]] : [])].filter(([part]) => wanted(part));
-    const results = await Promise.allSettled(plannedParts.map(([part, tokens]) => call(part, tokens)));
+    // As questões precisam ter 5 alternativas e feedback em todas; se vier fora do padrão, a IA
+    // refaz as questões uma vez, com a lista exata do que faltou.
+    const callChecked = async (part, tokens) => {
+      const first = await call(part, tokens);
+      if (part !== "assessment") return first;
+      const problems = assessmentIssues(first?.assessment?.questions);
+      if (!problems.length && (first?.assessment?.questions || []).length) return first;
+      const second = await call(part, tokens, `\n\nATENÇÃO: a versão anterior das questões saiu fora do padrão (${(problems.length ? problems : ["nenhuma questão devolvida"]).slice(0, 8).join("; ")}). Refaça TODAS as questões: cada uma com EXATAMENTE ${QUIZ_OPTION_COUNT} alternativas, uma única correta e "feedbackByOption" com ${QUIZ_OPTION_COUNT} feedbacks preenchidos (a correta e as ${QUIZ_OPTION_COUNT - 1} incorretas).`);
+      const secondProblems = assessmentIssues(second?.assessment?.questions);
+      return secondProblems.length <= problems.length ? second : first;
+    };
+    const results = await Promise.allSettled(plannedParts.map(([part, tokens]) => callChecked(part, tokens)));
     const failed = results.find((result) => result.status === "rejected");
     if (failed) throw failed.reason;
     const byPart = Object.fromEntries(plannedParts.map(([part], position) => [part, results[position].value]));

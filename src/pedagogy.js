@@ -103,6 +103,26 @@ export function buildProgression(plan = {}, index = 0) {
   };
 }
 
+export const QUIZ_OPTION_COUNT = 5;
+
+// Problemas objetivos de uma questão de múltipla escolha: o padrão é 5 alternativas, uma única
+// correta e feedback preenchido em TODAS as alternativas (a correta e as incorretas).
+export function questionIssues(question = {}) {
+  const issues = [];
+  const options = Array.isArray(question.options) ? question.options.filter((option) => String(option ?? "").trim()) : [];
+  if (options.length !== QUIZ_OPTION_COUNT) issues.push(`tem ${options.length} alternativas (devem ser ${QUIZ_OPTION_COUNT})`);
+  if (!Number.isInteger(question.answer) || question.answer < 0 || question.answer >= options.length) issues.push("a alternativa correta está fora do intervalo");
+  const feedback = Array.isArray(question.feedbackByOption) ? question.feedbackByOption : [];
+  const missing = options.map((_, position) => position).filter((position) => String(feedback[position] ?? "").trim().length < 12);
+  if (missing.length) issues.push(`faltam feedbacks nas alternativas ${missing.map((position) => String.fromCharCode(65 + position)).join(", ")}`);
+  return issues;
+}
+
+export function assessmentIssues(questions = []) {
+  const list = Array.isArray(questions) ? questions : [];
+  return list.flatMap((question, position) => questionIssues(question).map((issue) => `Questão ${position + 1}: ${issue}`));
+}
+
 export function pedagogicalReview(plan = {}) {
   const objectives = list(plan.learningObjectives || plan.objectives);
   const sections = Array.isArray(plan.contentSections) ? plan.contentSections : [];
@@ -119,7 +139,7 @@ export function pedagogicalReview(plan = {}) {
     { id: "activity-present", label: "Existe pelo menos uma atividade ativa ou evidência de produção.", pass: activities.length > 0 || practices.some((practice) => practice.product || practice.delivery) },
     { id: "diagnostic-present", label: "O diagnóstico inicial está presente ou sua ausência foi justificada.", pass: Boolean(plan.diagnostic?.prompt || plan.diagnostic?.question || plan.diagnostic?.justification || plan.formativeChecks?.length) },
     { id: "formative-present", label: "Há checagens formativas durante o percurso.", pass: Array.isArray(plan.formativeChecks) && plan.formativeChecks.length > 0 },
-    { id: "summative-alignment", label: "A avaliação final está alinhada aos objetivos e tem feedback.", pass: questions.length >= 4 && questions.every((question) => question.explanation) },
+    { id: "summative-alignment", label: "A avaliação final está alinhada aos objetivos, com 5 alternativas e feedback em todas.", pass: questions.length >= 4 && questions.every((question) => question.explanation && !questionIssues(question).length) },
     { id: "practice-complete", label: "Toda webprática possui produto, etapas, critérios e plano B.", pass: practices.every((practice) => practice.product && practice.steps?.length && (practice.rubric?.length || practice.criteria?.length) && practice.fallbackPlan) },
     { id: "resource-context", label: "Os recursos possuem função pedagógica e momento de uso.", pass: resources.every((resource) => Boolean(resource.objective || resource.pedagogicalUse || resource.guidingQuestion)) },
     { id: "accessibility", label: "Imagens e vídeos possuem alternativa acessível ou revisão pendente.", pass: resources.filter((resource) => ["image", "video", "audio"].includes(resource.kind)).every((resource) => resource.altText || resource.caption || resource.videoAccessibility || resource.requiresVerification) },
