@@ -1,4 +1,5 @@
 import { toStudentLesson, toGeneratorWeek } from "./student-export.js";
+import { parseSavedWeek, planPlacement } from "./week-import.js";
 import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
 import { createProductionWorkbook, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
 import { applyAdjustment, applyRewrite, approveWeek, bridgesBefore, canGenerateNext, dismissIssue, emptyFlow, normalizeFlow, recordGenerated, weekFlowStatus } from "./step-flow.js";
@@ -738,6 +739,44 @@ function restoreBackupFile(file) {
       restoreSnapshot(snapshot);
       enterWorkspace();
     } catch (error) { showAssistantMessage(error.message || "Não foi possível restaurar o backup.", true); }
+  };
+  reader.readAsText(file);
+}
+
+// Abre uma semana salva pelo próprio ClassAuthor (SemanaNN-título-ClassAuthor.json, a semana completa
+// com quiz, feedbacks e guia do professor). Entra no lugar da mesma semana do planejamento aberto,
+// ou como a próxima, se for a seguinte à última. Não é backup: o resto do planejamento não muda.
+function openSavedWeekFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onerror = () => showAssistantMessage("Não consegui ler o arquivo escolhido.", true);
+  reader.onload = () => {
+    try {
+      const saved = parseSavedWeek(String(reader.result || ""), file.name);
+      const placement = planPlacement(saved.number, state.weeks.length);
+      if (placement.action === "refuse") throw new Error(placement.reason);
+      const { index } = placement;
+      if (placement.action === "replace") {
+        const current = state.weeks[index];
+        const label = String(current?.meta?.title || current?.lessonPlan?.theme || `Semana ${saved.number}`).slice(0, 80);
+        const approved = state.weekApprovals?.[index] ? " (liberada)" : "";
+        const edited = state.studioEdits?.[index] ? "\nA versão editada no ClassAtelier desta semana também será descartada." : "";
+        if (!window.confirm(`Abrir a Semana ${saved.number} do arquivo no lugar da Semana ${saved.number} atual${approved}?\n\nAtual: ${label}\nDo arquivo: ${saved.title.slice(0, 80)}${edited}\n\nAs outras semanas não mudam. A liberação desta semana volta a ficar pendente.`)) return;
+      }
+      state.input = state.input || formInput();
+      state.weeks[index] = saved.week;
+      state.teacherGuides[index] = saved.teacherGuide || state.teacherGuides[index] || null;
+      if (state.studioEdits) delete state.studioEdits[index];
+      if (state.weekApprovals) delete state.weekApprovals[index];
+      if (state.flow?.approved) state.flow.approved[index] = false;
+      saveDraft("semana-aberta");
+      enterWorkspace();
+      rerenderWeeks();
+      $("#results-section").open = true;
+      setSaveStatus("Semana aberta", `A Semana ${saved.number} (${saved.title.slice(0, 60)}) foi carregada do arquivo. Confira e libere.`, "success");
+      showAssistantMessage(placement.action === "append" ? `Semana ${saved.number} aberta como a próxima do planejamento.` : `Semana ${saved.number} aberta no lugar da anterior. Confira e libere de novo.`);
+      captureWeekBridge(index);
+    } catch (error) { const reason = error.message || "Não foi possível abrir a semana."; setSaveStatus("Semana não aberta", reason, "warning"); showAssistantMessage(reason, true); }
   };
   reader.readAsText(file);
 }
@@ -2967,6 +3006,8 @@ $("#course-form").addEventListener("input", () => { updateAcademicInheritance();
 $("#save-backup-button").addEventListener("click", downloadBackup);
 $("#restore-backup-button").addEventListener("click", () => $("#backup-file-input").click());
 $("#backup-file-input").addEventListener("change", (event) => { restoreBackupFile(event.target.files?.[0]); event.target.value = ""; });
+$("#open-week-button").addEventListener("click", () => $("#week-file-input").click());
+$("#week-file-input").addEventListener("change", (event) => { openSavedWeekFile(event.target.files?.[0]); event.target.value = ""; });
 $("#restore-draft-button").addEventListener("click", () => { const draft = readDraft(); restoreSnapshot(draft); enterWorkspace(); });
 $("#discard-draft-button").addEventListener("click", () => { safeStorageRemove(); hideDraftRecovery(); if (document.body.classList.contains("welcome-active")) hideRecoveryDock(); else setSaveStatus("Salvamento local ativo", "O próximo briefing será salvo automaticamente neste navegador."); });
 window.addEventListener("beforeunload", () => saveDraft("fechamento"));
