@@ -2,6 +2,10 @@
 
 Aplicação para transformar um briefing de curso em uma trilha semanal de aulas compatível com o **ClassAtelier**. A interface combina uma área de planejamento editorial com uma prévia organizada por semanas. A linguagem visual se inspira na clareza do ClassAtelier — papel, tipografia editorial, barra de progresso, blocos e sumário — sem copiar a aplicação.
 
+## Versão
+
+Versão atual: **1.0.0** (Versionamento Semântico). O histórico está em [`CHANGELOG.md`](CHANGELOG.md); o número aparece no rodapé do aplicativo e em `/api/health`.
+
 ## Manual
 
 O **Manual Class** descreve os três aplicativos (ClassAuthor, ClassAtelier e ClassAcervo), cada menu, janela e caminho até o Moodle, com 87 capturas de tela: [`manual/manual-class.html`](manual/manual-class.html) (página) e [`manual/manual-class.pdf`](manual/manual-class.pdf) (impressão).

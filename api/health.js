@@ -1,3 +1,4 @@
+import { APP_VERSION } from "../src/version.js";
 import { accessRequired } from "../src/access.js";
 import { aiConfigStatus, getAIModel, getAIProvider, getAITokenSettings, isAIConfigured } from "../src/ai-client.js";
 
@@ -6,6 +7,8 @@ export default function handler(_request, response) {
   const settings = getAITokenSettings();
   response.status(200).json({
     ok: true,
+    app: "ClassAuthor",
+    version: APP_VERSION,
     aiConfigured: isAIConfigured(),
     provider: getAIProvider(),
     missingKey: aiConfigStatus().missingKey,

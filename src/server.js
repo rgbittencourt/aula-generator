@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "./calculations.js";
 import { buildFallbackLesson, normalizeCourseInput, normalizeLesson, normalizeWeeklyOutput, slugify, validateLesson } from "./aula-schema.js";
 import { assistBriefing, generateOneWeek, generateWithAI, regenerateMediationMessageWithAI, regenerateWeekWithAI } from "./ai.js";
+import { APP_VERSION } from "./version.js";
 import { aiConfigStatus, getAIModel, getAIProvider, getAITokenSettings, isAIConfigured } from "./ai-client.js";
 import { enrichLessonsWithResources } from "./research.js";
 import { createWeeksZip } from "./zip.js";
@@ -36,6 +37,8 @@ app.get("/api/health", (_req, res) => {
   const settings = getAITokenSettings();
   res.json({
     ok: true,
+    app: "ClassAuthor",
+    version: APP_VERSION,
     aiConfigured: isAIConfigured(),
     provider: getAIProvider(),
     missingKey: aiConfigStatus().missingKey,
