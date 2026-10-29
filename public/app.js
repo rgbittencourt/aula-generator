@@ -2074,7 +2074,7 @@ function downloadWeekFull(index) {
 }
 
 // ClassAtelier (o editor, hoje ainda publicado como ClassAtelier) recebe a semana por postMessage.
-const STUDIO_URL = "https://rgbittencourt.github.io/aula-studio/";
+const STUDIO_URL = "https://rgbittencourt.github.io/classatelier/";
 const STUDIO_ORIGIN = new URL(STUDIO_URL).origin;
 let studioToastTimer = null;
 
@@ -2165,7 +2165,7 @@ window.addEventListener("message", (event) => {
 
 function openInStudio(index) {
   const lesson = Number.isInteger(index) ? state.weeks[index] : null;
-  const win = window.open(STUDIO_URL, "aula-studio-editor");
+  const win = window.open(STUDIO_URL, "classatelier-editor");
   if (!win) { showStudioToast("O navegador bloqueou a nova aba. Libere pop-ups para este site e tente de novo."); return; }
   if (!lesson) return;
   const payload = studentProjectFor(index);

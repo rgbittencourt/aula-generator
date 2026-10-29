@@ -18,7 +18,7 @@ Os assets de marca ficam versionados para uso no cabeçalho, favicon, capas e co
 - `public/brand/ifsc-institutional-mark.png`: marca institucional do IFSC usada na capa;
 - `public/brand/inovalab-signature.png` e `public/brand/inovalab-symbol.png`: assinatura e símbolo do INOVALAB usados no crédito de desenvolvimento da capa.
 
-O ClassAtelier (o antigo Aula Studio, em <https://rgbittencourt.github.io/aula-studio/>, repositório `aula-studio`) tem a marca da janela em arco, sem a caneta, em `public/brand/classatelier-mark.svg`; ela aparece no botão **Abrir ClassAtelier**.
+O ClassAtelier (o antigo Aula Studio, em <https://rgbittencourt.github.io/classatelier/>, repositório `classatelier`) tem a marca da janela em arco, sem a caneta, em `public/brand/classatelier-mark.svg`; ela aparece no botão **Abrir ClassAtelier**.
 
 ## Situação atual
 
@@ -339,6 +339,17 @@ PORT=4310
 ```
 
 A chave é usada apenas pelo backend e nunca é enviada ao navegador.
+
+## Teste com a IA de verdade (ABNT e citações)
+
+`scripts/smoke-ai.mjs` escreve uma semana com o provedor configurado e mostra o que o professor precisa conferir: referências fora do padrão ABNT NBR 6023 (com o motivo de cada uma), citações no texto sem correspondência na lista de referências, citações diretas longas e as pendências do próprio ClassAuthor.
+
+```bash
+AI_PROVIDER=anthropic ANTHROPIC_API_KEY=... ANTHROPIC_MODEL=claude-sonnet-5-5 node scripts/smoke-ai.mjs
+node scripts/smoke-ai.mjs --semana 2 --tema "Learning analytics na gestão escolar" --salvar saida.json
+```
+
+A chave vem do `.env` ou do ambiente e nunca é impressa. Sem chave, o script avisa e não faz nada.
 
 ## Saída do ZIP
 
