@@ -4,7 +4,7 @@ Aplicação para transformar um briefing de curso em uma trilha semanal de aulas
 
 ## Versão
 
-Versão atual: **1.2.0** (Versionamento Semântico). O histórico está em [`CHANGELOG.md`](CHANGELOG.md); o número aparece no rodapé do aplicativo e em `/api/health`.
+Versão atual: **1.2.1** (Versionamento Semântico). O histórico está em [`CHANGELOG.md`](CHANGELOG.md); o número aparece no rodapé do aplicativo e em `/api/health`.
 
 ## Manual
 

@@ -8,6 +8,11 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.2.1 · 29/10/2026 · marca com fundo claro
+
+### Mudou
+- A **marca do ClassAuthor** passou a ter o quadrado de fundo claro (creme), como a do ClassAtelier e a do ClassAcervo: arco azul-marinho com o painel coral aceso e a caneta por cima, com um contorno claro que a separa do arco. Vale para o símbolo (`classauthor-mark.svg` e `.png`), o logo horizontal (`classauthor-logo.svg` e `.png`, `logo.svg`), o favicon (`favicon.svg`, `favicon-32.png`), o ícone da tela inicial (`apple-touch-icon.png`) e para a capa de entrada e o cabeçalho do app. A capa de compartilhamento (`classauthor-cover.*`) segue como estava, igual à dos outros dois apps (marca direto no fundo azul).
+
 ## 1.2.0 · 29/10/2026 · figura avulsa para o ClassAtelier
 
 ### Novo
