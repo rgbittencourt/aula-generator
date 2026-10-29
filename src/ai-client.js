@@ -159,6 +159,14 @@ function responseText(payload) {
     : "";
 }
 
+// Motivo de parada quando a resposta vem sem texto (ajuda a diagnosticar: limite de saída, recusa, filtro).
+function emptyReason(payload) {
+  const stop = getAIProvider() === "anthropic" ? payload?.stop_reason : payload?.choices?.[0]?.finish_reason;
+  const refusal = getAIProvider() === "anthropic" ? "" : payload?.choices?.[0]?.message?.refusal;
+  const labels = { max_tokens: "limite de saída atingido", length: "limite de saída atingido", refusal: "o modelo recusou a resposta", content_filter: "filtro de conteúdo do provedor", end_turn: "o modelo encerrou sem texto", stop: "o modelo encerrou sem texto" };
+  return [stop ? `${labels[stop] || stop} [${stop}]` : "", refusal ? `recusa: ${String(refusal).slice(0, 160)}` : ""].filter(Boolean).join("; ");
+}
+
 function responseFinishedByLength(payload) {
   return getAIProvider() === "anthropic" ? payload?.stop_reason === "max_tokens" : payload?.choices?.[0]?.finish_reason === "length";
 }
@@ -297,7 +305,9 @@ export async function callJson(messages, options = {}) {
     }
     const content = responseText(payload);
     if (!content) {
-      const emptyError = new Error("A API de IA retornou uma resposta vazia.");
+      const reason = emptyReason(payload);
+      console.error("empty AI response", { label: options.label || "", maxTokens, reason, usage: payload?.usage || null, model: payload?.model || "" });
+      const emptyError = new Error(`A API de IA retornou uma resposta vazia${reason ? ` (motivo informado pela API: ${reason})` : ""}.`);
       emptyError.code = "AI_EMPTY_RESPONSE";
       emptyError.retryable = true;
       emptyError.provider = getAIProvider();
@@ -371,7 +381,9 @@ export async function callText(messages, options = {}) {
     }
     const content = responseText(payload);
     if (!content) {
-      const emptyError = new Error("A API de IA retornou uma resposta vazia.");
+      const reason = emptyReason(payload);
+      console.error("empty AI response", { label: options.label || "", maxTokens, reason, usage: payload?.usage || null, model: payload?.model || "" });
+      const emptyError = new Error(`A API de IA retornou uma resposta vazia${reason ? ` (motivo informado pela API: ${reason})` : ""}.`);
       emptyError.code = "AI_EMPTY_RESPONSE";
       emptyError.retryable = true;
       emptyError.provider = getAIProvider();
