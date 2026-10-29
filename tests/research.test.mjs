@@ -11,7 +11,7 @@ function hasResourceBridge(blocks) {
   return (blocks || []).some((block) => block.props?.resourceId && block.type === "prose" && /Compare|Leia este artigo|relacionar/i.test(block.props?.body || "") || hasResourceBridge(block.props?.children));
 }
 
-test("pesquisa simulada seleciona imagem/leitura e gera blocos Aula Studio", async () => {
+test("pesquisa simulada seleciona imagem/leitura e gera blocos ClassAtelier", async () => {
   const input = normalizeCourseInput({ title: "Indicadores educacionais", weeks: 1, hoursPerWeek: 2, content: "Indicadores e análise de dados para gestão educacional", objectives: ["Analisar indicadores"] });
   const lesson = buildFallbackLesson(input, 0);
   const previousFetch = globalThis.fetch;

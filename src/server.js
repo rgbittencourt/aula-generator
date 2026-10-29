@@ -243,5 +243,5 @@ app.post("/api/webpractice-docx", async (req, res) => {
 });
 
 app.listen(port, host, () => {
-  console.log(`Aula Generator em http://${host}:${port}`);
+  console.log(`ClassAuthor em http://${host}:${port}`);
 });

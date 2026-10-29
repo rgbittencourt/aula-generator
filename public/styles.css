@@ -114,7 +114,7 @@
 .reader-resource-inline small{line-height:1.45;color:#65747b}
 @media (max-width:700px){.reader-resource-inline{padding:12px}.reader-resource-heading{gap:6px}}
 
-/* Composição compatível com Aula Studio */
+/* Composição compatível com o ClassAtelier */
 .composition-intro{max-width:920px}.composition-plan{display:grid;gap:18px}.composition-defaults{border:1px solid var(--line,#e3e4e8);border-radius:12px;overflow:hidden;background:var(--surface,#fff)}.composition-table-head,.composition-row{display:grid;grid-template-columns:minmax(220px,1.7fr) 110px 150px 110px;align-items:center;gap:12px;padding:10px 14px}.composition-table-head{background:#f7f5f1;color:#6d6b66;font-size:11px;text-transform:uppercase;letter-spacing:.08em}.composition-row{border-top:1px solid #ecebe8}.composition-row input,.composition-row select,.composition-week-cell input,.composition-week-cell select{width:100%;min-height:34px;border:1px solid #d9d9de;border-radius:7px;padding:6px 8px;background:#fff;color:#252b38}.composition-label{display:flex;flex-direction:column;gap:3px}.composition-label small,.composition-week-heading small,.composition-week summary small{font-size:11px;color:#85838a}.composition-items{display:flex;align-items:center;gap:5px;font-size:10px;color:#777}.composition-items input{width:58px}.composition-week-heading{display:flex;justify-content:space-between;gap:16px;align-items:baseline}.composition-week-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:8px}.composition-week{border:1px solid #e4e1da;border-radius:10px;background:#fff}.composition-week summary{cursor:pointer;display:flex;justify-content:space-between;gap:10px;padding:10px 12px;font-weight:700}.composition-week-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 12px 12px}.composition-week-cell{display:grid;gap:4px;font-size:10px;color:#777}.composition-week-cell span{min-height:25px}.composition-week-cell select{font-size:11px}.composition-week-cell input+input{margin-top:2px}@media (max-width:760px){.composition-table-head{display:none}.composition-row{grid-template-columns:1fr 74px 110px;gap:8px}.composition-row .composition-items{grid-column:2/-1}.composition-week-grid{grid-template-columns:1fr}.composition-week-heading{display:block}.composition-week-heading small{display:block;margin-top:4px}}
 /* Checklist: preserve the current list scroll position after each manual mark. */
 .review-list{overscroll-behavior:contain;scroll-behavior:auto}
@@ -404,7 +404,7 @@ body.welcome-active .recovery-dock{display:none!important}
 .project-sidebar>.summary-card{border-top:3px solid var(--coral)}
 
 
-/* Ação de sessão: separada do logo (novo projeto) e do atalho do Aula Studio. */
+/* Ação de sessão: separada do logo (novo projeto) e do atalho do ClassAtelier. */
 .session-exit-link{height:32px;padding:0 9px;border:1px solid #e3d5cd;border-radius:8px;background:#fffaf7;color:var(--coral-dark);font-size:10px;font-weight:700;white-space:nowrap;transition:background .15s,border-color .15s,transform .15s}
 .session-exit-link:hover{background:var(--coral-soft);border-color:#e8a18f;transform:translateY(-1px)}
 @media(max-width:620px){.session-exit-link{width:30px;padding:0;font-size:0}.session-exit-link::before{content:"↪";font-size:16px}}

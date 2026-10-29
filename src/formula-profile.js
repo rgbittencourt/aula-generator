@@ -1,5 +1,5 @@
 export const INTERNAL_FORMULA_PROFILE = Object.freeze({
-  id: "aula-generator-internal-v1",
+  id: "classauthor-internal-v1",
   version: "2026-09-30",
   source: {
     type: "internal",

@@ -1,17 +1,17 @@
-# Plano — Gerador de Aulas
+# Plano — ClassAuthor
 
 ## Objetivo
 
-Construir um planejador pedagógico assistido por IA que gere semanas completas, coerentes e editáveis no Aula Studio, sem impor a mesma estrutura didática a todas as semanas. A experiência do estudante será exportada em `.aula.json`; o material de apoio ao professor será produzido separadamente em PDF.
+Construir um planejador pedagógico assistido por IA que gere semanas completas, coerentes e editáveis no ClassAtelier, sem impor a mesma estrutura didática a todas as semanas. A experiência do estudante será exportada em `.aula.json`; o material de apoio ao professor será produzido separadamente em PDF.
 
 ## Decisões confirmadas
 
-- Repositório separado: `rgbittencourt/aula-generator`.
+- Repositório separado: `rgbittencourt/classauthor`.
 - Backend server-side com chave própria em ambiente seguro.
 - Calendário por numeração ou por data real.
 - Uma semana pode ter webprática ou não. Webpráticas são projetos independentes, podem receber um tema próprio e só entram na semana quando estiverem programadas.
 - Recursos audiovisuais, imagens, diagramas e leituras devem aparecer misturados ao texto no ponto didático em que serão usados, e não como uma seção obrigatoriamente separada.
-- O `.aula.json` contém somente a experiência do aluno e permanece compatível com o botão **Abrir** do Aula Studio.
+- O `.aula.json` contém somente a experiência do aluno e permanece compatível com o botão **Abrir** do ClassAtelier.
 - O guia do professor fica fora do JSON do aluno e é exportado como PDF para leitura na tela.
 - Os cálculos permanecem no código da aplicação, em perfil interno versionado, sem dependência de fonte externa.
 
@@ -35,7 +35,7 @@ A IA escolhe o arco didático adequado ao tema, aos objetivos, ao momento do cur
 
 ### Padrão mínimo de conteúdo textual
 
-Uma semana não é considerada pronta apenas porque contém blocos válidos ou recursos localizados. O gerador deve exigir título específico, abertura contextualizada, objetivos observáveis, pelo menos cinco seções de conteúdo com texto desenvolvido, síntese, conexão com a próxima semana e avaliação alinhada. A profundidade esperada é a de uma unidade didática completa: aproximadamente 2.200 palavras como piso ajustável pela carga, com seções substanciais e exemplos/contrapontos quando pertinentes. O resultado recebe métricas e alertas de qualidade e não deve ser enviado ao Aula Studio se permanecer estruturalmente insuficiente.
+Uma semana não é considerada pronta apenas porque contém blocos válidos ou recursos localizados. O gerador deve exigir título específico, abertura contextualizada, objetivos observáveis, pelo menos cinco seções de conteúdo com texto desenvolvido, síntese, conexão com a próxima semana e avaliação alinhada. A profundidade esperada é a de uma unidade didática completa: aproximadamente 2.200 palavras como piso ajustável pela carga, com seções substanciais e exemplos/contrapontos quando pertinentes. O resultado recebe métricas e alertas de qualidade e não deve ser enviado ao ClassAtelier se permanecer estruturalmente insuficiente.
 
 O fluxo também inclui revisão antes da exportação: cada semana pode ser aberta em uma prévia de leitura, conferida pelo professor e regenerada individualmente com uma solicitação livre, sem refazer o curso inteiro. A regeneração preserva o briefing e os demais campos da semana, recalcula a carga e atualiza o Planejamento Geral.
 
@@ -58,7 +58,7 @@ O gerador valida alinhamento entre objetivos, seções, atividades, evidências 
 
 `src/aula-schema.js` normaliza o documento do aluno e projeta a webprática apenas como uma orientação curta quando ela aparece na aula. `src/teacher-guide.js` normaliza o guia completo do professor, incluindo intenção didática, matriz de alinhamento, diagnóstico, mediação, equívocos comuns, diferenciação, acessibilidade, rubrica e checklist de qualidade.
 
-O módulo `src/pdf.js` converte o guia em PDF legível na tela. O PDF geral contém a visão do curso, uma seção por semana, carga calculada e os projetos de webprática em anexos de planejamento. Nenhum `teacherGuide` ou pacote interno da webprática é inserido nos JSONs destinados ao Aula Studio.
+O módulo `src/pdf.js` converte o guia em PDF legível na tela. O PDF geral contém a visão do curso, uma seção por semana, carga calculada e os projetos de webprática em anexos de planejamento. Nenhum `teacherGuide` ou pacote interno da webprática é inserido nos JSONs destinados ao ClassAtelier.
 
 ## Webpráticas independentes
 
@@ -66,11 +66,11 @@ Webpráticas são cadastradas como projetos separados. Cada projeto possui tema,
 
 ## Recursos no ponto de uso
 
-A IA deve indicar `sectionNumber`, `moment`, `objective`, `guidingQuestion` e `pedagogicalUse` para cada vídeo, imagem, diagrama ou leitura. O transformador de blocos insere esses recursos dentro do tópico/seção correspondente do Aula Studio. Recursos globais sem seção explícita são inseridos após a primeira seção pertinente, nunca como uma lista isolada obrigatória.
+A IA deve indicar `sectionNumber`, `moment`, `objective`, `guidingQuestion` e `pedagogicalUse` para cada vídeo, imagem, diagrama ou leitura. O transformador de blocos insere esses recursos dentro do tópico/seção correspondente do ClassAtelier. Recursos globais sem seção explícita são inseridos após a primeira seção pertinente, nunca como uma lista isolada obrigatória.
 
 ## Contratos e exportação
 
-Cada semana do aluno segue o contrato de blocos do Aula Studio: `id`, `type`, `bg`, `pad` e `props`, usando somente tipos conhecidos. O JSON semanal contém conteúdo, objetivos do aluno, recursos contextualizados, atividades, avaliação, síntese e metadados de carga necessários ao planejamento, mas não contém o guia do professor.
+Cada semana do aluno segue o contrato de blocos do ClassAtelier: `id`, `type`, `bg`, `pad` e `props`, usando somente tipos conhecidos. O JSON semanal contém conteúdo, objetivos do aluno, recursos contextualizados, atividades, avaliação, síntese e metadados de carga necessários ao planejamento, mas não contém o guia do professor.
 
 O ZIP contém:
 

@@ -8,9 +8,22 @@ const isGitHubPages = window.location.hostname.endsWith(".github.io");
 const createReviewMarks = () => ({ resources: {}, checks: {}, academic: {}, quality: {} });
 const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, studioEdits: {}, activeReviewGuidance: null, generation: null, flow: emptyFlow(), production: emptyProduction() };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
-const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
+const DRAFT_STORAGE_KEY = "classauthor:draft:v2";
 const DRAFT_MAX_AGE_DAYS = 30;
-const RIGHT_NAV_STORAGE_KEY = "aula-generator:right-navigation-collapsed:v1";
+const RIGHT_NAV_STORAGE_KEY = "classauthor:right-navigation-collapsed:v1";
+// Migração única: rascunhos e preferências salvos com o nome antigo passam para as chaves "classauthor:*".
+(function migrateLegacyStorage() {
+  try {
+    Object.keys(localStorage).forEach((key) => {
+      if (!key.startsWith("aula-generator:")) return;
+      const next = "classauthor:" + key.slice("aula-generator:".length);
+      if (localStorage.getItem(next) === null) localStorage.setItem(next, localStorage.getItem(key));
+      localStorage.removeItem(key);
+    });
+  } catch { /* armazenamento pode estar bloqueado */ }
+})();
+// Backups antigos (arquivos .json já baixados) ainda dizem app: "aula-generator"; continuam válidos.
+const isOwnApp = (name) => name === "classauthor" || name === "aula-generator";
 let saveTimer = null;
 let aiActivityHideTimer = null;
 let aiActionBusy = false;
@@ -446,7 +459,7 @@ function currentSnapshot() {
   if (!hasWork) return null;
   return {
     version: 2,
-    app: "aula-generator",
+    app: "classauthor",
     savedAt: new Date().toISOString(),
     form: input,
     results: state.weeks.length || state.generation ? {
@@ -495,7 +508,7 @@ function readDraft() {
   try {
     const draft = JSON.parse(raw);
     const age = draft?.savedAt ? Date.now() - new Date(draft.savedAt).getTime() : Infinity;
-    if (draft?.version !== 2 || draft?.app !== "aula-generator" || !draft.form || age > DRAFT_MAX_AGE_DAYS * 86400000) {
+    if (draft?.version !== 2 || !isOwnApp(draft?.app) || !draft.form || age > DRAFT_MAX_AGE_DAYS * 86400000) {
       safeStorageRemove();
       return null;
     }
@@ -720,7 +733,7 @@ function restoreBackupFile(file) {
   reader.onload = () => {
     try {
       const snapshot = JSON.parse(String(reader.result || ""));
-      if (snapshot?.version !== 2 || snapshot?.app !== "aula-generator" || !snapshot.form) throw new Error("Este arquivo não é um backup válido do ClassAuthor.");
+      if (snapshot?.version !== 2 || !isOwnApp(snapshot?.app) || !snapshot.form) throw new Error("Este arquivo não é um backup válido do ClassAuthor.");
       safeStorageSet(JSON.stringify(snapshot));
       restoreSnapshot(snapshot);
       enterWorkspace();
@@ -2174,10 +2187,10 @@ function openInStudio(index) {
   const finish = () => { settled = true; window.removeEventListener("message", onMessage); clearTimeout(fallbackTimer); };
   const onMessage = (event) => {
     if (event.source !== win || event.origin !== STUDIO_ORIGIN || !event.data) return;
-    if (event.data.type === "aulastudio:ready") { win.postMessage({ type: "classauthor:lesson", lesson: payload, fileName }, STUDIO_ORIGIN); return; }
-    if (event.data.type === "aulastudio:loaded") { finish(); showStudioToast(`Semana ${index + 1} aberta no ClassAtelier.${event.data.savedPrevious ? " A aula que estava aberta lá ficou na Biblioteca." : ""}`); }
-    else if (event.data.type === "aulastudio:declined") { finish(); showStudioToast("Você manteve a versão que já estava na Biblioteca do ClassAtelier."); }
-    else if (event.data.type === "aulastudio:error") { finish(); showStudioToast(`O editor não conseguiu abrir a semana: ${event.data.message || "arquivo inválido"}. Baixe o JSON Studio e use "Abrir projeto".`); }
+    if (event.data.type === "classatelier:ready") { win.postMessage({ type: "classauthor:lesson", lesson: payload, fileName }, STUDIO_ORIGIN); return; }
+    if (event.data.type === "classatelier:loaded") { finish(); showStudioToast(`Semana ${index + 1} aberta no ClassAtelier.${event.data.savedPrevious ? " A aula que estava aberta lá ficou na Biblioteca." : ""}`); }
+    else if (event.data.type === "classatelier:declined") { finish(); showStudioToast("Você manteve a versão que já estava na Biblioteca do ClassAtelier."); }
+    else if (event.data.type === "classatelier:error") { finish(); showStudioToast(`O editor não conseguiu abrir a semana: ${event.data.message || "arquivo inválido"}. Baixe o JSON ClassAtelier e use "Abrir projeto".`); }
   };
   window.addEventListener("message", onMessage);
   const fallbackTimer = setTimeout(() => {
@@ -2341,7 +2354,7 @@ async function enrichGeneratedWeek(data, input, index, headers, button) {
 }
 
 // ───────── Fluxo semana a semana: aprovar, refazer e ajustar pontas ─────────
-const STEP_MODE_KEY = "aula-generator:step-mode:v1";
+const STEP_MODE_KEY = "classauthor:step-mode:v1";
 
 function stepModeEnabled() {
   return Boolean($("#step-mode")?.checked);

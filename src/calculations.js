@@ -353,7 +353,7 @@ export function attachWorkloadToLessons(lessons, workload) {
           unresolved: week.unresolved,
           workloadAdjustment: week.workloadAdjustment,
           formulaProfile: week.formulaProfile,
-          calculationMethod: "aula-generator-internal-profile",
+          calculationMethod: "classauthor-internal-profile",
           notes: `${week.fitStatus}; diferença de ${week.varianceMinutes} minutos em relação à meta do estudante.`
         }
       }

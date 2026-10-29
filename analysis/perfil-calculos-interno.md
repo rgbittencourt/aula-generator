@@ -17,4 +17,4 @@ Este documento registra as regras usadas diretamente pela aplicação. Ele é ap
 
 ## Versionamento
 
-O identificador atual é `aula-generator-internal-v1`, versão `2026-09-30`. Mudanças futuras devem alterar a versão, atualizar os testes e registrar a justificativa no código.
+O identificador atual é `classauthor-internal-v1`, versão `2026-09-30`. Mudanças futuras devem alterar a versão, atualizar os testes e registrar a justificativa no código.

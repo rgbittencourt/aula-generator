@@ -611,7 +611,7 @@ export function normalizeCourseInput(raw = {}) {
     webPractices,
     webPractice: { enabled, moments: legacyMoments.length ? legacyMoments : splitLines(practice.moments || raw.practiceMoments), instructions: legacyInstructions || text(practice.instructions || raw.practiceInstructions), durationMinutes: webPractices.reduce((sum, item) => sum + item.durationMinutes, 0) },
     resourcePlan: normalizeResourcePlan(raw.resourcePlan || raw.weeklyResourcePlan, weeks),
-    compositionPlan: normalizeCompositionPlan(raw.compositionPlan || raw.blockComposition || raw.aulaStudioComposition, weeks),
+    compositionPlan: normalizeCompositionPlan(raw.compositionPlan || raw.blockComposition || raw.classAtelierComposition, weeks),
     author: text(raw.author), role: text(raw.role), institution: text(raw.institution), year: text(raw.year, String(new Date().getFullYear())), language: text(raw.language, "pt-BR"),
     license: text(raw.license, DEFAULT_LICENSE),
     formulaConfig: raw.formulaConfig && typeof raw.formulaConfig === "object" ? raw.formulaConfig : null,

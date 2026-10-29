@@ -1,4 +1,4 @@
-name: Deploy Aula Generator to GitHub Pages
+name: Deploy ClassAuthor to GitHub Pages
 
 on:
   push:

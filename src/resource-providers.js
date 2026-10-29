@@ -76,7 +76,7 @@ function extMeta(info, key) {
 export async function searchCommons(request) {
   try {
     const params = new URLSearchParams({ action: "query", generator: "search", gsrsearch: request.query, gsrnamespace: "6", gsrlimit: "5", prop: "imageinfo", iiprop: "url|extmetadata", iiurlwidth: "1400", format: "json", origin: "*" });
-    const payload = await fetchJson(`https://commons.wikimedia.org/w/api.php?${params}`, { "User-Agent": "AulaGenerator/1.0 (educational resource research)" });
+    const payload = await fetchJson(`https://commons.wikimedia.org/w/api.php?${params}`, { "User-Agent": "ClassAuthor/1.0 (educational resource research)" });
     const pages = Object.values(payload.query?.pages || {});
     const candidates = pages.map((page, index) => {
       const info = page.imageinfo?.[0] || {};
@@ -110,7 +110,7 @@ export async function searchCommons(request) {
 export async function searchCrossref(request) {
   try {
     const params = new URLSearchParams({ "query.bibliographic": request.query, rows: "5", mailto: process.env.CROSSREF_MAILTO || "" });
-    const payload = await fetchJson(`https://api.crossref.org/works?${params}`, { "User-Agent": "AulaGenerator/1.0 (educational resource research)" });
+    const payload = await fetchJson(`https://api.crossref.org/works?${params}`, { "User-Agent": "ClassAuthor/1.0 (educational resource research)" });
     const candidates = (payload.message?.items || []).map((item, index) => {
       const title = Array.isArray(item.title) ? item.title[0] : item.title;
       const authors = Array.isArray(item.author) ? item.author.map((author) => [author.given, author.family].filter(Boolean).join(" ")).filter(Boolean).join(", ") : "";
@@ -143,7 +143,7 @@ export async function searchOpenAlex(request) {
   try {
     const params = new URLSearchParams({ search: request.query, "per-page": "5" });
     if (process.env.CROSSREF_MAILTO) params.set("mailto", process.env.CROSSREF_MAILTO);
-    const payload = await fetchJson(`https://api.openalex.org/works?${params}`, { "User-Agent": "AulaGenerator/1.0 (educational resource research)" });
+    const payload = await fetchJson(`https://api.openalex.org/works?${params}`, { "User-Agent": "ClassAuthor/1.0 (educational resource research)" });
     const candidates = (payload.results || []).map((item, index) => {
       const authors = (item.authorships || []).map((entry) => entry.author?.display_name).filter(Boolean).join(", ");
       const href = text(item.doi || item.primary_location?.landing_page_url || item.open_access?.oa_url);

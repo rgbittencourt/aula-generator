@@ -1,7 +1,7 @@
 # Análise de profundidade das aulas de referência
 
 **Data:** 30/09/2026  
-**Fonte analisada:** seis semanas de aula em DOCX, um roteiro de webprática e uma base XLSX enviados para calibrar o Gerador de Aulas.
+**Fonte analisada:** seis semanas de aula em DOCX, um roteiro de webprática e uma base XLSX enviados para calibrar o ClassAuthor.
 
 ## Diagnóstico executivo
 
@@ -122,10 +122,10 @@ Uma semana só deve ser considerada pronta para revisão quando tiver:
 - síntese e conexão com a próxima semana;
 - avaliação alinhada, preferencialmente com 6 questões;
 - referências/glossário quando o tipo de unidade exigir;
-- um `hero`, um bloco visível de objetivos, um tópico de conteúdo e a estrutura editável compatível com o Aula Studio;
+- um `hero`, um bloco visível de objetivos, um tópico de conteúdo e a estrutura editável compatível com o ClassAtelier;
 - indicador de qualidade e pendências para o professor.
 
-A validação não deve “maquiar” uma semana vazia com um título padrão. Se a IA falhar, o sistema deve tentar uma etapa de reparo; se ainda falhar, deve marcar a semana como **insuficiente — não enviar ao Aula Studio**.
+A validação não deve “maquiar” uma semana vazia com um título padrão. Se a IA falhar, o sistema deve tentar uma etapa de reparo; se ainda falhar, deve marcar a semana como **insuficiente — não enviar ao ClassAtelier**.
 
 ## Mudança de fluxo necessária
 
@@ -139,4 +139,4 @@ O resultado não deve ir diretamente para download. Depois da geração, a inter
 6. recalcular a carga geral;
 7. baixar JSON e ZIP apenas depois da revisão.
 
-Essa revisão por semana é essencial para preservar a autoria e permitir que o professor corrija foco, tom, exemplos, profundidade, recursos e atividades antes de abrir o arquivo no Aula Studio.
+Essa revisão por semana é essencial para preservar a autoria e permitir que o professor corrija foco, tom, exemplos, profundidade, recursos e atividades antes de abrir o arquivo no ClassAtelier.

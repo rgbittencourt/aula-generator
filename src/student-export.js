@@ -226,7 +226,7 @@ export function toStudentLessons(lessons = []) {
  */
 export function toGeneratorWeek(lesson = {}, teacherGuide = null, extra = {}) {
   return {
-    generator: "aula-generator",
+    generator: "classauthor",
     format: "classauthor-semana",
     version: 1,
     exportedAt: extra.exportedAt || new Date().toISOString(),

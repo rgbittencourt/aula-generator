@@ -61,7 +61,7 @@ test("Material de Mediação não quebra com emojis, setas e símbolos fora do a
   assert.equal(buffer.subarray(0, 5).toString(), "%PDF-");
 });
 
-test("bloco de referências do Aula Studio leva cada referência como texto, nunca como objeto", () => {
+test("bloco de referências do ClassAtelier leva cada referência como texto, nunca como objeto", () => {
   const input = normalizeCourseInput({ title: "Curso refs", weeks: 1, objectives: ["Aplicar"] });
   const lesson = buildFallbackLesson(input, 0);
   const references = [{ citation: "AUTOR, A. Título. 2020.", href: "https://doi.org/10.1/x", publisher: "Editora" }, { citation: "OUTRO, B. Livro. 2019." }];

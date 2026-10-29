@@ -1,8 +1,8 @@
-# Direção visual — Gerador de Aulas
+# Direção visual — ClassAuthor
 
 ## Tema: Atelier Editorial de Aprendizagem
 
-O Gerador de Aulas será uma oficina digital para transformar uma intenção pedagógica em experiências de aprendizagem prontas para revisão. A interface se inspira na clareza editorial do Aula Studio — barra superior discreta, tipografia com contraste, superfícies de papel, sumário visual e blocos com função clara — mas assume uma identidade própria de planejamento.
+O ClassAuthor será uma oficina digital para transformar uma intenção pedagógica em experiências de aprendizagem prontas para revisão. A interface se inspira na clareza editorial do ClassAtelier — barra superior discreta, tipografia com contraste, superfícies de papel, sumário visual e blocos com função clara — mas assume uma identidade própria de planejamento.
 
 ### Movimento
 
@@ -64,4 +64,4 @@ Direta, acolhedora e profissional. A interface deve explicar o propósito pedag�
 
 ### Marca
 
-Aula Generator / Gerador de Aulas. O símbolo atual de cartões semanais empilhados permanece, agora acompanhado por uma pequena linha de percurso que sugere sequência didática.
+ClassAuthor. O símbolo atual de cartões semanais empilhados permanece, agora acompanhado por uma pequena linha de percurso que sugere sequência didática.

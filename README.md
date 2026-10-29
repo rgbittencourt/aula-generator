@@ -18,11 +18,11 @@ Os assets de marca ficam versionados para uso no cabeçalho, favicon, capas e co
 - `public/brand/ifsc-institutional-mark.png`: marca institucional do IFSC usada na capa;
 - `public/brand/inovalab-signature.png` e `public/brand/inovalab-symbol.png`: assinatura e símbolo do INOVALAB usados no crédito de desenvolvimento da capa.
 
-O ClassAtelier (o antigo Aula Studio, em <https://rgbittencourt.github.io/classatelier/>, repositório `classatelier`) tem a marca da janela em arco, sem a caneta, em `public/brand/classatelier-mark.svg`; ela aparece no botão **Abrir ClassAtelier**.
+O ClassAtelier (em <https://rgbittencourt.github.io/classatelier/>, repositório `classatelier`) tem a marca da janela em arco, sem a caneta, em `public/brand/classatelier-mark.svg`; ela aparece no botão **Abrir ClassAtelier**.
 
 ## Situação atual
 
-- **GitHub Pages:** versão pública estática em <https://rgbittencourt.github.io/aula-generator/>. Gera exemplos e ZIP diretamente no navegador, sem IA.
+- **GitHub Pages:** versão pública estática em <https://rgbittencourt.github.io/classauthor/>. Gera exemplos e ZIP diretamente no navegador, sem IA.
 - **Vercel:** implantação recomendada para ativar IA, pesquisa de recursos, Material de Mediação em PDF, DOCX individual e ZIP completo. O mesmo repositório executa o frontend e as funções serverless.
 - **Segurança:** as chaves da OpenAI e do YouTube devem ser cadastradas somente como variáveis secretas da Vercel. Elas nunca devem entrar no GitHub, no arquivo `.env` versionado ou nesta conversa.
 
@@ -44,7 +44,7 @@ A assinatura do ChatGPT e o uso da API são gerenciados em áreas diferentes da 
 2. Selecione ou crie o projeto que usará o ClassAuthor.
 3. Abra **API keys** — normalmente em <https://platform.openai.com/api-keys>.
 4. Clique em **Create new secret key**.
-5. Dê um nome identificável, como `aula-generator-vercel`.
+5. Dê um nome identificável, como `classauthor-vercel`.
 6. Crie a chave e copie-a imediatamente. A chave completa normalmente só é exibida nessa criação.
 7. Guarde-a em um gerenciador de senhas. **Não cole a chave no GitHub, no README, no navegador público ou no chat.**
 
@@ -61,9 +61,9 @@ Claude pode ser melhor para coerência e redação longa em alguns testes, mas n
 ## Passo a passo: publicar a versão com IA na Vercel
 
 1. Abra <https://vercel.com/>.
-2. Escolha **Continue with GitHub** e autorize a Vercel a acessar `rgbittencourt/aula-generator`.
+2. Escolha **Continue with GitHub** e autorize a Vercel a acessar `rgbittencourt/classauthor`.
 3. No painel da Vercel, clique em **Add New… → Project**.
-4. Em **Import Git Repository**, localize `rgbittencourt/aula-generator` e clique em **Import**.
+4. Em **Import Git Repository**, localize `rgbittencourt/classauthor` e clique em **Import**.
 5. Mantenha a raiz do repositório como **Root Directory**. Deixe **Build Command** e **Output Directory** vazios; use `npm install` como instalação automática.
 6. Em **Environment Variables**, adicione:
 

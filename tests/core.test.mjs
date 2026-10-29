@@ -78,7 +78,7 @@ test("normaliza metas de vídeos, artigos e leituras por semana", () => {
   assert.equal(resourcePlanForWeek(input, 2).videosPerWeek, 2);
 });
 
-test("normaliza composição Aula Studio com padrão e exceção por semana", () => {
+test("normaliza composição ClassAtelier com padrão e exceção por semana", () => {
   const input = normalizeCourseInput({ title: "Curso", weeks: 2, compositionPlan: { default: { rows: { citacao: { count: 1 }, accordion: { count: 1, itemsPerBlock: 4 }, flashcards: { count: 2, itemsPerBlock: 5 }, quiz: { count: 0 } } }, weeks: [{ weekNumber: 2, rows: { accordion: { count: 0 }, quiz: { count: 1, itemsPerBlock: 4 } } }] } });
   assert.equal(compositionPlanForWeek(input, 0).rows.accordion.count, 1);
   assert.equal(compositionPlanForWeek(input, 1).rows.accordion.count, 0);
@@ -90,11 +90,11 @@ test("normaliza composição Aula Studio com padrão e exceção por semana", ()
   // Citação sem autor e obra reais não entra como citação (vira destaque): a fonte é obrigatória.
   assert.ok(!hasBlock(lesson, "citacao"));
   assert.ok(!JSON.stringify(lesson).includes("Síntese da seção"));
-  assert.ok(buildWeekGenerationPrompt(input, 0).includes("COMPOSIÇÃO EDITORIAL DO AULA STUDIO"));
+  assert.ok(buildWeekGenerationPrompt(input, 0).includes("COMPOSIÇÃO EDITORIAL DO CLASSATELIER"));
   assert.ok(buildWeekGenerationPrompt(input, 0).includes('"composition"'));
 });
 
-test("refação aplica pedido explícito de quiz à semana e ao bloco Aula Studio", () => {
+test("refação aplica pedido explícito de quiz à semana e ao bloco ClassAtelier", () => {
   const input = normalizeCourseInput({ title: "Curso com quiz", weeks: 1, compositionPlan: { default: { rows: { quiz: { count: 0, policy: "none" } } } } });
   const requested = applyCompositionInstruction(input, 0, "Acrescente 1 quiz formativo ao final da semana.");
   assert.equal(compositionPlanForWeek(requested, 0).rows.quiz.count, 1);
@@ -117,7 +117,7 @@ test("repara itens genéricos de composição com conteúdo específico da seç�
   assert.ok(accordion?.props?.items?.every((item) => !/Item contextualizado/i.test(item.title) && /Governança de dados/i.test(item.title)));
   assert.equal(quiz?.props?.questions?.length, 5);
   assert.ok(quiz?.props?.questions?.every((question) => !/Item contextualizado/i.test(question.q) && /Governança de dados/i.test(question.q)));
-  // O quiz sai em Moodle XML e no JSON do ClassAuthor; o JSON do Aula Studio não o leva.
+  // O quiz sai em Moodle XML e no JSON do ClassAuthor; o JSON do ClassAtelier não o leva.
   assert.equal(findBlock(toStudentLesson(lesson).blocks, "quiz"), null);
 });
 
@@ -328,7 +328,7 @@ test("JSON do aluno não carrega webprática e o guia preserva o projeto separad
   assert.equal(guides[0].webPracticeProjects[0].artifacts.length, 1);
 });
 
-test("exportação do Aula Studio remove mediação, alinhamento, tempo e curadoria interna", () => {
+test("exportação do ClassAtelier remove mediação, alinhamento, tempo e curadoria interna", () => {
   const input = normalizeCourseInput({ title: "Curso de exportação", weeks: 1, hoursPerWeek: 4, objectives: ["Analisar"] });
   const lesson = normalizeLesson({
     lessonPlan: {
@@ -360,7 +360,7 @@ test("exportação do Aula Studio remove mediação, alinhamento, tempo e curado
   assert.equal(videoBridge.props.body, "");
 });
 
-test("JSON do Aula Studio não leva sugestões de recurso sem URL nem blocos de mídia vazios", () => {
+test("JSON do ClassAtelier não leva sugestões de recurso sem URL nem blocos de mídia vazios", () => {
   const exported = toStudentLesson({
     meta: { title: "Semana 1", courseTitle: "Curso", weekNumber: 1 },
     lessonPlan: { theme: "Tema", contentSections: [], activities: [], assessment: { questions: [] } },

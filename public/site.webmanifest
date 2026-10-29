@@ -3,13 +3,29 @@
   "short_name": "ClassAuthor",
   "description": "Planejamento pedagógico e geração de aulas semanais.",
   "lang": "pt-BR",
+  "id": "./",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#FFFDF8",
   "theme_color": "#14213D",
   "icons": [
-    { "src": "./favicon-32.png", "sizes": "32x32", "type": "image/png" },
-    { "src": "./apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any maskable" },
-    { "src": "./brand/classauthor-mark.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "./favicon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "./apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./brand/classauthor-mark.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }

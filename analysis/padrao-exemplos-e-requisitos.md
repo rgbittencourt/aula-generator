@@ -1,16 +1,16 @@
-# Padrão dos exemplos e requisitos do Gerador de Aulas
+# Padrão dos exemplos e requisitos do ClassAuthor
 
 **Data da análise:** 30/09/2026  
 **Arquivos analisados:** seis semanas em DOCX, um roteiro de webprática em DOCX e a planilha `dados_academicos_webpratica.xlsx`.
 
 ## 1. Decisão principal de produto
 
-O Gerador de Aulas não deve começar pela divisão automática de horas. O fluxo correto será:
+O ClassAuthor não deve começar pela divisão automática de horas. O fluxo correto será:
 
 1. **Construir a semana didaticamente completa**, com densidade e acabamento próximos aos DOCX enviados.
 2. **Validar a coerência pedagógica** entre objetivos, conteúdos, recursos, prática, avaliação e referências.
 3. **Só depois dimensionar o tempo**, distribuindo as horas entre leitura principal, vídeos, leituras extras, reflexão, prática, avaliação e revisão.
-4. Gerar **um arquivo JSON por semana**, compatível com o Aula Studio, e um ZIP com todos os JSONs.
+4. Gerar **um arquivo JSON por semana**, compatível com o ClassAtelier, e um ZIP com todos os JSONs.
 
 A estimativa de tempo passa a ser uma etapa derivada do conteúdo, e não uma restrição que empobrece o conteúdo.
 
@@ -88,7 +88,7 @@ Cada recurso deve aparecer com função pedagógica explícita, não como uma li
 
 ## 5. Contrato pedagógico proposto para cada semana
 
-O JSON semanal deverá manter os blocos que o Aula Studio já entende e acrescentar metadados ricos em `lessonPlan` ou campo equivalente:
+O JSON semanal deverá manter os blocos que o ClassAtelier já entende e acrescentar metadados ricos em `lessonPlan` ou campo equivalente:
 
 ```json
 {
@@ -142,9 +142,9 @@ O JSON semanal deverá manter os blocos que o Aula Studio já entende e acrescen
 }
 ```
 
-`blocks` continuará sendo a camada de apresentação importável pelo Aula Studio. O `lessonPlan` preservará a autoria pedagógica, os recursos, os critérios e o cálculo detalhado sem depender apenas do texto renderizado.
+`blocks` continuará sendo a camada de apresentação importável pelo ClassAtelier. O `lessonPlan` preservará a autoria pedagógica, os recursos, os critérios e o cálculo detalhado sem depender apenas do texto renderizado.
 
-## 6. Blocos Aula Studio mais adequados
+## 6. Blocos ClassAtelier mais adequados
 
 O editor já possui blocos que cobrem o padrão dos exemplos:
 
@@ -225,7 +225,7 @@ A base tem registros por estudante/disciplina/período, não uma linha por estud
 2. Reescrever o prompt de geração para exigir a estrutura editorial completa.
 3. Fazer o preenchimento assistido de briefing coletar recursos e práticas como conjuntos pedagógicos.
 4. Criar validações de coerência: objetivo sem conteúdo, recurso sem finalidade, prática sem produto, avaliação sem gabarito e tempo sem base.
-5. Gerar blocos Aula Studio a partir das seções, recursos, reflexões, webpráticas e avaliação.
+5. Gerar blocos ClassAtelier a partir das seções, recursos, reflexões, webpráticas e avaliação.
 6. Calcular a carga depois da geração do conteúdo.
 7. Adicionar exportação do **Plano de Ensino detalhado** em etapa separada, no nível da disciplina, além dos JSONs semanais.
 8. Manter recursos não verificados explicitamente marcados para revisão humana.
