@@ -14,7 +14,7 @@
 // restante do sistema (blocos do ClassAtelier, qualidade, ponte entre semanas,
 // pesquisa de recursos) segue igual. AULA_WRITER=json volta ao modo antigo.
 
-import { writerMethodologyBlock, derivativesMethodologyBlock } from "./methodology.js";
+import { writerMethodologyBlock, derivativesMethodologyBlock, webPracticeMethodologyBlock } from "./methodology.js";
 import { callJson, callText, getAIModel } from "./ai-client.js";
 import { normalizeAcademicPlan } from "./academic.js";
 import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
@@ -298,6 +298,9 @@ ${scheduledPractices.length && !separateWebpractice ? `- Há webprática agendad
   ].filter(Boolean);
   const methodology = derivativesMethodologyBlock(input, index, wants);
   if (methodology) rules.push(methodology);
+  // As webpráticas saem junto com a mediação ou numa chamada própria; a metodologia vai com elas.
+  const practiceMethodology = scheduledPractices.length && ((wants.mediation && !separateWebpractice) || (part === "webpractice" && wants.webpractice)) ? webPracticeMethodologyBlock(input, index, scheduledPractices) : "";
+  if (practiceMethodology) rules.push(practiceMethodology);
   return `Texto da semana ${weekNumber} ("${plan.theme}") do curso "${input.title}":
 
 ${text}

@@ -252,3 +252,41 @@ export function productionMethodologyBlock(input = {}) {
 - Coerência: nada de efeito, música ou imagem decorativa que não ajude a entender.
 - Personalização: fale com o estudante, em primeira e segunda pessoa.`;
 }
+
+// ---------- Webpráticas (sessões síncronas) ----------
+
+// Metodologia de uma webprática: "semana" (ou vazio) herda a metodologia da semana em que ela acontece.
+export function methodForPractice(practice = {}, input = {}, index = 0) {
+  const id = text(object(practice).methodology);
+  if (!id || id === "semana") return { ...methodForWeek(input, index), inherited: true };
+  if (id === "auto") return { id: "auto", label: "A IA escolhe e justifica", method: null, inherited: false };
+  const method = methodById(id);
+  return method ? { id: method.id, label: method.label, method, inherited: false } : { id: "nenhuma", label: "Nenhuma específica", method: null, inherited: false };
+}
+
+// Bloco acrescentado às regras da webprática: uma orientação por sessão agendada.
+export function webPracticeMethodologyBlock(input = {}, index = 0, practices = []) {
+  const lines = (Array.isArray(practices) ? practices : []).map((practice, position) => {
+    const choice = methodForPractice(practice, input, index);
+    const name = text(practice.title || practice.sessionTitle) || `Webprática ${position + 1}`;
+    if (choice.id === "nenhuma") return "";
+    if (choice.id === "auto") return `- "${name}": escolha UMA destas metodologias, a que melhor servir ao objetivo da sessão: ${ACTIVE_METHODS.map((method) => method.label).join("; ")}. Organize os passos (steps) pelas etapas dela.`;
+    return `- "${name}": ${choice.method.label}. ${choice.method.activities} Como é uma sessão ao vivo, use a versão síncrona completa da metodologia (sem as adaptações para fórum) e faça os passos (steps), com seus minutos, seguirem as etapas dela. Mediação: ${choice.method.mediation}`;
+  }).filter(Boolean);
+  if (!lines.length) return "";
+  return `METODOLOGIA ATIVA DAS WEBPRÁTICAS (sessões síncronas)
+${lines.join("\n")}
+Em cada projeto com metodologia, inclua "activeMethodology": { "label": "nome da metodologia", "rationale": "por que ela serve ao objetivo da sessão, em 1 ou 2 frases", "howApplied": "como os passos da sessão aplicam a metodologia, em 2 a 4 frases" }.`;
+}
+
+// Regra extra para "Preencher vazios com IA" (abordagem nova): objetivos pela Taxonomia de Bloom revisada.
+export function briefingObjectivesRule(input = {}) {
+  if (!isNewApproach(input)) return "";
+  return `
+OBJETIVOS PELA TAXONOMIA DE BLOOM REVISADA (obrigatório nesta abordagem):
+- Cada objetivo começa com UM verbo observável no infinitivo, seguido do objeto e do contexto (ex.: "Comparar SIGAA e SUAP quanto a ... no contexto de ...").
+- Proibido começar com verbo vago: compreender, conhecer, entender, saber, aprender, perceber, refletir, familiarizar-se.
+- Faça os objetivos progredirem ao longo do curso, dos níveis mais simples aos mais complexos: no máximo um objetivo de lembrar/entender (identificar, explicar, descrever…); os demais em aplicar (aplicar, resolver, utilizar…), analisar (comparar, analisar, diferenciar…), avaliar (avaliar, justificar, argumentar…) e criar (elaborar, propor, planejar…). Pelo menos um objetivo deve ser de avaliar ou criar.
+- Ajuste o teto ao nível da turma: pós-graduação e superior chegam a avaliar/criar; FIC e cursos introdutórios podem parar em aplicar/analisar.
+- Não escreva o nome do nível no texto do objetivo; o verbo já o indica.`;
+}

@@ -82,11 +82,18 @@ function scheduleLabel(practice) {
   return parts.join(" · ") || list(practice.moments).join(", ") || "A definir";
 }
 
+// Metodologia ativa declarada pela IA para a sessão (abordagem/metodologia da cópia de teste).
+function practiceMethodology(practice = {}) {
+  const source = practice?.activeMethodology && typeof practice.activeMethodology === "object" ? practice.activeMethodology : {};
+  const label = text(source.label);
+  return label ? { label, rationale: text(source.rationale), howApplied: text(source.howApplied) } : null;
+}
+
 export function practicePackageMarkdown(input, practice, index = 0) {
   const number = index + 1;
   const blocks = practiceBlocks(practice);
   const blockText = blocks.map((block) => `### ${block.number}. ${block.title}\n\n**Duração:** ${block.minutes || "a definir"} minutos\n\n${block.instructions || "Desenvolver este bloco com a turma."}\n\n**Ação do professor:** ${block.teacherAction || "Medie a execução e faça perguntas de acompanhamento."}\n\n**Ação do estudante:** ${block.studentAction || "Execute a etapa e registre a evidência."}\n\n**Evidência:** ${block.evidence || "A definir."}`).join("\n\n");
-  return `# Webprática ${number} — ${text(practice.sessionTitle || practice.title || "Sem título")}\n\n**Curso:** ${text(input.title)}  \n**Modalidade:** ${text(practice.modality || "Aula síncrona / laboratório prático")}  \n**Agenda:** ${scheduleLabel(practice)}  \n**Duração prevista:** ${text(practice.durationMinutes || "a definir")} minutos  \n**Ferramenta/plataforma:** ${[practice.tool, practice.platform].filter(Boolean).join(" · ") || "A definir"}\n\n## Visão geral\n\n${text(practice.context || practice.problem || "Apresente a situação-problema que dará sentido à prática.")}\n\n## Objetivo da sessão\n\n${text(practice.objective || "Definir o objetivo específico da prática.")}\n\n## Pré-requisitos\n\n${bullets(practice.prerequisites)}\n\n## Preparação do professor\n\n${bullets(practice.teacherPreparation || practice.preparation)}\n\n## Preparação dos estudantes\n\n${bullets(practice.studentPreparation)}\n\n## Materiais e ferramentas\n\n${bullets(practice.materials)}\n\n## Linha do tempo da sessão\n\n${blockText}\n\n## Produto e evidência\n\n${text(practice.product || practice.deliverable || practice.delivery || "Definir o produto final e o formato de entrega.")}\n\n## Critérios de avaliação\n\n${bullets(practice.criteria || practice.rubric)}\n\n## Prompts ou comandos de apoio\n\n${bullets(practice.prompts, "A IA deve gerar os prompts específicos desta etapa.")}\n\n## Plano B e acessibilidade\n\n${text(practice.fallbackPlan || "Defina uma alternativa para falha de internet, ferramenta ou arquivo.")}\n\n## Continuidade\n\n${text(practice.continuation || "Indique como o produto será retomado no percurso do curso.")}\n`;
+  return `# Webprática ${number} — ${text(practice.sessionTitle || practice.title || "Sem título")}\n\n**Curso:** ${text(input.title)}  \n**Modalidade:** ${text(practice.modality || "Aula síncrona / laboratório prático")}  \n**Agenda:** ${scheduleLabel(practice)}  \n**Duração prevista:** ${text(practice.durationMinutes || "a definir")} minutos  \n**Ferramenta/plataforma:** ${[practice.tool, practice.platform].filter(Boolean).join(" · ") || "A definir"}${practiceMethodology(practice) ? `  \n**Metodologia ativa:** ${practiceMethodology(practice).label}` : ""}\n\n## Visão geral\n\n${text(practice.context || practice.problem || "Apresente a situação-problema que dará sentido à prática.")}\n\n## Objetivo da sessão\n\n${text(practice.objective || "Definir o objetivo específico da prática.")}\n\n## Pré-requisitos\n\n${bullets(practice.prerequisites)}\n\n## Preparação do professor\n\n${bullets(practice.teacherPreparation || practice.preparation)}\n\n## Preparação dos estudantes\n\n${bullets(practice.studentPreparation)}\n\n## Materiais e ferramentas\n\n${bullets(practice.materials)}\n\n## Linha do tempo da sessão\n\n${blockText}\n\n## Produto e evidência\n\n${text(practice.product || practice.deliverable || practice.delivery || "Definir o produto final e o formato de entrega.")}\n\n## Critérios de avaliação\n\n${bullets(practice.criteria || practice.rubric)}\n\n## Prompts ou comandos de apoio\n\n${bullets(practice.prompts, "A IA deve gerar os prompts específicos desta etapa.")}\n\n## Plano B e acessibilidade\n\n${text(practice.fallbackPlan || "Defina uma alternativa para falha de internet, ferramenta ou arquivo.")}\n\n## Continuidade\n\n${text(practice.continuation || "Indique como o produto será retomado no percurso do curso.")}\n`;
 }
 
 function paragraph(value, options = {}) {
@@ -160,11 +167,13 @@ export async function createWebPracticeDocx(input, practice, index = 0) {
       ["Semana de ocorrência", practice.weekNumber ? `Semana ${practice.weekNumber}` : list(practice.moments).join(", ")],
       ["Data e horário", [formatDate(practice.date), practice.dayOfWeek, [practice.startTime, practice.endTime].filter(Boolean).join("–")].filter(Boolean).join(" · ")],
       ["Ferramenta/plataforma", [practice.tool, practice.platform].filter(Boolean).join(" · ")],
-      ["Produto final", practice.product || practice.deliverable || practice.delivery]
+      ["Produto final", practice.product || practice.deliverable || practice.delivery],
+      ...(practiceMethodology(practice) ? [["Metodologia ativa", practiceMethodology(practice).label]] : [])
     ]),
     paragraph("1. Visão geral", { heading: HeadingLevel.HEADING_1, color: "1F3B5B", before: 280 }),
     ...bodyParagraphs(practice.context || practice.problem || "Apresente a situação-problema que dará sentido à prática."),
     ...bodyParagraphs(practice.challenge ? `Desafio da sessão: ${practice.challenge}` : ""),
+    ...bodyParagraphs(practiceMethodology(practice) ? [`Metodologia ativa: ${practiceMethodology(practice).label}.`, practiceMethodology(practice).rationale, practiceMethodology(practice).howApplied].filter(Boolean).join(" ") : ""),
     paragraph("2. Objetivo da sessão", { heading: HeadingLevel.HEADING_1, color: "1F3B5B", before: 280 }),
     ...bodyParagraphs(practice.objective || "Definir o objetivo específico da prática."),
     paragraph("3. Pré-requisitos e preparação", { heading: HeadingLevel.HEADING_1, color: "1F3B5B", before: 280 }),

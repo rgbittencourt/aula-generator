@@ -623,3 +623,11 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .methodology-box .resource-plan-heading{margin-top:14px}
 .methodology-box .resource-plan-heading strong{font-size:14px;font-family:inherit}
 .methodology-weeks{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.practice-methodology-field{grid-column:1/-1}
+.bloom-meter{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:12px}
+.bloom-meter small{flex-basis:100%;color:#8a5a00}
+.bloom-chip{padding:2px 8px;border-radius:999px;background:#eef2f5;color:#33434f;font-weight:600}
+.bloom-lembrar,.bloom-entender{background:#e8eef6;color:#2c4a6e}
+.bloom-aplicar,.bloom-analisar{background:#e3f1e8;color:#1f6b45}
+.bloom-avaliar,.bloom-criar{background:#f4ecd3;color:#7a5a10}
+.bloom-vago,.bloom-unknown{background:#fbe4dc;color:#9a3b1b}

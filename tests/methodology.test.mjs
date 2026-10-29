@@ -74,3 +74,29 @@ test("plano de metodologia normaliza lixo sem quebrar", () => {
   assert.deepEqual(normalizeMethodologyPlan(null, 4), { default: "nenhuma", weeks: [] });
   assert.deepEqual(normalizeMethodologyPlan({ default: "x", weeks: "y" }, 4), { default: "nenhuma", weeks: [] });
 });
+
+test("webprática: herda a metodologia da semana ou usa a própria", async () => {
+  const { methodForPractice, webPracticeMethodologyBlock } = await import("../src/methodology.js");
+  const input = baseInput({ methodologyPlan: { default: "estudo-de-caso" }, webPracticeEnabled: true, webPractices: [{ title: "Lab A", weekNumber: 1 }, { title: "Lab B", weekNumber: 1, methodology: "juri-simulado" }] });
+  assert.equal(input.webPractices[1].methodology, "juri-simulado");
+  assert.equal(methodForPractice(input.webPractices[0], input, 0).id, "estudo-de-caso");
+  assert.equal(methodForPractice(input.webPractices[1], input, 0).id, "juri-simulado");
+  const block = webPracticeMethodologyBlock(input, 0, input.webPractices);
+  assert.match(block, /"Lab A": Estudo de caso/);
+  assert.match(block, /"Lab B": Júri simulado/);
+  const prompt = derivativesPrompt(input, 0, { theme: "T", contentSections: [], learningObjectives: [] }, input.webPractices, "webpractice");
+  assert.match(prompt, /METODOLOGIA ATIVA DAS WEBPRÁTICAS/);
+  assert.equal(webPracticeMethodologyBlock(baseInput(), 0, [{ title: "Lab" }]), "");
+});
+
+test("webprática: a metodologia declarada aparece no roteiro", async () => {
+  const { practicePackageMarkdown } = await import("../src/webpractice.js");
+  const md = practicePackageMarkdown(baseInput(), { title: "Lab", activeMethodology: { label: "Júri simulado / debate", rationale: "r", howApplied: "h" } }, 0);
+  assert.match(md, /\*\*Metodologia ativa:\*\* Júri simulado/);
+});
+
+test("Preencher vazios com IA: regra de Bloom só na abordagem nova", async () => {
+  const { buildBriefingPrompt } = await import("../src/ai.js");
+  assert.match(buildBriefingPrompt(baseInput({ pedagogicalApproach: "nova" }), ["objectives"]), /TAXONOMIA DE BLOOM REVISADA/);
+  assert.doesNotMatch(buildBriefingPrompt(baseInput(), ["objectives"]), /TAXONOMIA DE BLOOM REVISADA/);
+});

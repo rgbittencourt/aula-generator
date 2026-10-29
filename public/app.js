@@ -591,6 +591,7 @@ function applyInputToForm(input = {}) {
   if ($("#methodology-default")) $("#methodology-default").value = methodologyOptionExists(input.methodologyPlan?.default) ? input.methodologyPlan.default : "nenhuma";
   renderMethodologyWeeks(input.methodologyPlan || {});
   updateMethodologyHints();
+  updateBloomMeter();
   renderCompositionPlanWeeks(input.compositionPlan || {});
   updateAcademicInheritance();
   updateSummary();
@@ -667,6 +668,41 @@ function updateMethodologyHints() {
   if ($("#pedagogical-approach-hint")) $("#pedagogical-approach-hint").textContent = APPROACH_HINTS[approach] || "";
   const selected = $("#methodology-default")?.selectedOptions?.[0];
   if ($("#methodology-default-hint")) $("#methodology-default-hint").textContent = selected?.dataset.hint || "";
+}
+
+// Taxonomia de Bloom revisada: leitura dos verbos dos objetivos (mesma lista de src/methodology.js).
+const BLOOM_CLIENT = {
+  lembrar: "listar nomear identificar reconhecer definir citar recordar enumerar localizar indicar apontar memorizar",
+  entender: "explicar descrever resumir interpretar classificar exemplificar parafrasear ilustrar caracterizar situar conceituar discutir inferir traduzir",
+  aplicar: "aplicar executar usar utilizar implementar calcular resolver demonstrar empregar operar simular realizar praticar mapear preencher configurar",
+  analisar: "analisar comparar diferenciar distinguir organizar examinar investigar relacionar contrastar categorizar problematizar diagnosticar decompor correlacionar testar",
+  avaliar: "avaliar julgar criticar justificar argumentar defender verificar priorizar decidir recomendar validar selecionar posicionar-se ponderar monitorar",
+  criar: "criar elaborar planejar propor projetar construir desenvolver produzir formular compor redigir conceber prototipar desenhar estruturar gerar sistematizar"
+};
+const BLOOM_VAGUE = "compreender conhecer entender saber aprender apreciar perceber familiarizar-se familiarizar conscientizar-se conscientizar refletir estudar ver".split(" ");
+const BLOOM_ORDER = ["lembrar", "entender", "aplicar", "analisar", "avaliar", "criar"];
+const BLOOM_VERB_LEVEL = new Map(Object.entries(BLOOM_CLIENT).flatMap(([level, verbs]) => verbs.split(" ").map((verb) => [verb, level])));
+
+function bloomOf(objective) {
+  const cleaned = String(objective || "").trim().toLowerCase().replace(/^[-•*\d.)\s]+/, "").replace(/^(ao final[^,:]*[,:]\s*)?((o|a) (estudante|aluno|aluna|participante|cursista)\s+)?(ser[áa] capaz de|poder[áa]|deve(r[áa])?)\s+/, "").replace(/^ser capaz de\s+/, "");
+  const verb = (cleaned.match(/^[a-zà-ú]+(-se)?/) || [""])[0];
+  if (!verb) return null;
+  if (BLOOM_VAGUE.includes(verb)) return { verb, level: "vago" };
+  return { verb, level: BLOOM_VERB_LEVEL.get(verb) || BLOOM_VERB_LEVEL.get(verb.replace(/-se$/, "")) || "?" };
+}
+
+function updateBloomMeter() {
+  const meter = $("#bloom-meter");
+  if (!meter) return;
+  const items = splitLines($("#objectives")?.value || "").map(bloomOf).filter(Boolean);
+  if (!items.length) { meter.innerHTML = ""; return; }
+  const counts = {};
+  items.forEach((item) => { counts[item.level] = (counts[item.level] || 0) + 1; });
+  const chips = [...BLOOM_ORDER, "?", "vago"].filter((level) => counts[level]).map((level) => `<span class="bloom-chip bloom-${level === "?" ? "unknown" : level}">${level === "?" ? "verbo não reconhecido" : level === "vago" ? "verbo vago" : level} · ${counts[level]}</span>`).join("");
+  const vague = items.filter((item) => item.level === "vago").map((item) => item.verb);
+  const higher = items.some((item) => ["aplicar", "analisar", "avaliar", "criar"].includes(item.level));
+  const notes = [vague.length ? `Troque “${[...new Set(vague)].join("”, “")}” por um verbo observável.` : "", !higher ? "Nenhum objetivo chega a aplicar, analisar, avaliar ou criar." : ""].filter(Boolean).join(" ");
+  meter.innerHTML = `<strong>Taxonomia de Bloom:</strong> ${chips}${notes ? `<small>${escapeHtml(notes)}</small>` : ""}`;
 }
 
 // Metodologia em vigor numa semana, para mostrar nos cartões e na prévia.
@@ -849,6 +885,11 @@ let practiceSequence = 0;
 let materialSequence = 0;
 const selectOption = (value, option) => value === option ? "selected" : "";
 
+function practiceMethodologyOptions(selected = "semana") {
+  const current = selected || "semana";
+  return [`<option value="semana" ${current === "semana" ? "selected" : ""}>Mesma da semana</option>`, ...methodologyOptions().map((option) => `<option value="${escapeHtml(option.value)}" title="${escapeHtml(option.hint)}" ${option.value === current ? "selected" : ""}>${escapeHtml(option.label)}</option>`)].join("");
+}
+
 function practiceCard(data = {}) {
   practiceSequence += 1;
   const id = data.id || `webpractice-${practiceSequence}`;
@@ -856,6 +897,7 @@ function practiceCard(data = {}) {
     <div class="item-card-heading"><strong>Sessão prática <span class="item-index">${practiceSequence}</span></strong><button class="remove-item" type="button" data-remove-practice aria-label="Remover webprática">×</button></div>
     <div class="field-grid two">
       <label class="field"><span>Título da sessão</span><input class="practice-title" value="${escapeHtml(data.title || data.sessionTitle || "")}" placeholder="Ex.: Laboratório de prototipagem com IA" /></label>
+      <label class="field practice-methodology-field"><span>Metodologia ativa da sessão</span><select class="practice-methodology">${practiceMethodologyOptions(data.methodology)}</select><small class="hint">“Mesma da semana” herda a metodologia escolhida para a semana em que a sessão acontece.</small></label>
       <label class="field"><span>Modalidade</span><select class="practice-modality"><option ${selectOption(data.modality, "Aula síncrona / laboratório prático")}>Aula síncrona / laboratório prático</option><option ${selectOption(data.modality, "Aula síncrona")}>Aula síncrona</option><option ${selectOption(data.modality, "Laboratório prático")}>Laboratório prático</option></select></label>
     </div>
     <div class="field-grid three">
@@ -948,7 +990,8 @@ function collectPractices() {
     materials: splitLines(card.querySelector(".practice-materials").value),
     product: card.querySelector(".practice-product").value.trim(),
     fallbackPlan: card.querySelector(".practice-fallback").value.trim(),
-    durationMinutes: Number(card.querySelector(".practice-duration").value) || 90
+    durationMinutes: Number(card.querySelector(".practice-duration").value) || 90,
+    methodology: card.querySelector(".practice-methodology")?.value || "semana"
   }));
 }
 
@@ -1319,7 +1362,7 @@ async function assistBriefing() {
     const briefing = data.briefing || {};
     const filled = [];
     if (!$("#audience").value.trim() && briefing.audience) { $("#audience").value = briefing.audience; filled.push("público"); }
-    if (!$("#objectives").value.trim() && Array.isArray(briefing.objectives) && briefing.objectives.length) { $("#objectives").value = briefing.objectives.join("\n"); filled.push("objetivos"); }
+    if (!$("#objectives").value.trim() && Array.isArray(briefing.objectives) && briefing.objectives.length) { $("#objectives").value = briefing.objectives.join("\n"); filled.push("objetivos"); updateBloomMeter(); }
     if (!$("#content").value.trim() && briefing.content) { $("#content").value = briefing.content; filled.push("conteúdos"); }
     if ($("#practice-enabled").checked && Array.isArray(briefing.webPractices) && briefing.webPractices.length) {
       const practiceFieldsFilled = mergeBriefingPractices(briefing.webPractices);
@@ -3075,7 +3118,7 @@ $("#methodology-default")?.addEventListener("change", () => { updateMethodologyH
 $("#methodology-weeks")?.addEventListener("change", (event) => { const row = event.target.closest("[data-methodology-week]"); if (row) row.classList.toggle("is-override", Boolean(event.target.value)); scheduleSave(); });
 $("#weeks").addEventListener("input", () => { const resourcePlan = collectResourcePlan(); const compositionPlan = collectCompositionPlan(); renderResourcePlanWeeks(resourcePlan); renderMethodologyWeeks(collectMethodologyPlan()); renderCompositionPlanWeeks(compositionPlan); updateSummary(); updateProgress(); scheduleSave(); });
 $("#practice-enabled").addEventListener("change", () => { togglePractice(); scheduleSave(); });
-$("#course-form").addEventListener("input", () => { updateAcademicInheritance(); updateSummary(); updateProgress(); scheduleSave(); });
+$("#course-form").addEventListener("input", () => { updateBloomMeter(); updateAcademicInheritance(); updateSummary(); updateProgress(); scheduleSave(); });
 $("#save-backup-button").addEventListener("click", downloadBackup);
 $("#restore-backup-button").addEventListener("click", () => $("#backup-file-input").click());
 $("#backup-file-input").addEventListener("change", (event) => { restoreBackupFile(event.target.files?.[0]); event.target.value = ""; });
@@ -3090,4 +3133,4 @@ $("#assist-button").dataset.label = "Preencher vazios com IA";
 $("#recalculate-button").dataset.label = "Recalcular qualidade";
 initializeWelcome();
 enhanceLayout();
-renderResourcePlanWeeks(); renderMethodologyWeeks(); updateMethodologyHints(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
+renderResourcePlanWeeks(); renderMethodologyWeeks(); updateMethodologyHints(); updateBloomMeter(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();

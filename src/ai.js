@@ -1,4 +1,4 @@
-import { writerMethodologyBlock, derivativesMethodologyBlock } from "./methodology.js";
+import { writerMethodologyBlock, derivativesMethodologyBlock, webPracticeMethodologyBlock, briefingObjectivesRule } from "./methodology.js";
 import { KNOWN_BLOCK_TYPES, normalizeLesson, normalizeWeeklyOutput, practiceScheduledForWeek, resourcePlanForWeek } from "./aula-schema.js";
 import { abntRules } from "./abnt.js";
 import { measureLessonQuality, qualityPromptGuidance, qualityTargets } from "./content-quality.js";
@@ -47,7 +47,7 @@ Regras:
 Contexto essencial do briefing atual (campos extensos e configurações não relacionadas foram omitidos para manter a solicitação dentro do limite do modelo):
 ${JSON.stringify(compactInput, null, 2)}
 
-Retorne JSON válido agora.`;
+Retorne JSON válido agora.${briefingObjectivesRule(input)}`;
 }
 
 function text(value) { return typeof value === "string" ? value.trim() : ""; }
@@ -88,7 +88,8 @@ export function compactBriefingPractice(practice = {}, index = 0) {
     assessment: clipText(practice.assessment, 300),
     criteria: compactList(practice.criteria, 5, 180),
     fallbackPlan: clipText(practice.fallbackPlan, 300),
-    durationMinutes: Math.max(0, safeNumber(practice.durationMinutes, 45))
+    durationMinutes: Math.max(0, safeNumber(practice.durationMinutes, 45)),
+    ...(text(practice.methodology) && text(practice.methodology) !== "semana" ? { methodology: clipText(practice.methodology, 40) } : {})
   };
 }
 function compactBriefingMaterial(material = {}, index = 0) {
@@ -461,7 +462,7 @@ ${JSON.stringify(compactInput, null, 2)}
 
 Sessões práticas independentes agendadas para esta semana (não inserir no texto-base; desenvolver somente em teacherGuide.webPracticeProjects e no DOCX separado):
 ${JSON.stringify(scheduledPractices.map((practice, practiceIndex) => compactBriefingPractice(practice, practiceIndex)), null, 2)}
-${[writerMethodologyBlock(input, weekIndex), derivativesMethodologyBlock(input, weekIndex, { assessment: true, activities: true, mediation: true, explain: true })].filter(Boolean).map((block) => `\n${block}`).join("\n")}
+${[writerMethodologyBlock(input, weekIndex), derivativesMethodologyBlock(input, weekIndex, { assessment: true, activities: true, mediation: true, explain: true }), webPracticeMethodologyBlock(input, weekIndex, scheduledPractices)].filter(Boolean).map((block) => `\n${block}`).join("\n")}
 Retorne JSON completo, sem omitir propriedades obrigatórias.`;
 }
 

@@ -307,7 +307,9 @@ function normalizePractice(value = {}, index = 0) {
     variants: { simplified: text(practice.variants?.simplified || practice.simplifiedVersion), advanced: text(practice.variants?.advanced || practice.advancedVersion) },
     resources: normalizeResources(practice.resources, "practice-resource"),
     durationMinutes: Math.max(0, number(practice.durationMinutes || practice.sessionMinutes, 45)),
-    delivery: text(practice.delivery || practice.evidence)
+    delivery: text(practice.delivery || practice.evidence),
+    methodology: text(practice.methodology),
+    activeMethodology: practice.activeMethodology && typeof practice.activeMethodology === "object" && text(practice.activeMethodology.label) ? { label: text(practice.activeMethodology.label), rationale: text(practice.activeMethodology.rationale), howApplied: text(practice.activeMethodology.howApplied) } : null
   };
 }
 
