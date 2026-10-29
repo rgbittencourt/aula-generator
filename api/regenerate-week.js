@@ -8,6 +8,7 @@ import { validateCourse } from "../src/validation.js";
 import { getAIModel, getAIProvider } from "../src/ai-client.js";
 import bridgeHandler from "../src/bridge-handler.js";
 import derivativesHandler from "../src/derivatives-handler.js";
+import figureHandler from "../src/figure-handler.js";
 import illustrateHandler from "../src/illustrate-handler.js";
 import productionHandler from "../src/production-handler.js";
 import weekEditHandler from "../src/week-edit-handler.js";
@@ -16,6 +17,8 @@ export default async function handler(request, response) {
   // /api/bridge e /api/derivatives são encaminhados para esta função (limite de 12 funções do plano Hobby).
   if (["summary", "adjust"].includes(request.body?.action)) return bridgeHandler(request, response);
   if (request.body?.action === "derivatives") return derivativesHandler(request, response);
+  // /api/figure (figura avulsa pedida pelo ClassAtelier, com CORS) também chega aqui, inclusive o OPTIONS.
+  if (request.method === "OPTIONS" || request.body?.action === "figure") return figureHandler(request, response);
   if (request.body?.action === "illustrate") return illustrateHandler(request, response);
   if (request.body?.action === "production") return productionHandler(request, response);
   if (request.body?.action === "edit") return weekEditHandler(request, response);

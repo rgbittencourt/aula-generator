@@ -8,6 +8,17 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.2.0 · 29/10/2026 · figura avulsa para o ClassAtelier
+
+### Novo
+- Rota **`POST /api/figure`**: cria **uma** figura (diagrama ou ilustração em SVG, com legenda, texto alternativo e o crédito «Ilustração criada por IA») a partir de uma descrição. É o que o botão **Inserir imagem no cursor → Criar com IA** do ClassAtelier 1.3.0 usa. Não é uma função nova da Vercel: segue dentro de `api/regenerate-week.js` (limite de 12 funções do plano Hobby).
+- **CORS restrito**: só responde a páginas de `https://rgbittencourt.github.io` e de `localhost`/`127.0.0.1`; outros endereços recebem 403. Para liberar outro endereço, use a variável `AULA_CORS_ORIGINS` (lista separada por vírgulas).
+- Com `AULA_ACCESS_CODE` configurado, o código continua obrigatório (cabeçalho `x-aula-access-code`), como nas demais rotas de IA.
+- `src/figure-handler.js` e testes em `tests/figure-handler.test.mjs`.
+
+### Compatibilidade
+- Nada quebra. Sem chave de IA configurada, a rota responde 503 com a mensagem de sempre.
+
 ## 1.1.0 · 29/10/2026 · abrir semana salva
 
 ### Novo

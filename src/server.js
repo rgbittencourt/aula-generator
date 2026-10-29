@@ -20,6 +20,7 @@ import { applyCompositionInstruction } from "./composition.js";
 import generateWeekHandler from "../api/generate-week.js";
 import bridgeHandler from "./bridge-handler.js";
 import derivativesHandler from "./derivatives-handler.js";
+import figureHandler from "./figure-handler.js";
 import illustrateHandler from "./illustrate-handler.js";
 import productionHandler from "./production-handler.js";
 import regenerateWeekHandler from "../api/regenerate-week.js";
@@ -71,6 +72,8 @@ app.post("/api/generate-week", (req, res) => generateWeekHandler(req, res));
 app.post("/api/bridge", (req, res) => bridgeHandler(req, res));
 app.post("/api/derivatives", (req, res) => derivativesHandler(req, res));
 app.post("/api/illustrate", (req, res) => illustrateHandler(req, res));
+app.options("/api/figure", (req, res) => figureHandler(req, res));
+app.post("/api/figure", (req, res) => figureHandler(req, res));
 app.post("/api/production", (req, res) => productionHandler(req, res));
 
 app.post("/api/enrich-week", async (req, res) => {

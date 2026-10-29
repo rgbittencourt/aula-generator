@@ -4,7 +4,7 @@ Aplicação para transformar um briefing de curso em uma trilha semanal de aulas
 
 ## Versão
 
-Versão atual: **1.1.0** (Versionamento Semântico). O histórico está em [`CHANGELOG.md`](CHANGELOG.md); o número aparece no rodapé do aplicativo e em `/api/health`.
+Versão atual: **1.2.0** (Versionamento Semântico). O histórico está em [`CHANGELOG.md`](CHANGELOG.md); o número aparece no rodapé do aplicativo e em `/api/health`.
 
 ## Manual
 
@@ -101,6 +101,7 @@ Claude pode ser melhor para coerência e redação longa em alguns testes, mas n
 | `AULA_ACADEMIC_REVIEW` | `true` | Production, Preview e Development |
 | `AULA_AUTO_REPAIR` | `true` | Production, Preview e Development |
 | `AULA_ACCESS_CODE` | uma frase/código privado seu | Production, Preview e Development |
+| `AULA_CORS_ORIGINS` | (opcional) endereços extras que podem pedir figuras ao `/api/figure`, separados por vírgula. O GitHub Pages do autor e o localhost já são aceitos | Production, Preview e Development |
 | `YOUTUBE_API_KEY` | chave opcional do YouTube Data API | Production e, se desejar, Preview |
 | `AULA_OPENALEX_ENABLED` | `true` por padrão; use `false` para desativar o fallback acadêmico | Production, Preview e Development |
 

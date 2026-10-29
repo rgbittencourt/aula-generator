@@ -3,7 +3,7 @@
 // sempre com a legenda "Ilustração criada por IA".
 
 import { callText } from "./ai-client.js";
-import { allFigures, figureBlock, sanitizeSvg, svgDataUri } from "./figures.js";
+import { AI_FIGURE_CREDIT, allFigures, figureBlock, sanitizeSvg, svgDataUri } from "./figures.js";
 
 const text = (value) => String(value ?? "").trim();
 const plain = (html) => text(html).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
@@ -74,4 +74,28 @@ export async function illustrateWeek(input, week, { ask = callText, limit = 3 } 
   const figures = nextSections.flatMap((section) => (section.figures || []).map((figure) => ({ ...figure, sectionNumber: text(figure.sectionNumber || section.number) })));
   const next = { ...week, lessonPlan: { ...plan, contentSections: nextSections }, blocks: insertFigureBlocks(week.blocks, figures) };
   return { week: next, drawn: done.size, failed: todo.length - done.size, total: allFigures(plan).length };
+}
+
+/**
+ * Uma figura avulsa, pedida pelo ClassAtelier ("Inserir imagem no cursor → Criar com IA").
+ * Devolve o SVG já limpo e em URI de dados, com legenda, texto alternativo e crédito de IA.
+ * `ask` é injetável para teste.
+ */
+export async function drawFigureFromPrompt({ prompt, context = "", title = "" } = {}, { ask = callText } = {}) {
+  const description = text(prompt).slice(0, 1200);
+  if (description.length < 4) { const error = new Error("Descreva a imagem que a IA deve criar (pelo menos uma frase curta)."); error.code = "FIGURE_PROMPT_MISSING"; throw error; }
+  const near = plain(context).slice(0, 1500);
+  const messages = [{ role: "system", content: SYSTEM }, { role: "user", content: `${text(title) ? `Aula: "${text(title).slice(0, 200)}".\n` : ""}${near ? `Trecho do texto onde a figura entrará (use os mesmos termos):\n${near}\n\n` : ""}Diagrama a desenhar: ${description}\n\nDevolva somente o <svg>.` }];
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const result = await ask(messages, { temperature: 0.4, maxTokens: 7000, ignoreRequestBudget: true, cacheSystem: true });
+    const svg = sanitizeSvg(result.text);
+    if (svg) {
+      const label = svg.match(/aria-label\s*=\s*"([^"]{3,300})"/i)?.[1];
+      return { svg, src: svgDataUri(svg), alt: text(label) || description.slice(0, 240), caption: `${description.replace(/[.\s]+$/, "").slice(0, 200)}. Ilustração criada por IA.`, credit: AI_FIGURE_CREDIT };
+    }
+    messages.push({ role: "assistant", content: String(result.text || "").slice(0, 4000) }, { role: "user", content: "Esse SVG foi recusado (precisa ser um único <svg> com viewBox, sem script, imagem, <use>, links nem recursos externos, e completo até </svg>). Devolva só o <svg> corrigido." });
+  }
+  const error = new Error("A IA não devolveu um desenho válido. Tente descrever de outro jeito (uma ideia por figura).");
+  error.code = "FIGURE_INVALID";
+  throw error;
 }
