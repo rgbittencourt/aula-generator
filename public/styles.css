@@ -603,3 +603,8 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .week-actions .week-open-studio .wordmark b{color:var(--navy)}
 .week-actions .week-open-studio .wordmark i{color:var(--coral-dark)}
 @media(max-width:620px){button.studio-top-link{width:36px;padding:0}.studio-open-arrow{display:none}}
+
+.studio-edit{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--mint-soft,#e8f4ee);border:1px solid var(--line);font-size:12px;line-height:1.5;color:var(--ink)}
+.studio-edit small{display:block;margin-top:4px;color:var(--muted);font-size:11px}
+.studio-edit-actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+.studio-edit .link-button{padding:0;border:0;background:none;color:var(--navy);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer}

@@ -6,7 +6,7 @@ import { applyAdjustment, applyRewrite, approveWeek, bridgesBefore, canGenerateN
 const $ = (selector) => document.querySelector(selector);
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
 const createReviewMarks = () => ({ resources: {}, checks: {}, academic: {}, quality: {} });
-const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, activeReviewGuidance: null, generation: null, flow: emptyFlow(), production: emptyProduction() };
+const state = { input: null, weeks: [], workload: null, generalPlan: null, teacherGuides: [], provider: null, validation: null, previewIndex: null, reviewMarks: createReviewMarks(), weekApprovals: {}, studioEdits: {}, activeReviewGuidance: null, generation: null, flow: emptyFlow(), production: emptyProduction() };
 const blockLabels = { hero: "Abertura", topic: "Tópico", prose: "Texto", titulo: "Título", video: "Vídeo", materiais: "Materiais", quiz: "Quiz", destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", imagem: "Imagem", externalembed: "Conteúdo externo", accordion: "FAQ", columns: "Colunas", referencias: "Referências" };
 const DRAFT_STORAGE_KEY = "aula-generator:draft:v2";
 const DRAFT_MAX_AGE_DAYS = 30;
@@ -372,6 +372,7 @@ function resetDisciplineForm(preserveSession = true) {
   state.validation = null;
   state.reviewMarks = createReviewMarks();
   state.weekApprovals = {};
+  state.studioEdits = {};
   state.production = emptyProduction();
   state.flow = emptyFlow();
   state.activeReviewGuidance = null;
@@ -458,6 +459,7 @@ function currentSnapshot() {
       validation: state.validation,
       reviewMarks: state.reviewMarks,
       weekApprovals: state.weekApprovals,
+      studioEdits: state.studioEdits,
       production: state.production,
       stepFlow: state.flow,
       generation: state.generation,
@@ -677,6 +679,7 @@ function restoreSnapshot(snapshot) {
   applyInputToForm(snapshot.form);
   state.reviewMarks = snapshot.results?.reviewMarks || snapshot.reviewMarks || createReviewMarks();
   state.weekApprovals = snapshot.results?.weekApprovals || snapshot.weekApprovals || {};
+  state.studioEdits = snapshot.results?.studioEdits || {};
   state.production = normalizeProductionState(snapshot.results?.production);
   state.flow = normalizeFlow(snapshot.results?.stepFlow);
   state.generation = snapshot.results?.generation || snapshot.generation || null;
@@ -1504,7 +1507,7 @@ async function retryDerivatives(index, options = {}) {
     if (accessCode) headers["x-aula-access-code"] = accessCode;
     const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input, weekIndex: index, week: state.weeks[index], teacherGuide: state.teacherGuides[index], ...(parts ? { parts } : {}) }) });
     const done = await readApiResponse(response, `Não foi possível gerar ${partsText} da semana ${index + 1}.`);
-    state.weeks[index] = done.week;
+    state.weeks[index] = done.week; if (state.studioEdits) delete state.studioEdits[index];
     state.teacherGuides[index] = done.teacherGuide || state.teacherGuides[index];
     saveDraft("derivados-gerados");
     refreshChecklistFromWeek(index);
@@ -1540,7 +1543,7 @@ async function applyTargetedEdit(index, instruction, scope) {
     const theme = (week) => week?.lessonPlan?.theme || week?.meta?.title || "";
     const response = await fetch("/api/regenerate-week", { method: "POST", headers, signal: AbortSignal.timeout(280000), body: JSON.stringify({ action: "edit", scope, input, weekIndex: index, instruction, week: { ...state.weeks[index], teacherGuide: state.teacherGuides[index] }, previousTheme: index > 0 ? theme(state.weeks[index - 1]) : "", nextTheme: theme(state.weeks[index + 1]) }) });
     const done = await readApiResponse(response, "Não foi possível alterar a semana.");
-    state.weeks[index] = done.week;
+    state.weeks[index] = done.week; if (state.studioEdits) delete state.studioEdits[index];
     saveDraft("semana-alterada");
     refreshChecklistFromWeek(index);
     renderWeeks({ input: state.input, weeks: state.weeks, workload: state.workload, generalPlan: state.generalPlan, teacherGuides: state.teacherGuides, provider: state.provider, validation: state.validation }, { scrollToResults: false });
@@ -2026,7 +2029,7 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
     const qualityLabel = manuallyApproved ? "conferida e liberada por você" : ({ ready: "conteúdo pronto", complete: "conteúdo completo", blocked: "bloqueada: pendência crítica", review: "revisão recomendada", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[automaticStatus] || "qualidade não medida");
     const approvalButton = automaticStatus !== "ready" && automaticStatus !== "complete" ? `<button class="week-approve ${manuallyApproved ? "is-approved" : ""}" data-index="${index}" type="button">${manuallyApproved ? "Desfazer liberação" : "Liberar após conferência"}</button>` : "";
     const statusDetail = reasons.length ? `<small class="week-status-detail">${escapeHtml(manuallyApproved ? `Diagnóstico automático: ${reasons.join(" · ")}` : reasons.join(" · "))}</small>` : "";
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no ClassAtelier (sem o quiz)">JSON ClassAtelier <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do ClassAuthor, com quiz, feedbacks e guia do professor">JSON ClassAuthor <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button><button class="button button-secondary week-open-studio" data-index="${index}" type="button" title="Abre o ClassAtelier em outra aba já com esta semana carregada">Abrir esta semana no <strong class="wordmark"><b>Class</b><i>Atelier</i></strong> <span>↗</span></button>${approvalButton}</div></article>`;
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no ClassAtelier (sem o quiz)">JSON ClassAtelier <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do ClassAuthor, com quiz, feedbacks e guia do professor">JSON ClassAuthor <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button><button class="button button-secondary week-open-studio" data-index="${index}" type="button" title="Abre o ClassAtelier em outra aba já com esta semana carregada">Abrir esta semana no <strong class="wordmark"><b>Class</b><i>Atelier</i></strong> <span>↗</span></button>${approvalButton}</div>${studioEditMarkup(index)}</article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
   const weeksNote = $("#weeks-sector-note");
@@ -2036,6 +2039,7 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
   $("#week-grid").querySelectorAll(".week-download-full").forEach((button) => button.addEventListener("click", () => downloadWeekFull(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-open-studio").forEach((button) => button.addEventListener("click", () => openInStudio(Number(button.dataset.index))));
   $("#week-grid").querySelectorAll(".week-download-quiz").forEach((button) => button.addEventListener("click", () => downloadWeekQuiz(Number(button.dataset.index))));
+  $("#week-grid").querySelectorAll(".studio-edit").forEach((box) => wireStudioEdit(box));
   $("#week-grid").querySelectorAll(".week-approve").forEach((button) => button.addEventListener("click", () => toggleWeekApproval(Number(button.dataset.index))));
   renderGeneralPlan(data.generalPlan);
   renderWorkload(data.workload);
@@ -2056,7 +2060,7 @@ function weekFileName(lesson, index, suffix) {
 function downloadWeek(index) {
   const lesson = state.weeks[index];
   if (!lesson) return;
-  downloadBlob(new Blob([JSON.stringify(toStudentLesson(lesson), null, 2)], { type: "application/json" }), weekFileName(lesson, index, "classatelier.json"));
+  downloadBlob(new Blob([JSON.stringify(studentProjectFor(index), null, 2)], { type: "application/json" }), weekFileName(lesson, index, "classatelier.json"));
 }
 
 function downloadWeekFull(index) {
@@ -2091,12 +2095,76 @@ function refreshStudioWeekSelect() {
   select.value = chosen !== "" && Number(chosen) < weeks.length ? chosen : String(weeks.length - 1);
 }
 
+// ── Volta do ClassAtelier: a semana editada lá chega por postMessage e passa a ser a versão do aluno ──
+// A semana gerada continua intacta em state.weeks (quiz, guia do professor, carga horária); a edição
+// fica em state.studioEdits[index] e vale para "Abrir no ClassAtelier", "JSON ClassAtelier" e o ZIP.
+function studentProjectFor(index) {
+  const edit = state.studioEdits?.[index];
+  if (edit?.project?.blocks?.length) return edit.project;
+  return toStudentLesson(state.weeks[index]);
+}
+
+function studioEditMarkup(index) {
+  const edit = state.studioEdits?.[index];
+  if (!edit) return "";
+  const when = new Date(edit.at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const words = edit.text ? edit.text.split(/\s+/).filter(Boolean).length : 0;
+  return `<div class="studio-edit" data-index="${index}"><strong>Versão editada no ClassAtelier</strong> · ${escapeHtml(when)}${words ? ` · ${words.toLocaleString("pt-BR")} palavras` : ""}<small>Esta é a versão usada em «Abrir no ClassAtelier», «JSON ClassAtelier» e no ZIP. O quiz, o guia do professor e a carga horária continuam os da geração.</small><span class="studio-edit-actions"><button type="button" class="link-button studio-edit-text" data-index="${index}">Baixar o texto (.txt)</button><button type="button" class="link-button studio-edit-drop" data-index="${index}">Voltar à versão gerada</button></span></div>`;
+}
+
+function wireStudioEdit(box) {
+  const index = Number(box.dataset.index);
+  box.querySelector(".studio-edit-text")?.addEventListener("click", () => {
+    const edit = state.studioEdits?.[index];
+    if (!edit?.text) return;
+    downloadBlob(new Blob([edit.text], { type: "text/plain;charset=utf-8" }), weekFileName(state.weeks[index], index, "texto-editado.txt"));
+  });
+  box.querySelector(".studio-edit-drop")?.addEventListener("click", () => {
+    if (!window.confirm("Descartar a versão editada no ClassAtelier e voltar à versão gerada desta semana?\n\nA aula continua guardada na Biblioteca do ClassAtelier.")) return;
+    delete state.studioEdits[index];
+    refreshStudioEditNote(index);
+    saveDraft("edição do ClassAtelier descartada");
+  });
+}
+
+function refreshStudioEditNote(index) {
+  const card = $("#week-grid")?.querySelectorAll(".week-card")[index];
+  if (!card) return;
+  card.querySelector(".studio-edit")?.remove();
+  const html = studioEditMarkup(index);
+  if (html) { card.insertAdjacentHTML("beforeend", html); wireStudioEdit(card.querySelector(".studio-edit")); }
+}
+
+// Descobre a semana da aula devolvida: pelo nome do arquivo com que ela foi aberta e, se não achar, pelo título.
+function weekIndexForStudioLesson(fileName, title) {
+  const weeks = state.weeks || [];
+  let index = fileName ? weeks.findIndex((lesson, i) => weekFileName(lesson, i, "classatelier.json") === fileName) : -1;
+  if (index < 0 && fileName) { const m = /^semana-(\d{2})-/i.exec(fileName); if (m && weeks[Number(m[1]) - 1]) index = Number(m[1]) - 1; }
+  if (index < 0 && title) { const norm = (s) => String(s || "").trim().toLowerCase(); const hits = weeks.map((lesson, i) => (norm(lesson.meta?.title) === norm(title) ? i : -1)).filter((i) => i >= 0); if (hits.length === 1) index = hits[0]; }
+  return index;
+}
+
+window.addEventListener("message", (event) => {
+  if (event.origin !== STUDIO_ORIGIN || !event.data || event.data.type !== "classatelier:lesson") return;
+  const reply = (message) => { try { event.source?.postMessage(message, STUDIO_ORIGIN); } catch { /* a aba do editor pode ter sido fechada */ } };
+  const { lesson, text, fileName, title } = event.data;
+  if (!Array.isArray(lesson?.blocks) || !lesson.blocks.length) { reply({ type: "classauthor:error", message: "a aula veio sem blocos." }); return; }
+  const index = weekIndexForStudioLesson(fileName, title || lesson.meta?.title);
+  if (index < 0) { reply({ type: "classauthor:error", message: "não encontrei a semana de origem. Abra a aula pelo botão «Abrir esta semana no ClassAtelier» deste painel." }); return; }
+  state.studioEdits = state.studioEdits || {};
+  state.studioEdits[index] = { project: { meta: lesson.meta || {}, blocks: lesson.blocks }, text: String(text || ""), fileName: fileName || "", at: new Date().toISOString() };
+  refreshStudioEditNote(index);
+  saveDraft("semana devolvida pelo ClassAtelier");
+  showStudioToast(`A semana ${index + 1} voltou editada do ClassAtelier. Ela agora é a versão usada ao abrir e ao baixar o JSON ClassAtelier.`);
+  reply({ type: "classauthor:received", week: index + 1, title: state.weeks[index]?.meta?.title || "" });
+});
+
 function openInStudio(index) {
   const lesson = Number.isInteger(index) ? state.weeks[index] : null;
   const win = window.open(STUDIO_URL, "aula-studio-editor");
   if (!win) { showStudioToast("O navegador bloqueou a nova aba. Libere pop-ups para este site e tente de novo."); return; }
   if (!lesson) return;
-  const payload = toStudentLesson(lesson);
+  const payload = studentProjectFor(index);
   const fileName = weekFileName(lesson, index, "classatelier.json");
   let settled = false;
   const finish = () => { settled = true; window.removeEventListener("message", onMessage); clearTimeout(fallbackTimer); };
@@ -2390,7 +2458,7 @@ async function adjustBridge(index, kind, button = null) {
     const input = state.input || formInput();
     const body = { input, weekIndex: index, week: state.weeks[index], ...(kind === "opening" ? { previousBridge: neighbor } : { nextBridge: neighbor }) };
     const data = await postJson("/api/bridge", { ...body, action: "adjust" }, "Não foi possível ajustar a ponte.");
-    state.weeks[index] = data.week;
+    state.weeks[index] = data.week; if (state.studioEdits) delete state.studioEdits[index];
     applyAdjustment(state.flow, index, kind, data.summary);
     saveDraft("pontas-ajustadas");
     rerenderWeeks();
@@ -2551,6 +2619,7 @@ async function generate() {
   }
   state.reviewMarks = resumeGeneration ? state.reviewMarks : createReviewMarks();
   state.weekApprovals = resumeGeneration ? state.weekApprovals : {};
+  state.studioEdits = resumeGeneration ? (state.studioEdits || {}) : {};
   if (!resumeGeneration) state.production = emptyProduction();
   const button = $("#generate-button");
   if (!beginAiAction(button)) return;
@@ -2742,7 +2811,7 @@ async function downloadZip() {
     if (isGitHubPages) {
       if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
       const zip = new window.JSZip();
-      state.weeks.forEach((lesson, index) => { const number = String(index + 1).padStart(2, "0"); zip.file(`classatelier/semana-${number}-${slugify(lesson.meta?.title)}-classatelier.json`, JSON.stringify(toStudentLesson(lesson), null, 2)); zip.file(`classauthor/semana-${number}-${slugify(lesson.meta?.title)}-classauthor.json`, JSON.stringify(toGeneratorWeek(lesson, state.teacherGuides?.[index]), null, 2)); const xml = createMoodleXml(lesson, { courseTitle: currentInput.title, weekNumber: index + 1 }); if (xml) zip.file(`moodle/semana-${number}-${slugify(lesson.meta?.title)}-quiz.xml`, xml); });
+      state.weeks.forEach((lesson, index) => { const number = String(index + 1).padStart(2, "0"); zip.file(`classatelier/semana-${number}-${slugify(lesson.meta?.title)}-classatelier.json`, JSON.stringify(studentProjectFor(index), null, 2)); zip.file(`classauthor/semana-${number}-${slugify(lesson.meta?.title)}-classauthor.json`, JSON.stringify(toGeneratorWeek(lesson, state.teacherGuides?.[index]), null, 2)); const xml = createMoodleXml(lesson, { courseTitle: currentInput.title, weekNumber: index + 1 }); if (xml) zip.file(`moodle/semana-${number}-${slugify(lesson.meta?.title)}-quiz.xml`, xml); });
       if (state.generalPlan) zip.file("planejamento-geral.json", JSON.stringify(state.generalPlan, null, 2));
       zip.file("professor/LEIA-ME.txt", "O Material de Mediação em PDF é gerado na versão Vercel com backend. Este modo público contém apenas o exemplo do aluno.");
       downloadBlob(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), `${slugify(currentInput.title)}-semanas.zip`);
