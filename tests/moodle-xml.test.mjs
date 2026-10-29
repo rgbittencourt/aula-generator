@@ -57,7 +57,7 @@ test("ZIP separa o quiz Moodle XML do .aula.json", async () => {
   const buffer = await createWeeksZip(input, [lesson(), lesson(1)], null, []);
   const zip = await JSZip.loadAsync(buffer);
   const names = Object.keys(zip.files);
-  assert.equal(names.filter((name) => /^moodle\/semana-0[12]-.*-quiz\.xml$/.test(name)).length, 2);
+  assert.equal(names.filter((name) => /^moodle\/Semana0[12]-.*-Quiz\.xml$/.test(name)).length, 2);
   assert.ok(names.includes("moodle/todas-as-semanas-quiz.xml"));
   await wellFormed(await zip.files["moodle/todas-as-semanas-quiz.xml"].async("string"));
 });
@@ -75,8 +75,8 @@ test("ZIP: o JSON do ClassAtelier não leva o quiz e o do ClassAuthor leva a sem
   week.blocks = [...(week.blocks || []), { id: "q1", type: "quiz", props: { questions: week.lessonPlan.assessment.questions } }, { id: "r1", type: "referencias", props: { title: "Referências", items: [{ html: "AUTOR. Título.", href: "https://doi.org/10/x", credit: "" }] } }];
   const zip = await JSZip.loadAsync(await createWeeksZip(input, [week], null, [{ resourceNotes: ["x"] }]));
   const names = Object.keys(zip.files);
-  const studio = names.find((name) => name.endsWith("-classatelier.json"));
-  const generator = names.find((name) => name.startsWith("classauthor/") && name.endsWith("-classauthor.json"));
+  const studio = names.find((name) => name.endsWith("-ClassAtelier.json"));
+  const generator = names.find((name) => name.startsWith("classauthor/") && name.endsWith("-ClassAuthor.json"));
   assert.ok(studio && generator);
   const studioJson = JSON.parse(await zip.files[studio].async("string"));
   assert.ok(!studioJson.blocks.some((block) => block.type === "quiz"));

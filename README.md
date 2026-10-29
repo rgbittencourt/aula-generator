@@ -240,12 +240,12 @@ Depois de escrever a semana, o ClassAuthor procura no texto valores em R$, perce
 
 A aplicação produz duas camadas diferentes:
 
-- **Aula do aluno:** cada semana é um JSON (`semana-NN-titulo-classatelier.json`) compatível com o botão **Abrir** do ClassAtelier. Ele contém apenas a experiência de aprendizagem do aluno: texto, objetivos, recursos contextualizados, atividades, avaliação, síntese e referências necessárias. O arquivo não leva alinhamento pedagógico, parágrafos internos de ligação, justificativas de curadoria, status de revisão, cálculo de tempo, ajustes de carga ou mensagens de acompanhamento. `lessonPlan.webPractices` é sempre `[]`.
+- **Aula do aluno:** cada semana é um JSON (`SemanaNN-titulo-ClassAtelier.json`) compatível com o botão **Abrir** do ClassAtelier. Ele contém apenas a experiência de aprendizagem do aluno: texto, objetivos, recursos contextualizados, atividades, avaliação, síntese e referências necessárias. O arquivo não leva alinhamento pedagógico, parágrafos internos de ligação, justificativas de curadoria, status de revisão, cálculo de tempo, ajustes de carga ou mensagens de acompanhamento. `lessonPlan.webPractices` é sempre `[]`.
 - **Material de Mediação:** é mantido fora do JSON do aluno e exportado em PDF. Reúne intenção pedagógica, arco didático, matriz de alinhamento, diagnóstico, perguntas de mediação, equívocos comuns, intervenções, diferenciação, acessibilidade, avaliação, revisão espiral, checklist, carga detalhada, o ponto exato de uso e a justificativa de cada recurso, além de mensagens semanais para WhatsApp e Moodle. As mensagens têm o mesmo propósito, mas são redigidas de modo diferente: WhatsApp mais próximo e informal; Moodle mais organizado para o ambiente do curso. Cada mensagem pode ser editada, receber tom e instruções próprias e ser refeita isoladamente pela IA.
 - O **Material de Mediação** é um guia de acompanhamento que cresce a cada semana gerada: o PDF traz capa com a situação (liberadas, rascunhos, a gerar), sumário com páginas, mapa da UC, ritmo de acompanhamento e sinais de alerta, os vídeos da UC e, para cada semana já gerada (marcada como **Liberada** ou **Rascunho em revisão**), a semana em uma página, as ideias-chave, o roteiro antes/durante/depois com as mensagens de WhatsApp e Moodle nos pontos certos, perguntas prováveis dos alunos, equívocos comuns, sinais de alerta e intervenções, atividades, gabarito comentado, recursos, pontos a conferir antes de publicar, vídeos da semana, ponte, trilhas, acessibilidade, webprática e um anexo técnico. As semanas ainda não geradas aparecem no fim com o tema previsto. Seções sem conteúdo não aparecem. As explicações para o professor (resumo, perguntas dos alunos, equívocos, intervenções) vêm da parte `explain` dos derivados; em semanas antigas, o botão **Completar explicações do Material de Mediação** na prévia gera só essa parte, sem tocar no texto. Emojis e símbolos que a fonte do PDF não tem são omitidos.
 - **Roteiro de webprática:** cada sessão prática agendada é mantida em `teacherGuide.webPracticeProjects` e exportada como DOCX editável próprio, sem ser inserida no texto-base semanal.
 
-Na tela de resultados, o app se chama **ClassAuthor**. Todos os arquivos levam o crédito “Conteúdo elaborado com ClassAuthor, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.”: como último bloco da aula do ClassAtelier (rodapé de autoria), nos campos `aiTool`, `aiUse` e `generatedBy` do `meta`, no JSON do ClassAuthor, na categoria do Moodle XML, na capa do PDF e na planilha de produção, além do nome e da instituição de quem preencheu a capa. Cada semana tem três downloads, com o destino no nome: **JSON ClassAtelier** (`semana-NN-titulo-classatelier.json`, para abrir no ClassAtelier, sem o quiz; as referências saem como texto), **JSON ClassAuthor** (`semana-NN-titulo-classauthor.json`, a semana completa com quiz, feedbacks e guia do professor) e **Quiz XML** (`semana-NN-titulo-quiz.xml`, para importar no banco de questões do Moodle). O painel separado **Webpráticas programadas** mostra a agenda e oferece **Baixar DOCX** para cada sessão. **Material de Mediação PDF** baixa o documento de mediação. **Pacote completo ZIP** reúne os JSONs, o Planejamento Geral, o Material de Mediação em PDF e os projetos de webprática em Markdown, JSON, arquivos auxiliares e DOCX.
+Na tela de resultados, o app se chama **ClassAuthor**. Todos os arquivos levam o crédito “Conteúdo elaborado com ClassAuthor, uma ferramenta de planejamento pedagógico desenvolvida por Rogério Bittencourt, INOVALAB - IFSC.”: como último bloco da aula do ClassAtelier (rodapé de autoria), nos campos `aiTool`, `aiUse` e `generatedBy` do `meta`, no JSON do ClassAuthor, na categoria do Moodle XML, na capa do PDF e na planilha de produção, além do nome e da instituição de quem preencheu a capa. Cada semana tem três downloads, com o destino no nome: **JSON ClassAtelier** (`SemanaNN-titulo-ClassAtelier.json`, para abrir no ClassAtelier, sem o quiz; as referências saem como texto), **JSON ClassAuthor** (`semana-NN-titulo-classauthor.json`, a semana completa com quiz, feedbacks e guia do professor) e **Quiz XML** (`semana-NN-titulo-quiz.xml`, para importar no banco de questões do Moodle). O painel separado **Webpráticas programadas** mostra a agenda e oferece **Baixar DOCX** para cada sessão. **Material de Mediação PDF** baixa o documento de mediação. **Pacote completo ZIP** reúne os JSONs, o Planejamento Geral, o Material de Mediação em PDF e os projetos de webprática em Markdown, JSON, arquivos auxiliares e DOCX.
 
 **Abrir no ClassAtelier.** O botão **Abrir ClassAtelier**, no cabeçalho, abre o editor em outra aba e, ao lado dele, a lista **com** define qual semana já entra carregada (ou editor em branco). Cada cartão de semana também tem **Abrir esta semana no ClassAtelier**. A semana segue por `postMessage` só para a aba que o ClassAuthor abriu; a aula que estava aberta no editor vai para a **Biblioteca** do ClassAtelier (nada se perde); só se a mesma semana já estiver lá, com edições, ele pergunta antes de substituir. Se o editor não responder em 25 s, o arquivo da semana é baixado para você usar em **Abrir projeto**.
 
@@ -343,12 +343,12 @@ A chave é usada apenas pelo backend e nunca é enviada ao navegador.
 ## Saída do ZIP
 
 ```text
-classatelier/semana-01-titulo-classatelier.json
-classatelier/semana-02-titulo-classatelier.json
-classauthor/semana-01-titulo-classauthor.json
-classauthor/semana-02-titulo-classauthor.json
-moodle/semana-01-titulo-quiz.xml
-moodle/semana-02-titulo-quiz.xml
+classatelier/Semana01-titulo-ClassAtelier.json
+classatelier/Semana02-titulo-ClassAtelier.json
+classauthor/Semana01-titulo-ClassAuthor.json
+classauthor/Semana02-titulo-ClassAuthor.json
+moodle/Semana01-titulo-Quiz.xml
+moodle/Semana02-titulo-Quiz.xml
 moodle/todas-as-semanas-quiz.xml
 planejamento-geral.json
 professor/material-de-mediacao.pdf
@@ -359,6 +359,8 @@ webpraticas/01-tema/arquivos/*
 producao/planilha-de-producao.xlsx   (se já houver roteiros gerados)
 producao/roteiros-de-video.md
 ```
+
+Os nomes seguem o padrão que o próprio ClassAtelier usa nos projetos: `SemanaNN-` + título sem acento e sem palavras soltas no fim (até 60 letras) + destino (`ClassAtelier.json`, `ClassAuthor.json`, `Quiz.xml`). Assim o arquivo baixado daqui, o projeto salvo no ClassAtelier e o publicado no acervo têm o mesmo nome-base, e o ClassAtelier troca sozinho a versão antiga da mesma semana quando o título muda.
 
 ### Produção audiovisual e planilha de produção
 

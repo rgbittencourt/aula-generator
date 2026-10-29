@@ -2050,23 +2050,27 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
 }
 
 // Três arquivos por semana, com o destino no nome:
-//  - semana-NN-titulo-classatelier.json: o que abre no ClassAtelier (sem o quiz);
-//  - semana-NN-titulo-classauthor.json: a semana completa, com quiz, feedbacks e guia do professor;
-//  - semana-NN-titulo-quiz.xml: o quiz em Moodle XML, com feedback em todas as alternativas.
+//  - SemanaNN-titulo-ClassAtelier.json: o que abre no ClassAtelier (sem o quiz);
+//  - SemanaNN-titulo-ClassAuthor.json: a semana completa, com quiz, feedbacks e guia do professor;
+//  - SemanaNN-titulo-Quiz.xml: o quiz em Moodle XML, com feedback em todas as alternativas.
+// Mesmo padrão dos projetos do ClassAtelier (título sem acento, até 60 letras, sem palavra solta no fim).
 function weekFileName(lesson, index, suffix) {
-  return `semana-${String(index + 1).padStart(2, "0")}-${slugify(lesson.meta?.title)}-${suffix}`;
+  let slug = slugify(lesson.meta?.title || "aula").replace(/^semana-0*\d+-?/, "");
+  if (slug.length > 60) slug = slug.slice(0, 60).replace(/-[^-]*$/, "") || slug.slice(0, 60);
+  slug = slug.replace(/(-(de|da|do|das|dos|em|na|no|nas|nos|e|a|o|as|os|para|com|por|que|um|uma))+$/, "").replace(/-$/, "") || "aula";
+  return `Semana${String(index + 1).padStart(2, "0")}-${slug}-${suffix}`;
 }
 
 function downloadWeek(index) {
   const lesson = state.weeks[index];
   if (!lesson) return;
-  downloadBlob(new Blob([JSON.stringify(studentProjectFor(index), null, 2)], { type: "application/json" }), weekFileName(lesson, index, "classatelier.json"));
+  downloadBlob(new Blob([JSON.stringify(studentProjectFor(index), null, 2)], { type: "application/json" }), weekFileName(lesson, index, "ClassAtelier.json"));
 }
 
 function downloadWeekFull(index) {
   const lesson = state.weeks[index];
   if (!lesson) return;
-  downloadBlob(new Blob([JSON.stringify(toGeneratorWeek(lesson, state.teacherGuides?.[index]), null, 2)], { type: "application/json" }), weekFileName(lesson, index, "classauthor.json"));
+  downloadBlob(new Blob([JSON.stringify(toGeneratorWeek(lesson, state.teacherGuides?.[index]), null, 2)], { type: "application/json" }), weekFileName(lesson, index, "ClassAuthor.json"));
 }
 
 // ClassAtelier (o editor, hoje ainda publicado como ClassAtelier) recebe a semana por postMessage.
@@ -2117,7 +2121,7 @@ function wireStudioEdit(box) {
   box.querySelector(".studio-edit-text")?.addEventListener("click", () => {
     const edit = state.studioEdits?.[index];
     if (!edit?.text) return;
-    downloadBlob(new Blob([edit.text], { type: "text/plain;charset=utf-8" }), weekFileName(state.weeks[index], index, "texto-editado.txt"));
+    downloadBlob(new Blob([edit.text], { type: "text/plain;charset=utf-8" }), weekFileName(state.weeks[index], index, "Texto-editado.txt"));
   });
   box.querySelector(".studio-edit-drop")?.addEventListener("click", () => {
     if (!window.confirm("Descartar a versão editada no ClassAtelier e voltar à versão gerada desta semana?\n\nA aula continua guardada na Biblioteca do ClassAtelier.")) return;
@@ -2138,8 +2142,8 @@ function refreshStudioEditNote(index) {
 // Descobre a semana da aula devolvida: pelo nome do arquivo com que ela foi aberta e, se não achar, pelo título.
 function weekIndexForStudioLesson(fileName, title) {
   const weeks = state.weeks || [];
-  let index = fileName ? weeks.findIndex((lesson, i) => weekFileName(lesson, i, "classatelier.json") === fileName) : -1;
-  if (index < 0 && fileName) { const m = /^semana-(\d{2})-/i.exec(fileName); if (m && weeks[Number(m[1]) - 1]) index = Number(m[1]) - 1; }
+  let index = fileName ? weeks.findIndex((lesson, i) => weekFileName(lesson, i, "ClassAtelier.json") === fileName) : -1;
+  if (index < 0 && fileName) { const m = /^semana-?(\d{1,2})-/i.exec(fileName); if (m && weeks[Number(m[1]) - 1]) index = Number(m[1]) - 1; }
   if (index < 0 && title) { const norm = (s) => String(s || "").trim().toLowerCase(); const hits = weeks.map((lesson, i) => (norm(lesson.meta?.title) === norm(title) ? i : -1)).filter((i) => i >= 0); if (hits.length === 1) index = hits[0]; }
   return index;
 }
@@ -2165,7 +2169,7 @@ function openInStudio(index) {
   if (!win) { showStudioToast("O navegador bloqueou a nova aba. Libere pop-ups para este site e tente de novo."); return; }
   if (!lesson) return;
   const payload = studentProjectFor(index);
-  const fileName = weekFileName(lesson, index, "classatelier.json");
+  const fileName = weekFileName(lesson, index, "ClassAtelier.json");
   let settled = false;
   const finish = () => { settled = true; window.removeEventListener("message", onMessage); clearTimeout(fallbackTimer); };
   const onMessage = (event) => {
@@ -2189,7 +2193,7 @@ function downloadWeekQuiz(index) {
   if (!lesson) return;
   const xml = createMoodleXml(lesson, { courseTitle: state.input?.title || formInput().title, weekNumber: index + 1 });
   if (!xml) { showError(`A semana ${index + 1} ainda não tem questões para exportar. Gere as questões primeiro.`); return; }
-  downloadBlob(new Blob([xml], { type: "application/xml;charset=utf-8" }), weekFileName(lesson, index, "quiz.xml"));
+  downloadBlob(new Blob([xml], { type: "application/xml;charset=utf-8" }), weekFileName(lesson, index, "Quiz.xml"));
 }
 
 function apiHeaders() {
@@ -2811,7 +2815,7 @@ async function downloadZip() {
     if (isGitHubPages) {
       if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
       const zip = new window.JSZip();
-      state.weeks.forEach((lesson, index) => { const number = String(index + 1).padStart(2, "0"); zip.file(`classatelier/semana-${number}-${slugify(lesson.meta?.title)}-classatelier.json`, JSON.stringify(studentProjectFor(index), null, 2)); zip.file(`classauthor/semana-${number}-${slugify(lesson.meta?.title)}-classauthor.json`, JSON.stringify(toGeneratorWeek(lesson, state.teacherGuides?.[index]), null, 2)); const xml = createMoodleXml(lesson, { courseTitle: currentInput.title, weekNumber: index + 1 }); if (xml) zip.file(`moodle/semana-${number}-${slugify(lesson.meta?.title)}-quiz.xml`, xml); });
+      state.weeks.forEach((lesson, index) => { zip.file(`classatelier/${weekFileName(lesson, index, "ClassAtelier.json")}`, JSON.stringify(studentProjectFor(index), null, 2)); zip.file(`classauthor/${weekFileName(lesson, index, "ClassAuthor.json")}`, JSON.stringify(toGeneratorWeek(lesson, state.teacherGuides?.[index]), null, 2)); const xml = createMoodleXml(lesson, { courseTitle: currentInput.title, weekNumber: index + 1 }); if (xml) zip.file(`moodle/${weekFileName(lesson, index, "Quiz.xml")}`, xml); });
       if (state.generalPlan) zip.file("planejamento-geral.json", JSON.stringify(state.generalPlan, null, 2));
       zip.file("professor/LEIA-ME.txt", "O Material de Mediação em PDF é gerado na versão Vercel com backend. Este modo público contém apenas o exemplo do aluno.");
       downloadBlob(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), `${slugify(currentInput.title)}-semanas.zip`);

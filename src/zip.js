@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { slugify } from "./aula-schema.js";
+import { weekFileName } from "./aula-schema.js";
 import { createWebPracticeDocxFiles, createWebPracticeFiles } from "./webpractice.js";
 import { createMediationMaterialPdf } from "./pdf.js";
 import { collectWebPracticeProjects } from "./teacher-guide.js";
@@ -13,13 +13,13 @@ export async function createWeeksZip(input, weeks, generalPlan = null, teacherGu
   const allGuides = options.mediationGuides || teacherGuides;
   for (const [index, lesson] of weeks.entries()) {
     const number = String(index + 1).padStart(2, "0");
-    const slug = slugify(lesson.meta?.title || `${input.title}-semana-${number}`, `semana-${number}`);
+    const title = lesson.meta?.title || `${input.title} semana ${number}`;
     // Três arquivos por semana, com o destino no nome: o do ClassAtelier (sem o quiz), o completo
     // do ClassAuthor (com quiz, feedbacks e guia do professor) e o quiz em Moodle XML.
-    folder.file(`semana-${number}-${slug}-classatelier.json`, JSON.stringify(toStudentLesson(lesson), null, 2));
-    zip.file(`classauthor/semana-${number}-${slug}-classauthor.json`, JSON.stringify(toGeneratorWeek(lesson, allGuides[index]), null, 2));
+    folder.file(weekFileName(title, index + 1, "ClassAtelier.json"), JSON.stringify(toStudentLesson(lesson), null, 2));
+    zip.file(`classauthor/${weekFileName(title, index + 1, "ClassAuthor.json")}`, JSON.stringify(toGeneratorWeek(lesson, allGuides[index]), null, 2));
     const xml = createMoodleXml(lesson, { courseTitle: input.title, weekNumber: index + 1 });
-    if (xml) zip.file(`moodle/semana-${number}-${slug}-quiz.xml`, xml);
+    if (xml) zip.file(`moodle/${weekFileName(title, index + 1, "Quiz.xml")}`, xml);
   }
   const combined = createCombinedMoodleXml(weeks, { courseTitle: input.title });
   if (combined && weeks.length > 1) zip.file("moodle/todas-as-semanas-quiz.xml", combined);

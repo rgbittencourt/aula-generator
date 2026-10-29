@@ -109,6 +109,15 @@ export function slugify(value, fallback = "aula") {
   return slug || fallback;
 }
 
+// Nome de arquivo de uma semana, no mesmo padrão que o ClassAtelier usa nos seus projetos:
+// Semana01-titulo-da-aula-ClassAtelier.json (título sem acento, no máximo 60 letras, sem palavra solta no fim).
+export function weekFileName(title, number, suffix) {
+  let slug = slugify(title, "aula").replace(/^semana-0*\d+-?/, "");
+  if (slug.length > 60) slug = slug.slice(0, 60).replace(/-[^-]*$/, "") || slug.slice(0, 60);
+  slug = slug.replace(/(-(de|da|do|das|dos|em|na|no|nas|nos|e|a|o|as|os|para|com|por|que|um|uma))+$/, "").replace(/-$/, "") || "aula";
+  return `Semana${String(number).padStart(2, "0")}-${slug}-${suffix}`;
+}
+
 function validDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text(value))) return false;
   const date = new Date(`${value}T12:00:00Z`);
