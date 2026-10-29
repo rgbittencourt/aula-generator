@@ -1,3 +1,4 @@
+import { normalizeApproach, normalizeMethodologyPlan, methodForWeek } from "./methodology.js";
 import { normalizeDidacticArc, buildAlignmentMatrix, buildProgression, pedagogicalReview } from "./pedagogy.js";
 import { sortReferencesAbnt } from "./abnt.js";
 import { measureLessonQuality } from "./content-quality.js";
@@ -574,12 +575,30 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
     writer: text(plan.writer),
     academicProfile: normalizeAcademicProfile(input.academicProfile, input),
     academicPlan: object(plan.academicPlan),
-    notes: splitLines(plan.notes)
+    notes: splitLines(plan.notes),
+    pedagogicalApproach: normalizeApproach(input.pedagogicalApproach),
+    activeMethodology: normalizeActiveMethodology(plan.activeMethodology, input, index)
   };
   normalized.alignmentMatrix = buildAlignmentMatrix(normalized);
   normalized.spiralReview = buildProgression(normalized, index);
-  normalized.pedagogicalReview = pedagogicalReview(normalized);
+  normalized.pedagogicalReview = pedagogicalReview(normalized, { input, index });
   return normalized;
+}
+
+// Metodologia ativa da semana: o que a IA declarou nas atividades ou, na falta, o que o professor escolheu.
+function normalizeActiveMethodology(value, input = {}, index = 0) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const chosen = methodForWeek(input, index);
+  const declared = text(source.label);
+  if (!declared && (chosen.id === "nenhuma" || chosen.id === "auto")) return chosen.id === "auto" ? { id: "auto", label: "", requested: "auto", rationale: "", howApplied: "", modalityNote: "" } : null;
+  return {
+    id: text(source.id, chosen.id),
+    label: declared || chosen.label,
+    requested: chosen.id,
+    rationale: text(source.rationale),
+    howApplied: text(source.howApplied),
+    modalityNote: text(source.modalityNote)
+  };
 }
 
 export function normalizeCourseInput(raw = {}) {
@@ -607,6 +626,8 @@ export function normalizeCourseInput(raw = {}) {
     materials,
     weeks, hoursPerWeek, calendarMode,
     didacticMode: text(raw.didacticMode, "auto"),
+    pedagogicalApproach: normalizeApproach(raw.pedagogicalApproach),
+    methodologyPlan: normalizeMethodologyPlan(raw.methodologyPlan, weeks),
     startDate: calendarMode === "calendar" && validDate(raw.startDate) ? raw.startDate : null,
     webPractices,
     webPractice: { enabled, moments: legacyMoments.length ? legacyMoments : splitLines(practice.moments || raw.practiceMoments), instructions: legacyInstructions || text(practice.instructions || raw.practiceInstructions), durationMinutes: webPractices.reduce((sum, item) => sum + item.durationMinutes, 0) },

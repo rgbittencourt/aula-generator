@@ -14,6 +14,7 @@
 // restante do sistema (blocos do ClassAtelier, qualidade, ponte entre semanas,
 // pesquisa de recursos) segue igual. AULA_WRITER=json volta ao modo antigo.
 
+import { writerMethodologyBlock, derivativesMethodologyBlock } from "./methodology.js";
 import { callJson, callText, getAIModel } from "./ai-client.js";
 import { normalizeAcademicPlan } from "./academic.js";
 import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
@@ -74,6 +75,7 @@ PEDIDO DO PROFESSOR PARA ESTA REVISÃO:
 "${String(instruction || "").trim()}"
 
 Como revisar: reescreva o documento inteiro já com o pedido incorporado. O que o professor não mencionou deve permanecer praticamente idêntico (mesmas frases, mesma ordem, mesmos casos e callouts), porque ele já leu e aprovou esses trechos. Não encolha o texto, não resuma e mantenha a voz. Se o pedido mudar um fato ou um caso, ajuste também o que dependia dele (síntese, glossário, referências, "Pontos a conferir").` : "";
+  const methodology = writerMethodologyBlock(input, index);
   return `Escreva a unidade da semana ${weekNumber} do curso "${input.title}". ${intro}
 
 PÚBLICO E NÍVEL: ${input.audience || "estudantes de pós-graduação"} (${input.level || "pós-graduação"}), em ${input.language || "português do Brasil"}.
@@ -96,7 +98,7 @@ TAMANHO: pelo menos ${targets.requiredSectionCount} seções numeradas, cada uma
 RECURSOS: ${resourcePlan.videosPerWeek} vídeo(s) e ${resourcePlan.articlesPerWeek} artigo(s) nesta semana (${resourcePlan.requiredReadingsPerWeek} de leitura obrigatória, nível ${resourcePlan.requiredReadingLevel}). Cada um é um callout 🔎 colocado no parágrafo exato em que ajuda, com "busca" específica. ${provided.length ? `Links fornecidos pelo professor (únicos que podem aparecer em "url:"): ${provided.join(" ")}` : "O professor não forneceu links: use somente \"busca\"."}
 ${bridge ? `\n${bridge}\n` : ""}
 ${closingRequirement()} Esse texto vai na seção "O que vem por aí", em um único parágrafo.
-${previousWeeksBlock(previousWeeks)}
+${methodology ? `\n${methodology}\n` : ""}${previousWeeksBlock(previousWeeks)}
 ${revision}
 
 BRIEFING DO CURSO:
@@ -294,6 +296,8 @@ ${scheduledPractices.length && !separateWebpractice ? `- Há webprática agendad
     part === "webpractice" && wants.webpractice && `REGRAS DA WEBPRÁTICA
 - Desenvolva o projeto completo de cada webprática agendada para esta semana, só em teacherGuide.webPracticeProjects (nunca no texto do aluno), ligado ao que o texto ensinou. Briefing da prática: ${JSON.stringify(scheduledPractices.map((practice, practiceIndex) => compactBriefingPractice(practice, practiceIndex)))}`
   ].filter(Boolean);
+  const methodology = derivativesMethodologyBlock(input, index, wants);
+  if (methodology) rules.push(methodology);
   return `Texto da semana ${weekNumber} ("${plan.theme}") do curso "${input.title}":
 
 ${text}
@@ -360,7 +364,7 @@ async function buildDerivatives(input, index, plan, only = null) {
 
 function mergeDerivatives(plan, derivatives) {
   const pick = (key) => derivatives[key] && (Array.isArray(derivatives[key]) ? derivatives[key].length : Object.keys(derivatives[key]).length) ? { [key]: derivatives[key] } : {};
-  return { ...plan, ...pick("assessment"), ...pick("diagnostic"), ...pick("formativeChecks"), ...pick("activities"), ...pick("selfAssessment") };
+  return { ...plan, ...pick("assessment"), ...pick("diagnostic"), ...pick("formativeChecks"), ...pick("activities"), ...pick("selfAssessment"), ...pick("activeMethodology") };
 }
 
 async function composeWeek(input, index, markdown, options = {}) {

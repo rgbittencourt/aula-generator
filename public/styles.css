@@ -608,3 +608,18 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .studio-edit small{display:block;margin-top:4px;color:var(--muted);font-size:11px}
 .studio-edit-actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
 .studio-edit .link-button{padding:0;border:0;background:none;color:var(--navy);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer}
+
+/* Abordagem pedagógica e metodologias ativas (cópia de teste) */
+.methodology-box{margin:18px 0;padding:16px;border:1px solid #d3b56e;border-radius:12px;background:#fffaf0}
+.methodology-box .profile-heading{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
+.methodology-box .profile-heading small{color:#6b5a2e}
+.methodology-weeks{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-top:8px}
+.methodology-week{display:grid;grid-template-columns:78px minmax(0,1fr);gap:8px;align-items:center;padding:8px 10px;border:1px solid #e8dcc0;border-radius:10px;background:#fff}
+.methodology-week span{font-size:12px;font-weight:700;color:#6b5a2e}
+.methodology-week select{min-height:34px;padding:6px 8px;font-size:12px;width:100%}
+.methodology-week.is-override{border-color:#b8902f;background:#fff6dd}
+.week-method{display:inline-block;margin:2px 0 4px;padding:2px 8px;border-radius:999px;background:#fbefd0;color:#6b4a00;font-size:11px;font-weight:600}
+.reader-methodology{border-left:3px solid #d3b56e;padding-left:12px}
+.methodology-box .resource-plan-heading{margin-top:14px}
+.methodology-box .resource-plan-heading strong{font-size:14px;font-family:inherit}
+.methodology-weeks{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}

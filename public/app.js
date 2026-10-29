@@ -365,6 +365,8 @@ function resetDisciplineForm(preserveSession = true) {
   addPractice();
   addMaterial();
   renderResourcePlanWeeks();
+  renderMethodologyWeeks();
+  updateMethodologyHints();
   renderCompositionPlanWeeks();
   toggleCalendar();
   togglePractice();
@@ -585,6 +587,10 @@ function applyInputToForm(input = {}) {
   if ($("#resource-default-required")) $("#resource-default-required").value = Number.isFinite(Number(resourceDefaults.requiredReadingsPerWeek)) ? resourceDefaults.requiredReadingsPerWeek : 1;
   if ($("#resource-default-level")) $("#resource-default-level").value = resourceDefaults.requiredReadingLevel || "essential";
   renderResourcePlanWeeks(resourcePlan);
+  if ($("#pedagogical-approach")) $("#pedagogical-approach").value = input.pedagogicalApproach === "atual" ? "atual" : "nova";
+  if ($("#methodology-default")) $("#methodology-default").value = methodologyOptionExists(input.methodologyPlan?.default) ? input.methodologyPlan.default : "nenhuma";
+  renderMethodologyWeeks(input.methodologyPlan || {});
+  updateMethodologyHints();
   renderCompositionPlanWeeks(input.compositionPlan || {});
   updateAcademicInheritance();
   updateSummary();
@@ -614,6 +620,64 @@ function collectResourcePlan() {
     },
     weeks
   };
+}
+
+// ---- Abordagem pedagógica e metodologias ativas (cópia de teste) ----
+const APPROACH_HINTS = {
+  nova: "Planeja de trás para frente (o que o estudante vai produzir vem antes do texto), pede objetivos com verbos observáveis, confere o alinhamento com as atividades e a avaliação e aplica princípios de multimídia no texto, nos slides e nos vídeos.",
+  atual: "Gera exatamente como a versão principal do ClassAuthor. Use para comparar."
+};
+
+function methodologyOptions() {
+  return [...($("#methodology-default")?.options || [])].map((option) => ({ value: option.value, label: option.textContent, hint: option.dataset.hint || "" }));
+}
+
+function methodologyOptionExists(value) {
+  return methodologyOptions().some((option) => option.value === value);
+}
+
+function methodologyLabel(value) {
+  return methodologyOptions().find((option) => option.value === value)?.label || "";
+}
+
+function collectMethodologyPlan() {
+  const weeks = [...document.querySelectorAll("[data-methodology-week]")]
+    .map((row) => ({ weekNumber: Number(row.dataset.methodologyWeek), method: row.querySelector("select")?.value || "" }))
+    .filter((entry) => entry.method);
+  return { default: $("#methodology-default")?.value || "nenhuma", weeks };
+}
+
+function renderMethodologyWeeks(plan = {}) {
+  const container = $("#methodology-weeks");
+  if (!container) return;
+  const weeks = Math.min(52, Math.max(1, Number($("#weeks")?.value) || 1));
+  const byWeek = new Map((Array.isArray(plan.weeks) ? plan.weeks : []).map((entry) => [Number(entry.weekNumber || entry.week), entry.method]));
+  const defaultLabel = methodologyLabel($("#methodology-default")?.value || "nenhuma");
+  const options = methodologyOptions();
+  container.innerHTML = Array.from({ length: weeks }, (_, index) => {
+    const weekNumber = index + 1;
+    const chosen = byWeek.get(weekNumber) || "";
+    const choices = [`<option value="">Padrão (${escapeHtml(defaultLabel)})</option>`, ...options.map((option) => `<option value="${escapeHtml(option.value)}" title="${escapeHtml(option.hint)}" ${option.value === chosen ? "selected" : ""}>${escapeHtml(option.label)}</option>`)].join("");
+    return `<label class="methodology-week ${chosen ? "is-override" : ""}" data-methodology-week="${weekNumber}"><span>Semana ${weekNumber}</span><select aria-label="Metodologia ativa da semana ${weekNumber}">${choices}</select></label>`;
+  }).join("");
+}
+
+function updateMethodologyHints() {
+  const approach = $("#pedagogical-approach")?.value || "nova";
+  if ($("#pedagogical-approach-hint")) $("#pedagogical-approach-hint").textContent = APPROACH_HINTS[approach] || "";
+  const selected = $("#methodology-default")?.selectedOptions?.[0];
+  if ($("#methodology-default-hint")) $("#methodology-default-hint").textContent = selected?.dataset.hint || "";
+}
+
+// Metodologia em vigor numa semana, para mostrar nos cartões e na prévia.
+function methodologyForWeekLabel(index, lesson) {
+  const declared = lesson?.lessonPlan?.activeMethodology;
+  if (declared?.label) return declared.label;
+  const plan = state.input?.methodologyPlan || collectMethodologyPlan();
+  const specific = (plan.weeks || []).find((entry) => Number(entry.weekNumber) === index + 1)?.method;
+  const id = specific || plan.default || "nenhuma";
+  if (id === "nenhuma") return "";
+  return id === "auto" ? "Metodologia: a IA escolhe" : methodologyLabel(id);
 }
 
 function renderResourcePlanWeeks(plan = {}) {
@@ -921,6 +985,8 @@ function formInput() {
     objectives: splitLines($("#objectives").value),
     content: $("#content").value,
     didacticMode: $("#didactic-mode").value,
+    pedagogicalApproach: $("#pedagogical-approach")?.value || "nova",
+    methodologyPlan: collectMethodologyPlan(),
     academicProfile: {
       discipline: $("#course-title").value.trim(),
       level: $("#level").value,
@@ -1477,12 +1543,13 @@ function renderLessonPreview(lesson, index) {
   const timeItems = (plan.timePlan?.items || []).filter((item) => Number(item.minutes || item.learnerMinutes) > 0).map((item) => `<li><strong>${escapeHtml(workloadItemLabel(item))}</strong>: ${escapeHtml(item.title || "")} — ${formatLoad(item.minutes || item.learnerMinutes)}${item.required === false ? " · complementar" : " · obrigatório"}</li>`).join("");
   const timeBreakdown = Object.entries(plan.timePlan?.breakdown || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<li><strong>${escapeHtml(breakdownLabels[key] || key)}</strong>: ${formatLoad(value)}</li>`).join("");
   const timeMarkup = timeItems || timeBreakdown ? `<section class="time-breakdown reader-time-breakdown"><h3>Tempo desta semana</h3><p>O cálculo está separado por texto-base, leituras, mídias e atividades. “Obrigatório” indica o que entra na trilha essencial; “complementar” não é obrigatório.</p><ul>${timeItems || timeBreakdown}</ul></section>` : "";
+  const methodology = plan.activeMethodology?.label ? `<section class="reader-methodology"><h3>Metodologia ativa: ${escapeHtml(plan.activeMethodology.label)}</h3>${plan.activeMethodology.rationale ? `<p><strong>Por que esta metodologia:</strong> ${escapeHtml(plan.activeMethodology.rationale)}</p>` : ""}${plan.activeMethodology.howApplied ? `<p><strong>Como as atividades a aplicam:</strong> ${escapeHtml(plan.activeMethodology.howApplied)}</p>` : ""}${plan.activeMethodology.modalityNote ? `<p><small>${escapeHtml(plan.activeMethodology.modalityNote)}</small></p>` : ""}</section>` : "";
   const alignment = (plan.alignmentMatrix || []).length ? `<section><h3>Alinhamento pedagógico</h3><ul>${plan.alignmentMatrix.map((row) => `<li><strong>${escapeHtml(row.objective || "Objetivo")}</strong>: ${escapeHtml(row.evidence || "evidência a definir")} · avaliação: ${escapeHtml((row.assessmentQuestions || []).join(", ") || "a definir")}</li>`).join("")}</ul></section>` : "";
   const mediation = mediationMessagesMarkup(guide.mediationMessages, plan.theme || lesson?.meta?.title || `a semana ${index + 1}`, index + 1)
     + (guide.weekSummary && guide.studentFAQ?.length ? "" : `<section class="reader-warning"><h3>Explicações para o professor</h3><p>Esta semana ainda não tem o resumo, as perguntas prováveis dos alunos, os equívocos comuns e os sinais de alerta que entram no Material de Mediação. O texto da semana não é alterado.</p><button type="button" class="secondary" id="retry-explain-button">Completar explicações do Material de Mediação</button></section>`);
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
-  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
+  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${methodology}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
   renderFlowPanel(index);
   $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
   $("#retry-explain-button")?.addEventListener("click", (event) => retryDerivatives(index, { parts: ["explain"], button: event.currentTarget }));
@@ -1801,6 +1868,9 @@ function reviewActionFor(kind, item, lesson) {
     "objective-present": { scope: "edit", title: "Como verificar os objetivos", checks: ["Há de 4 a 6 objetivos, cada um com verbo observável (comparar, aplicar, justificar…).", "Cada objetivo é coberto por pelo menos uma seção do texto."], ask: "Reescreva SOMENTE a lista de objetivos de aprendizagem: de 4 a 6 objetivos observáveis (verbo mensurável + objeto + contexto), cada um coberto por uma seção do texto atual. Não altere o texto das seções.", accept: "Lista de objetivos observáveis, coerente com as seções existentes." },
     "content-present": { scope: sections.length < 5 ? "full" : "edit", title: "Como verificar o desenvolvimento do conteúdo", checks: ["Há pelo menos 5 seções e quatro delas com desenvolvimento real (conceito, exemplo, aplicação).", "Nenhuma seção é só uma introdução de duas linhas."], ask: sections.length < 5 ? "O texto tem menos de 5 seções. Acrescente as seções que faltam para cobrir os objetivos, mantendo as existentes exatamente como estão." : "Desenvolva SOMENTE as seções curtas (menos de 120 caracteres de corpo), inserindo parágrafos de aprofundamento: o conceito, um exemplo concreto e, se couber, um contraponto. Não mexa nas seções que já estão desenvolvidas.", accept: "Todas as seções com desenvolvimento real; as já boas permanecem iguais." },
     "alignment-complete": { scope: "derivatives", parts: ["assessment", "activities"], title: "Como verificar o alinhamento", checks: ["Cada objetivo aparece no texto, em uma atividade com evidência e em pelo menos uma questão."], ask: "Gerar de novo apenas as questões e as atividades, de modo que cada objetivo tenha conteúdo, atividade, evidência e questão relacionados.", accept: "Matriz de alinhamento completa; o texto da semana não é tocado." },
+    "bloom-verbs": { scope: "edit", title: "Como verificar os verbos dos objetivos", checks: ["Nenhum objetivo começa com compreender, conhecer, entender, saber, aprender, perceber ou refletir.", "Cada verbo descreve algo que se pode observar na produção do estudante."], ask: "Reescreva SOMENTE a lista de objetivos de aprendizagem, trocando verbos vagos (compreender, conhecer, entender, saber, aprender, perceber, refletir) por verbos observáveis equivalentes (explicar, comparar, aplicar, analisar, avaliar, propor…), sem mudar a intenção de cada objetivo. Não altere o texto das seções.", accept: "Todos os objetivos com verbos observáveis, mesma intenção." },
+    "bloom-balance": { scope: "edit", title: "Como verificar o nível dos objetivos", checks: ["Pelo menos um objetivo pede aplicar, analisar, avaliar ou criar.", "O texto da semana prepara o estudante para esse nível (exemplo aplicado, caso ou exercício)."], ask: "Reescreva SOMENTE a lista de objetivos de aprendizagem para que pelo menos um deles esteja em nível de aplicação ou acima (aplicar, analisar, avaliar ou criar), coerente com o que as seções já desenvolvem. Não altere o texto das seções.", accept: "Ao menos um objetivo em nível de aplicação ou acima." },
+    "methodology-applied": { scope: "derivatives", parts: ["activities"], title: "Como verificar a metodologia ativa", checks: ["As atividades seguem a estrutura da metodologia escolhida para a semana.", "Há uma justificativa de por que ela serve aos objetivos e de como foi aplicada."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação, seguindo a metodologia ativa da semana.", accept: "Atividades estruturadas pela metodologia, com justificativa." },
     "activity-present": { scope: "derivatives", parts: ["activities"], title: "Como verificar as atividades", checks: ["Existe ao menos uma atividade ativa ou produto observável, com critérios."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "Pelo menos uma atividade com evidência e critérios." },
     "diagnostic-present": { scope: "derivatives", parts: ["activities"], title: "Como verificar o diagnóstico", checks: ["Há uma pergunta de entrada ligada ao dia a dia do estudante, ou a ausência está justificada."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "Diagnóstico de entrada presente." },
     "formative-present": { scope: "derivatives", parts: ["activities"], title: "Como verificar as paradas formativas", checks: ["Há de 2 a 4 checagens ao longo das seções, cada uma com o que fazer se o estudante errar."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "De 2 a 4 paradas formativas com ação de correção." },
@@ -2081,7 +2151,7 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
     const qualityLabel = manuallyApproved ? "conferida e liberada por você" : ({ ready: "conteúdo pronto", complete: "conteúdo completo", blocked: "bloqueada: pendência crítica", review: "revisão recomendada", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[automaticStatus] || "qualidade não medida");
     const approvalButton = automaticStatus !== "ready" && automaticStatus !== "complete" ? `<button class="week-approve ${manuallyApproved ? "is-approved" : ""}" data-index="${index}" type="button">${manuallyApproved ? "Desfazer liberação" : "Liberar após conferência"}</button>` : "";
     const statusDetail = reasons.length ? `<small class="week-status-detail">${escapeHtml(manuallyApproved ? `Diagnóstico automático: ${reasons.join(" · ")}` : reasons.join(" · "))}</small>` : "";
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no ClassAtelier (sem o quiz)">JSON ClassAtelier <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do ClassAuthor, com quiz, feedbacks e guia do professor">JSON ClassAuthor <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button><button class="button button-secondary week-open-studio" data-index="${index}" type="button" title="Abre o ClassAtelier em outra aba já com esta semana carregada">Abrir esta semana no <strong class="wordmark"><b>Class</b><i>Atelier</i></strong> <span>↗</span></button>${approvalButton}</div>${studioEditMarkup(index)}</article>`;
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${methodologyForWeekLabel(index, lesson) ? `<span class="week-method">${escapeHtml(methodologyForWeekLabel(index, lesson))}</span>` : ""}${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no ClassAtelier (sem o quiz)">JSON ClassAtelier <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do ClassAuthor, com quiz, feedbacks e guia do professor">JSON ClassAuthor <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button><button class="button button-secondary week-open-studio" data-index="${index}" type="button" title="Abre o ClassAtelier em outra aba já com esta semana carregada">Abrir esta semana no <strong class="wordmark"><b>Class</b><i>Atelier</i></strong> <span>↗</span></button>${approvalButton}</div>${studioEditMarkup(index)}</article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
   const weeksNote = $("#weeks-sector-note");
@@ -3000,7 +3070,10 @@ document.addEventListener("keydown", (event) => { if (event.key === "Escape" && 
 window.addEventListener("resize", syncRecoveryLayout);
 window.addEventListener("scroll", keepWorkspaceAtTop, { passive: true });
 $("#calendar-mode").addEventListener("change", () => { toggleCalendar(); scheduleSave(); });
-$("#weeks").addEventListener("input", () => { const resourcePlan = collectResourcePlan(); const compositionPlan = collectCompositionPlan(); renderResourcePlanWeeks(resourcePlan); renderCompositionPlanWeeks(compositionPlan); updateSummary(); updateProgress(); scheduleSave(); });
+$("#pedagogical-approach")?.addEventListener("change", () => { updateMethodologyHints(); scheduleSave(); });
+$("#methodology-default")?.addEventListener("change", () => { updateMethodologyHints(); renderMethodologyWeeks(collectMethodologyPlan()); scheduleSave(); });
+$("#methodology-weeks")?.addEventListener("change", (event) => { const row = event.target.closest("[data-methodology-week]"); if (row) row.classList.toggle("is-override", Boolean(event.target.value)); scheduleSave(); });
+$("#weeks").addEventListener("input", () => { const resourcePlan = collectResourcePlan(); const compositionPlan = collectCompositionPlan(); renderResourcePlanWeeks(resourcePlan); renderMethodologyWeeks(collectMethodologyPlan()); renderCompositionPlanWeeks(compositionPlan); updateSummary(); updateProgress(); scheduleSave(); });
 $("#practice-enabled").addEventListener("change", () => { togglePractice(); scheduleSave(); });
 $("#course-form").addEventListener("input", () => { updateAcademicInheritance(); updateSummary(); updateProgress(); scheduleSave(); });
 $("#save-backup-button").addEventListener("click", downloadBackup);
@@ -3017,4 +3090,4 @@ $("#assist-button").dataset.label = "Preencher vazios com IA";
 $("#recalculate-button").dataset.label = "Recalcular qualidade";
 initializeWelcome();
 enhanceLayout();
-renderResourcePlanWeeks(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
+renderResourcePlanWeeks(); renderMethodologyWeeks(); updateMethodologyHints(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();

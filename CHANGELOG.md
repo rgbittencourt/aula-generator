@@ -8,6 +8,14 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
+## 1.3.0 · em teste (ramo `metodologia`) · abordagem pedagógica e metodologias ativas
+
+- Novo bloco no briefing (seção 05): **Abordagem pedagógica** (atual ou nova) e **Metodologia ativa**, com padrão do curso e escolha por semana.
+- Abordagem nova: planejamento reverso, objetivos com verbos observáveis (Bloom revisada), alinhamento construtivo nas atividades e na avaliação, e princípios de aprendizagem multimídia no texto, nos slides e nos vídeos.
+- Metodologias ativas: sala de aula invertida, estudo de caso, ABP/PBL, projetos, instrução por pares, gamificação, júri simulado/debate, rotação por estações e design thinking, ou "a IA escolhe e justifica". A metodologia molda o texto, as atividades e a mediação, e aparece no cartão e na prévia da semana.
+- Novas conferências: verbos dos objetivos, nível dos objetivos e aplicação da metodologia.
+- Compatível com os backups da 1.2.1 nos dois sentidos; sem os campos novos, a geração é idêntica à 1.2.1.
+
 ## 1.2.1 · 29/10/2026 · marca com fundo claro
 
 ### Mudou

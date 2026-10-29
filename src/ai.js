@@ -1,3 +1,4 @@
+import { writerMethodologyBlock, derivativesMethodologyBlock } from "./methodology.js";
 import { KNOWN_BLOCK_TYPES, normalizeLesson, normalizeWeeklyOutput, practiceScheduledForWeek, resourcePlanForWeek } from "./aula-schema.js";
 import { abntRules } from "./abnt.js";
 import { measureLessonQuality, qualityPromptGuidance, qualityTargets } from "./content-quality.js";
@@ -460,7 +461,7 @@ ${JSON.stringify(compactInput, null, 2)}
 
 Sessões práticas independentes agendadas para esta semana (não inserir no texto-base; desenvolver somente em teacherGuide.webPracticeProjects e no DOCX separado):
 ${JSON.stringify(scheduledPractices.map((practice, practiceIndex) => compactBriefingPractice(practice, practiceIndex)), null, 2)}
-
+${[writerMethodologyBlock(input, weekIndex), derivativesMethodologyBlock(input, weekIndex, { assessment: true, activities: true, mediation: true, explain: true })].filter(Boolean).map((block) => `\n${block}`).join("\n")}
 Retorne JSON completo, sem omitir propriedades obrigatórias.`;
 }
 

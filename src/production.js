@@ -7,6 +7,7 @@
 //   2. slides  -> apresentação da semana + narração slide a slide
 // A UC tem uma chamada própria (apresentação, WhatsApp e encerramento).
 
+import { productionMethodologyBlock } from "./methodology.js";
 import { callJson } from "./ai-client.js";
 import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
 
@@ -106,7 +107,7 @@ Devolva este JSON:
     "message": "texto de acompanhamento para colar no WhatsApp junto do vídeo (2–4 linhas, com um emoji no máximo por linha)"
   }
 }
-O moodleVideo deve ter de 7 a 12 segmentos; o whatsappVideo, de 3 a 5.`;
+O moodleVideo deve ter de 7 a 12 segmentos; o whatsappVideo, de 3 a 5.${productionMethodologyBlock(input) ? `\n\n${productionMethodologyBlock(input)}` : ""}`;
 }
 
 function slidesPrompt(input, index, week, ctx) {
@@ -135,7 +136,7 @@ Devolva este JSON:
     }
   ],
   "ttsNotes": [{"term": "sigla ou nome difícil", "say": "como pronunciar/escrever para a voz sintética", "pause": "pausa ou ênfase útil, se houver"}]
-}`;
+}${productionMethodologyBlock(input) ? `\n\n${productionMethodologyBlock(input)}` : ""}`;
 }
 
 function courseDigest(input, weeks = []) {
