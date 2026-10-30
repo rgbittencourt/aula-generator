@@ -113,6 +113,28 @@ function providerMessages(messages = []) {
   }));
 }
 
+// Raciocínio ("thinking") dos modelos Claude recentes. Nos modelos 5.x ele vem LIGADO por padrão e
+// conta dentro de max_tokens: numa tarefa mais exigente, o modelo pode gastar todo o limite pensando
+// e devolver resposta sem texto (stop_reason "max_tokens"). Como cada chamada do ClassAuthor já é uma
+// tarefa bem especificada, o padrão aqui é desligar o raciocínio prévio onde a API permite.
+// ANTHROPIC_THINKING=default|adaptive|disabled|between_tools e ANTHROPIC_EFFORT=low|medium|high mudam isso.
+let thinkingUnsupported = false;
+export function anthropicThinkingConfig(model = getAIModel()) {
+  const configured = String(process.env.ANTHROPIC_THINKING || "").trim().toLowerCase();
+  const effortEnv = String(process.env.ANTHROPIC_EFFORT || "").trim().toLowerCase();
+  const effort = ["low", "medium", "high", "xhigh", "max"].includes(effortEnv) ? effortEnv : "";
+  if (configured === "default" || thinkingUnsupported) return { thinking: null, effort };
+  if (["adaptive", "disabled", "between_tools"].includes(configured)) return { thinking: { type: configured }, effort };
+  const id = String(model || "").toLowerCase();
+  // Sonnet 5.5: "disabled" é recusado; "between_tools" desliga o raciocínio antes da resposta.
+  if (/sonnet-5-5/.test(id)) return { thinking: { type: "between_tools" }, effort };
+  // Sonnet 5, Haiku 5.5 e Opus 5 aceitam "disabled" (com esforço até "high").
+  if (/sonnet-5(?!-\d)|haiku-5-5|opus-5(?!-\d)/.test(id)) return { thinking: { type: "disabled" }, effort: effort && ["xhigh", "max"].includes(effort) ? "high" : effort };
+  // Opus 5.5, Fable e Mythos: raciocínio sempre ligado; reduz o esforço para sobrar espaço ao texto.
+  if (/opus-5-5|fable|mythos/.test(id)) return { thinking: null, effort: effort || "low" };
+  return { thinking: null, effort };
+}
+
 function buildRequest(messages, options, maxTokens) {
   const provider = getAIProvider();
   if (provider !== "anthropic") {
@@ -145,6 +167,9 @@ function buildRequest(messages, options, maxTokens) {
   if (process.env.ANTHROPIC_STRUCTURED_OUTPUTS === "true") {
     body.output_config = { format: { type: "json_schema", schema: { type: "object", additionalProperties: true } } };
   }
+  const reasoning = anthropicThinkingConfig(body.model);
+  if (reasoning.thinking) body.thinking = reasoning.thinking;
+  if (reasoning.effort) body.output_config = { ...(body.output_config || {}), effort: reasoning.effort };
   return {
     url: endpointUrl(),
     headers: { "Content-Type": "application/json", "x-api-key": providerKey(), "anthropic-version": process.env.ANTHROPIC_VERSION || "2023-06-01" },
@@ -297,6 +322,13 @@ export async function callJson(messages, options = {}) {
     const payload = await response.json().catch(() => ({}));
     const providerError = providerErrorMessage(payload, response);
     if (!response.ok || providerError && !payload?.choices && !payload?.content) {
+      // Configuração de raciocínio recusada por este modelo: volta ao padrão da API e tenta de novo.
+      if (response.status === 400 && getAIProvider() === "anthropic" && !thinkingUnsupported && /thinking|effort|output_config/i.test(String(providerError))) {
+        console.error("thinking config rejected; falling back to API default", { model: request.body?.model, error: String(providerError).slice(0, 300) });
+        thinkingUnsupported = true;
+        attempt -= 1;
+        continue;
+      }
       const classification = classifyProviderError(providerError, response.status);
       const retryAfterMs = retryDelay(response, attempt);
       if (classification.retryable && attempt < maxAttempts - 1 && retryAfterMs <= 30000) {
@@ -377,6 +409,13 @@ export async function callText(messages, options = {}) {
     const payload = await response.json().catch(() => ({}));
     const providerError = providerErrorMessage(payload, response);
     if (!response.ok || providerError && !payload?.choices && !payload?.content) {
+      // Configuração de raciocínio recusada por este modelo: volta ao padrão da API e tenta de novo.
+      if (response.status === 400 && getAIProvider() === "anthropic" && !thinkingUnsupported && /thinking|effort|output_config/i.test(String(providerError))) {
+        console.error("thinking config rejected; falling back to API default", { model: request.body?.model, error: String(providerError).slice(0, 300) });
+        thinkingUnsupported = true;
+        attempt -= 1;
+        continue;
+      }
       const classification = classifyProviderError(providerError, response.status);
       const retryAfterMs = retryDelay(response, attempt);
       if (classification.retryable && attempt < maxAttempts - 1 && retryAfterMs <= 30000) {

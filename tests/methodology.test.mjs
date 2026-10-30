@@ -100,3 +100,27 @@ test("Preencher vazios com IA: regra de Bloom só na abordagem nova", async () =
   assert.match(buildBriefingPrompt(baseInput({ pedagogicalApproach: "nova" }), ["objectives"]), /TAXONOMIA DE BLOOM REVISADA/);
   assert.doesNotMatch(buildBriefingPrompt(baseInput(), ["objectives"]), /TAXONOMIA DE BLOOM REVISADA/);
 });
+
+test("voz humana: regras no prompt da abordagem nova e conferência de clichês", async () => {
+  const { aiClicheReport } = await import("../src/methodology.js");
+  assert.match(buildWriterPrompt(baseInput({ pedagogicalApproach: "nova" }), 0), /VOZ HUMANA/);
+  const report = aiClicheReport("Além disso, vale ressaltar que é fundamental. Além disso, nesse contexto.");
+  assert.equal(report.hits[0].term, "além disso");
+  assert.ok(report.total >= 4);
+  const review = pedagogicalReview({ learningObjectives: ["Analisar X"], contentSections: [{ body: "Além disso, vale ressaltar. Além disso, é fundamental. Nesse contexto, em suma." }] }, { input: baseInput({ pedagogicalApproach: "nova" }), index: 0 });
+  assert.equal(review.checks.find((check) => check.id === "human-voice").pass, false);
+});
+
+test("raciocínio do modelo: desligado onde a API permite", async () => {
+  const { anthropicThinkingConfig } = await import("../src/ai-client.js");
+  const before = process.env.ANTHROPIC_THINKING; delete process.env.ANTHROPIC_THINKING;
+  try {
+    assert.deepEqual(anthropicThinkingConfig("claude-sonnet-5-5").thinking, { type: "between_tools" });
+    assert.deepEqual(anthropicThinkingConfig("claude-sonnet-5").thinking, { type: "disabled" });
+    assert.equal(anthropicThinkingConfig("claude-opus-5-5").thinking, null);
+    assert.equal(anthropicThinkingConfig("claude-opus-5-5").effort, "low");
+    assert.equal(anthropicThinkingConfig("claude-sonnet-4-6").thinking, null);
+    process.env.ANTHROPIC_THINKING = "default";
+    assert.equal(anthropicThinkingConfig("claude-sonnet-5-5").thinking, null);
+  } finally { if (before === undefined) delete process.env.ANTHROPIC_THINKING; else process.env.ANTHROPIC_THINKING = before; }
+});

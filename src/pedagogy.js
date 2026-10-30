@@ -1,4 +1,4 @@
-import { bloomProfile, isNewApproach, methodForWeek } from "./methodology.js";
+import { aiClicheReport, bloomProfile, isNewApproach, methodForWeek } from "./methodology.js";
 const text = (value) => String(value ?? "").trim();
 // Itens que chegam como objeto (ex.: verbetes do glossário) viram o seu rótulo, e não "[object Object]".
 const itemText = (item) => item && typeof item === "object" ? text(item.term || item.title || item.label || item.name || item.text || item.description) : text(item);
@@ -152,6 +152,7 @@ export function pedagogicalReview(plan = {}, context = {}) {
     const bloom = bloomProfile(objectives);
     checks.push(
       { id: "bloom-verbs", label: "Os objetivos usam verbos observáveis (sem compreender, conhecer, entender, saber…).", pass: objectives.length > 0 && bloom.vague.length === 0, detail: bloom.vague.map((item) => item.objective) },
+      { id: "human-voice", label: "O texto evita marcas de texto de IA (\"além disso\", \"vale ressaltar\", \"é fundamental\"…).", ...(() => { const body = sections.map((section) => `${text(section.body)} ${(section.subsections || []).map((sub) => text(sub.body)).join(" ")}`).join(" ").replace(/<[^>]+>/g, " "); const report = aiClicheReport(`${text(plan.welcome)} ${body}`); return { pass: report.total <= 4 && report.perThousand <= 1.5, detail: report.hits.slice(0, 8).map((hit) => `${hit.term} (${hit.count}×)`) }; })() },
       { id: "bloom-balance", label: "Pelo menos um objetivo está em nível de aplicação ou acima (aplicar, analisar, avaliar ou criar).", pass: bloom.higher.length > 0, levels: bloom.items.map((item) => ({ objective: item.objective, verb: item.verb, level: item.level })) }
     );
   }

@@ -183,12 +183,37 @@ export function bloomProfile(objectives = []) {
 
 // ---------- Blocos de prompt ----------
 
-const MAYER_TEXT = `- Sinalização: cada seção anuncia a sua ideia central no primeiro parágrafo e destaca em negrito a ideia-chave (no máximo uma ou duas por seção).
-- Segmentação: um parágrafo, uma ideia; seções longas ganham subtítulos. Prefira três parágrafos claros a um bloco denso.
-- Pré-treino: defina cada termo técnico na primeira vez que ele aparece, antes de usá-lo num raciocínio.
-- Coerência: corte curiosidades e digressões que não servem a nenhum objetivo; o tamanho vem de desenvolvimento, não de enfeite.
-- Contiguidade: imagem, tabela ou recurso 🔎 fica junto do parágrafo que o explica, nunca agrupado no fim.
-- Personalização: fale com o estudante (você), em tom de conversa acadêmica, sem perder rigor.`;
+const MAYER_TEXT = `(Estes princípios valem sem mudar a voz descrita no guia: prosa corrida, de professor conversando com a turma.)
+- Pré-treino: defina cada termo técnico na primeira vez que ele aparece, em linguagem simples, antes de usá-lo num raciocínio.
+- Sinalização discreta: o leitor precisa saber, logo no começo de cada seção, que pergunta ela responde. Diga isso com naturalidade, não com fórmula ("Nesta seção veremos…" é proibido).
+- Coerência: corte o que não serve a nenhum objetivo; o tamanho vem de desenvolvimento (caso, exemplo, contraexemplo), nunca de enfeite ou repetição.
+- Contiguidade: figura, tabela ou recurso 🔎 fica junto do parágrafo que o explica.
+- Personalização: fale com o estudante (você, vocês, a gente), como numa boa aula.`;
+
+// Voz humana: marcas típicas de texto gerado por IA em português, que o professor percebe na hora.
+export const AI_CLICHES = Object.freeze([
+  "além disso", "nesse sentido", "dessa forma", "desse modo", "vale ressaltar", "vale destacar", "é importante ressaltar", "é importante destacar",
+  "é fundamental", "é crucial", "é essencial", "em resumo", "em suma", "em síntese,", "neste contexto", "nesse contexto", "no cenário atual",
+  "nos dias de hoje", "cada vez mais", "desempenha um papel", "papel crucial", "papel fundamental", "não se trata apenas", "mais do que nunca",
+  "no mundo atual", "em um mundo", "por fim, mas não menos importante", "mergulhar", "jornada", "desbravar", "potencializar", "alavancar",
+  "nesta seção, veremos", "nesta seção veremos", "como vimos anteriormente", "imagine que você", "a chave para", "ferramenta poderosa"
+]);
+
+export function aiClicheReport(textValue = "") {
+  const plain = String(textValue || "").toLowerCase();
+  const words = plain.split(/\s+/).filter(Boolean).length || 1;
+  const hits = AI_CLICHES.map((term) => ({ term, count: plain.split(term).length - 1 })).filter((item) => item.count > 0).sort((a, b) => b.count - a.count);
+  const total = hits.reduce((sum, item) => sum + item.count, 0);
+  return { total, perThousand: Math.round((total / words) * 10000) / 10, hits };
+}
+
+const HUMAN_VOICE = `VOZ HUMANA (o texto precisa soar como um professor de verdade escrevendo, não como IA)
+- Proibido usar: ${AI_CLICHES.map((term) => `"${term}"`).join(", ")}. Encadeie as ideias pelo próprio raciocínio (por isso, só que, aí está o problema, repare que), não por conectivos de redação.
+- Abra cada seção com algo concreto (uma situação de sala de aula ou de trabalho, um erro comum, um dado, uma pergunta que o estudante faria), não com definição de dicionário.
+- Varie de verdade o ritmo: frases curtas ao lado de períodos longos; nem todo parágrafo termina com uma "lição" ou moral.
+- Nada de trios automáticos ("rápido, eficiente e seguro"), de "não é só X, é Y" nem de dois-pontos dramáticos em série. Negrito só para termo novo e para a ideia que o estudante precisa guardar, no máximo uma por seção.
+- Use exemplos com cara de Brasil e da área do curso (instituições, sistemas, situações reais do público do briefing). Não invente histórias pessoais do professor ("certa vez, em minha turma…"): use situações típicas ("é comum, em sala, alguém perguntar…").
+- Antes de entregar, releia como se fosse o estudante: se uma frase poderia estar em qualquer texto sobre qualquer assunto, reescreva-a com o assunto desta aula.`;
 
 function methodText(choice) {
   if (choice.id === "auto") return `METODOLOGIA ATIVA DESTA SEMANA: a IA escolhe (ela será definida junto com as atividades). Escreva o texto de modo que prepare o estudante para uma atividade de aplicação, análise ou criação, e não só para lembrar.`;
@@ -208,7 +233,9 @@ export function writerMethodologyBlock(input = {}, index = 0) {
 - Objetivos: mantenha a intenção dos objetivos recebidos, mas, se algum começar com verbo vago (compreender, conhecer, entender, saber, aprender, perceber, refletir), reescreva-o com um verbo observável equivalente (explicar, comparar, aplicar, analisar, avaliar, propor…). Garanta que pelo menos um objetivo da semana esteja em nível de aplicação ou acima (aplicar, analisar, avaliar ou criar).
 - Na síntese, diga com clareza o que o estudante deve ser capaz de FAZER ao final da semana, ligado aos objetivos.
 PRINCÍPIOS DE APRENDIZAGEM MULTIMÍDIA NO TEXTO
-${MAYER_TEXT}`);
+${MAYER_TEXT}
+
+${HUMAN_VOICE}`);
   }
   const method = methodText(choice);
   if (method) parts.push(method);
@@ -250,7 +277,8 @@ export function productionMethodologyBlock(input = {}) {
 - Segmentação: a cada 3 ou 4 minutos de fala, uma pausa explícita ("antes de seguir, pense em…") ou uma pergunta de verificação; o vídeo deve poder ser cortado nesses pontos.
 - Sinalização: anuncie no início o que será visto e marque cada mudança de parte.
 - Coerência: nada de efeito, música ou imagem decorativa que não ajude a entender.
-- Personalização: fale com o estudante, em primeira e segunda pessoa.`;
+- Personalização: fale com o estudante, em primeira e segunda pessoa.
+- Voz humana: nada de "além disso", "vale ressaltar", "é fundamental", "nesse contexto", "em suma", "no cenário atual", "jornada", "mergulhar"; fale como o professor falaria gravando para a turma dele.`;
 }
 
 // ---------- Webpráticas (sessões síncronas) ----------
