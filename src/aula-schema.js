@@ -785,7 +785,7 @@ function integrateRootResources(blocks, weekNumber, plan = {}) {
 
 export function weekMeta(input, index) {
   const calendar = weekCalendar(input, index);
-  return { title: `${input.title} — ${calendar.label}`, courseTitle: input.title, weekNumber: calendar.weekNumber, weekLabel: calendar.label, calendarStartDate: calendar.startDate, calendarEndDate: calendar.endDate, studyHours: input.hoursPerWeek, author: input.author, role: input.role, institution: input.institution, year: input.year, aiTool: GENERATOR_TOOL, aiUse: GENERATOR_AI_USE, generatedBy: GENERATOR_CREDIT, license: input.license };
+  return { title: `${input.title} — ${calendar.label}`, courseTitle: input.title, unit: input.unit === "aula" ? "aula" : "semana", weekNumber: calendar.weekNumber, weekLabel: calendar.label, calendarStartDate: calendar.startDate, calendarEndDate: calendar.endDate, studyHours: input.hoursPerWeek, author: input.author, role: input.role, institution: input.institution, year: input.year, aiTool: GENERATOR_TOOL, aiUse: GENERATOR_AI_USE, generatedBy: GENERATOR_CREDIT, license: input.license };
 }
 
 function html(value) { return text(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -963,7 +963,7 @@ export function normalizeLesson(raw, input, index) {
   const blocks = sourceBlocks.length && hasHero && hasTopic && hasObjectives && hasContent ? sourceBlocks : fallbackBlocks(input, index, lessonPlan);
   const baseMeta = weekMeta(input, index);
   const suppliedMeta = source.meta && typeof source.meta === "object" ? source.meta : {};
-  const meta = { ...fallback.meta, ...baseMeta, ...suppliedMeta, title: lessonPlan.theme, courseTitle: input.title, weekNumber: index + 1, weekLabel: baseMeta.weekLabel, calendarStartDate: baseMeta.calendarStartDate, calendarEndDate: baseMeta.calendarEndDate, studyHours: input.hoursPerWeek };
+  const meta = { ...fallback.meta, ...baseMeta, ...suppliedMeta, title: lessonPlan.theme, courseTitle: input.title, unit: input.unit === "aula" ? "aula" : "semana", weekNumber: index + 1, weekLabel: baseMeta.weekLabel, calendarStartDate: baseMeta.calendarStartDate, calendarEndDate: baseMeta.calendarEndDate, studyHours: input.hoursPerWeek };
   const generationMeta = source.generationMeta && typeof source.generationMeta === "object" ? {
     phase: text(source.generationMeta.phase, "complete"),
     mode: text(source.generationMeta.mode),
