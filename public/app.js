@@ -184,7 +184,7 @@ function enhanceLayout() {
     weeksSector.className = "results-sector weeks-sector";
     weeksSector.id = "results-weeks";
     weeksSector.open = false;
-    weeksSector.innerHTML = '<summary class="results-sector-summary"><div class="results-sector-copy"><strong>Semanas planejadas</strong><small id="weeks-sector-note">As semanas aparecerão aqui depois da geração.</small></div><span class="sector-chevron results-sector-chevron" aria-hidden="true">⌄</span></summary>';
+    weeksSector.innerHTML = '<summary class="results-sector-summary"><div class="results-sector-copy"><strong id="weeks-sector-title">Semanas planejadas</strong><small id="weeks-sector-note">As semanas aparecerão aqui depois da geração.</small></div><span class="sector-chevron results-sector-chevron" aria-hidden="true">⌄</span></summary>';
     const body = document.createElement("div");
     body.className = "results-sector-body";
     weekGrid.remove();
@@ -2353,6 +2353,8 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
     return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${methodologyForWeekLabel(index, lesson) ? `<span class="week-method">${escapeHtml(methodologyForWeekLabel(index, lesson))}</span>` : ""}${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no ClassAtelier (sem o quiz)">JSON ClassAtelier <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do ClassAuthor, com quiz, feedbacks e guia do professor">JSON ClassAuthor <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button><button class="button button-secondary week-open-studio" data-index="${index}" type="button" title="Abre o ClassAtelier em outra aba já com esta semana carregada">Abrir esta semana no <strong class="wordmark"><b>Class</b><i>Atelier</i></strong> <span>↗</span></button>${approvalButton}</div>${studioEditMarkup(index)}</article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
+  const weeksTitle = $("#weeks-sector-title");
+  if (weeksTitle) weeksTitle.textContent = courseUnit() === "aula" ? "Aulas planejadas" : "Semanas planejadas";
   const weeksNote = $("#weeks-sector-note");
   if (weeksNote) weeksNote.textContent = partial ? `${data.weeks.length} de ${totalWeeks} semana(s) preservada(s); a geração pode ser retomada pela próxima semana.` : `${data.weeks.length} semana(s) gerada(s); abra cada cartão para revisar o conteúdo do aluno.`;
   $("#week-grid").querySelectorAll(".week-preview").forEach((button) => button.addEventListener("click", () => openLessonPreview(Number(button.dataset.index))));
@@ -3369,6 +3371,9 @@ function applyUnitToUi() {
   const unit = courseUnit();
   unitApplied = unit;
   localizeUnitNode(document.body, unit);
+  // Títulos fixos das abas, definidos de forma explícita (não dependem da troca automática).
+  const weeksTitle = document.getElementById("weeks-sector-title");
+  if (weeksTitle) weeksTitle.textContent = unit === "aula" ? "Aulas planejadas" : "Semanas planejadas";
   if (!unitObserver) {
     unitObserver = new MutationObserver((mutations) => {
       const current = courseUnit();
