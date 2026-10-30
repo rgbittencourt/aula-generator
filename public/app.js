@@ -394,6 +394,8 @@ function resetDisciplineForm(preserveSession = true) {
   renderResourcePlanWeeks();
   renderMethodologyWeeks();
   updateMethodologyHints();
+  updateBloomMeter();
+  applyUnitToUi();
   renderCompositionPlanWeeks();
   toggleCalendar();
   togglePractice();
