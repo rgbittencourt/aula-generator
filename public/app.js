@@ -936,7 +936,7 @@ function practiceCard(data = {}) {
   practiceSequence += 1;
   const id = data.id || `webpractice-${practiceSequence}`;
   return `<article class="item-card practice-card" data-id="${escapeHtml(id)}">
-    <div class="item-card-heading"><strong>Sessão prática <span class="item-index">${practiceSequence}</span></strong><button class="remove-item" type="button" data-remove-practice aria-label="Remover webprática">×</button></div>
+    <div class="item-card-heading"><strong>Sessão prática <span class="item-index">${practiceSequence}</span></strong><button class="remove-item" type="button" data-remove-practice aria-label="Remover prática">×</button></div>
     <div class="field-grid two">
       <label class="field"><span>Título da sessão</span><input class="practice-title" value="${escapeHtml(data.title || data.sessionTitle || "")}" placeholder="Ex.: Laboratório de prototipagem com IA" /></label>
       <label class="field practice-methodology-field"><span>Metodologia ativa da sessão</span><select class="practice-methodology">${practiceMethodologyOptions(data.methodology)}</select><small class="hint">“Mesma da semana” herda a metodologia escolhida para a semana em que a sessão acontece.</small></label>
@@ -1038,7 +1038,7 @@ function applyPracticeCount() {
   const current = document.querySelectorAll("#practice-list .practice-card").length;
   while (document.querySelectorAll("#practice-list .practice-card").length < requested) addPractice();
   syncPracticeCount();
-  if (current > requested) showAssistantMessage(`Já existem ${current} webprática(s) preenchidas. A redução não remove dados automaticamente; use × nos cartões que deseja retirar.`);
+  if (current > requested) showAssistantMessage(`Já existem ${current} prática(s) preenchidas. A redução não remove dados automaticamente; use × nos cartões que deseja retirar.`);
   updateSummary(); updateProgress(); scheduleSave();
 }
 
@@ -1439,7 +1439,7 @@ async function assistBriefing() {
     if (accessCode) headers["x-aula-access-code"] = accessCode;
     const response = await fetch("/api/assist-briefing", { method: "POST", headers, body: JSON.stringify({ input, missingFields }) });
     const data = await readApiResponse(response, "Não foi possível preencher o briefing.");
-    setAiActivity("Aplicando sugestões da IA", "Organizando objetivos, materiais e campos de webpráticas…", { progress: 82 });
+    setAiActivity("Aplicando sugestões da IA", "Organizando objetivos, materiais e campos das práticas…", { progress: 82 });
     const briefing = data.briefing || {};
     const filled = [];
     if (!$("#audience").value.trim() && briefing.audience) { $("#audience").value = briefing.audience; filled.push("público"); }
@@ -1447,7 +1447,7 @@ async function assistBriefing() {
     if (!$("#content").value.trim() && briefing.content) { $("#content").value = briefing.content; filled.push("conteúdos"); }
     if ($("#practice-enabled").checked && Array.isArray(briefing.webPractices) && briefing.webPractices.length) {
       const practiceFieldsFilled = mergeBriefingPractices(briefing.webPractices);
-      if (practiceFieldsFilled) filled.push(`${briefing.webPractices.length} webprática(s) analisadas (${practiceFieldsFilled} campo(s) completado(s))`);
+      if (practiceFieldsFilled) filled.push(`${briefing.webPractices.length} prática(s) analisadas (${practiceFieldsFilled} campo(s) completado(s))`);
     }
     if (Array.isArray(briefing.materials) && briefing.materials.length && !collectMaterials().some((material) => material.title || material.objective || material.alignment || material.link)) {
       $("#materials-list").innerHTML = "";
@@ -1769,7 +1769,7 @@ function methodologyPreviewMarkup(plan, guide, index, lesson) {
     ${warnings ? `<h4>Sinais de alerta e o que fazer</h4><ul>${warnings}</ul>` : ""}
     ${assess.howToAssess || (assess.criteria || []).length ? `<h4>Como avaliar a aprendizagem</h4>${assess.howToAssess ? `<p>${escapeHtml(assess.howToAssess)}</p>` : ""}${list((assess.criteria || []).map((item) => `${item.criterion || ""}${item.evidence ? ` — evidência: ${item.evidence}` : ""}`))}` : ""}
     ${(mg.pitfalls || []).length ? `<h4>Erros comuns</h4>${list(mg.pitfalls)}` : ""}
-    ${mg.adaptations ? `<h4>Adaptações</h4>${list([mg.adaptations.ead ? `100% a distância: ${mg.adaptations.ead}` : "", mg.adaptations.synchronous ? `Encontro ao vivo / webprática: ${mg.adaptations.synchronous}` : "", mg.adaptations.largeClass ? `Turma grande: ${mg.adaptations.largeClass}` : ""].filter(Boolean))}` : ""}
+    ${mg.adaptations ? `<h4>Adaptações</h4>${list([mg.adaptations.ead ? `100% a distância: ${mg.adaptations.ead}` : "", mg.adaptations.synchronous ? `Encontro ao vivo / prática: ${mg.adaptations.synchronous}` : "", mg.adaptations.largeClass ? `Turma grande: ${mg.adaptations.largeClass}` : ""].filter(Boolean))}` : ""}
     <button type="button" class="secondary" id="methodology-guide-button">Gerar o guia de novo</button></details></section>`;
 }
 
@@ -2011,7 +2011,7 @@ function workloadItemLabel(item = {}) {
   if (item.category === "video") return item.required ? "Vídeo obrigatório" : "Vídeo complementar";
   if (item.category === "assessment") return "Quiz/avaliação";
   if (item.category === "forum") return "Fórum/discussão";
-  if (item.category === "practice") return "Webprática síncrona";
+  if (item.category === "practice") return "Prática (webprática, laboratório ou aula síncrona)";
   if (item.category === "review") return "Síntese e revisão";
   if (item.category === "image") return "Imagem/diagrama";
   if (item.category === "audio") return "Áudio/podcast";
@@ -2031,7 +2031,7 @@ const breakdownLabels = {
   interactiveMinutes: "Interativos ClassAtelier",
   quizMinutes: "Quiz/avaliação",
   forumMinutes: "Fórum/discussão",
-  practiceMinutes: "Webprática",
+  practiceMinutes: "Prática",
   reviewMinutes: "Síntese/revisão",
   projectMinutes: "Projeto/produção",
   otherMinutes: "Outras atividades"
@@ -2055,7 +2055,7 @@ function reviewCheckChecked(item = {}, reviewMarks = state.reviewMarks || create
 //   scope "full"            -> reescrita da semana (só quando o próprio item exige texto novo em grande parte)
 //   scope "manual"          -> conferência humana; não há o que a IA refazer sozinha
 const REVIEW_LIMITS_EDIT = "Altere SOMENTE o que este item exige. Preserve todo o resto da semana: título, objetivos, seções, recursos, figuras, questões e atividades que não estejam envolvidos. Não reordene nem reescreva por estilo. Não invente autores, dados, referências, DOI ou URLs; onde faltar base, marque como “a conferir”.";
-const PARTS_LABEL = { methodology: "o guia de aplicação da metodologia", explain: "as explicações para o professor", assessment: "as questões", activities: "o diagnóstico, as paradas e as atividades", mediation: "o Material de Mediação", webpractice: "a webprática" };
+const PARTS_LABEL = { methodology: "o guia de aplicação da metodologia", explain: "as explicações para o professor", assessment: "as questões", activities: "o diagnóstico, as paradas e as atividades", mediation: "o Material de Mediação", webpractice: "a prática" };
 
 function reviewActionFor(kind, item, lesson) {
   const id = String(item.id || "");
@@ -2075,7 +2075,7 @@ function reviewActionFor(kind, item, lesson) {
     "diagnostic-present": { scope: "derivatives", parts: ["activities"], title: "Como verificar o diagnóstico", checks: ["Há uma pergunta de entrada ligada ao dia a dia do estudante, ou a ausência está justificada."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "Diagnóstico de entrada presente." },
     "formative-present": { scope: "derivatives", parts: ["activities"], title: "Como verificar as paradas formativas", checks: ["Há de 2 a 4 checagens ao longo das seções, cada uma com o que fazer se o estudante errar."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "De 2 a 4 paradas formativas com ação de correção." },
     "summative-alignment": { scope: "derivatives", parts: ["assessment"], title: "Como verificar a avaliação final", checks: ["As 6 questões cobrem todos os objetivos, têm 5 alternativas e feedback em todas.", "A explicação da correta cita o texto da semana."], ask: "Gerar de novo apenas as questões da atividade avaliativa (6 questões, 5 alternativas, feedback em todas).", accept: "Questões alinhadas aos objetivos, com feedback por alternativa." },
-    "practice-complete": { scope: "derivatives", parts: [scheduledPractice ? "webpractice" : "mediation"], title: "Como verificar a webprática", checks: ["A webprática tem produto, etapas, critérios e plano B."], ask: scheduledPractice ? "Gerar de novo apenas o projeto da webprática (produto, etapas, critérios e plano B)." : "Gerar de novo apenas o Material de Mediação.", accept: "Webprática com produto, etapas, critérios e plano B." },
+    "practice-complete": { scope: "derivatives", parts: [scheduledPractice ? "webpractice" : "mediation"], title: "Como verificar a prática", checks: ["A prática tem produto, etapas, critérios e plano B."], ask: scheduledPractice ? "Gerar de novo apenas o projeto da prática (produto, etapas, critérios e plano B)." : "Gerar de novo apenas o Material de Mediação.", accept: "Prática com produto, etapas, critérios e plano B." },
     "self-assessment": { scope: "derivatives", parts: ["activities"], title: "Como verificar a autoavaliação", checks: ["O estudante recebe perguntas de autoavaliação com escala, ou uma reflexão final."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "Autoavaliação presente." },
     "resource-context": { scope: "edit", title: "Como verificar a função dos recursos", checks: ["Em cada recurso “Veja mais aqui”, o parágrafo diz o que observar e por que vale abrir.", "A função pedagógica cabe em uma frase e aponta o objetivo atendido."], ask: "Para os recursos que estão sem parágrafo de ligação ou sem função pedagógica, escreva a ligação (o que observar e por que vale abrir, em duas ou três frases, no ponto do texto em que o recurso aparece) e a função pedagógica (uma frase). Mude somente esses dois campos, só nos recursos que estiverem vazios ou genéricos; não troque links nem mexa no texto das seções.", accept: "Todo recurso com ligação e função pedagógica específicas; links e texto inalterados." },
     accessibility: { scope: "edit", title: "Como verificar a acessibilidade", checks: ["Imagens e figuras têm texto alternativo que descreve o que importa, em uma frase.", "Vídeos e áudios: legenda ou transcrição é conferência humana na fonte; a IA não consegue garantir isso."], ask: "Escreva o texto alternativo (uma frase descritiva, sem “imagem de”) SOMENTE das imagens, figuras e recursos visuais que estão sem ele. Não altere links, títulos nem o texto das seções. Para vídeos e áudios, não invente informação sobre legenda ou transcrição.", accept: "Todo recurso visual com texto alternativo; o restante inalterado." },
@@ -2252,7 +2252,7 @@ function renderGeneralPlan(plan) {
   const checklistMarkup = reviewPanelMarkup("checks", "Checklist pedagógico", checklist, `${passed}/${checklist.length} itens atendidos automaticamente; ${checkedChecks}/${checklist.length} atualmente marcados. Desmarque qualquer item que queira refazer ou revisar novamente.`, "Nenhum item pedagógico foi retornado.", reviewOpenStates.get("checks") ?? true);
   const progressionMarkup = Array.isArray(plan.progression) && plan.progression.length ? `<div class="general-warning"><strong>Progressão curricular</strong><ul>${plan.progression.map((item) => `<li>Semana ${item.weekNumber}: ${escapeHtml(item.theme || "")} ${item.projectMilestone ? `— ${escapeHtml(item.projectMilestone)}` : ""}</li>`).join("")}</ul></div>` : "";
   const practices = Array.isArray(plan.webPracticeSchedule) ? plan.webPracticeSchedule : [];
-  const practiceMarkup = practices.length ? `<section class="webpractice-schedule"><div class="schedule-heading"><div><p class="eyebrow">SESSÕES PRÁTICAS INDEPENDENTES</p><h3>Práticas/Laboratório</h3><p>Estas sessões não entram no texto-base nem no JSON do aluno. Cada uma é exportada como roteiro DOCX para o professor.</p></div></div><div class="schedule-list">${practices.map((practice, index) => `<article class="schedule-item"><div><strong>${escapeHtml(practice.title || `Webprática ${index + 1}`)}</strong><span>${escapeHtml([practice.weekNumber ? `Semana ${practice.weekNumber}` : "", practice.date ? formatDate(practice.date) : "", practice.dayOfWeek, [practice.startTime, practice.endTime].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "Agenda a confirmar")}</span><small>${escapeHtml([practice.modality, practice.tool, practice.platform].filter(Boolean).join(" · ") || "Sessão síncrona / laboratório prático")}</small></div><button class="button button-secondary webpractice-download" data-practice-id="${escapeHtml(practice.id || practice.title || "")}" type="button">Baixar DOCX <span>↓</span></button></article>`).join("")}</div></section>` : "";
+  const practiceMarkup = practices.length ? `<section class="webpractice-schedule"><div class="schedule-heading"><div><p class="eyebrow">SESSÕES PRÁTICAS INDEPENDENTES</p><h3>Práticas/Laboratório</h3><p>Estas sessões não entram no texto-base nem no JSON do aluno. Cada uma é exportada como roteiro DOCX para o professor.</p></div></div><div class="schedule-list">${practices.map((practice, index) => `<article class="schedule-item"><div><strong>${escapeHtml(practice.title || `Prática ${index + 1}`)}</strong><span>${escapeHtml([practice.weekNumber ? `Semana ${practice.weekNumber}` : "", practice.date ? formatDate(practice.date) : "", practice.dayOfWeek, [practice.startTime, practice.endTime].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "Agenda a confirmar")}</span><small>${escapeHtml([practice.modality, practice.tool, practice.platform].filter(Boolean).join(" · ") || "Sessão síncrona / laboratório prático")}</small></div><button class="button button-secondary webpractice-download" data-practice-id="${escapeHtml(practice.id || practice.title || "")}" type="button">Baixar DOCX <span>↓</span></button></article>`).join("")}</div></section>` : "";
   const resourceItems = unresolved.length ? unresolved.map((item, index) => ({ ...item, id: item.id || `resource-${item.weekNumber || 0}-${index + 1}`, label: item.title || "Recurso sem título", pass: false, detail: item.status || "Conferência pendente" })) : [{ id: "resources-ok", weekNumber: 0, label: "Recursos sem pendências automáticas", pass: true, detail: "Ainda assim, confirme coerência, duração/páginas, acessibilidade e licença antes de exportar." }];
   const reviewedResources = resourceItems.filter((item) => reviewMarkChecked("resources", item, reviewMarks)).length;
   const resourcesMarkup = reviewPanelMarkup("resources", "Checklist de recursos e acessibilidade", resourceItems, `${reviewedResources}/${resourceItems.length} itens atualmente marcados. Os recursos devem ser abertos e conferidos antes da publicação.`, "Nenhum recurso foi localizado para conferência.", reviewOpenStates.get("resources") ?? true);
@@ -2283,7 +2283,7 @@ function renderGeneralPlan(plan) {
     const itemMarkup = items.map((item) => `<li><strong>${escapeHtml(workloadItemLabel(item))}</strong><span>${escapeHtml(item.title || "")}</span><em>${formatLoad(item.minutes || item.learnerMinutes)}</em></li>`).join("");
     return `<details class="load-week"><summary><strong>Semana ${escapeHtml(week.weekNumber)}</strong><span>${formatLoad(week.calculatedMinutes)} calculados · ${formatLoad(week.targetMinutes)} de meta</span></summary><ul>${itemMarkup || "<li>Sem itens calculáveis ainda.</li>"}</ul></details>`;
   }).join("");
-  const timeBreakdownMarkup = `<section class="time-breakdown"><p class="eyebrow">CARGA ABERTA POR ATIVIDADE</p><h3>De onde vem o tempo calculado?</h3><p>O texto-base é contado separadamente das leituras, vídeos, quiz, fórum, revisão e webpráticas. Artigos/leitura aparecem como obrigatórios ou complementares conforme a marcação do recurso.</p><div class="breakdown-summary">${breakdownSummary || "<span>A carga será calculada depois da redação.</span>"}</div><div class="load-weeks">${weeklyLoads}</div></section>`;
+  const timeBreakdownMarkup = `<section class="time-breakdown"><p class="eyebrow">CARGA ABERTA POR ATIVIDADE</p><h3>De onde vem o tempo calculado?</h3><p>O texto-base é contado separadamente das leituras, vídeos, quiz, fórum, revisão e práticas. Artigos/leitura aparecem como obrigatórios ou complementares conforme a marcação do recurso.</p><div class="breakdown-summary">${breakdownSummary || "<span>A carga será calculada depois da redação.</span>"}</div><div class="load-weeks">${weeklyLoads}</div></section>`;
   const overviewMarkup = `<div class="plan-overview"><p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o Material de Mediação são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div></div>`;
   const checklistsMarkup = `<div class="results-checklists">${resourcesMarkup}${checklistMarkup}${academicMarkup}${qualityMarkup}${progressionMarkup}${practiceMarkup}</div>`;
   container.innerHTML = `${overviewMarkup}${timeBreakdownMarkup}${checklistsMarkup}`;
@@ -2526,12 +2526,12 @@ function apiHeaders() {
 
 async function downloadWebPractice(practiceId) {
   if (!practiceId || !state.weeks.length) return;
-  if (isGitHubPages) { showError("O DOCX das webpráticas é gerado na versão Vercel com backend."); return; }
+  if (isGitHubPages) { showError("O DOCX das práticas é gerado na versão Vercel com backend."); return; }
   const button = document.querySelector(`.webpractice-download[data-practice-id="${CSS.escape(practiceId)}"]`);
   if (button) { button.disabled = true; button.classList.add("is-loading"); }
   try {
     const response = await fetch("/api/webpractice-docx", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides, practiceId }) });
-    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível criar o DOCX da webprática."); }
+    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível criar o DOCX da prática."); }
     const disposition = response.headers.get("Content-Disposition") || "";
     const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `${slugify(practiceId)}-roteiro.docx`;
     downloadBlob(await response.blob(), filename);
@@ -2941,7 +2941,7 @@ async function generate() {
   if (!input.objectives.length && !input.content.trim()) { showError("Informe ao menos um objetivo ou conteúdo-base para orientar a geração."); $("#objectives").focus(); return; }
   if (input.webPractice.enabled) {
     const incomplete = input.webPractices.find((practice) => !practice.title || (!practice.weekNumber && !practice.date));
-    if (incomplete) { showError("Cada webprática precisa de um título e de uma semana ou data de ocorrência. Ela não será alocada automaticamente."); return; }
+    if (incomplete) { showError("Cada prática precisa de um título e de uma semana ou data de ocorrência. Ela não será alocada automaticamente."); return; }
   }
   const generation = state.generation;
   const continuable = generation?.status === "partial"
