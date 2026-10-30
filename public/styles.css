@@ -650,3 +650,13 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .material-source-status{margin:4px 0 8px;font-size:13px}.material-source-empty{color:#6b7690}.material-source-warning{color:#9a3b1b}
 .link-button{background:none;border:0;padding:0 0 0 8px;color:#bf4c34;text-decoration:underline;cursor:pointer;font:inherit}
 .reader-source-used{border-left:3px solid #9fb3c8;padding-left:12px}
+/* Ritmo vertical dos formulários: cada campo (rótulo + caixa) fica separado do próximo,
+   para o rótulo ficar claramente ligado à caixa logo ABAIXO dele. */
+.field-grid + .field-grid,.academic-profile-box .field-grid + .field-grid{margin-top:0}
+.field-grid{margin-bottom:22px;row-gap:22px}
+.field{margin-bottom:22px}
+.field-grid > .field,.resource-plan-week .field,.practice-count-controls .field,.methodology-week,.composition-week .field{margin-bottom:0}
+.field > span:first-child{margin-bottom:1px}
+.field .hint,.field > small{margin-top:-2px}
+.bloom-meter{margin-top:10px}
+.material-source-box .field-grid{margin-bottom:14px}
