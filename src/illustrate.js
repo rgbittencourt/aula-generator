@@ -73,7 +73,8 @@ export async function illustrateWeek(input, week, { ask = callText, limit = 3 } 
   const nextSections = sections.map((section) => ({ ...section, figures: (section.figures || []).map((figure) => done.has(figure.id) ? { ...figure, src: svgDataUri(done.get(figure.id)), aiGenerated: true } : figure) }));
   const figures = nextSections.flatMap((section) => (section.figures || []).map((figure) => ({ ...figure, sectionNumber: text(figure.sectionNumber || section.number) })));
   const next = { ...week, lessonPlan: { ...plan, contentSections: nextSections }, blocks: insertFigureBlocks(week.blocks, figures) };
-  return { week: next, drawn: done.size, failed: todo.length - done.size, total: allFigures(plan).length };
+  const reasons = settled.map((result) => result.status === "rejected" ? text(result.reason?.message) : (result.value ? "" : "o SVG devolvido foi recusado duas vezes")).filter(Boolean);
+  return { week: next, drawn: done.size, failed: todo.length - done.size, total: allFigures(plan).length, reasons: [...new Set(reasons)].slice(0, 3) };
 }
 
 /**

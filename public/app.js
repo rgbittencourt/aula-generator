@@ -1586,15 +1586,17 @@ function renderLessonPreview(lesson, index) {
   const timeItems = (plan.timePlan?.items || []).filter((item) => Number(item.minutes || item.learnerMinutes) > 0).map((item) => `<li><strong>${escapeHtml(workloadItemLabel(item))}</strong>: ${escapeHtml(item.title || "")} — ${formatLoad(item.minutes || item.learnerMinutes)}${item.required === false ? " · complementar" : " · obrigatório"}</li>`).join("");
   const timeBreakdown = Object.entries(plan.timePlan?.breakdown || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<li><strong>${escapeHtml(breakdownLabels[key] || key)}</strong>: ${formatLoad(value)}</li>`).join("");
   const timeMarkup = timeItems || timeBreakdown ? `<section class="time-breakdown reader-time-breakdown"><h3>Tempo desta semana</h3><p>O cálculo está separado por texto-base, leituras, mídias e atividades. “Obrigatório” indica o que entra na trilha essencial; “complementar” não é obrigatório.</p><ul>${timeItems || timeBreakdown}</ul></section>` : "";
+  const pendingFigures = weekHasPendingFigures(lesson) ? `<section class="reader-warning"><h3>Figuras pendentes</h3><p>Esta semana tem diagramas planejados que ainda não foram desenhados pela IA. O texto não é alterado.</p><button type="button" class="secondary" id="retry-figures-button">Criar figuras pendentes</button></section>` : "";
   const methodology = plan.activeMethodology?.label ? `<section class="reader-methodology"><h3>Metodologia ativa: ${escapeHtml(plan.activeMethodology.label)}</h3>${plan.activeMethodology.rationale ? `<p><strong>Por que esta metodologia:</strong> ${escapeHtml(plan.activeMethodology.rationale)}</p>` : ""}${plan.activeMethodology.howApplied ? `<p><strong>Como as atividades a aplicam:</strong> ${escapeHtml(plan.activeMethodology.howApplied)}</p>` : ""}${plan.activeMethodology.modalityNote ? `<p><small>${escapeHtml(plan.activeMethodology.modalityNote)}</small></p>` : ""}</section>` : "";
   const alignment = (plan.alignmentMatrix || []).length ? `<section><h3>Alinhamento pedagógico</h3><ul>${plan.alignmentMatrix.map((row) => `<li><strong>${escapeHtml(row.objective || "Objetivo")}</strong>: ${escapeHtml(row.evidence || "evidência a definir")} · avaliação: ${escapeHtml((row.assessmentQuestions || []).join(", ") || "a definir")}</li>`).join("")}</ul></section>` : "";
   const mediation = mediationMessagesMarkup(guide.mediationMessages, plan.theme || lesson?.meta?.title || `a semana ${index + 1}`, index + 1)
     + (guide.weekSummary && guide.studentFAQ?.length ? "" : `<section class="reader-warning"><h3>Explicações para o professor</h3><p>Esta semana ainda não tem o resumo, as perguntas prováveis dos alunos, os equívocos comuns e os sinais de alerta que entram no Material de Mediação. O texto da semana não é alterado.</p><button type="button" class="secondary" id="retry-explain-button">Completar explicações do Material de Mediação</button></section>`);
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
-  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${methodology}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
+  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${pendingFigures}${sectionsMarkup}${methodology}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
   renderFlowPanel(index);
   $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
+  $("#retry-figures-button")?.addEventListener("click", () => retryFigures(index));
   $("#retry-explain-button")?.addEventListener("click", (event) => retryDerivatives(index, { parts: ["explain"], button: event.currentTarget }));
   $("#production-week-button")?.addEventListener("click", () => generateProductionWeek(index));
   $("#production-sheet-button-card")?.addEventListener("click", downloadProductionSheet);
@@ -1653,6 +1655,31 @@ function refreshChecklistFromWeek(index) {
 }
 
 // Gera só a avaliação, as atividades e a mediação de uma semana cujo texto já está salvo.
+async function retryFigures(index) {
+  if (aiActionBusy) return;
+  const button = $("#retry-figures-button");
+  if (!beginAiAction(button)) return;
+  setBusy(button, true, "Desenhando…");
+  try {
+    const input = formInput();
+    const accessCode = input.accessCode || $("#access-code")?.value || "";
+    delete input.accessCode;
+    const headers = { "Content-Type": "application/json" };
+    if (accessCode) headers["x-aula-access-code"] = accessCode;
+    const result = await illustrateGeneratedWeek({ week: state.weeks[index], teacherGuide: state.teacherGuides[index] }, input, index, headers, button);
+    if (result.week) { state.weeks[index] = result.week; if (state.studioEdits) delete state.studioEdits[index]; }
+    saveDraft("figuras-geradas");
+    openLessonPreview(index);
+    if (result.figuresError) finishAiActivity("Figuras não criadas", result.figuresError, "error");
+    else if (!result.figuresFailed) finishAiActivity("Figuras criadas", `Os diagramas da semana ${index + 1} foram desenhados. Confira na prévia.`);
+  } catch (error) {
+    finishAiActivity("Figuras não criadas", error.message, "error");
+  } finally {
+    setBusy(button, false, "");
+    endAiAction();
+  }
+}
+
 async function retryDerivatives(index, options = {}) {
   if (aiActionBusy) return;
   const parts = Array.isArray(options.parts) && options.parts.length ? options.parts : null;
@@ -2467,9 +2494,14 @@ async function illustrateGeneratedWeek(data, input, index, headers, button) {
   try {
     const response = await fetch("/api/illustrate", { method: "POST", headers, signal: controller.signal, body: JSON.stringify({ action: "illustrate", input, weekIndex: index, week: data.week }) });
     const done = await readApiResponse(response, `Não foi possível criar as figuras da semana ${index + 1}.`);
+    if (done.failed) {
+      const why = (done.reasons || []).join(" · ");
+      setAiActivity("Figuras incompletas", `${done.drawn || 0} de ${(done.drawn || 0) + done.failed} figura(s) da semana ${index + 1} foram criadas.${why ? ` Motivo: ${why}.` : ""} O texto foi preservado; use “Criar figuras pendentes” na prévia da semana para tentar de novo.`, { progress: 100, tone: "error" });
+    }
     return { ...data, week: done.week, figuresFailed: done.failed || 0 };
   } catch (error) {
     console.warn(`Figuras da semana ${index + 1} adiadas:`, error);
+    setAiActivity("Figuras não criadas", `As figuras da semana ${index + 1} não foram concluídas (${error.message || "falha na IA"}). O texto foi preservado; use “Criar figuras pendentes” na prévia da semana para tentar de novo.`, { progress: 100, tone: "error" });
     return { ...data, figuresError: error.message || "As figuras não foram concluídas." };
   } finally {
     clearTimeout(timer);

@@ -164,7 +164,8 @@ function emptyReason(payload) {
   const stop = getAIProvider() === "anthropic" ? payload?.stop_reason : payload?.choices?.[0]?.finish_reason;
   const refusal = getAIProvider() === "anthropic" ? "" : payload?.choices?.[0]?.message?.refusal;
   const labels = { max_tokens: "limite de saída atingido", length: "limite de saída atingido", refusal: "o modelo recusou a resposta", content_filter: "filtro de conteúdo do provedor", end_turn: "o modelo encerrou sem texto", stop: "o modelo encerrou sem texto" };
-  return [stop ? `${labels[stop] || stop} [${stop}]` : "", refusal ? `recusa: ${String(refusal).slice(0, 160)}` : ""].filter(Boolean).join("; ");
+  const blocks = Array.isArray(payload?.content) ? [...new Set(payload.content.map((block) => block?.type).filter(Boolean))] : [];
+  return [stop ? `${labels[stop] || stop} [${stop}]` : "", blocks.length && !blocks.includes("text") ? `blocos sem texto: ${blocks.join(", ")}` : "", refusal ? `recusa: ${String(refusal).slice(0, 160)}` : ""].filter(Boolean).join("; ");
 }
 
 function responseFinishedByLength(payload) {
@@ -279,13 +280,14 @@ export async function callJson(messages, options = {}) {
   }
   const maxAttempts = Math.max(1, getAITokenSettings().maxRetries);
   let formatRetry = false;
+  let raisedMaxTokens = 0;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const retryingFormat = formatRetry;
     const requestMessages = formatRetry
       ? [...messages, { role: "user", content: options.formatRetryInstruction || "A resposta anterior veio em formato JSON inválido ou foi truncada. Gere novamente uma versão compacta e completa do mesmo objeto, sem markdown, comentários ou texto fora do JSON; use aspas duplas em todas as propriedades e não deixe vírgula antes de } ou ]." }]
       : messages;
     const requestedMaxTokens = configuredMaxTokens(options, retryingFormat);
-    const maxTokens = boundedOutputTokens(requestMessages, requestedMaxTokens);
+    const maxTokens = Math.max(boundedOutputTokens(requestMessages, requestedMaxTokens), raisedMaxTokens);
     const request = buildRequest(requestMessages, options, maxTokens);
     const response = await fetch(request.url, {
       method: "POST",
@@ -311,6 +313,9 @@ export async function callJson(messages, options = {}) {
       emptyError.code = "AI_EMPTY_RESPONSE";
       emptyError.retryable = true;
       emptyError.provider = getAIProvider();
+      // Resposta vazia por limite de saída: o modelo gastou o espaço antes de escrever (por
+      // exemplo, raciocinando). A próxima tentativa vai com o dobro de espaço, até 32 mil tokens.
+      if (responseFinishedByLength(payload)) raisedMaxTokens = Math.min(32000, Math.max(maxTokens * 2, 8000));
       if (attempt < maxAttempts - 1) { await wait(250); continue; }
       throw emptyError;
     }
@@ -361,11 +366,12 @@ export async function callText(messages, options = {}) {
     throw error;
   }
   const maxAttempts = Math.max(1, getAITokenSettings().maxRetries);
+  let raisedMaxTokens = 0;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     // Na Anthropic a redação leva um guia longo (em cache) e não deve ter a saída cortada
     // pela "margem local" de tokens, pensada para o limite por minuto da OpenAI.
     const requested = configuredMaxTokens(options);
-    const maxTokens = options.ignoreRequestBudget && getAIProvider() === "anthropic" ? requested : boundedOutputTokens(messages, requested);
+    const maxTokens = Math.max(options.ignoreRequestBudget && getAIProvider() === "anthropic" ? requested : boundedOutputTokens(messages, requested), raisedMaxTokens);
     const request = buildRequest(messages, { ...options, plainText: true }, maxTokens);
     const response = await fetch(request.url, { method: "POST", headers: request.headers, body: JSON.stringify(request.body) });
     const payload = await response.json().catch(() => ({}));
@@ -387,6 +393,9 @@ export async function callText(messages, options = {}) {
       emptyError.code = "AI_EMPTY_RESPONSE";
       emptyError.retryable = true;
       emptyError.provider = getAIProvider();
+      // Resposta vazia por limite de saída: o modelo gastou o espaço antes de escrever (por
+      // exemplo, raciocinando). A próxima tentativa vai com o dobro de espaço, até 32 mil tokens.
+      if (responseFinishedByLength(payload)) raisedMaxTokens = Math.min(32000, Math.max(maxTokens * 2, 8000));
       if (attempt < maxAttempts - 1) { await wait(250); continue; }
       throw emptyError;
     }
