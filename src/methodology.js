@@ -318,3 +318,38 @@ OBJETIVOS PELA TAXONOMIA DE BLOOM REVISADA (obrigatório nesta abordagem):
 - Ajuste o teto ao nível da turma: pós-graduação e superior chegam a avaliar/criar; FIC e cursos introdutórios podem parar em aplicar/analisar.
 - Não escreva o nome do nível no texto do objetivo; o verbo já o indica.`;
 }
+
+// ---------- Guia de aplicação da metodologia (Material de Mediação) ----------
+
+export const METHODOLOGY_GUIDE_SPEC = `  "teacherGuide": {
+    "methodologyGuide": {
+      "method": "nome da metodologia",
+      "whatItIs": "o que é, em 2 ou 3 frases simples, para quem nunca usou",
+      "whyHere": "por que ela serve aos objetivos DESTA semana, em 2 frases",
+      "beforeTheWeek": ["o que o professor prepara antes de abrir a semana (materiais, avisos, ajustes no Moodle)"],
+      "phases": [ { "name": "nome da etapa (ex.: Antes do encontro: estudo prévio)", "when": "quando, no calendário da semana (ex.: dias 1 a 3)", "goal": "para que serve esta etapa", "teacherActions": ["o que o professor faz"], "studentActions": ["o que o estudante faz"], "materials": ["o que é usado: seção do texto, vídeo, quiz, fórum, webprática"] } ],
+      "studentInstructions": "texto pronto para postar no Moodle explicando ao estudante como a semana vai funcionar com esta metodologia: o que fazer, em que ordem e por quê (de 80 a 150 palavras, tom acolhedor, sem jargão)",
+      "monitoring": [ { "indicator": "o que acompanhar (ex.: quantos fizeram o quiz de verificação)", "howToCheck": "onde e como ver isso (relatório do Moodle, fórum, respostas)", "when": "quando olhar", "ifLow": "o que fazer se estiver abaixo do esperado" } ],
+      "successSignals": ["sinal observável de que a metodologia está funcionando"],
+      "warningSignals": [ { "signal": "sinal de que não está funcionando", "action": "o que fazer, concretamente" } ],
+      "assessment": { "howToAssess": "como avaliar se os estudantes aprenderam com esta metodologia (o que conta, o que não conta)", "criteria": [ { "criterion": "critério observável", "evidence": "evidência na produção do estudante" } ] },
+      "pitfalls": ["erro comum de quem aplica esta metodologia pela primeira vez, e como evitar"],
+      "adaptations": { "ead": "como fica 100% a distância e assíncrono", "synchronous": "como aproveitar um encontro ao vivo ou a webprática", "largeClass": "ajuste para turma grande ou pouco participativa" }
+    }
+  }`;
+
+export function methodologyGuideRules(input = {}, index = 0, plan = {}) {
+  const choice = methodForWeek(input, index);
+  const declared = plan.activeMethodology && typeof plan.activeMethodology === "object" ? plan.activeMethodology : {};
+  const method = choice.method || ACTIVE_METHODS.find((item) => item.label === text(declared.label) || item.id === text(declared.id)) || null;
+  const label = method ? method.label : text(declared.label) || "a metodologia ativa escolhida para a semana";
+  const activities = (Array.isArray(plan.activities) ? plan.activities : []).slice(0, 6).map((activity) => ({ titulo: text(activity.title), tipo: text(activity.type), instrucoes: text(activity.instructions).slice(0, 500), evidencia: text(activity.evidence) }));
+  return `REGRAS DO GUIA DE APLICAÇÃO DA METODOLOGIA
+- Metodologia desta semana: ${label}.${declared.howApplied ? ` Como as atividades já geradas a aplicam: ${text(declared.howApplied)}` : ""}${method ? `\n- Referência da metodologia: ${method.text} ${method.activities} ${method.mediation}` : ""}
+- O leitor é o professor que talvez nunca tenha usado esta metodologia: o guia precisa dizer COMO aplicar, QUANDO cada etapa acontece, DE QUE JEITO conduzir e COMO saber se está funcionando. Seja concreto e prático; nada de definição genérica de manual.
+- Amarre tudo ao que esta semana já tem: as seções do texto, as atividades abaixo, o quiz, o fórum, os vídeos e a webprática, se houver. Use os nomes reais delas. Não invente atividade nova sem dizer que é sugestão opcional.
+- "phases": de 3 a 5 etapas em ordem cronológica, cobrindo antes, durante e depois. Cada uma com ações do professor e do estudante.
+- "monitoring": de 3 a 5 indicadores que o professor consegue de fato ver no Moodle ou na turma. "warningSignals": de 3 a 5, cada um com ação concreta.
+- Escreva em português do Brasil, de colega para colega, sem jargão vazio.
+${activities.length ? `ATIVIDADES JÁ GERADAS PARA A SEMANA:\n${JSON.stringify(activities, null, 2)}` : ""}`;
+}

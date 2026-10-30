@@ -1602,7 +1602,7 @@ function renderLessonPreview(lesson, index) {
   const timeBreakdown = Object.entries(plan.timePlan?.breakdown || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<li><strong>${escapeHtml(breakdownLabels[key] || key)}</strong>: ${formatLoad(value)}</li>`).join("");
   const timeMarkup = timeItems || timeBreakdown ? `<section class="time-breakdown reader-time-breakdown"><h3>Tempo desta semana</h3><p>O cálculo está separado por texto-base, leituras, mídias e atividades. “Obrigatório” indica o que entra na trilha essencial; “complementar” não é obrigatório.</p><ul>${timeItems || timeBreakdown}</ul></section>` : "";
   const pendingFigures = weekHasPendingFigures(lesson) ? `<section class="reader-warning"><h3>Figuras pendentes</h3><p>Esta semana tem diagramas planejados que ainda não foram desenhados pela IA. O texto não é alterado.</p><button type="button" class="secondary" id="retry-figures-button">Criar figuras pendentes</button></section>` : "";
-  const methodology = plan.activeMethodology?.label ? `<section class="reader-methodology"><h3>Metodologia ativa: ${escapeHtml(plan.activeMethodology.label)}</h3>${plan.activeMethodology.rationale ? `<p><strong>Por que esta metodologia:</strong> ${escapeHtml(plan.activeMethodology.rationale)}</p>` : ""}${plan.activeMethodology.howApplied ? `<p><strong>Como as atividades a aplicam:</strong> ${escapeHtml(plan.activeMethodology.howApplied)}</p>` : ""}${plan.activeMethodology.modalityNote ? `<p><small>${escapeHtml(plan.activeMethodology.modalityNote)}</small></p>` : ""}</section>` : "";
+  const methodology = methodologyPreviewMarkup(plan, guide, index, lesson);
   const alignment = (plan.alignmentMatrix || []).length ? `<section><h3>Alinhamento pedagógico</h3><ul>${plan.alignmentMatrix.map((row) => `<li><strong>${escapeHtml(row.objective || "Objetivo")}</strong>: ${escapeHtml(row.evidence || "evidência a definir")} · avaliação: ${escapeHtml((row.assessmentQuestions || []).join(", ") || "a definir")}</li>`).join("")}</ul></section>` : "";
   const mediation = mediationMessagesMarkup(guide.mediationMessages, plan.theme || lesson?.meta?.title || `a semana ${index + 1}`, index + 1)
     + (guide.weekSummary && guide.studentFAQ?.length ? "" : `<section class="reader-warning"><h3>Explicações para o professor</h3><p>Esta semana ainda não tem o resumo, as perguntas prováveis dos alunos, os equívocos comuns e os sinais de alerta que entram no Material de Mediação. O texto da semana não é alterado.</p><button type="button" class="secondary" id="retry-explain-button">Completar explicações do Material de Mediação</button></section>`);
@@ -1612,6 +1612,7 @@ function renderLessonPreview(lesson, index) {
   renderFlowPanel(index);
   $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
   $("#retry-figures-button")?.addEventListener("click", () => retryFigures(index));
+  $("#methodology-guide-button")?.addEventListener("click", async (event) => { await retryDerivatives(index, { parts: ["methodology"], button: event.currentTarget }); openLessonPreview(index); });
   document.querySelectorAll("#lesson-reader .copy-suggestion").forEach((button) => button.addEventListener("click", async () => {
     const value = button.previousElementSibling?.value || "";
     try { await navigator.clipboard.writeText(value); } catch { button.previousElementSibling?.select(); document.execCommand?.("copy"); }
@@ -1675,6 +1676,33 @@ function refreshChecklistFromWeek(index) {
 }
 
 // Gera só a avaliação, as atividades e a mediação de uma semana cujo texto já está salvo.
+// Metodologia ativa na prévia: por que, como as atividades a aplicam e o guia de aplicação para o professor.
+function methodologyPreviewMarkup(plan, guide, index, lesson) {
+  const declared = plan.activeMethodology || {};
+  const label = declared.label || methodologyForWeekLabel(index, lesson);
+  if (!label) return "";
+  const list = (items) => (Array.isArray(items) && items.length ? `<ul>${items.map((item) => `<li>${escapeHtml(typeof item === "object" ? Object.values(item).filter(Boolean).join(" — ") : item)}</li>`).join("")}</ul>` : "");
+  const mg = guide?.methodologyGuide;
+  const head = `<h3>Metodologia ativa: ${escapeHtml(label.replace(/^Metodologia: /, ""))}</h3>${declared.rationale ? `<p><strong>Por que esta metodologia:</strong> ${escapeHtml(declared.rationale)}</p>` : ""}${declared.howApplied ? `<p><strong>Como as atividades a aplicam:</strong> ${escapeHtml(declared.howApplied)}</p>` : ""}${declared.modalityNote ? `<p><small>${escapeHtml(declared.modalityNote)}</small></p>` : ""}`;
+  if (!mg) return `<section class="reader-methodology">${head}<div class="reader-warning"><p>O <strong>guia de aplicação</strong> (passo a passo, como acompanhar e como avaliar se está funcionando) ainda não foi gerado para esta semana. Ele também entra no Material de Mediação (PDF).</p><button type="button" class="secondary" id="methodology-guide-button">Gerar o guia de aplicação da metodologia</button></div></section>`;
+  const phases = (mg.phases || []).map((phase, position) => `<li><strong>${position + 1}. ${escapeHtml(phase.name || "Etapa")}</strong>${phase.when ? ` <em>(${escapeHtml(phase.when)})</em>` : ""}${phase.goal ? `<br>${escapeHtml(phase.goal)}` : ""}${(phase.teacherActions || []).length ? `<br><small><strong>Professor:</strong> ${escapeHtml(phase.teacherActions.join(" · "))}</small>` : ""}${(phase.studentActions || []).length ? `<br><small><strong>Estudante:</strong> ${escapeHtml(phase.studentActions.join(" · "))}</small>` : ""}</li>`).join("");
+  const monitoring = (mg.monitoring || []).map((item) => `<li><strong>${escapeHtml(item.indicator || "")}</strong>${item.howToCheck ? ` — ${escapeHtml(item.howToCheck)}` : ""}${item.when ? ` <em>(${escapeHtml(item.when)})</em>` : ""}${item.ifLow ? `<br><small>Se estiver baixo: ${escapeHtml(item.ifLow)}</small>` : ""}</li>`).join("");
+  const warnings = (mg.warningSignals || []).map((item) => `<li><strong>${escapeHtml(item.signal || "")}</strong>${item.action ? ` → ${escapeHtml(item.action)}` : ""}</li>`).join("");
+  const assess = mg.assessment || {};
+  return `<section class="reader-methodology">${head}<details open><summary><strong>Guia de aplicação para o professor</strong></summary>
+    ${mg.whatItIs ? `<p><strong>O que é:</strong> ${escapeHtml(mg.whatItIs)}</p>` : ""}${mg.whyHere ? `<p><strong>Por que nesta semana:</strong> ${escapeHtml(mg.whyHere)}</p>` : ""}
+    ${(mg.beforeTheWeek || []).length ? `<h4>Antes de abrir a semana</h4>${list(mg.beforeTheWeek)}` : ""}
+    ${phases ? `<h4>Passo a passo</h4><ol class="methodology-phases">${phases}</ol>` : ""}
+    ${mg.studentInstructions ? `<h4>Texto para o aluno (Moodle)</h4><p class="methodology-student-text">${escapeHtml(mg.studentInstructions)}</p>` : ""}
+    ${monitoring ? `<h4>Como acompanhar se está funcionando</h4><ul>${monitoring}</ul>` : ""}
+    ${(mg.successSignals || []).length ? `<h4>Sinais de que deu certo</h4>${list(mg.successSignals)}` : ""}
+    ${warnings ? `<h4>Sinais de alerta e o que fazer</h4><ul>${warnings}</ul>` : ""}
+    ${assess.howToAssess || (assess.criteria || []).length ? `<h4>Como avaliar a aprendizagem</h4>${assess.howToAssess ? `<p>${escapeHtml(assess.howToAssess)}</p>` : ""}${list((assess.criteria || []).map((item) => `${item.criterion || ""}${item.evidence ? ` — evidência: ${item.evidence}` : ""}`))}` : ""}
+    ${(mg.pitfalls || []).length ? `<h4>Erros comuns</h4>${list(mg.pitfalls)}` : ""}
+    ${mg.adaptations ? `<h4>Adaptações</h4>${list([mg.adaptations.ead ? `100% a distância: ${mg.adaptations.ead}` : "", mg.adaptations.synchronous ? `Encontro ao vivo / webprática: ${mg.adaptations.synchronous}` : "", mg.adaptations.largeClass ? `Turma grande: ${mg.adaptations.largeClass}` : ""].filter(Boolean))}` : ""}
+    <button type="button" class="secondary" id="methodology-guide-button">Gerar o guia de novo</button></details></section>`;
+}
+
 // Imagem sugerida (foto para gerar fora, ou visual para o Napkin): o professor cria e insere no ClassAtelier.
 function suggestedImageMarkup(figure) {
   if (figure.kind === "foto") {
@@ -1806,7 +1834,7 @@ async function regenerateSelectedWeek() {
     state.weeks = data.weeks || state.weeks;
     state.teacherGuides = data.teacherGuides || state.teacherGuides;
     saveDraft("semana-refeita");
-    const completed = await completeDerivativesStep({ ...data, week: data.weeks?.[index], teacherGuide: data.teacherGuides?.[index], resourcesDeferred: true }, input, index, headers, button);
+    const completed = await completeMethodologyStep(await completeDerivativesStep({ ...data, week: data.weeks?.[index], teacherGuide: data.teacherGuides?.[index], resourcesDeferred: true }, input, index, headers, button), input, index, headers, button);
     const enriched = await illustrateGeneratedWeek(await enrichGeneratedWeek(completed, input, index, headers, button), input, index, headers, button);
     if (enriched.week) data.weeks[index] = enriched.week;
     if (enriched.teacherGuide) data.teacherGuides[index] = enriched.teacherGuide;
@@ -1957,7 +1985,7 @@ function reviewCheckChecked(item = {}, reviewMarks = state.reviewMarks || create
 //   scope "full"            -> reescrita da semana (só quando o próprio item exige texto novo em grande parte)
 //   scope "manual"          -> conferência humana; não há o que a IA refazer sozinha
 const REVIEW_LIMITS_EDIT = "Altere SOMENTE o que este item exige. Preserve todo o resto da semana: título, objetivos, seções, recursos, figuras, questões e atividades que não estejam envolvidos. Não reordene nem reescreva por estilo. Não invente autores, dados, referências, DOI ou URLs; onde faltar base, marque como “a conferir”.";
-const PARTS_LABEL = { explain: "as explicações para o professor", assessment: "as questões", activities: "o diagnóstico, as paradas e as atividades", mediation: "o Material de Mediação", webpractice: "a webprática" };
+const PARTS_LABEL = { methodology: "o guia de aplicação da metodologia", explain: "as explicações para o professor", assessment: "as questões", activities: "o diagnóstico, as paradas e as atividades", mediation: "o Material de Mediação", webpractice: "a webprática" };
 
 function reviewActionFor(kind, item, lesson) {
   const id = String(item.id || "");
@@ -2512,6 +2540,27 @@ async function completeDerivativesStep(data, input, index, headers, button) {
   }
 }
 
+// Guia de aplicação da metodologia ativa (Material de Mediação): etapa própria, depois das atividades.
+function weekNeedsMethodologyGuide(index, week, guide) {
+  if (guide?.methodologyGuide) return false;
+  if (week?.lessonPlan?.activeMethodology?.label) return true;
+  return Boolean(methodologyForWeekLabel(index, week));
+}
+
+async function completeMethodologyStep(data, input, index, headers, button) {
+  if (!data?.week || data?.week?.generationMeta?.derivativesPending || !weekNeedsMethodologyGuide(index, data.week, data.teacherGuide)) return data;
+  setButtonLabel(button, `Escrevendo o guia da metodologia da semana ${index + 1}…`);
+  setAiActivity("Guia da metodologia", `Montando o passo a passo de como aplicar a metodologia da semana ${index + 1}, como acompanhar e como avaliar…`, { progress: Math.round(((index + 0.6) / (input.weeks + 1)) * 100) });
+  try {
+    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input, weekIndex: index, week: data.week, teacherGuide: data.teacherGuide, parts: ["methodology"] }) });
+    const done = await readApiResponse(response, `Não foi possível escrever o guia da metodologia da semana ${index + 1}.`);
+    return { ...data, week: done.week, teacherGuide: done.teacherGuide };
+  } catch (error) {
+    console.warn(`Guia da metodologia da semana ${index + 1} adiado:`, error);
+    return { ...data, methodologyError: error.message || "O guia da metodologia não foi concluído." };
+  }
+}
+
 // Figuras (diagramas SVG) criadas por IA: etapa própria, depois do texto e dos recursos.
 function weekHasPendingFigures(week) {
   return (week?.lessonPlan?.contentSections || []).some((section) => (section.figures || []).some((figure) => !figure.src && (!figure.kind || figure.kind === "diagrama")));
@@ -2767,6 +2816,7 @@ async function generateDistributed(input, accessCode, button, options = {}) {
     saveDraft("semana-gerada");
     renderWeeks({ ok: true, partial: true, provider: "ai-distributed-partial", model: data.model, input, weeks: state.weeks, teacherGuides: state.teacherGuides, generation: state.generation }, { scrollToResults: false });
     data = await completeDerivativesStep(data, input, index, headers, button);
+    data = await completeMethodologyStep(data, input, index, headers, button);
     data = await enrichGeneratedWeek(data, input, index, headers, button);
     data = await illustrateGeneratedWeek(data, input, index, headers, button);
     weeks[index] = data.week;

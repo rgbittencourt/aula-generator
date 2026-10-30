@@ -1,3 +1,4 @@
+import { methodForWeek } from "./methodology.js";
 import { buildAlignmentMatrix, buildProgression, fallbackDidacticArc, pedagogicalReview, normalizeDidacticArc } from "./pedagogy.js";
 import { practiceScheduledForWeek } from "./aula-schema.js";
 
@@ -264,7 +265,10 @@ function normalizeGuide(source = {}, plan = {}, input = {}, index = 0) {
     timePlan,
     workloadAdjustment,
     workloadAdvice: list(raw.workloadAdvice || raw.timeAdjustmentSuggestions || workloadAdjustment.suggestions?.map((item) => item.rationale || item.action || item.title)),
-    notes: list(raw.notes)
+    notes: list(raw.notes),
+    methodologyRequested: methodForWeek(input, index).id !== "nenhuma" || Boolean(plan.activeMethodology?.label),
+    activeMethodology: plan.activeMethodology && typeof plan.activeMethodology === "object" ? plan.activeMethodology : null,
+    methodologyGuide: raw.methodologyGuide && typeof raw.methodologyGuide === "object" && !Array.isArray(raw.methodologyGuide) ? raw.methodologyGuide : null
   };
 }
 

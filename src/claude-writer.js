@@ -14,7 +14,7 @@
 // restante do sistema (blocos do ClassAtelier, qualidade, ponte entre semanas,
 // pesquisa de recursos) segue igual. AULA_WRITER=json volta ao modo antigo.
 
-import { writerMethodologyBlock, derivativesMethodologyBlock, webPracticeMethodologyBlock } from "./methodology.js";
+import { writerMethodologyBlock, derivativesMethodologyBlock, webPracticeMethodologyBlock, METHODOLOGY_GUIDE_SPEC, methodologyGuideRules } from "./methodology.js";
 import { callJson, callText, getAIModel } from "./ai-client.js";
 import { normalizeAcademicPlan } from "./academic.js";
 import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
@@ -239,7 +239,9 @@ export function derivativesPrompt(input, index, plan, scheduledPractices, part =
     activities: ["all", "guide", "activities"].includes(part),
     mediation: ["all", "guide", "mediation"].includes(part),
     explain: ["all", "guide", "explain"].includes(part),
-    webpractice: ["all", "guide", "webpractice"].includes(part) && scheduledPractices.length > 0
+    webpractice: ["all", "guide", "webpractice"].includes(part) && scheduledPractices.length > 0,
+    // O guia da metodologia sai numa chamada própria, depois das atividades (precisa delas).
+    methodology: part === "methodology"
   };
   // Com webprática, o projeto completo sai numa chamada própria (é a parte mais longa do guia).
   const separateWebpractice = part === "mediation" || part === "webpractice";
@@ -275,7 +277,7 @@ export function derivativesPrompt(input, index, plan, scheduledPractices, part =
   const webpracticeSpec = `  "teacherGuide": {
     "webPracticeProjects": [ { "title": "...", "problem": "...", "context": "...", "studentRole": "...", "challenge": "...", "deliverable": "...", "steps": [ { "minutes": 10, "instructions": "...", "evidence": "..." } ], "criteria": ["..."], "fallbackPlan": "..." } ]
   }`;
-  const specs = [wants.assessment && assessmentSpec, wants.activities && activitiesSpec, wants.mediation && mediationSpec, wants.explain && explainSpec, part === "webpractice" && wants.webpractice && webpracticeSpec].filter(Boolean);
+  const specs = [wants.methodology && METHODOLOGY_GUIDE_SPEC, wants.assessment && assessmentSpec, wants.activities && activitiesSpec, wants.mediation && mediationSpec, wants.explain && explainSpec, part === "webpractice" && wants.webpractice && webpracticeSpec].filter(Boolean);
   const rules = [
     wants.assessment && `REGRAS DA AVALIAÇÃO
 - Exatamente 6 questões, todas de múltipla escolha com EXATAMENTE 5 alternativas e uma única correta, cobrindo todos os objetivos. Não use verdadeiro/falso. "answer" é o índice (começando em 0, de 0 a 4) da alternativa correta; varie a posição da correta entre as questões.
@@ -296,7 +298,7 @@ ${scheduledPractices.length && !separateWebpractice ? `- Há webprática agendad
     part === "webpractice" && wants.webpractice && `REGRAS DA WEBPRÁTICA
 - Desenvolva o projeto completo de cada webprática agendada para esta semana, só em teacherGuide.webPracticeProjects (nunca no texto do aluno), ligado ao que o texto ensinou. Briefing da prática: ${JSON.stringify(scheduledPractices.map((practice, practiceIndex) => compactBriefingPractice(practice, practiceIndex)))}`
   ].filter(Boolean);
-  const methodology = derivativesMethodologyBlock(input, index, wants);
+  const methodology = wants.methodology ? methodologyGuideRules(input, index, plan) : derivativesMethodologyBlock(input, index, wants);
   if (methodology) rules.push(methodology);
   // As webpráticas saem junto com a mediação ou numa chamada própria; a metodologia vai com elas.
   const practiceMethodology = scheduledPractices.length && ((wants.mediation && !separateWebpractice) || (part === "webpractice" && wants.webpractice)) ? webPracticeMethodologyBlock(input, index, scheduledPractices) : "";
@@ -322,7 +324,7 @@ ${rules.join("\n\n")}${rules.length ? "\n\n" : ""}Responda somente JSON válido.
 // (o erro é da etapa inteira e a repetição refaz as duas).
 async function buildDerivatives(input, index, plan, only = null) {
   const scheduled = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index));
-  const names = { assessment: "assessment", activities: "diagnostic, formativeChecks, activities, selfAssessment", mediation: "teacherGuide", explain: "teacherGuide (weekSummary, keyIdeas, studentFAQ, ...)", webpractice: "teacherGuide.webPracticeProjects" };
+  const names = { methodology: "teacherGuide.methodologyGuide", assessment: "assessment", activities: "diagnostic, formativeChecks, activities, selfAssessment", mediation: "teacherGuide", explain: "teacherGuide (weekSummary, keyIdeas, studentFAQ, ...)", webpractice: "teacherGuide.webPracticeProjects" };
   const call = (part, maxTokens, extra = "") => callJson([
     { role: "system", content: DERIVATIVES_SYSTEM },
     { role: "user", content: `${derivativesPrompt(input, index, plan, scheduled, part)}${extra}` }
@@ -339,7 +341,7 @@ async function buildDerivatives(input, index, plan, only = null) {
     // `only` limita a regeneração a partes (ex.: ["assessment"]) quando o professor quer
     // consertar um item específico sem refazer o que já conferiu.
     const wanted = (part) => !Array.isArray(only) || only.includes(part);
-    const plannedParts = [["assessment", 12000], ["activities", 9000], ["mediation", 12000], ["explain", 12000], ...(scheduled.length ? [["webpractice", 12000]] : [])].filter(([part]) => wanted(part));
+    const plannedParts = [["assessment", 12000], ["activities", 9000], ["mediation", 12000], ["explain", 12000], ...(scheduled.length ? [["webpractice", 12000]] : []), ...(Array.isArray(only) && only.includes("methodology") ? [["methodology", 12000]] : [])].filter(([part]) => wanted(part));
     // As questões precisam ter 5 alternativas e feedback em todas; se vier fora do padrão, a IA
     // refaz as questões uma vez, com a lista exata do que faltou.
     const callChecked = async (part, tokens) => {
@@ -355,9 +357,9 @@ async function buildDerivatives(input, index, plan, only = null) {
     const failed = results.find((result) => result.status === "rejected");
     if (failed) throw failed.reason;
     const byPart = Object.fromEntries(plannedParts.map(([part], position) => [part, results[position].value]));
-    const { assessment, activities, mediation, explain, webpractice } = byPart;
+    const { assessment, activities, mediation, explain, webpractice, methodology } = byPart;
     const object = (value) => (value && typeof value === "object" ? value : {});
-    const teacherGuide = { ...object(object(mediation).teacherGuide), ...object(object(explain).teacherGuide), ...(object(object(webpractice).teacherGuide).webPracticeProjects ? { webPracticeProjects: webpractice.teacherGuide.webPracticeProjects } : {}) };
+    const teacherGuide = { ...object(object(mediation).teacherGuide), ...object(object(explain).teacherGuide), ...(object(object(methodology).teacherGuide).methodologyGuide ? { methodologyGuide: methodology.teacherGuide.methodologyGuide } : {}), ...(object(object(webpractice).teacherGuide).webPracticeProjects ? { webPracticeProjects: webpractice.teacherGuide.webPracticeProjects } : {}) };
     const data = { ...object(activities), ...(Object.keys(teacherGuide).length ? { teacherGuide } : {}), ...(object(assessment).assessment ? { assessment: assessment.assessment } : {}) };
     return { data, error: "" };
   } catch (error) {
@@ -455,7 +457,7 @@ export async function regenerateWeekProse(input, index, currentWeek, instruction
 // Segunda etapa do modo de prosa: avaliação, atividades e Material de Mediação a
 // partir do texto que o professor já tem. Recebe a semana normalizada (lessonPlan)
 // e devolve a semana reconstruída, o guia do professor e o novo estado de geração.
-export const DERIVATIVE_PARTS = ["assessment", "activities", "mediation", "explain", "webpractice"];
+export const DERIVATIVE_PARTS = ["assessment", "activities", "mediation", "explain", "webpractice", "methodology"];
 
 export async function completeWeekDerivatives(input, index, week, teacherGuide = {}, options = {}) {
   const plan = week?.lessonPlan || {};

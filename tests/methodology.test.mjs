@@ -138,3 +138,16 @@ test("figuras: diagrama, foto e Napkin são reconhecidos; só o diagrama vai par
   await illustrateWeek({ title: "T" }, { lessonPlan, blocks: [] }, { ask: async (messages) => { asked.push(messages); return { text: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>' }; } });
   assert.equal(asked.length, 1);
 });
+
+test("guia da metodologia: prompt próprio com as atividades da semana; entra no Material de Mediação", async () => {
+  const input = baseInput({ methodologyPlan: { default: "sala-invertida" } });
+  const prompt = derivativesPrompt(input, 0, { theme: "T", contentSections: [], learningObjectives: ["Analisar X"], activities: [{ title: "Quiz de verificação", instructions: "Responda" }] }, [], "methodology");
+  assert.match(prompt, /"methodologyGuide"/);
+  assert.match(prompt, /Sala de aula invertida/);
+  assert.match(prompt, /Quiz de verificação/);
+  assert.doesNotMatch(prompt, /"feedbackByOption"/);
+  const { buildTeacherGuides } = await import("../src/teacher-guide.js");
+  const guide = buildTeacherGuides(input, [{ lessonPlan: { weekNumber: 1, theme: "T", learningObjectives: [], contentSections: [] } }], [{ methodologyGuide: { method: "Sala de aula invertida", phases: [{ name: "Antes" }] } }])[0];
+  assert.equal(guide.methodologyGuide.method, "Sala de aula invertida");
+  assert.equal(guide.methodologyRequested, true);
+});
