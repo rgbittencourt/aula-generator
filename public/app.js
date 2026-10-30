@@ -2,6 +2,7 @@ import { toStudentLesson, toGeneratorWeek } from "./student-export.js";
 import { parseSavedWeek, planPlacement } from "./week-import.js";
 import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
 import { createProductionWorkbook, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
+import { SOURCE_USAGES, deleteSourceDoc, importSourceFile, sourceExcerptsForWeek } from "./source-materials.js";
 import { applyAdjustment, applyRewrite, approveWeek, bridgesBefore, canGenerateNext, dismissIssue, emptyFlow, normalizeFlow, recordGenerated, weekFlowStatus } from "./step-flow.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -950,10 +951,31 @@ function practiceCard(data = {}) {
   </article>`;
 }
 
+// Conteúdo do material (PDF/DOCX): o texto fica neste navegador; só trechos de cada semana vão para a IA.
+function materialSourceStatus(file) {
+  if (!file) return `<span class="material-source-empty">Nenhum arquivo anexado. Anexe a apostila, o livro ou o roteiro de laboratório para a IA usar o conteúdo dele.</span>`;
+  const unit = file.unit === "parte" ? "partes" : "páginas";
+  return `<strong>📎 ${escapeHtml(file.name || "arquivo")}</strong> · ${Number(file.pageCount) || 0} ${unit} com texto extraído${file.warning ? `<br><span class="material-source-warning">⚠ ${escapeHtml(file.warning)}</span>` : ""} <button type="button" class="link-button material-source-remove">Remover arquivo</button>`;
+}
+
+function materialSourceBox(data = {}) {
+  const usage = data.sourceUsage || "";
+  return `<div class="material-source-box">
+      <div class="material-source-head"><strong>Usar o conteúdo deste material na geração</strong><small>O arquivo é lido no seu navegador e fica guardado nele; para cada semana, só os trechos ligados ao tema vão para a IA, com a página.</small></div>
+      <div class="field-grid two">
+        <label class="field"><span>Arquivo (PDF ou DOCX)</span><input class="material-file" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" /></label>
+        <label class="field"><span>Como a IA deve usar</span><select class="material-usage">${SOURCE_USAGES.map((option) => `<option value="${option.id}" ${option.id === usage ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select></label>
+      </div>
+      <p class="material-source-status">${materialSourceStatus(data.sourceFile)}</p>
+      <label class="field"><span>Páginas por semana (opcional)</span><textarea class="material-week-pages" rows="2" placeholder="Uma linha por semana. Ex.: 1: 1-30
+2: 31-45, 50">${escapeHtml(data.sourceWeekPages || "")}</textarea><small class="hint">Em branco, o app escolhe sozinho os trechos que combinam com o tema de cada semana. “Roteiro de prática” só entra nas semanas com sessão prática.</small></label>
+    </div>`;
+}
+
 function materialCard(data = {}) {
   materialSequence += 1;
   const id = data.id || `material-${materialSequence}`;
-  return `<article class="item-card material-card" data-id="${escapeHtml(id)}" data-notes="${escapeHtml(data.notes || "")}">
+  return `<article class="item-card material-card" data-id="${escapeHtml(id)}" data-notes="${escapeHtml(data.notes || "")}" data-source="${escapeHtml(data.sourceFile ? JSON.stringify(data.sourceFile) : "")}">
     <div class="item-card-heading"><strong>Material <span class="item-index">${materialSequence}</span></strong><button class="remove-item" type="button" data-remove-material aria-label="Remover material">×</button></div>
     <div class="field-grid two">
       <label class="field"><span>Título do material</span><input class="material-title" value="${escapeHtml(data.title || "")}" placeholder="Ex.: Texto-base sobre mobilidade urbana" /></label>
@@ -977,6 +999,7 @@ function materialCard(data = {}) {
       <label class="field"><span>Duração (min)</span><input class="material-duration" type="number" min="0" step="1" value="${Number(data.durationMinutes) || ""}" placeholder="Para vídeo/áudio" /></label>
       <label class="field checkbox-field"><span>Leitura obrigatória</span><input class="material-required" type="checkbox" ${data.required ? "checked" : ""} /></label>
     </div>
+    ${materialSourceBox(data)}
     <label class="field"><span>Objetivo do material</span><input class="material-objective" value="${escapeHtml(data.objective || "")}" placeholder="Por que o estudante precisa deste material?" /></label>
     <label class="field"><span>Alinhamento com o conteúdo</span><textarea class="material-alignment" rows="2" placeholder="Que conceito, objetivo ou webprática ele sustenta?">${escapeHtml(data.alignment || "")}</textarea></label>
     <label class="field"><span>Como o estudante vai usar</span><textarea class="material-use" rows="2" placeholder="Ler, comparar, assistir com roteiro, extrair dados…">${escapeHtml(data.use || "")}</textarea></label>
@@ -1046,6 +1069,9 @@ function collectMaterials() {
     source: card.querySelector(".material-source")?.value.trim() || "",
     whereToFind: card.querySelector(".material-where")?.value.trim() || "",
     search: card.querySelector(".material-search")?.value.trim() || "",
+    sourceFile: (() => { try { return card.dataset.source ? JSON.parse(card.dataset.source) : null; } catch { return null; } })(),
+    sourceUsage: card.querySelector(".material-usage")?.value || "",
+    sourceWeekPages: card.querySelector(".material-week-pages")?.value.trim() || "",
     notes: card.dataset.notes || ""
   }));
 }
@@ -1626,12 +1652,14 @@ function renderLessonPreview(lesson, index) {
   const timeMarkup = timeItems || timeBreakdown ? `<section class="time-breakdown reader-time-breakdown"><h3>Tempo desta semana</h3><p>O cálculo está separado por texto-base, leituras, mídias e atividades. “Obrigatório” indica o que entra na trilha essencial; “complementar” não é obrigatório.</p><ul>${timeItems || timeBreakdown}</ul></section>` : "";
   const pendingFigures = weekHasPendingFigures(lesson) ? `<section class="reader-warning"><h3>Figuras pendentes</h3><p>Esta semana tem diagramas planejados que ainda não foram desenhados pela IA. O texto não é alterado.</p><button type="button" class="secondary" id="retry-figures-button">Criar figuras pendentes</button></section>` : "";
   const methodology = methodologyPreviewMarkup(plan, guide, index, lesson);
+  const usageLabel = { base: "base do conteúdo", apoio: "referência de apoio", pratica: "roteiro de prática" };
+  const sourceUsed = (plan.sourceUsed || []).length ? `<section class="reader-source-used"><h3>Material do professor usado nesta semana</h3><ul>${plan.sourceUsed.map((item) => `<li><strong>${escapeHtml(item.title || "Material")}</strong> (${escapeHtml(usageLabel[item.usage] || item.usage || "")}) · ${item.unit === "parte" ? "partes" : "páginas"} ${escapeHtml((item.pages || []).join(", "))}${item.chosenByTeacher ? " · escolhidas por você" : " · escolhidas pelo app"}</li>`).join("")}</ul><small>Estes foram os trechos enviados à IA. Se não forem os certos, indique as páginas da semana no cartão do material e refaça a semana.</small></section>` : "";
   const alignment = (plan.alignmentMatrix || []).length ? `<section><h3>Alinhamento pedagógico</h3><ul>${plan.alignmentMatrix.map((row) => `<li><strong>${escapeHtml(row.objective || "Objetivo")}</strong>: ${escapeHtml(row.evidence || "evidência a definir")} · avaliação: ${escapeHtml((row.assessmentQuestions || []).join(", ") || "a definir")}</li>`).join("")}</ul></section>` : "";
   const mediation = mediationMessagesMarkup(guide.mediationMessages, plan.theme || lesson?.meta?.title || `a semana ${index + 1}`, index + 1)
     + (guide.weekSummary && guide.studentFAQ?.length ? "" : `<section class="reader-warning"><h3>Explicações para o professor</h3><p>Esta semana ainda não tem o resumo, as perguntas prováveis dos alunos, os equívocos comuns e os sinais de alerta que entram no Material de Mediação. O texto da semana não é alterado.</p><button type="button" class="secondary" id="retry-explain-button">Completar explicações do Material de Mediação</button></section>`);
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
-  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${pendingFigures}${sectionsMarkup}${methodology}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
+  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${pendingFigures}${sourceUsed}${sectionsMarkup}${methodology}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
   renderFlowPanel(index);
   $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
   $("#retry-figures-button")?.addEventListener("click", () => retryFigures(index));
@@ -1776,7 +1804,7 @@ async function retryDerivatives(index, options = {}) {
     delete input.accessCode;
     const headers = { "Content-Type": "application/json" };
     if (accessCode) headers["x-aula-access-code"] = accessCode;
-    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input, weekIndex: index, week: state.weeks[index], teacherGuide: state.teacherGuides[index], ...(parts ? { parts } : {}) }) });
+    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input: await withSources(input, index, state.weeks[index]), weekIndex: index, week: state.weeks[index], teacherGuide: state.teacherGuides[index], ...(parts ? { parts } : {}) }) });
     const done = await readApiResponse(response, `Não foi possível gerar ${partsText} da semana ${index + 1}.`);
     state.weeks[index] = done.week; if (state.studioEdits) delete state.studioEdits[index];
     state.teacherGuides[index] = done.teacherGuide || state.teacherGuides[index];
@@ -1852,7 +1880,7 @@ async function regenerateSelectedWeek() {
     state.input = input;
     const headers = { "Content-Type": "application/json" };
     if (accessCode) headers["x-aula-access-code"] = accessCode;
-    const response = await fetch("/api/regenerate-week", { method: "POST", headers, body: JSON.stringify({ input, weekIndex: index, instruction, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
+    const response = await fetch("/api/regenerate-week", { method: "POST", headers, body: JSON.stringify({ input: await withSources(input, index, state.weeks[index]), weekIndex: index, instruction, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
     const data = await readApiResponse(response, "Não foi possível refazer a semana.");
     state.weeks = data.weeks || state.weeks;
     state.teacherGuides = data.teacherGuides || state.teacherGuides;
@@ -2522,7 +2550,7 @@ async function requestGeneratedWeek(input, index, headers, previousWeeks, button
       const response = await fetch("/api/generate-week", {
         method: "POST",
         headers,
-        body: JSON.stringify({ input, weekIndex: index, previousWeeks, bridges })
+        body: JSON.stringify({ input: await withSources(input, index), weekIndex: index, previousWeeks, bridges })
       });
       const data = await readApiResponse(response, `Não foi possível gerar a semana ${index + 1}.`);
       if (!data.week) {
@@ -2552,7 +2580,7 @@ async function completeDerivativesStep(data, input, index, headers, button) {
   setButtonLabel(button, `Gerando avaliação e mediação da semana ${index + 1}…`);
   setAiActivity("Avaliação e mediação", `O texto da semana ${index + 1} já está salvo. Escrevendo as questões (com feedback por alternativa), as atividades e as mensagens de acompanhamento a partir dele…`, { progress: Math.round(((index + 0.6) / (input.weeks + 1)) * 100) });
   try {
-    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input, weekIndex: index, week: data.week, teacherGuide: data.teacherGuide }) });
+    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input: await withSources(input, index, data.week), weekIndex: index, week: data.week, teacherGuide: data.teacherGuide }) });
     const done = await readApiResponse(response, `Não foi possível gerar a avaliação da semana ${index + 1}.`);
     return { ...data, week: done.week, teacherGuide: done.teacherGuide, generation: done.generation };
   } catch (error) {
@@ -2574,7 +2602,7 @@ async function completeMethodologyStep(data, input, index, headers, button) {
   setButtonLabel(button, `Escrevendo o guia da metodologia da semana ${index + 1}…`);
   setAiActivity("Guia da metodologia", `Montando o passo a passo de como aplicar a metodologia da semana ${index + 1}, como acompanhar e como avaliar…`, { progress: Math.round(((index + 0.6) / (input.weeks + 1)) * 100) });
   try {
-    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input, weekIndex: index, week: data.week, teacherGuide: data.teacherGuide, parts: ["methodology"] }) });
+    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input: await withSources(input, index, data.week), weekIndex: index, week: data.week, teacherGuide: data.teacherGuide, parts: ["methodology"] }) });
     const done = await readApiResponse(response, `Não foi possível escrever o guia da metodologia da semana ${index + 1}.`);
     return { ...data, week: done.week, teacherGuide: done.teacherGuide };
   } catch (error) {
@@ -3252,6 +3280,46 @@ document.addEventListener("keydown", (event) => { if (event.key === "Escape" && 
 window.addEventListener("resize", syncRecoveryLayout);
 window.addEventListener("scroll", keepWorkspaceAtTop, { passive: true });
 $("#calendar-mode").addEventListener("change", () => { toggleCalendar(); scheduleSave(); });
+// Anexar / remover o arquivo de um material.
+$("#materials-list")?.addEventListener("change", async (event) => {
+  const input = event.target.closest(".material-file");
+  if (!input || !input.files?.length) return;
+  const card = input.closest(".material-card");
+  const status = card.querySelector(".material-source-status");
+  status.textContent = "Lendo o arquivo…";
+  try {
+    const file = await importSourceFile(input.files[0], card.dataset.id, (done, total) => { status.textContent = `Lendo o arquivo… página ${done} de ${total}`; });
+    card.dataset.source = JSON.stringify(file);
+    status.innerHTML = materialSourceStatus(file);
+    const usage = card.querySelector(".material-usage");
+    if (usage && !usage.value) usage.value = "base";
+    if (!card.querySelector(".material-title").value.trim()) card.querySelector(".material-title").value = file.name.replace(/\.(pdf|docx)$/i, "");
+    scheduleSave();
+  } catch (error) {
+    status.innerHTML = `<span class="material-source-warning">Não foi possível ler o arquivo: ${escapeHtml(error.message || "erro")}</span>`;
+  } finally { input.value = ""; }
+});
+$("#materials-list")?.addEventListener("click", async (event) => {
+  const button = event.target.closest(".material-source-remove");
+  if (!button) return;
+  const card = button.closest(".material-card");
+  try { const file = JSON.parse(card.dataset.source || "null"); if (file?.id) await deleteSourceDoc(file.id); } catch { /* sem arquivo */ }
+  card.dataset.source = "";
+  card.querySelector(".material-source-status").innerHTML = materialSourceStatus(null);
+  scheduleSave();
+});
+
+// Acrescenta ao pedido os trechos dos materiais anexados que combinam com esta semana.
+async function withSources(input, index, week = null) {
+  try {
+    const excerpts = await sourceExcerptsForWeek(input, index, week);
+    return excerpts.length ? { ...input, sourceExcerpts: excerpts } : input;
+  } catch (error) {
+    console.warn("Trechos dos materiais não incluídos:", error);
+    return input;
+  }
+}
+
 $("#pedagogical-approach")?.addEventListener("change", () => { updateMethodologyHints(); scheduleSave(); });
 $("#methodology-default")?.addEventListener("change", () => { updateMethodologyHints(); renderMethodologyWeeks(collectMethodologyPlan()); scheduleSave(); });
 $("#methodology-weeks")?.addEventListener("change", (event) => { const row = event.target.closest("[data-methodology-week]"); if (row) row.classList.toggle("is-override", Boolean(event.target.value)); scheduleSave(); });
@@ -3273,3 +3341,4 @@ $("#recalculate-button").dataset.label = "Recalcular qualidade";
 initializeWelcome();
 enhanceLayout();
 renderResourcePlanWeeks(); renderMethodologyWeeks(); updateMethodologyHints(); updateBloomMeter(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
+

@@ -645,3 +645,8 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .methodology-student-text{padding:10px 12px;border-radius:8px;background:#fff6dd;white-space:pre-wrap}
 .results-load-combined > * + *{margin-top:18px}
 .material-notes{color:#8a5a00;margin:-4px 0 10px}
+.material-source-box{margin:12px 0;padding:12px 14px;border:1px dashed #9fb3c8;border-radius:10px;background:#f6f9fc}
+.material-source-head{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}.material-source-head small{color:#5b6b7f}
+.material-source-status{margin:4px 0 8px;font-size:13px}.material-source-empty{color:#6b7690}.material-source-warning{color:#9a3b1b}
+.link-button{background:none;border:0;padding:0 0 0 8px;color:#bf4c34;text-decoration:underline;cursor:pointer;font:inherit}
+.reader-source-used{border-left:3px solid #9fb3c8;padding-left:12px}

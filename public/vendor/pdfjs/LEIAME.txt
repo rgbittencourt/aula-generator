@@ -1,0 +1,1 @@
+pdf.js 4.10.38 (Mozilla, Apache-2.0), usado para extrair o texto de PDFs anexados aos Materiais de apoio, no navegador.

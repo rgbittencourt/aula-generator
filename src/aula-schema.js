@@ -1,3 +1,4 @@
+import { normalizeSourceExcerpts, sourceUsedSummary } from "./source-material.js";
 import { normalizeApproach, normalizeMethodologyPlan, methodForWeek } from "./methodology.js";
 import { normalizeDidacticArc, buildAlignmentMatrix, buildProgression, pedagogicalReview } from "./pedagogy.js";
 import { sortReferencesAbnt } from "./abnt.js";
@@ -341,6 +342,9 @@ function normalizeMaterial(value = {}, index = 0) {
     source: text(material.source || material.reference),
     whereToFind: text(material.whereToFind),
     search: text(material.search),
+    sourceFile: material.sourceFile && typeof material.sourceFile === "object" && text(material.sourceFile.id) ? { id: text(material.sourceFile.id), name: text(material.sourceFile.name), unit: text(material.sourceFile.unit), pageCount: Number(material.sourceFile.pageCount) || 0 } : null,
+    sourceUsage: ["base", "apoio", "pratica"].includes(text(material.sourceUsage)) ? text(material.sourceUsage) : "",
+    sourceWeekPages: text(material.sourceWeekPages).slice(0, 2000),
     notes: text(material.notes)
   };
 }
@@ -583,7 +587,8 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
     academicPlan: object(plan.academicPlan),
     notes: splitLines(plan.notes),
     pedagogicalApproach: normalizeApproach(input.pedagogicalApproach),
-    activeMethodology: normalizeActiveMethodology(plan.activeMethodology, input, index)
+    activeMethodology: normalizeActiveMethodology(plan.activeMethodology, input, index),
+    sourceUsed: Array.isArray(input.sourceExcerpts) && input.sourceExcerpts.length ? sourceUsedSummary(input.sourceExcerpts) : (Array.isArray(plan.sourceUsed) ? plan.sourceUsed : [])
   };
   normalized.alignmentMatrix = buildAlignmentMatrix(normalized);
   normalized.spiralReview = buildProgression(normalized, index);
@@ -634,6 +639,7 @@ export function normalizeCourseInput(raw = {}) {
     didacticMode: text(raw.didacticMode, "auto"),
     pedagogicalApproach: normalizeApproach(raw.pedagogicalApproach),
     methodologyPlan: normalizeMethodologyPlan(raw.methodologyPlan, weeks),
+    sourceExcerpts: normalizeSourceExcerpts(raw.sourceExcerpts),
     startDate: calendarMode === "calendar" && validDate(raw.startDate) ? raw.startDate : null,
     webPractices,
     webPractice: { enabled, moments: legacyMoments.length ? legacyMoments : splitLines(practice.moments || raw.practiceMoments), instructions: legacyInstructions || text(practice.instructions || raw.practiceInstructions), durationMinutes: webPractices.reduce((sum, item) => sum + item.durationMinutes, 0) },

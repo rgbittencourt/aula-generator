@@ -160,3 +160,20 @@ test("práticas: modalidade no roteiro e regra por modalidade no prompt", async 
   const input = baseInput({ webPracticeEnabled: true, webPractices: [{ title: "Lab", weekNumber: 1, modality: "Laboratório prático" }] });
   assert.match(derivativesPrompt(input, 0, { theme: "T", contentSections: [], learningObjectives: [] }, input.webPractices, "webpractice"), /Laboratório prático: presencial/);
 });
+
+test("material do professor: trechos limpos, no prompt de redação e resumo na semana", async () => {
+  const excerpt = (page, usage = "base") => ({ materialId: "m1", title: "Apostila de BD", reference: "SILVA, A. Apostila de BD. IFSC, 2025.", usage, unit: "p.", page: String(page), text: `Conteúdo da página ${page} sobre álgebra relacional e otimização heurística.` });
+  const input = baseInput({ sourceExcerpts: [excerpt(3), excerpt(4), excerpt(9, "pratica"), { usage: "x", text: "ignorar este trecho que não tem uso válido" }] });
+  assert.equal(input.sourceExcerpts.length, 3);
+  const prompt = buildWriterPrompt(input, 0);
+  assert.match(prompt, /MATERIAL DO PROFESSOR/);
+  assert.match(prompt, /\| p\. 3\]/);
+  assert.doesNotMatch(prompt, /p\. 9\]/);
+  const practice = derivativesPrompt(baseInput({ sourceExcerpts: [excerpt(9, "pratica")], webPracticeEnabled: true, webPractices: [{ title: "Lab", weekNumber: 1, modality: "Laboratório prático" }] }), 0, { theme: "T", contentSections: [], learningObjectives: [] }, [{ title: "Lab", weekNumber: 1 }], "webpractice");
+  assert.match(practice, /ROTEIRO DE PRÁTICA/);
+  const { normalizeLesson } = await import("../src/aula-schema.js");
+  const lesson = normalizeLesson({ lessonPlan: { theme: "T", contentSections: [] } }, input, 0);
+  const plan = lesson.lessonPlan || lesson;
+  assert.deepEqual(plan.sourceUsed.map((item) => item.pages), [["3", "4", "9"]]);
+  assert.equal(buildWriterPrompt(baseInput(), 0).includes("MATERIAL DO PROFESSOR"), false);
+});
