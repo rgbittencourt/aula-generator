@@ -638,3 +638,6 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .reader-suggested-image label{display:block;font-size:12px;font-weight:700;margin-top:6px}
 .reader-suggested-image textarea{width:100%;margin:4px 0;font:13px/1.45 system-ui,sans-serif;padding:8px;border:1px solid #e1d6b8;border-radius:8px;background:#fff;resize:vertical}
 .reader-suggested-image small{display:block;color:#6b5a2e;margin-top:4px}
+
+.production-sector .production-uc{margin:0;border:0;border-radius:0;background:transparent;padding:4px 2px 2px}
+.results-sector.hidden{display:none}

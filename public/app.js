@@ -143,7 +143,7 @@ function enhanceLayout() {
   navigation.className = "sidebar-navigation";
   navigation.id = "project-navigation";
   navigation.setAttribute("aria-label", "Navegação do planejamento");
-  navigation.innerHTML = '<p class="sidebar-label">NAVEGAR PELO PROJETO</p>' + navItems.map((item) => `<a href="#${item.id}" data-scroll-to="${item.id}">${escapeHtml(item.title)}<span>→</span></a>`).join("") + '<a href="#results-load" data-scroll-to="results-load">Carga por atividade<span>→</span></a><a href="#results-breakdown" data-scroll-to="results-breakdown">Carga aberta por atividade<span>→</span></a><a href="#results-review" data-scroll-to="results-review">Checklists<span>→</span></a><a href="#results-weeks" data-scroll-to="results-weeks">Semanas planejadas<span>→</span></a>';
+  navigation.innerHTML = '<p class="sidebar-label">NAVEGAR PELO PROJETO</p>' + navItems.map((item) => `<a href="#${item.id}" data-scroll-to="${item.id}">${escapeHtml(item.title)}<span>→</span></a>`).join("") + '<a href="#results-load" data-scroll-to="results-load">Carga por atividade<span>→</span></a><a href="#results-breakdown" data-scroll-to="results-breakdown">Carga aberta por atividade<span>→</span></a><a href="#results-review" data-scroll-to="results-review">Checklists<span>→</span></a><a href="#results-weeks" data-scroll-to="results-weeks">Semanas planejadas<span>→</span></a><a href="#results-production" data-scroll-to="results-production">Produção audiovisual<span>→</span></a>';
   const navigationColumn = document.createElement("aside");
   navigationColumn.className = "navigation-column";
   navigationColumn.setAttribute("aria-label", "Navegação do planejamento");
@@ -189,6 +189,21 @@ function enhanceLayout() {
     body.appendChild(weekGrid);
     weeksSector.appendChild(body);
     parent.appendChild(weeksSector);
+    // Produção audiovisual: aba própria, depois das semanas (só faz sentido com as semanas planejadas e liberadas).
+    const productionCard = $("#production-uc-card");
+    if (productionCard && !$("#results-production")) {
+      const productionSector = document.createElement("details");
+      productionSector.className = "results-sector production-sector hidden";
+      productionSector.id = "results-production";
+      productionSector.open = false;
+      productionSector.innerHTML = '<summary class="results-sector-summary"><div class="results-sector-copy"><strong>Produção audiovisual</strong><small id="production-sector-note">Vídeos da UC (abertura, aviso no WhatsApp e encerramento) e planilha de produção, depois que todas as semanas forem liberadas.</small></div><span class="sector-chevron results-sector-chevron" aria-hidden="true">⌄</span></summary>';
+      const productionBody = document.createElement("div");
+      productionBody.className = "results-sector-body";
+      productionCard.remove();
+      productionBody.appendChild(productionCard);
+      productionSector.appendChild(productionBody);
+      weeksSector.after(productionSector);
+    }
   }
   resetWorkspaceScroll();
 }
@@ -2963,8 +2978,11 @@ function productionCourseGate() {
 function renderProductionUcCard() {
   const card = $("#production-uc-card");
   if (!card) return;
-  if (!state.weeks.length) { card.classList.add("hidden"); card.innerHTML = ""; return; }
+  const sector = $("#results-production");
+  if (!state.weeks.length) { card.classList.add("hidden"); card.innerHTML = ""; sector?.classList.add("hidden"); return; }
+  sector?.classList.remove("hidden");
   const gate = productionCourseGate();
+  if ($("#production-sector-note")) $("#production-sector-note").textContent = gate.ready ? "Todas as semanas liberadas: os vídeos da UC e a planilha de produção já podem ser gerados." : gate.missing ? `Disponível depois que todas as semanas forem planejadas e liberadas (faltam ${gate.missing}).` : `Disponível depois que todas as semanas forem liberadas (falta liberar: ${gate.pending.join(", ")}).`;
   const course = state.production?.course;
   const status = gate.ready ? "Todas as semanas estão liberadas: já dá para gerar." : gate.missing ? `Ainda faltam ${gate.missing} semana(s) para serem geradas.` : `Falta liberar a(s) semana(s) ${gate.pending.join(", ")}.`;
   const videos = course?.videos?.length ? `<ul>${course.videos.map((video) => `<li><strong>${escapeHtml(video.title || "")}</strong> · ${escapeHtml(video.platform || "")} — ${formatDuration(video.durationSeconds)}</li>`).join("")}</ul>` : "";
