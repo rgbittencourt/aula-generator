@@ -143,7 +143,7 @@ function enhanceLayout() {
   navigation.className = "sidebar-navigation";
   navigation.id = "project-navigation";
   navigation.setAttribute("aria-label", "Navegação do planejamento");
-  navigation.innerHTML = '<p class="sidebar-label">NAVEGAR PELO PROJETO</p>' + navItems.map((item) => `<a href="#${item.id}" data-scroll-to="${item.id}">${escapeHtml(item.title)}<span>→</span></a>`).join("") + '<a href="#results-load" data-scroll-to="results-load">Carga por atividade<span>→</span></a><a href="#results-breakdown" data-scroll-to="results-breakdown">Carga aberta por atividade<span>→</span></a><a href="#results-review" data-scroll-to="results-review">Checklists<span>→</span></a><a href="#results-weeks" data-scroll-to="results-weeks">Semanas planejadas<span>→</span></a><a href="#results-production" data-scroll-to="results-production">Produção audiovisual<span>→</span></a>';
+  navigation.innerHTML = '<p class="sidebar-label">NAVEGAR PELO PROJETO</p>' + navItems.map((item) => `<a href="#${item.id}" data-scroll-to="${item.id}">${escapeHtml(item.title)}<span>→</span></a>`).join("") + '<a href="#results-load" data-scroll-to="results-load">Carga por atividade<span>→</span></a><a href="#results-review" data-scroll-to="results-review">Checklists<span>→</span></a><a href="#results-weeks" data-scroll-to="results-weeks">Semanas planejadas<span>→</span></a><a href="#results-production" data-scroll-to="results-production">Produção audiovisual<span>→</span></a>';
   const navigationColumn = document.createElement("aside");
   navigationColumn.className = "navigation-column";
   navigationColumn.setAttribute("aria-label", "Navegação do planejamento");
@@ -2160,8 +2160,7 @@ function organizeResultSectors(container, previousOpenStates = null) {
     return sector;
   };
   container.replaceChildren(
-    makeSector("results-load", "Carga por atividade", "Resumo da meta, carga calculada, categorias e arco didático do curso.", overview),
-    makeSector("results-breakdown", "Carga aberta por atividade", "Tempo separado por texto-base, leituras, vídeos, interativos, avaliação e demais atividades.", breakdown),
+    makeSector("results-load", "Carga por atividade", "Resumo da meta e da carga calculada e, logo abaixo, o tempo aberto por texto-base, leituras, vídeos, interativos, avaliação e demais atividades.", (() => { const both = document.createElement("div"); both.className = "results-load-combined"; if (overview) both.appendChild(overview); if (breakdown) both.appendChild(breakdown); return both; })()),
     makeSector("results-review", "Checklists", "Conferências pedagógicas, acadêmicas, de recursos, qualidade e liberação manual.", checklists)
   );
 }
