@@ -668,3 +668,5 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .reader-approved-plan pre{white-space:pre-wrap;font:13px/1.5 system-ui,sans-serif;background:#f6f9fc;border-radius:8px;padding:12px;margin-top:8px}
 /* Pasta do projeto */
 .project-folder-bar{border-color:#d7d3ea;background:#f4f2fb;color:#3f3a66}.project-folder-bar .recovery-icon{background:#5b528f}.project-folder-bar.is-connected{border-color:#bfe4df;background:#edf8f6;color:#275d58}.project-folder-bar.is-connected .recovery-icon{background:var(--teal)}.project-folder-bar small{line-height:1.45}
+/* Figuras e imagens do texto, na composição */
+.composition-figures{border:1px solid #d7d3ea;border-radius:12px;overflow:hidden;background:#f8f7fd}.composition-figures>.composition-week-heading{padding:12px 14px 4px;flex-direction:column;align-items:flex-start;gap:4px}.composition-figure-row{grid-template-columns:minmax(220px,1.7fr) 110px;border-top:1px solid #e6e3f2}

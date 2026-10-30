@@ -862,6 +862,13 @@ const compositionCatalog = [
   ["accordion", "Acordeão / FAQ", "Interativos", 1, 3], ["flashcards", "Flashcards", "Interativos", 0, 6], ["slider", "Slider / passo a passo", "Interativos", 0, 3], ["linhadotempo", "Linha do tempo", "Interativos", 0, 4], ["columns", "Colunas comparativas", "Interativos", 0, 2], ["quiz", "Quiz formativo", "Interativos", 1, 5], ["externalembed", "Conteúdo externo", "Mídia", 0, 1]
 ];
 
+// Figuras escritas no texto pela IA: diagrama (desenhado depois), texto para o Napkin e foto (pedido para gerar fora).
+const FIGURE_KINDS = [
+  ["diagrama", "Diagramas", "desenhados pela IA do ClassAuthor"],
+  ["napkin", "Textos para o Napkin", "você cola no napkin.ai e escolhe o visual"],
+  ["foto", "Fotos / imagens", "pedido pronto para gerar fora (ChatGPT etc.)"]
+];
+
 function compositionDefaultRows() {
   return Object.fromEntries(compositionCatalog.map(([key, label, group, count, itemsPerBlock]) => [key, { key, label, group, count, policy: "prefer", itemsPerBlock }]));
 }
@@ -884,7 +891,9 @@ function collectCompositionPlan() {
       return [key, { count: count === "" ? "" : Math.min(12, Math.max(0, Number(count) || 0)), policy, itemsPerBlock: itemsPerBlock > 1 ? (Number(row.querySelector(`[data-composition-week-items="${key}"]`)?.value) || itemsPerBlock) : 1 }];
     }))
   }));
-  return { preset: "balanced", default: { rows }, weeks };
+  const figuresFrom = (root, attr) => Object.fromEntries(FIGURE_KINDS.map(([kind]) => { const value = root.querySelector(`[${attr}="${kind}"]`)?.value ?? ""; return [kind, value === "" ? null : Math.min(6, Math.max(0, Number(value) || 0))]; }));
+  weeks.forEach((entry) => { const row = document.querySelector(`[data-composition-week="${entry.weekNumber}"]`); if (row) entry.figures = figuresFrom(row, "data-figure-week"); });
+  return { preset: "balanced", default: { rows, figures: figuresFrom(document, "data-figure-default") }, weeks };
 }
 
 function renderCompositionPlanWeeks(plan = {}) {
@@ -901,9 +910,12 @@ function renderCompositionPlanWeeks(plan = {}) {
   const weekMarkup = Array.from({ length: weeks }, (_, index) => {
     const weekNumber = index + 1;
     const rowPlan = byWeek.get(weekNumber) || {};
-    return `<details class="composition-week" data-composition-week="${weekNumber}"><summary>Semana ${weekNumber}<small>Deixe vazio para herdar o padrão</small></summary><div class="composition-week-grid">${compositionCatalog.map(([key, label, group, defaultCount, itemsPerBlock]) => { const row = rowPlan[key] || {}; return `<label class="composition-week-cell"><span>${escapeHtml(label)}</span><input data-composition-week-count="${key}" type="number" min="0" max="12" step="1" value="${row.count ?? ""}" placeholder="padrão" />${itemsPerBlock > 1 ? `<input data-composition-week-items="${key}" type="number" min="1" max="12" value="${row.itemsPerBlock || ""}" placeholder="${itemsPerBlock} itens" />` : ""}<select data-composition-week-policy="${key}"><option value="">padrão</option><option value="prefer" ${row.policy === "prefer" ? "selected" : ""}>preferir</option><option value="required" ${row.policy === "required" ? "selected" : ""}>obrigatório</option><option value="none" ${row.policy === "none" ? "selected" : ""}>não usar</option></select></label>`; }).join("")}</div></details>`;
+    const weekFigures = entries.find((entry) => Number(entry.weekNumber || entry.week) === weekNumber)?.figures || {};
+    return `<details class="composition-week" data-composition-week="${weekNumber}"><summary>Semana ${weekNumber}<small>Deixe vazio para herdar o padrão</small></summary><div class="composition-week-grid">${FIGURE_KINDS.map(([kind, label]) => `<label class="composition-week-cell"><span>🖼️ ${escapeHtml(label)}</span><input data-figure-week="${kind}" type="number" min="0" max="6" step="1" value="${weekFigures[kind] ?? ""}" placeholder="padrão" /></label>`).join("")}${compositionCatalog.map(([key, label, group, defaultCount, itemsPerBlock]) => { const row = rowPlan[key] || {}; return `<label class="composition-week-cell"><span>${escapeHtml(label)}</span><input data-composition-week-count="${key}" type="number" min="0" max="12" step="1" value="${row.count ?? ""}" placeholder="padrão" />${itemsPerBlock > 1 ? `<input data-composition-week-items="${key}" type="number" min="1" max="12" value="${row.itemsPerBlock || ""}" placeholder="${itemsPerBlock} itens" />` : ""}<select data-composition-week-policy="${key}"><option value="">padrão</option><option value="prefer" ${row.policy === "prefer" ? "selected" : ""}>preferir</option><option value="required" ${row.policy === "required" ? "selected" : ""}>obrigatório</option><option value="none" ${row.policy === "none" ? "selected" : ""}>não usar</option></select></label>`; }).join("")}</div></details>`;
   }).join("");
-  container.innerHTML = `<div class="composition-defaults"><div class="composition-table-head"><strong>Bloco do ClassAtelier</strong><span>Qtd. padrão</span><span>Política</span><span>Itens/bloco</span></div>${defaultRows}</div><div class="composition-week-heading"><strong>Exceções por semana</strong><small>Use apenas quando uma semana precisar de composição diferente.</small></div><div class="composition-week-list">${weekMarkup}</div>`;
+  const defaultFigures = plan.default?.figures || {};
+  const figureRows = FIGURE_KINDS.map(([kind, label, hint]) => `<div class="composition-row composition-figure-row"><span class="composition-label"><strong>${escapeHtml(label)}</strong><small>${escapeHtml(hint)}</small></span><input data-figure-default="${kind}" type="number" min="0" max="6" step="1" value="${defaultFigures[kind] ?? ""}" placeholder="IA decide" aria-label="Quantidade de ${escapeHtml(label.toLowerCase())} por semana" /></div>`).join("");
+  container.innerHTML = `<div class="composition-figures"><div class="composition-week-heading"><strong>Figuras e imagens do texto</strong><small>Quantas a IA deve preparar em cada semana. Vazio: a IA decide (de 1 a 3, só onde a imagem explica melhor que o texto). 0: nenhuma daquele tipo.</small></div>${figureRows}</div><div class="composition-defaults"><div class="composition-table-head"><strong>Bloco do ClassAtelier</strong><span>Qtd. padrão</span><span>Política</span><span>Itens/bloco</span></div>${defaultRows}</div><div class="composition-week-heading"><strong>Exceções por semana</strong><small>Use apenas quando uma semana precisar de composição diferente.</small></div><div class="composition-week-list">${weekMarkup}</div>`;
 }
 
 function restoreSnapshot(snapshot) {
@@ -1724,7 +1736,7 @@ function renderLessonPreview(lesson, index) {
     const reflection = section.reflection?.question ? `<div class="reader-callout"><strong>Para refletir</strong><p>${escapeHtml(section.reflection.question)}</p>${paragraphsMarkup(section.reflection.body || "")}</div>` : "";
     const composition = (plan.composition?.entries || []).filter((entry) => Number(entry.sectionNumber) === Number(section.number) || (!entry.sectionNumber && section.number === "1")).map(compositionPreview).join("");
     const resources = [...(section.resources || [])].map(resourcePreview).join("");
-    const figures = (section.figures || []).map((figure) => figure.src ? `<figure class="reader-figure"><img src="${escapeHtml(figure.src)}" alt="${escapeHtml(figure.description || figure.caption || "Figura")}" loading="lazy" /><figcaption>${escapeHtml((figure.caption || figure.description || "").replace(/[.\s]+$/, ""))}. <em>Ilustração criada por IA · revisar antes de publicar.</em></figcaption></figure>` : suggestedImageMarkup(figure)).join("");
+    const figures = (section.figures || []).map((figure) => figure.src ? `<figure class="reader-figure"><img src="${escapeHtml(figure.src)}" alt="${escapeHtml(figure.description || figure.caption || "Figura")}" loading="lazy" /><figcaption>${escapeHtml((figure.caption || figure.description || "").replace(/[.\s]+$/, ""))}. <em>Ilustração criada por IA · revisar antes de publicar.</em></figcaption></figure>` : suggestedImageMarkup(figure, { lesson: plan.theme || lesson?.meta?.title || "", section: section.title || "" })).join("");
     return `<section><h3>${escapeHtml(`${section.number || ""} ${section.title || "Seção"}`.trim())}</h3>${paragraphsMarkup(section.body)}${figures}${composition}${resources}${subs}${caseMarkup}${reflection}</section>`;
   }).join("");
   const globalResources = Object.values(allResources).flat().filter((resource) => resource && !sections.some((section) => (section.resources || []).some((item) => item.id && item.id === resource.id))).slice(0, 12).map(resourcePreview).join("");
@@ -1755,7 +1767,7 @@ function renderLessonPreview(lesson, index) {
   const timeItems = (plan.timePlan?.items || []).filter((item) => Number(item.minutes || item.learnerMinutes) > 0).map((item) => `<li><strong>${escapeHtml(workloadItemLabel(item))}</strong>: ${escapeHtml(item.title || "")} — ${formatLoad(item.minutes || item.learnerMinutes)}${item.required === false ? " · complementar" : " · obrigatório"}</li>`).join("");
   const timeBreakdown = Object.entries(plan.timePlan?.breakdown || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<li><strong>${escapeHtml(breakdownLabels[key] || key)}</strong>: ${formatLoad(value)}</li>`).join("");
   const timeMarkup = timeItems || timeBreakdown ? `<section class="time-breakdown reader-time-breakdown"><h3>Tempo desta semana</h3><p>O cálculo está separado por texto-base, leituras, mídias e atividades. “Obrigatório” indica o que entra na trilha essencial; “complementar” não é obrigatório.</p><ul>${timeItems || timeBreakdown}</ul></section>` : "";
-  const pendingFigures = weekHasPendingFigures(lesson) ? `<section class="reader-warning"><h3>Figuras pendentes</h3><p>Esta semana tem diagramas planejados que ainda não foram desenhados pela IA. O texto não é alterado.</p><button type="button" class="secondary" id="retry-figures-button">Criar figuras pendentes</button></section>` : "";
+  const pendingFigures = weekHasPendingFigures(lesson) ? `<section class="reader-warning"><h3>Figuras pendentes</h3><p>Esta semana tem diagramas planejados que ainda não foram desenhados pela IA. O texto não é alterado. Se algum continuar sem sair, cada diagrama pendente, no ponto do texto em que aparece, traz um pedido pronto para o ChatGPT (ou outro gerador de imagens) e um texto para o Napkin.</p><button type="button" class="secondary" id="retry-figures-button">Criar figuras pendentes</button></section>` : "";
   const methodology = methodologyPreviewMarkup(plan, guide, index, lesson);
   const approvedPlanText = plan.approvedPlan || state.lessonPlans?.[index] || "";
   const approvedPlanMarkup = approvedPlanText ? `<section class="reader-approved-plan"><details><summary><strong>Plano da aula aprovado por você</strong> <small>(a aula foi gerada seguindo este plano)</small></summary><pre>${escapeHtml(approvedPlanText)}</pre></details></section>` : "";
@@ -1862,14 +1874,30 @@ function methodologyPreviewMarkup(plan, guide, index, lesson) {
 }
 
 // Imagem sugerida (foto para gerar fora, ou visual para o Napkin): o professor cria e insere no ClassAtelier.
-function suggestedImageMarkup(figure) {
+function suggestedImageMarkup(figure, context = {}) {
   if (figure.kind === "foto") {
     return `<div class="reader-suggested-image"><strong>📷 Foto sugerida</strong> <span>(crie fora, por exemplo no ChatGPT, e insira no ClassAtelier com “Inserir imagem no cursor”)</span><p>${escapeHtml(figure.description)}</p>${figure.prompt ? `<label>Pedido para o gerador de imagens</label><textarea readonly rows="3">${escapeHtml(figure.prompt)}</textarea><button type="button" class="secondary copy-suggestion">Copiar pedido</button>` : ""}${figure.caption ? `<small>Legenda sugerida: ${escapeHtml(figure.caption)}</small>` : ""}</div>`;
   }
   if (figure.kind === "napkin") {
     return `<div class="reader-suggested-image"><strong>🧩 Visual sugerido para o Napkin</strong> <span>(cole o texto em <a href="https://www.napkin.ai" target="_blank" rel="noopener">napkin.ai</a>, escolha o visual e insira no ClassAtelier)</span><p>${escapeHtml(figure.description)}</p>${figure.napkinText ? `<label>Texto para colar no Napkin</label><textarea readonly rows="4">${escapeHtml(figure.napkinText)}</textarea><button type="button" class="secondary copy-suggestion">Copiar texto</button>` : ""}${figure.caption ? `<small>Legenda sugerida: ${escapeHtml(figure.caption)}</small>` : ""}</div>`;
   }
-  return `<p class="reader-resource-pending">Figura prevista (ainda sem ilustração): ${escapeHtml(figure.description)}</p>`;
+  const prompt = externalDiagramPrompt(figure, context);
+  const napkin = [figure.description, figure.caption].filter(Boolean).map((part) => String(part).replace(/[.\s]+$/, "")).join(". ") + ".";
+  return `<div class="reader-suggested-image is-pending"><strong>📐 Diagrama ainda não desenhado</strong> <span>(use “Criar figuras pendentes” acima ou crie fora: cole o pedido no ChatGPT ou em outro gerador de imagens, ou o texto no <a href="https://www.napkin.ai" target="_blank" rel="noopener">napkin.ai</a>, e insira no ClassAtelier com “Inserir imagem no cursor”)</span><p>${escapeHtml(figure.description)}</p><label>Pedido para o ChatGPT ou outro gerador de imagens</label><textarea readonly rows="6">${escapeHtml(prompt)}</textarea><button type="button" class="secondary copy-suggestion">Copiar pedido</button><label>Texto para colar no Napkin</label><textarea readonly rows="3">${escapeHtml(napkin)}</textarea><button type="button" class="secondary copy-suggestion">Copiar texto</button>${figure.caption ? `<small>Legenda sugerida: ${escapeHtml(figure.caption)}</small>` : ""}</div>`;
+}
+
+// Pedido pronto para gerar fora o diagrama que a IA do ClassAuthor não desenhou.
+function externalDiagramPrompt(figure, context = {}) {
+  const course = $("#course-title")?.value.trim() || "";
+  const audience = $("#audience")?.value.trim() || "";
+  return [
+    `Crie um diagrama didático para uma aula${course ? ` do curso "${course}"` : ""}${context.lesson ? `, tema "${context.lesson}"` : ""}${context.section ? `, seção "${context.section}"` : ""}.`,
+    `O que o diagrama precisa mostrar: ${String(figure.description || "").replace(/[.\s]+$/, "")}.`,
+    figure.caption ? `Ele vai acompanhar a legenda: "${String(figure.caption).replace(/[.\s]+$/, "")}".` : "",
+    audience ? `Público: ${audience}.` : "",
+    "Requisitos: tecnicamente exato; todos os rótulos em português do Brasil, escritos exatamente com os termos acima e sem erros de ortografia; estilo vetorial plano e limpo, fundo branco, poucas cores com bom contraste (legível também em preto e branco), setas e conectores claros, hierarquia visual evidente; formato horizontal 16:9; sem pessoas, sem logotipos, sem marcas d'água e sem texto decorativo além dos rótulos.",
+    "Se algum termo técnico for ambíguo, pergunte antes de desenhar."
+  ].filter(Boolean).join("\n");
 }
 
 async function retryFigures(index) {

@@ -1,4 +1,4 @@
-import { compositionPlanForWeek } from "./composition.js";
+import { compositionPlanForWeek, figureCountsAsked } from "./composition.js";
 import { sourceMaterialBlock } from "./source-material.js";
 import { approvedPlanBlock } from "./lesson-plan.js";
 // Modo de escrita em prosa ("como o Claude escreve").
@@ -83,7 +83,8 @@ Como revisar: reescreva o documento inteiro já com o pedido incorporado. O que 
   const askedQuotes = Number(composition?.rows?.citacao?.count) || 0;
   const blocksAsk = [
     askedTips ? `- O professor pediu ${askedTips} dica(s) do professor (📌) nesta semana, cada uma no ponto do texto em que ajuda.` : "",
-    askedQuotes ? `- O professor pediu até ${askedQuotes} citação(ões) direta(s) (📜), mas SÓ com frase exata e fonte completa (autor, obra, ano e página); se não houver uma citação real e segura, não invente: deixe sem.` : ""
+    askedQuotes ? `- O professor pediu até ${askedQuotes} citação(ões) direta(s) (📜), mas SÓ com frase exata e fonte completa (autor, obra, ano e página); se não houver uma citação real e segura, não invente: deixe sem.` : "",
+    figureAsk(composition.figures)
   ].filter(Boolean).join("\n");
   const methodology = [blocksAsk ? `BLOCOS PEDIDOS PELO PROFESSOR\n${blocksAsk}` : "", approvedPlanBlock(input), writerMethodologyBlock(input, index), sourceMaterialBlock(input, "writer")].filter(Boolean).join("\n\n");
   return `Escreva a unidade da semana ${weekNumber} do curso "${input.title}". ${intro}
@@ -183,8 +184,21 @@ ${outline}
 SUA TAREFA AGORA: a semana será escrita em ${total} partes simultâneas, unidas depois na ordem. Você escreve somente a PARTE ${part} de ${total}: ela ${scope}.
 - Use os cabeçalhos "## n. Título" exatamente como estão no roteiro; subseções "### n.1 …" quando o conceito pedir.
 - Não escreva nada das outras partes e não repita o caso ou o dado que o roteiro atribui a outra seção. Nada de introdução ou conclusão própria da parte: comece direto no Markdown e, ${closing ? "ao chegar à síntese, retome os casos do roteiro, o contraponto e os conceitos novos" : "na última seção desta parte, deixe uma tensão que a seção seguinte do roteiro resolve"}.
-- Cada seção com cerca de ${targets.sectionTargetWords} palavras (mínimo ${targets.sectionMinimumWords}); inclua em cada seção desta parte TODOS os callouts 🔎 (vídeo, artigo) e as figuras 🖼️ (no formato do guia: > 🖼️ **Figura** [diagrama | descrição: "…"]: legenda) que o roteiro lhe atribui, no parágrafo exato em que ajudam, mais os 💭, 💡 e ⚠️ conforme o roteiro. Sem esses 🔎 a semana fica sem recursos.
+- Cada seção com cerca de ${targets.sectionTargetWords} palavras (mínimo ${targets.sectionMinimumWords}); inclua em cada seção desta parte TODOS os callouts 🔎 (vídeo, artigo) e as figuras 🖼️ (no formato do guia, conforme o tipo marcado no roteiro: > 🖼️ **Figura** [diagrama | descrição: "…"]: legenda; [napkin | descrição: "…" | texto: "…"]; [foto | descrição: "…" | prompt: "…"]) que o roteiro lhe atribui, no parágrafo exato em que ajudam, mais os 💭, 💡 e ⚠️ conforme o roteiro. Sem esses 🔎 a semana fica sem recursos.
 - Esta instrução vale mais do que qualquer outra que peça o documento inteiro.`;
+}
+
+// Quantas figuras de cada tipo o professor pediu na aba de composição (vazio = a IA decide).
+export function figureAsk(figures) {
+  if (!figureCountsAsked(figures)) return "";
+  const part = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+  const asked = [];
+  const n = (kind) => Number(figures?.[kind]) || 0;
+  if (figures.diagrama !== null && figures.diagrama !== undefined) asked.push(part(n("diagrama"), "diagrama", "diagramas"));
+  if (figures.napkin !== null && figures.napkin !== undefined) asked.push(part(n("napkin"), "figura napkin (texto para o Napkin AI)", "figuras napkin (textos para o Napkin AI)"));
+  if (figures.foto !== null && figures.foto !== undefined) asked.push(part(n("foto"), "foto (com o pedido para o gerador de imagens)", "fotos (com o pedido para o gerador de imagens)"));
+  const free = ["diagrama", "napkin", "foto"].filter((kind) => figures?.[kind] === null || figures?.[kind] === undefined);
+  return `- Figuras 🖼️: o professor pediu EXATAMENTE ${asked.join(", ")} nesta semana, cada uma na seção em que explica melhor que o texto, no formato do guia (diagrama, napkin ou foto). Isso substitui a faixa "de 1 a 3 figuras".${free.length ? ` Para ${free.join(" e ")}, use só se fizer falta.` : " Não acrescente figuras de outro tipo."}`;
 }
 
 async function writeWeekMarkdown(input, index, { progression, previousWeeks, bridges, current, instruction, temperature, targets }) {
@@ -201,7 +215,7 @@ ANTES DE ESCREVER, faça o ROTEIRO da semana. Responda somente com ele, neste fo
 # Semana ${weekNumber} — Título da semana
 1. Título da seção | cobre: o que a seção explica | caso ou dado concreto: instituição, ano, número, norma ou autor reais (marque "conferir" se não tiver certeza) | callouts: 🔎/💭/💡/⚠️/🖼️ que entram
 2. …
-Uma linha por seção numerada, no mínimo ${targets.requiredSectionCount} seções, na ordem didática (problema, conceito, caso, lição, limite; contraponto crítico perto do fim). Casos e dados não podem se repetir entre seções. Distribua pelas seções, na coluna callouts, EXATAMENTE ${resources.videosPerWeek} callout(s) 🔎 de vídeo e ${resources.articlesPerWeek} de artigo, cada um na seção em que realmente ajuda, e diga o que o recurso mostra. Marque também 1 ou 2 seções com 🖼️ (figura: diagrama que explica melhor que o texto) e escreva ao lado, em "figura:", o que o desenho mostra. Subseções e demais partes (boas-vindas, síntese, glossário) não entram no roteiro.`;
+Uma linha por seção numerada, no mínimo ${targets.requiredSectionCount} seções, na ordem didática (problema, conceito, caso, lição, limite; contraponto crítico perto do fim). Casos e dados não podem se repetir entre seções. Distribua pelas seções, na coluna callouts, EXATAMENTE ${resources.videosPerWeek} callout(s) 🔎 de vídeo e ${resources.articlesPerWeek} de artigo, cada um na seção em que realmente ajuda, e diga o que o recurso mostra. ${figureCountsAsked(compositionPlanForWeek(input, index).figures) ? `Marque com 🖼️ as seções que recebem as figuras pedidas pelo professor (em BLOCOS PEDIDOS) e escreva ao lado, em "figura:", o tipo (diagrama, napkin ou foto) e o que ela mostra.` : `Marque também 1 ou 2 seções com 🖼️ (figura: diagrama que explica melhor que o texto) e escreva ao lado, em "figura:", o que o desenho mostra.`} Subseções e demais partes (boas-vindas, síntese, glossário) não entram no roteiro.`;
   const askOutline = (text) => callText([system, { role: "user", content: text }], { temperature, maxTokens: 3000, ignoreRequestBudget: true, cacheSystem: true });
   let outline = String((await askOutline(outlineAsk)).text || "").trim();
   let { sections } = parseOutline(outline);

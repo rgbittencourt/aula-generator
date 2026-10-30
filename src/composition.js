@@ -30,6 +30,21 @@ export const COMPOSITION_CATALOG = Object.freeze([
   { key: "externalembed", type: "externalembed", label: "Conteúdo externo", group: "Mídia", unit: "bloco", defaultCount: 0, defaultPolicy: "prefer" }
 ]);
 
+// Figuras escritas pela IA dentro do texto (não são blocos montados pelo app):
+// diagrama (desenhado depois por IA), napkin (texto para o Napkin AI) e foto (pedido para gerar fora).
+// Vazio (null) = a IA decide, de 1 a 3 figuras por semana, como antes.
+export const FIGURE_KINDS = Object.freeze(["diagrama", "napkin", "foto"]);
+export function normalizeFigureCounts(value) {
+  const source = object(value);
+  const out = {};
+  FIGURE_KINDS.forEach((kind) => {
+    const raw = source[kind];
+    out[kind] = raw === null || raw === undefined || raw === "" ? null : Math.min(6, Math.max(0, integer(raw, 0)));
+  });
+  return out;
+}
+export function figureCountsAsked(counts) { return FIGURE_KINDS.some((kind) => counts?.[kind] !== null && counts?.[kind] !== undefined); }
+
 const CATALOG_BY_KEY = Object.fromEntries(COMPOSITION_CATALOG.map((item) => [item.key, item]));
 const POLICIES = new Set(["auto", "prefer", "required", "none"]);
 
@@ -87,11 +102,11 @@ export function normalizeCompositionPlan(value = {}, weeks = 1) {
       const raw = overrideSource[definition.key] ?? overrideSource[definition.type];
       rows[definition.key] = raw === undefined ? null : normalizeRow(raw, definition, defaults[definition.key]);
     });
-    return { weekNumber, rows };
+    return { weekNumber, rows, figures: normalizeFigureCounts(item.figures) };
   }).filter(Boolean).filter((entry, index, list) => list.findIndex((candidate) => candidate.weekNumber === entry.weekNumber) === index);
   return {
     preset: text(source.preset || source.mode, "balanced"),
-    default: { rows: defaults },
+    default: { rows: defaults, figures: normalizeFigureCounts(source.default?.figures || source.figures) },
     weeks: weekPlans
   };
 }
@@ -104,7 +119,10 @@ export function compositionPlanForWeek(input = {}, index = 0) {
   COMPOSITION_CATALOG.forEach((definition) => {
     rows[definition.key] = override[definition.key] ? normalizeRow(override[definition.key], definition, defaults[definition.key]) : normalizeRow(defaults[definition.key], definition);
   });
-  return { weekNumber: index + 1, preset: plan.preset || "balanced", rows };
+  const baseFigures = normalizeFigureCounts(plan.default?.figures);
+  const weekFigures = normalizeFigureCounts((plan.weeks || []).find((entry) => Number(entry.weekNumber) === index + 1)?.figures);
+  const figures = Object.fromEntries(FIGURE_KINDS.map((kind) => [kind, weekFigures[kind] ?? baseFigures[kind]]));
+  return { weekNumber: index + 1, preset: plan.preset || "balanced", rows, figures };
 }
 
 const COMPOSITION_REQUESTS = Object.freeze({
