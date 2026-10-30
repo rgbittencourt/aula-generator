@@ -36,7 +36,8 @@ Regras:
 - trate cada webprática como aula síncrona ou laboratório independente, com roteiro operacional próprio; nunca a transforme em leitura, seção, atividade ou bloco do texto-base semanal;
 - alinhe cada webprática a objetivos e conteúdos específicos, distribuindo-as em semanas e datas coerentes do calendário;
 - quando uma webprática já existir parcialmente, devolva o mesmo item/id e preencha os campos solicitados, especialmente título, semana/data, ferramenta, objetivo, contexto, preparação, materiais, produto e plano B. Não crie uma segunda prática para substituir a primeira;
-- gere materiais de apoio como objetos com type, title, link, moment, required, objective, alignment, use, pages, durationMinutes e notes. Eles devem servir aos objetivos e conteúdos, indicar por que serão usados, em que momento entram e como o estudante trabalhará com eles;
+- gere materiais de apoio como objetos com type, title, author, source, whereToFind, search, link, moment, required, objective, alignment, use, pages, durationMinutes e notes. Eles devem servir aos objetivos e conteúdos, indicar por que serão usados, em que momento entram e como o estudante trabalhará com eles;
+- cada material precisa ser uma obra REAL e identificável, nunca genérica ("texto-base sobre X", "vídeo explicativo"): "author" (autor ou instituição), "source" (referência no formato ABNT com o que você souber com segurança: AUTOR. Título. Edição. Local: Editora, ano; ou a instituição/portal), "whereToFind" (onde o professor encontra: site oficial da instituição, Portal Gov.br, SciELO, repositório institucional, biblioteca virtual da instituição, canal oficial etc.), "search" (termos exatos para localizar a obra) e, se for livro ou apostila, capítulo ou páginas em "pages" só se tiver certeza. Prefira fontes brasileiras, oficiais ou de acesso aberto. Se não tiver segurança de que a obra existe, não a sugira; se nenhuma obra real servir, sugira o tipo como "Material a produzir pelo professor" e diga em "notes" o que ele deve conter. Marque em "notes" o que precisa ser conferido;
 - para referências e artigos, sugira obras, autores, documentos ou fontes que o professor deve conferir; não invente URLs, DOI, páginas ou dados bibliográficos específicos;
 - para vídeos e imagens, gere termos de busca e intenção pedagógica; use links somente quando já tiverem sido fornecidos pelo usuário;
 - não preencha nome de autor ou instituição, pois esses dados devem vir do usuário;
@@ -239,6 +240,9 @@ export function compactWeekInput(input = {}, index = 0, resourcePlan = {}) {
       objective: clipText(item?.objective, 280),
       alignment: clipText(item?.alignment, 280),
       use: clipText(item?.use, 280),
+      author: clipText(item?.author, 160),
+      source: clipText(item?.source, 300),
+      whereToFind: clipText(item?.whereToFind, 200),
       durationMinutes: Math.max(0, safeNumber(item?.durationMinutes, 0))
     })),
     resourcePlan: {
@@ -287,8 +291,10 @@ function normalizeBriefingMaterial(material, index) {
     type: text(material?.type) || "Texto-base",
     title: text(material?.title),
     link: text(material?.link || material?.href),
-    source: text(material?.source || material?.publisher || material?.institution),
+    source: text(material?.source || material?.reference || material?.publisher || material?.institution),
     author: text(material?.author),
+    whereToFind: text(material?.whereToFind || material?.where || material?.location),
+    search: text(material?.search || material?.searchQuery),
     required: Boolean(material?.required ?? material?.mandatory),
     moment: text(material?.moment),
     objective: text(material?.objective),

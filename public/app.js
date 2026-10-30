@@ -943,12 +943,21 @@ function practiceCard(data = {}) {
 function materialCard(data = {}) {
   materialSequence += 1;
   const id = data.id || `material-${materialSequence}`;
-  return `<article class="item-card material-card" data-id="${escapeHtml(id)}">
+  return `<article class="item-card material-card" data-id="${escapeHtml(id)}" data-notes="${escapeHtml(data.notes || "")}">
     <div class="item-card-heading"><strong>Material <span class="item-index">${materialSequence}</span></strong><button class="remove-item" type="button" data-remove-material aria-label="Remover material">×</button></div>
     <div class="field-grid two">
       <label class="field"><span>Título do material</span><input class="material-title" value="${escapeHtml(data.title || "")}" placeholder="Ex.: Texto-base sobre mobilidade urbana" /></label>
       <label class="field"><span>Tipo</span><select class="material-type"><option ${selectOption(data.type, "Texto-base")}>Texto-base</option><option ${selectOption(data.type, "Artigo científico")}>Artigo científico</option><option ${selectOption(data.type, "Livro ou capítulo")}>Livro ou capítulo</option><option ${selectOption(data.type, "Vídeo")}>Vídeo</option><option ${selectOption(data.type, "Relatório ou dados")}>Relatório ou dados</option><option ${selectOption(data.type, "Infográfico")}>Infográfico</option><option ${selectOption(data.type, "Exercício")}>Exercício</option></select></label>
     </div>
+    <div class="field-grid two">
+      <label class="field"><span>Autor ou instituição</span><input class="material-author" value="${escapeHtml(data.author || "")}" placeholder="Ex.: ELMASRI, R.; NAVATHE, S. ou Ministério da Educação" /></label>
+      <label class="field"><span>Referência (ABNT)</span><input class="material-source" value="${escapeHtml(data.source || "")}" placeholder="AUTOR. Título. Edição. Local: Editora, ano." /></label>
+    </div>
+    <div class="field-grid two">
+      <label class="field"><span>Onde encontrar</span><input class="material-where" value="${escapeHtml(data.whereToFind || "")}" placeholder="Ex.: biblioteca virtual do IFSC; site oficial; SciELO" /></label>
+      <label class="field"><span>Termos de busca</span><input class="material-search" value="${escapeHtml(data.search || "")}" placeholder="Para localizar a obra certa" /></label>
+    </div>
+    ${data.notes ? `<p class="hint material-notes">⚠ ${escapeHtml(data.notes)}</p>` : ""}${!data.link && (data.source || data.title) && data.verificationStatus === "suggested-no-url" ? `<p class="hint material-notes">Sugestão da IA: confira se a obra existe e cole o link real antes de usar.</p>` : ""}
     <div class="field-grid two">
       <label class="field"><span>Momento de uso</span><input class="material-moment" value="${escapeHtml(data.moment || "")}" placeholder="Ex.: antes da semana 1; revisão da semana 3" /></label>
       <label class="field"><span>Link real (opcional)</span><input class="material-link" type="url" value="${escapeHtml(data.link || "")}" placeholder="Cole somente um link conferido" /></label>
@@ -1023,7 +1032,11 @@ function collectMaterials() {
     objective: card.querySelector(".material-objective").value.trim(),
     alignment: card.querySelector(".material-alignment").value.trim(),
     use: card.querySelector(".material-use").value.trim(),
-    notes: ""
+    author: card.querySelector(".material-author")?.value.trim() || "",
+    source: card.querySelector(".material-source")?.value.trim() || "",
+    whereToFind: card.querySelector(".material-where")?.value.trim() || "",
+    search: card.querySelector(".material-search")?.value.trim() || "",
+    notes: card.dataset.notes || ""
   }));
 }
 

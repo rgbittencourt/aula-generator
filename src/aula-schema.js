@@ -337,6 +337,10 @@ function normalizeMaterial(value = {}, index = 0) {
     link: normalized.href,
     alignment: text(material.alignment || material.contentAlignment),
     use: text(material.use || material.howToUse || material.readingGuide),
+    author: text(material.author),
+    source: text(material.source || material.reference),
+    whereToFind: text(material.whereToFind),
+    search: text(material.search),
     notes: text(material.notes)
   };
 }
