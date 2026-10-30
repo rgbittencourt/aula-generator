@@ -4,6 +4,7 @@ import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
 import { createProductionWorkbook, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
 import { SOURCE_USAGES, deleteSourceDoc, importSourceFile, sourceExcerptsForWeek } from "./source-materials.js";
 import { deepLocalizeUnit, localizeUnitText } from "./unit-text.js";
+import { DRAFT_FILE, chooseProjectFolder, folderPermission, folderSupported, forgetProjectFolder, loadProjectFolder, openExistingProjectFolder, projectFolder, saveToProjectFolder, SUBFOLDERS } from "./project-folder.js";
 import { applyAdjustment, applyRewrite, approveWeek, bridgesBefore, canGenerateNext, dismissIssue, emptyFlow, normalizeFlow, recordGenerated, weekFlowStatus } from "./step-flow.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -251,7 +252,92 @@ async function downloadBlob(blob, filename) {
     filename = localizeUnitText(filename, unit);
     if (/^(text\/|application\/(json|xml))/i.test(blob.type || "") || /\.(json|xml|md|txt|html)$/i.test(filename)) blob = new Blob([localizeUnitText(await blob.text(), unit)], { type: blob.type });
   }
+  if (projectFolder()) {
+    try {
+      const path = await saveToProjectFolder(blob, filename, { interactive: true });
+      if (path) { showAssistantMessage(`Salvo na pasta do projeto: ${path}`); renderProjectFolder(); return; }
+    } catch { /* sem permissão ou pasta movida: cai no download normal */ }
+    renderProjectFolder();
+  }
   return downloadBlobRaw(blob, filename);
+}
+
+// ── Pasta do projeto ──────────────────────────────────────────────
+// O rascunho vai junto para a pasta (backup/rascunho-atual.json) a cada salvamento automático,
+// e um histórico (backup/historico/) a cada 20 minutos, no máximo. Assim o planejamento abre
+// em outro navegador ou computador com "Abrir pasta de projeto".
+let folderState = "none";
+let lastHistoryAt = 0;
+async function renderProjectFolder() {
+  const box = $("#project-folder-bar");
+  if (!box) return;
+  if (!folderSupported()) {
+    box.querySelector("#project-folder-status").innerHTML = "<strong>Pasta do projeto</strong><small>Este navegador não deixa o site gravar numa pasta do computador. No Chrome ou no Edge (computador), tudo o que for salvo vai para uma pasta só do projeto, separada em subpastas. Aqui, os arquivos continuam indo para Downloads.</small>";
+    box.querySelectorAll("button").forEach((button) => button.classList.add("hidden"));
+    return;
+  }
+  const folder = projectFolder();
+  folderState = folder ? await folderPermission(false).catch(() => "none") : "none";
+  const status = box.querySelector("#project-folder-status");
+  const subfolders = SUBFOLDERS.map(([name]) => name).join(", ");
+  if (!folder) status.innerHTML = `<strong>Pasta do projeto: ainda não escolhida</strong><small>Escolha onde criar a pasta deste planejamento. Backups, rascunho, Material de Mediação, arquivos do ClassAtelier, XML do Moodle, práticas, produção e pacotes passam a ser salvos nela, cada um na sua subpasta (${subfolders}).</small>`;
+  else if (folderState === "granted") status.innerHTML = `<strong>Pasta do projeto: ${escapeHtml(folder.name)}</strong><small>Tudo o que você salvar vai para cá, separado em subpastas. O rascunho é gravado em backup/${DRAFT_FILE} a cada alteração. Em outro navegador ou computador, use “Abrir pasta de projeto”.</small>`;
+  else status.innerHTML = `<strong>Pasta do projeto: ${escapeHtml(folder.name)} (aguardando permissão)</strong><small>O navegador pede sua autorização de novo depois que a página é recarregada. Clique em “Reconectar pasta”. Enquanto isso, os arquivos vão para Downloads.</small>`;
+  $("#project-folder-choose").classList.remove("hidden");
+  $("#project-folder-open").classList.remove("hidden");
+  $("#project-folder-choose").textContent = folder ? "Trocar pasta" : "Criar pasta do projeto";
+  $("#project-folder-choose").classList.toggle("button-primary", !folder);
+  $("#project-folder-choose").classList.toggle("button-secondary", Boolean(folder));
+  $("#project-folder-reconnect").classList.toggle("hidden", !folder || folderState === "granted");
+  $("#project-folder-forget").classList.toggle("hidden", !folder);
+  box.classList.toggle("is-connected", folderState === "granted");
+}
+async function writeDraftToFolder(snapshot) {
+  if (!projectFolder() || folderState !== "granted" || !snapshot) return;
+  try {
+    const text = JSON.stringify(snapshot, null, 2);
+    await saveToProjectFolder(new Blob([text], { type: "application/json" }), DRAFT_FILE, { interactive: false, subfolder: "backup" });
+    if (Date.now() - lastHistoryAt > 20 * 60000) {
+      lastHistoryAt = Date.now();
+      const now = new Date(); const pad = (n) => String(n).padStart(2, "0");
+      const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}h${pad(now.getMinutes())}`;
+      await saveToProjectFolder(new Blob([text], { type: "application/json" }), `rascunho-${stamp}.json`, { interactive: false, subfolder: "backup/historico" });
+    }
+  } catch { folderState = "none"; renderProjectFolder(); }
+}
+async function handleChooseFolder() {
+  try {
+    const snapshot = currentSnapshot();
+    const folder = await chooseProjectFolder($("#course-title")?.value.trim() || "planejamento", courseUnit() === "aula" ? "aulas" : "semanas");
+    folderState = "granted";
+    lastHistoryAt = 0;
+    if (snapshot) { snapshot.projectFolder = folder.name; await writeDraftToFolder(snapshot); }
+    renderProjectFolder();
+    showAssistantMessage(folder.reused ? `Pasta de projeto reaproveitada: ${folder.name}.` : `Pasta do projeto criada: ${folder.name}, com as subpastas ${SUBFOLDERS.map(([name]) => name).join(", ")}.`);
+  } catch (error) {
+    if (error?.name !== "AbortError") showAssistantMessage(`Não foi possível criar a pasta: ${error.message || error}`, true);
+  }
+}
+async function handleOpenFolder() {
+  try {
+    const { name, draft } = await openExistingProjectFolder();
+    folderState = "granted";
+    renderProjectFolder();
+    if (!draft) { showAssistantMessage(`Pasta ${name} conectada, mas não encontrei rascunho nem backup dentro de backup/.`, true); return; }
+    if (draft?.version !== 2 || !isOwnApp(draft?.app)) throw new Error("O rascunho desta pasta não é um backup válido do ClassAuthor.");
+    if (currentSnapshot() && !window.confirm(`Abrir o planejamento da pasta ${name}? O que está aberto agora será substituído (ele continua salvo na pasta dele, se tiver uma).`)) return;
+    safeStorageSet(JSON.stringify(draft));
+    restoreSnapshot(draft);
+    enterWorkspace();
+    showAssistantMessage(`Planejamento aberto da pasta ${name}.`);
+  } catch (error) {
+    if (error?.name !== "AbortError") showAssistantMessage(error.message || "Não foi possível abrir a pasta.", true);
+  }
+}
+async function handleReconnectFolder() {
+  try { folderState = await folderPermission(true); } catch { folderState = "none"; }
+  renderProjectFolder();
+  if (folderState === "granted") { saveDraft("pasta"); showAssistantMessage(`Pasta ${projectFolder()?.name} reconectada.`); }
 }
 function downloadBlobRaw(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
 function addDays(dateString, days) { const date = new Date(`${dateString}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); }
@@ -448,6 +534,7 @@ function startNewProject(event) {
   clearTimeout(saveTimer);
   saveTimer = null;
   resetDisciplineForm(true);
+  forgetProjectFolder().then(renderProjectFolder);
   document.body.classList.remove("welcome-active");
   document.body.classList.add("workspace-active");
   document.documentElement.classList.add("workspace-active");
@@ -523,6 +610,7 @@ function saveDraft(reason = "") {
       return;
     }
     if (document.body.classList.contains("workspace-active")) updateDraftRecoveryCard(snapshot);
+    writeDraftToFolder(snapshot);
     const resultText = snapshot.results ? ` · ${snapshot.results.weeks.length} semana(s) preservada(s)` : "";
     setSaveStatus("Salvamento local ativo", `Último salvamento: ${formatSavedAt(snapshot.savedAt)}${resultText}`, "success");
   } catch {
@@ -2482,6 +2570,10 @@ window.addEventListener("message", (event) => {
   state.studioEdits[index] = { project: { meta: lesson.meta || {}, blocks: lesson.blocks }, text: String(text || ""), fileName: fileName || "", at: new Date().toISOString() };
   refreshStudioEditNote(index);
   saveDraft("semana devolvida pelo ClassAtelier");
+  if (projectFolder() && folderState === "granted") {
+    const name = localizeUnitText(fileName || weekFileName(state.weeks[index], index, "ClassAtelier.json"), courseUnit());
+    saveToProjectFolder(new Blob([JSON.stringify({ meta: lesson.meta || {}, blocks: lesson.blocks }, null, 2)], { type: "application/json" }), name, { interactive: false, subfolder: "classatelier" }).catch(() => {});
+  }
   showStudioToast(`A semana ${index + 1} voltou editada do ClassAtelier. Ela agora é a versão usada ao abrir e ao baixar o JSON ClassAtelier.`);
   reply({ type: "classauthor:received", week: index + 1, title: state.weeks[index]?.meta?.title || "" });
 });
@@ -3294,6 +3386,11 @@ $("#course-form").addEventListener("submit", (event) => { event.preventDefault()
 initStepMode();
 $("#assist-button").addEventListener("click", assistBriefing);
 $("#zip-button").addEventListener("click", downloadZip);
+$("#project-folder-choose")?.addEventListener("click", handleChooseFolder);
+$("#project-folder-open")?.addEventListener("click", handleOpenFolder);
+$("#project-folder-reconnect")?.addEventListener("click", handleReconnectFolder);
+$("#project-folder-forget")?.addEventListener("click", async () => { if (!window.confirm("Desligar a pasta do projeto? Nada é apagado dela; os próximos arquivos voltam a ir para Downloads.")) return; await forgetProjectFolder(); renderProjectFolder(); });
+loadProjectFolder().then(renderProjectFolder);
 $("#production-sheet-button")?.addEventListener("click", downloadProductionSheet);
 $("#teacher-pdf-button").addEventListener("click", downloadTeacherPdf);
 $("#recalculate-button").addEventListener("click", recalculateQuality);
@@ -3314,7 +3411,9 @@ $("#materials-list")?.addEventListener("change", async (event) => {
   const status = card.querySelector(".material-source-status");
   status.textContent = "Lendo o arquivo…";
   try {
-    const file = await importSourceFile(input.files[0], card.dataset.id, (done, total) => { status.textContent = `Lendo o arquivo… página ${done} de ${total}`; });
+    const original = input.files[0];
+    const file = await importSourceFile(original, card.dataset.id, (done, total) => { status.textContent = `Lendo o arquivo… página ${done} de ${total}`; });
+    if (projectFolder()) saveToProjectFolder(original, original.name, { interactive: true, subfolder: "fontes" }).catch(() => {});
     card.dataset.source = JSON.stringify(file);
     status.innerHTML = materialSourceStatus(file);
     const usage = card.querySelector(".material-usage");

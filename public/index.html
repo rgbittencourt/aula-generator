@@ -80,6 +80,7 @@
 
   <div class="recovery-dock hidden" id="recovery-dock">
     <p class="recovery-menu-label">BACKUP E RECUPERAÇÃO</p>
+    <section class="recovery-bar project-folder-bar" id="project-folder-bar" aria-live="polite"><div class="recovery-copy"><span class="recovery-icon">▣</span><div id="project-folder-status"><strong>Pasta do projeto</strong><small>Verificando…</small></div></div><div class="recovery-actions"><button class="button button-primary hidden" type="button" id="project-folder-choose">Criar pasta do projeto</button><button class="button button-secondary hidden" type="button" id="project-folder-reconnect">Reconectar pasta</button><button class="button button-secondary hidden" type="button" id="project-folder-open" title="Abre o planejamento de uma pasta de projeto criada antes, em outro navegador ou computador">Abrir pasta de projeto</button><button class="button button-secondary hidden" type="button" id="project-folder-forget">Desligar pasta</button></div></section>
     <section class="recovery-bar hidden" id="recovery-bar" aria-live="polite">
       <div class="recovery-copy"><span class="recovery-icon">↥</span><div><strong id="save-status-title">Salvamento local ativo</strong><small id="save-status">O briefing e as aulas geradas serão salvos automaticamente neste navegador.</small></div></div>
       <div class="recovery-actions"><button class="button button-secondary" type="button" id="save-backup-button">Baixar backup</button><button class="button button-secondary" type="button" id="restore-backup-button">Restaurar backup</button><button class="button button-secondary" type="button" id="open-week-button" title="Abre um arquivo SemanaNN-…-ClassAuthor.json salvo por este app">Abrir semana salva</button><input id="backup-file-input" type="file" accept="application/json,.json" class="hidden" /><input id="week-file-input" type="file" accept="application/json,.json" class="hidden" /></div>
@@ -245,7 +246,7 @@
   </main>
   <footer class="site-footer"><span>ClassAuthor <span class="semver" title="Versionamento Semântico: MAIOR.MENOR.CORREÇÃO">v1.3.0</span> · desenvolvido por Rogério Bittencourt, INOVALAB - IFSC</span><span>Saída compatível com ClassAtelier · revisão humana antes da publicação</span></footer>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script type="module" src="/app.js?v=20261030-unidade-1"></script>
+  <script type="module" src="/app.js?v=20261030-pasta-1"></script>
   <div id="test-copy-ribbon" role="note" style="position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:9999;background:#8a5a00;color:#fff;font:600 12px/1.2 system-ui,sans-serif;letter-spacing:.06em;padding:7px 14px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none">CÓPIA DE TESTE · METODOLOGIA · seus dados aqui ficam separados da versão principal</div>
 </body>
 </html>

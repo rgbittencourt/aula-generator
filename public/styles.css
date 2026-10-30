@@ -666,3 +666,5 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .plan-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
 .plan-status{min-height:1.2em;color:#8a5a00;margin:0 0 10px}
 .reader-approved-plan pre{white-space:pre-wrap;font:13px/1.5 system-ui,sans-serif;background:#f6f9fc;border-radius:8px;padding:12px;margin-top:8px}
+/* Pasta do projeto */
+.project-folder-bar{border-color:#d7d3ea;background:#f4f2fb;color:#3f3a66}.project-folder-bar .recovery-icon{background:#5b528f}.project-folder-bar.is-connected{border-color:#bfe4df;background:#edf8f6;color:#275d58}.project-folder-bar.is-connected .recovery-icon{background:var(--teal)}.project-folder-bar small{line-height:1.45}
