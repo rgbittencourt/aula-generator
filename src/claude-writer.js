@@ -303,6 +303,10 @@ ${scheduledPractices.length && !separateWebpractice ? `- Há webprática agendad
   // As webpráticas saem junto com a mediação ou numa chamada própria; a metodologia vai com elas.
   const practiceMethodology = scheduledPractices.length && ((wants.mediation && !separateWebpractice) || (part === "webpractice" && wants.webpractice)) ? webPracticeMethodologyBlock(input, index, scheduledPractices) : "";
   if (practiceMethodology) rules.push(practiceMethodology);
+  if (scheduledPractices.length && ((wants.mediation && !separateWebpractice) || (part === "webpractice" && wants.webpractice))) rules.push(`MODALIDADE DE CADA SESSÃO PRÁTICA (respeite o campo "modality")
+- Webprática síncrona: encontro online ao vivo, com ferramenta digital; preveja plano B para falha de conexão e de ferramenta.
+- Laboratório prático: presencial, no laboratório; liste equipamentos, insumos e materiais físicos, organização dos grupos e bancadas, cuidados de segurança e de descarte quando couber, e o que fazer se um equipamento falhar.
+- Aula síncrona: encontro ao vivo (online ou presencial) dialogado, com momentos de participação da turma; não transforme em palestra.`);
   return `Texto da semana ${weekNumber} ("${plan.theme}") do curso "${input.title}":
 
 ${text}

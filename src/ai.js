@@ -260,7 +260,7 @@ function normalizeBriefingPractice(practice, index) {
     id: text(practice?.id) || `webpractice-${index + 1}`,
     title: text(practice?.title || practice?.sessionTitle),
     type: text(practice?.type) || "Laboratório prático",
-    modality: text(practice?.modality || practice?.format) || "Aula síncrona / laboratório prático",
+    modality: text(practice?.modality || practice?.format) || "Webprática síncrona",
     weekNumber: Math.max(0, safeNumber(practice?.weekNumber || practice?.week, 0)),
     date: text(practice?.date || practice?.sessionDate),
     dayOfWeek: text(practice?.dayOfWeek || practice?.day),

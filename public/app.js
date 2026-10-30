@@ -900,6 +900,16 @@ let practiceSequence = 0;
 let materialSequence = 0;
 const selectOption = (value, option) => value === option ? "selected" : "";
 
+// Modalidades das sessões práticas. O valor antigo "Aula síncrona / laboratório prático" vira "Webprática síncrona".
+const PRACTICE_MODALITIES = ["Webprática síncrona", "Laboratório prático", "Aula síncrona"];
+function practiceModality(value) {
+  const raw = String(value || "").trim();
+  if (PRACTICE_MODALITIES.includes(raw)) return raw;
+  if (/laborat/i.test(raw) && !/síncrona \//i.test(raw)) return "Laboratório prático";
+  if (/^aula síncrona$/i.test(raw)) return "Aula síncrona";
+  return "Webprática síncrona";
+}
+
 function practiceMethodologyOptions(selected = "semana") {
   const current = selected || "semana";
   return [`<option value="semana" ${current === "semana" ? "selected" : ""}>Mesma da semana</option>`, ...methodologyOptions().map((option) => `<option value="${escapeHtml(option.value)}" title="${escapeHtml(option.hint)}" ${option.value === current ? "selected" : ""}>${escapeHtml(option.label)}</option>`)].join("");
@@ -913,7 +923,7 @@ function practiceCard(data = {}) {
     <div class="field-grid two">
       <label class="field"><span>Título da sessão</span><input class="practice-title" value="${escapeHtml(data.title || data.sessionTitle || "")}" placeholder="Ex.: Laboratório de prototipagem com IA" /></label>
       <label class="field practice-methodology-field"><span>Metodologia ativa da sessão</span><select class="practice-methodology">${practiceMethodologyOptions(data.methodology)}</select><small class="hint">“Mesma da semana” herda a metodologia escolhida para a semana em que a sessão acontece.</small></label>
-      <label class="field"><span>Modalidade</span><select class="practice-modality"><option ${selectOption(data.modality, "Aula síncrona / laboratório prático")}>Aula síncrona / laboratório prático</option><option ${selectOption(data.modality, "Aula síncrona")}>Aula síncrona</option><option ${selectOption(data.modality, "Laboratório prático")}>Laboratório prático</option></select></label>
+      <label class="field"><span>Modalidade</span><select class="practice-modality">${(() => { const current = practiceModality(data.modality); return PRACTICE_MODALITIES.map((value) => `<option ${current === value ? "selected" : ""}>${value}</option>`).join(""); })()}</select></label>
     </div>
     <div class="field-grid three">
       <label class="field"><span>Semana de ocorrência <b>*</b></span><input class="practice-week" type="number" min="1" max="52" value="${Number(data.weekNumber || data.week) || ""}" placeholder="Ex.: 2" /></label>
@@ -2184,7 +2194,7 @@ function renderGeneralPlan(plan) {
   const resultOpenStates = new Map([...container.querySelectorAll(":scope > .results-sector")].map((sector) => [sector.id, sector.open]));
   const reviewOpenStates = new Map([...container.querySelectorAll(".review-panel")].flatMap((panel) => { const kind = [...panel.classList].find((name) => name.startsWith("checklist-"))?.replace("checklist-", ""); return kind ? [[kind, panel.open]] : []; }));
   const totals = plan.totals;
-  const labels = { contentMinutes: "Conteúdo", resourcesMinutes: "Materiais e mídia", practiceMinutes: "Webpráticas", assessmentMinutes: "Avaliação", reviewMinutes: "Revisão", communicationMinutes: "Comunicação", projectMinutes: "Projetos", otherMinutes: "Outros" };
+  const labels = { contentMinutes: "Conteúdo", resourcesMinutes: "Materiais e mídia", practiceMinutes: "Práticas/Laboratório", assessmentMinutes: "Avaliação", reviewMinutes: "Revisão", communicationMinutes: "Comunicação", projectMinutes: "Projetos", otherMinutes: "Outros" };
   const categoryMarkup = Object.entries(plan.categoryTotals || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<span>${escapeHtml(labels[key] || key)}: ${formatMinutes(value)}</span>`).join("");
   const unresolved = Array.isArray(plan.unresolvedResources) ? plan.unresolvedResources : [];
   const arcs = (plan.didacticArcs || []).filter((arc) => arc.label).map((arc) => `<span class="arc-chip">${escapeHtml(arc.label)}</span>`).join("");
@@ -2195,7 +2205,7 @@ function renderGeneralPlan(plan) {
   const checklistMarkup = reviewPanelMarkup("checks", "Checklist pedagógico", checklist, `${passed}/${checklist.length} itens atendidos automaticamente; ${checkedChecks}/${checklist.length} atualmente marcados. Desmarque qualquer item que queira refazer ou revisar novamente.`, "Nenhum item pedagógico foi retornado.", reviewOpenStates.get("checks") ?? true);
   const progressionMarkup = Array.isArray(plan.progression) && plan.progression.length ? `<div class="general-warning"><strong>Progressão curricular</strong><ul>${plan.progression.map((item) => `<li>Semana ${item.weekNumber}: ${escapeHtml(item.theme || "")} ${item.projectMilestone ? `— ${escapeHtml(item.projectMilestone)}` : ""}</li>`).join("")}</ul></div>` : "";
   const practices = Array.isArray(plan.webPracticeSchedule) ? plan.webPracticeSchedule : [];
-  const practiceMarkup = practices.length ? `<section class="webpractice-schedule"><div class="schedule-heading"><div><p class="eyebrow">SESSÕES PRÁTICAS INDEPENDENTES</p><h3>Webpráticas programadas</h3><p>Estas sessões não entram no texto-base nem no JSON do aluno. Cada uma é exportada como roteiro DOCX para o professor.</p></div></div><div class="schedule-list">${practices.map((practice, index) => `<article class="schedule-item"><div><strong>${escapeHtml(practice.title || `Webprática ${index + 1}`)}</strong><span>${escapeHtml([practice.weekNumber ? `Semana ${practice.weekNumber}` : "", practice.date ? formatDate(practice.date) : "", practice.dayOfWeek, [practice.startTime, practice.endTime].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "Agenda a confirmar")}</span><small>${escapeHtml([practice.modality, practice.tool, practice.platform].filter(Boolean).join(" · ") || "Sessão síncrona / laboratório prático")}</small></div><button class="button button-secondary webpractice-download" data-practice-id="${escapeHtml(practice.id || practice.title || "")}" type="button">Baixar DOCX <span>↓</span></button></article>`).join("")}</div></section>` : "";
+  const practiceMarkup = practices.length ? `<section class="webpractice-schedule"><div class="schedule-heading"><div><p class="eyebrow">SESSÕES PRÁTICAS INDEPENDENTES</p><h3>Práticas/Laboratório</h3><p>Estas sessões não entram no texto-base nem no JSON do aluno. Cada uma é exportada como roteiro DOCX para o professor.</p></div></div><div class="schedule-list">${practices.map((practice, index) => `<article class="schedule-item"><div><strong>${escapeHtml(practice.title || `Webprática ${index + 1}`)}</strong><span>${escapeHtml([practice.weekNumber ? `Semana ${practice.weekNumber}` : "", practice.date ? formatDate(practice.date) : "", practice.dayOfWeek, [practice.startTime, practice.endTime].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "Agenda a confirmar")}</span><small>${escapeHtml([practice.modality, practice.tool, practice.platform].filter(Boolean).join(" · ") || "Sessão síncrona / laboratório prático")}</small></div><button class="button button-secondary webpractice-download" data-practice-id="${escapeHtml(practice.id || practice.title || "")}" type="button">Baixar DOCX <span>↓</span></button></article>`).join("")}</div></section>` : "";
   const resourceItems = unresolved.length ? unresolved.map((item, index) => ({ ...item, id: item.id || `resource-${item.weekNumber || 0}-${index + 1}`, label: item.title || "Recurso sem título", pass: false, detail: item.status || "Conferência pendente" })) : [{ id: "resources-ok", weekNumber: 0, label: "Recursos sem pendências automáticas", pass: true, detail: "Ainda assim, confirme coerência, duração/páginas, acessibilidade e licença antes de exportar." }];
   const reviewedResources = resourceItems.filter((item) => reviewMarkChecked("resources", item, reviewMarks)).length;
   const resourcesMarkup = reviewPanelMarkup("resources", "Checklist de recursos e acessibilidade", resourceItems, `${reviewedResources}/${resourceItems.length} itens atualmente marcados. Os recursos devem ser abertos e conferidos antes da publicação.`, "Nenhum recurso foi localizado para conferência.", reviewOpenStates.get("resources") ?? true);

@@ -270,7 +270,7 @@ function normalizePractice(value = {}, index = 0) {
     id: text(practice.id, `webpractice-${index + 1}`),
     title: text(practice.title, `Webprática ${index + 1}`),
     type: text(practice.type, "Laboratório prático"),
-    modality: text(practice.modality || practice.format, "Aula síncrona / laboratório prático"),
+    modality: text(practice.modality || practice.format, "Webprática síncrona"),
     weekNumber: Math.max(0, integer(practice.weekNumber || practice.week, 0)),
     date: validDate(practice.date || practice.sessionDate) ? text(practice.date || practice.sessionDate) : "",
     dayOfWeek: text(practice.dayOfWeek || practice.day),

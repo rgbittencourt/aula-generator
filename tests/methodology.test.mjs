@@ -151,3 +151,12 @@ test("guia da metodologia: prompt próprio com as atividades da semana; entra no
   assert.equal(guide.methodologyGuide.method, "Sala de aula invertida");
   assert.equal(guide.methodologyRequested, true);
 });
+
+test("práticas: modalidade no roteiro e regra por modalidade no prompt", async () => {
+  const { practicePackageMarkdown } = await import("../src/webpractice.js");
+  assert.match(practicePackageMarkdown(baseInput(), { title: "Lab", modality: "Laboratório prático" }, 0), /^# Laboratório prático 1/);
+  assert.match(practicePackageMarkdown(baseInput(), { title: "Aula", modality: "Aula síncrona" }, 0), /^# Aula síncrona 1/);
+  assert.match(practicePackageMarkdown(baseInput(), { title: "Web", modality: "Aula síncrona / laboratório prático" }, 0), /^# Webprática 1/);
+  const input = baseInput({ webPracticeEnabled: true, webPractices: [{ title: "Lab", weekNumber: 1, modality: "Laboratório prático" }] });
+  assert.match(derivativesPrompt(input, 0, { theme: "T", contentSections: [], learningObjectives: [] }, input.webPractices, "webpractice"), /Laboratório prático: presencial/);
+});
