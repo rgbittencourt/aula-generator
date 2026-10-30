@@ -1555,7 +1555,7 @@ function renderLessonPreview(lesson, index) {
     const reflection = section.reflection?.question ? `<div class="reader-callout"><strong>Para refletir</strong><p>${escapeHtml(section.reflection.question)}</p>${paragraphsMarkup(section.reflection.body || "")}</div>` : "";
     const composition = (plan.composition?.entries || []).filter((entry) => Number(entry.sectionNumber) === Number(section.number) || (!entry.sectionNumber && section.number === "1")).map(compositionPreview).join("");
     const resources = [...(section.resources || [])].map(resourcePreview).join("");
-    const figures = (section.figures || []).map((figure) => figure.src ? `<figure class="reader-figure"><img src="${escapeHtml(figure.src)}" alt="${escapeHtml(figure.description || figure.caption || "Figura")}" loading="lazy" /><figcaption>${escapeHtml((figure.caption || figure.description || "").replace(/[.\s]+$/, ""))}. <em>Ilustração criada por IA · revisar antes de publicar.</em></figcaption></figure>` : `<p class="reader-resource-pending">Figura prevista (ainda sem ilustração): ${escapeHtml(figure.description)}</p>`).join("");
+    const figures = (section.figures || []).map((figure) => figure.src ? `<figure class="reader-figure"><img src="${escapeHtml(figure.src)}" alt="${escapeHtml(figure.description || figure.caption || "Figura")}" loading="lazy" /><figcaption>${escapeHtml((figure.caption || figure.description || "").replace(/[.\s]+$/, ""))}. <em>Ilustração criada por IA · revisar antes de publicar.</em></figcaption></figure>` : suggestedImageMarkup(figure)).join("");
     return `<section><h3>${escapeHtml(`${section.number || ""} ${section.title || "Seção"}`.trim())}</h3>${paragraphsMarkup(section.body)}${figures}${composition}${resources}${subs}${caseMarkup}${reflection}</section>`;
   }).join("");
   const globalResources = Object.values(allResources).flat().filter((resource) => resource && !sections.some((section) => (section.resources || []).some((item) => item.id && item.id === resource.id))).slice(0, 12).map(resourcePreview).join("");
@@ -1597,6 +1597,11 @@ function renderLessonPreview(lesson, index) {
   renderFlowPanel(index);
   $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
   $("#retry-figures-button")?.addEventListener("click", () => retryFigures(index));
+  document.querySelectorAll("#lesson-reader .copy-suggestion").forEach((button) => button.addEventListener("click", async () => {
+    const value = button.previousElementSibling?.value || "";
+    try { await navigator.clipboard.writeText(value); } catch { button.previousElementSibling?.select(); document.execCommand?.("copy"); }
+    const label = button.textContent; button.textContent = "Copiado!"; setTimeout(() => { button.textContent = label; }, 1600);
+  }));
   $("#retry-explain-button")?.addEventListener("click", (event) => retryDerivatives(index, { parts: ["explain"], button: event.currentTarget }));
   $("#production-week-button")?.addEventListener("click", () => generateProductionWeek(index));
   $("#production-sheet-button-card")?.addEventListener("click", downloadProductionSheet);
@@ -1655,6 +1660,17 @@ function refreshChecklistFromWeek(index) {
 }
 
 // Gera só a avaliação, as atividades e a mediação de uma semana cujo texto já está salvo.
+// Imagem sugerida (foto para gerar fora, ou visual para o Napkin): o professor cria e insere no ClassAtelier.
+function suggestedImageMarkup(figure) {
+  if (figure.kind === "foto") {
+    return `<div class="reader-suggested-image"><strong>📷 Foto sugerida</strong> <span>(crie fora, por exemplo no ChatGPT, e insira no ClassAtelier com “Inserir imagem no cursor”)</span><p>${escapeHtml(figure.description)}</p>${figure.prompt ? `<label>Pedido para o gerador de imagens</label><textarea readonly rows="3">${escapeHtml(figure.prompt)}</textarea><button type="button" class="secondary copy-suggestion">Copiar pedido</button>` : ""}${figure.caption ? `<small>Legenda sugerida: ${escapeHtml(figure.caption)}</small>` : ""}</div>`;
+  }
+  if (figure.kind === "napkin") {
+    return `<div class="reader-suggested-image"><strong>🧩 Visual sugerido para o Napkin</strong> <span>(cole o texto em <a href="https://www.napkin.ai" target="_blank" rel="noopener">napkin.ai</a>, escolha o visual e insira no ClassAtelier)</span><p>${escapeHtml(figure.description)}</p>${figure.napkinText ? `<label>Texto para colar no Napkin</label><textarea readonly rows="4">${escapeHtml(figure.napkinText)}</textarea><button type="button" class="secondary copy-suggestion">Copiar texto</button>` : ""}${figure.caption ? `<small>Legenda sugerida: ${escapeHtml(figure.caption)}</small>` : ""}</div>`;
+  }
+  return `<p class="reader-resource-pending">Figura prevista (ainda sem ilustração): ${escapeHtml(figure.description)}</p>`;
+}
+
 async function retryFigures(index) {
   if (aiActionBusy) return;
   const button = $("#retry-figures-button");
@@ -2483,7 +2499,7 @@ async function completeDerivativesStep(data, input, index, headers, button) {
 
 // Figuras (diagramas SVG) criadas por IA: etapa própria, depois do texto e dos recursos.
 function weekHasPendingFigures(week) {
-  return (week?.lessonPlan?.contentSections || []).some((section) => (section.figures || []).some((figure) => !figure.src));
+  return (week?.lessonPlan?.contentSections || []).some((section) => (section.figures || []).some((figure) => !figure.src && (!figure.kind || figure.kind === "diagrama")));
 }
 
 async function illustrateGeneratedWeek(data, input, index, headers, button) {

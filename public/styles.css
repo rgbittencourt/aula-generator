@@ -631,3 +631,10 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .bloom-aplicar,.bloom-analisar{background:#e3f1e8;color:#1f6b45}
 .bloom-avaliar,.bloom-criar{background:#f4ecd3;color:#7a5a10}
 .bloom-vago,.bloom-unknown{background:#fbe4dc;color:#9a3b1b}
+
+.reader-suggested-image{margin:14px 0;padding:12px 14px;border:1px dashed #b8902f;border-radius:10px;background:#fffaf0}
+.reader-suggested-image span{font-size:12px;color:#6b5a2e}
+.reader-suggested-image p{margin:6px 0}
+.reader-suggested-image label{display:block;font-size:12px;font-weight:700;margin-top:6px}
+.reader-suggested-image textarea{width:100%;margin:4px 0;font:13px/1.45 system-ui,sans-serif;padding:8px;border:1px solid #e1d6b8;border-radius:8px;background:#fff;resize:vertical}
+.reader-suggested-image small{display:block;color:#6b5a2e;margin-top:4px}

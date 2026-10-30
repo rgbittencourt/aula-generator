@@ -359,7 +359,7 @@ function normalizeSection(value = {}, index = 0) {
     didacticRole: text(section.didacticRole || section.role),
     resources: normalizeResources(section.resources, "section-resource"),
     // Figuras (diagramas) criadas por IA: descrição para o modelo e, depois de ilustradas, o SVG em src.
-    figures: Array.isArray(section.figures) ? section.figures.map((figure, figureIndex) => ({ id: text(figure?.id, `fig-${index + 1}-${figureIndex + 1}`), kind: text(figure?.kind, "diagrama"), description: text(figure?.description), caption: text(figure?.caption), sectionNumber: text(figure?.sectionNumber, section.number), src: text(figure?.src), aiGenerated: Boolean(figure?.src) })).filter((figure) => figure.description) : [],
+    figures: Array.isArray(section.figures) ? section.figures.map((figure, figureIndex) => ({ id: text(figure?.id, `fig-${index + 1}-${figureIndex + 1}`), kind: ["foto", "napkin"].includes(text(figure?.kind)) ? text(figure?.kind) : "diagrama", description: text(figure?.description), prompt: text(figure?.prompt), napkinText: text(figure?.napkinText), caption: text(figure?.caption), sectionNumber: text(figure?.sectionNumber, section.number), src: text(figure?.src), aiGenerated: Boolean(figure?.src) })).filter((figure) => figure.description) : [],
     // Callouts escritos no ponto do texto (modo de prosa): destaque, atenção e reflexão.
     callouts: Array.isArray(section.callouts) ? section.callouts.map((callout) => ({
       kind: ["destaque", "atencao", "reflexao"].includes(callout?.kind) ? callout.kind : "destaque",

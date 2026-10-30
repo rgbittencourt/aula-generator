@@ -124,3 +124,17 @@ test("raciocínio do modelo: desligado onde a API permite", async () => {
     assert.equal(anthropicThinkingConfig("claude-sonnet-5-5").thinking, null);
   } finally { if (before === undefined) delete process.env.ANTHROPIC_THINKING; else process.env.ANTHROPIC_THINKING = before; }
 });
+
+test("figuras: diagrama, foto e Napkin são reconhecidos; só o diagrama vai para a IA desenhar", async () => {
+  const { parseWeekMarkdown } = await import("../src/writer-markdown.js");
+  const { illustrateWeek } = await import("../src/illustrate.js");
+  const md = `# Semana 1 — Teste\n## Boas-vindas\nOlá.\n## Objetivos de aprendizagem\nAo final desta semana, você será capaz de:\n- Analisar X\n## 1. Seção\nTexto da seção um com conteúdo.\n\n> 🖼️ **Figura** [diagrama | descrição: "árvore de operadores"]: Árvore.\n\n> 🖼️ **Figura** [foto | descrição: "servidor de banco de dados em rack" | prompt: "foto realista de um rack de servidores em data center, luz fria, sem pessoas"]: Um data center.\n\n> 🖼️ **Figura** [napkin | descrição: "ciclo da consulta" | texto: "A consulta é analisada, traduzida, otimizada e executada."]: Ciclo.\n## Síntese conceitual\nFim.\n`;
+  const { lessonPlan } = parseWeekMarkdown(md, { weekNumber: 1 });
+  const figures = lessonPlan.contentSections[0].figures;
+  assert.deepEqual(figures.map((figure) => figure.kind), ["diagrama", "foto", "napkin"]);
+  assert.match(figures[1].prompt, /rack de servidores/);
+  assert.match(figures[2].napkinText, /otimizada/);
+  const asked = [];
+  await illustrateWeek({ title: "T" }, { lessonPlan, blocks: [] }, { ask: async (messages) => { asked.push(messages); return { text: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>' }; } });
+  assert.equal(asked.length, 1);
+});
