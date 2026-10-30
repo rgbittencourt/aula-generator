@@ -3381,6 +3381,9 @@ function applyUnitToUi() {
   }
 }
 $("#course-unit")?.addEventListener("change", () => { applyUnitToUi(); scheduleSave(); });
+// O navegador pode restaurar o valor do seletor ao recarregar a página, sem avisar: reaplica.
+window.addEventListener("pageshow", () => applyUnitToUi());
+window.addEventListener("load", () => setTimeout(applyUnitToUi, 0));
 
 // Acrescenta ao pedido o plano aprovado da aula e os trechos dos materiais anexados que combinam com ela.
 async function withSources(input, index, week = null) {
