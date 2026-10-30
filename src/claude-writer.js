@@ -1,4 +1,5 @@
 import { sourceMaterialBlock } from "./source-material.js";
+import { approvedPlanBlock } from "./lesson-plan.js";
 // Modo de escrita em prosa ("como o Claude escreve").
 //
 // Em vez de pedir à IA um JSON de ~40 campos (o que a faz escrever "para preencher
@@ -76,7 +77,7 @@ PEDIDO DO PROFESSOR PARA ESTA REVISÃO:
 "${String(instruction || "").trim()}"
 
 Como revisar: reescreva o documento inteiro já com o pedido incorporado. O que o professor não mencionou deve permanecer praticamente idêntico (mesmas frases, mesma ordem, mesmos casos e callouts), porque ele já leu e aprovou esses trechos. Não encolha o texto, não resuma e mantenha a voz. Se o pedido mudar um fato ou um caso, ajuste também o que dependia dele (síntese, glossário, referências, "Pontos a conferir").` : "";
-  const methodology = [writerMethodologyBlock(input, index), sourceMaterialBlock(input, "writer")].filter(Boolean).join("\n\n");
+  const methodology = [approvedPlanBlock(input), writerMethodologyBlock(input, index), sourceMaterialBlock(input, "writer")].filter(Boolean).join("\n\n");
   return `Escreva a unidade da semana ${weekNumber} do curso "${input.title}". ${intro}
 
 PÚBLICO E NÍVEL: ${input.audience || "estudantes de pós-graduação"} (${input.level || "pós-graduação"}), em ${input.language || "português do Brasil"}.
@@ -307,6 +308,8 @@ ${scheduledPractices.length && !separateWebpractice ? `- Há webprática agendad
   const practiceInThisCall = scheduledPractices.length && ((wants.mediation && !separateWebpractice) || (part === "webpractice" && wants.webpractice));
   const sourceBlock = wants.activities || wants.methodology || wants.explain ? sourceMaterialBlock(input, "derivatives") : practiceInThisCall ? sourceMaterialBlock(input, "practice") : "";
   if (sourceBlock) rules.push(sourceBlock);
+  const planBlock = approvedPlanBlock(input);
+  if (planBlock && (wants.activities || wants.methodology || wants.explain || wants.mediation || wants.webpractice)) rules.unshift(planBlock);
   if (scheduledPractices.length && ((wants.mediation && !separateWebpractice) || (part === "webpractice" && wants.webpractice))) rules.push(`MODALIDADE DE CADA SESSÃO PRÁTICA (respeite o campo "modality")
 - Webprática síncrona: encontro online ao vivo, com ferramenta digital; preveja plano B para falha de conexão e de ferramenta.
 - Laboratório prático: presencial, no laboratório; liste equipamentos, insumos e materiais físicos, organização dos grupos e bancadas, cuidados de segurança e de descarte quando couber, e o que fazer se um equipamento falhar.

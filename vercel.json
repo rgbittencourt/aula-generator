@@ -12,6 +12,7 @@
     { "src": "/api/figure", "dest": "/api/regenerate-week" },
     { "src": "/api/illustrate", "dest": "/api/regenerate-week" },
     { "src": "/api/production", "dest": "/api/regenerate-week" },
+    { "src": "/api/lesson-plan", "dest": "/api/regenerate-week" },
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/", "dest": "/public/index.html" },
     { "src": "/(.*)", "dest": "/public/$1" }

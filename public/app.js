@@ -406,7 +406,7 @@ function resetDisciplineForm(preserveSession = true) {
   state.weekApprovals = {};
   state.studioEdits = {};
   state.production = emptyProduction();
-  state.flow = emptyFlow();
+  state.flow = emptyFlow(); state.lessonPlans = {};
   state.activeReviewGuidance = null;
   state.generation = null;
   state.previewIndex = null;
@@ -494,6 +494,7 @@ function currentSnapshot() {
       studioEdits: state.studioEdits,
       production: state.production,
       stepFlow: state.flow,
+      lessonPlans: state.lessonPlans || {},
       generation: state.generation,
       weeks: state.weeks
     } : null
@@ -812,6 +813,7 @@ function restoreSnapshot(snapshot) {
   state.studioEdits = snapshot.results?.studioEdits || {};
   state.production = normalizeProductionState(snapshot.results?.production);
   state.flow = normalizeFlow(snapshot.results?.stepFlow);
+  state.lessonPlans = snapshot.results?.lessonPlans && typeof snapshot.results.lessonPlans === "object" ? snapshot.results.lessonPlans : {};
   state.generation = snapshot.results?.generation || snapshot.generation || null;
   if (["running", "consolidating"].includes(state.generation?.status)) state.generation = { ...state.generation, status: "partial" };
   if (state.generation?.status === "partial") {
@@ -1652,6 +1654,8 @@ function renderLessonPreview(lesson, index) {
   const timeMarkup = timeItems || timeBreakdown ? `<section class="time-breakdown reader-time-breakdown"><h3>Tempo desta semana</h3><p>O cálculo está separado por texto-base, leituras, mídias e atividades. “Obrigatório” indica o que entra na trilha essencial; “complementar” não é obrigatório.</p><ul>${timeItems || timeBreakdown}</ul></section>` : "";
   const pendingFigures = weekHasPendingFigures(lesson) ? `<section class="reader-warning"><h3>Figuras pendentes</h3><p>Esta semana tem diagramas planejados que ainda não foram desenhados pela IA. O texto não é alterado.</p><button type="button" class="secondary" id="retry-figures-button">Criar figuras pendentes</button></section>` : "";
   const methodology = methodologyPreviewMarkup(plan, guide, index, lesson);
+  const approvedPlanText = plan.approvedPlan || state.lessonPlans?.[index] || "";
+  const approvedPlanMarkup = approvedPlanText ? `<section class="reader-approved-plan"><details><summary><strong>Plano da aula aprovado por você</strong> <small>(a aula foi gerada seguindo este plano)</small></summary><pre>${escapeHtml(approvedPlanText)}</pre></details></section>` : "";
   const usageLabel = { base: "base do conteúdo", apoio: "referência de apoio", pratica: "roteiro de prática" };
   const sourceUsed = (plan.sourceUsed || []).length ? `<section class="reader-source-used"><h3>Material do professor usado nesta semana</h3><ul>${plan.sourceUsed.map((item) => `<li><strong>${escapeHtml(item.title || "Material")}</strong> (${escapeHtml(usageLabel[item.usage] || item.usage || "")}) · ${item.unit === "parte" ? "partes" : "páginas"} ${escapeHtml((item.pages || []).join(", "))}${item.chosenByTeacher ? " · escolhidas por você" : " · escolhidas pelo app"}</li>`).join("")}</ul><small>Estes foram os trechos enviados à IA. Se não forem os certos, indique as páginas da semana no cartão do material e refaça a semana.</small></section>` : "";
   const alignment = (plan.alignmentMatrix || []).length ? `<section><h3>Alinhamento pedagógico</h3><ul>${plan.alignmentMatrix.map((row) => `<li><strong>${escapeHtml(row.objective || "Objetivo")}</strong>: ${escapeHtml(row.evidence || "evidência a definir")} · avaliação: ${escapeHtml((row.assessmentQuestions || []).join(", ") || "a definir")}</li>`).join("")}</ul></section>` : "";
@@ -1659,7 +1663,7 @@ function renderLessonPreview(lesson, index) {
     + (guide.weekSummary && guide.studentFAQ?.length ? "" : `<section class="reader-warning"><h3>Explicações para o professor</h3><p>Esta semana ainda não tem o resumo, as perguntas prováveis dos alunos, os equívocos comuns e os sinais de alerta que entram no Material de Mediação. O texto da semana não é alterado.</p><button type="button" class="secondary" id="retry-explain-button">Completar explicações do Material de Mediação</button></section>`);
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
-  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${pendingFigures}${sourceUsed}${sectionsMarkup}${methodology}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
+  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${pendingFigures}${approvedPlanMarkup}${sourceUsed}${sectionsMarkup}${methodology}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
   renderFlowPanel(index);
   $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
   $("#retry-figures-button")?.addEventListener("click", () => retryFigures(index));
@@ -2853,6 +2857,11 @@ async function generateDistributed(input, accessCode, button, options = {}) {
     }));
     let data;
     try {
+      if (!(await ensureLessonPlan(input, index, headers, button))) {
+        const stop = new Error(`Geração pausada antes da aula ${index + 1}: o plano não foi aprovado. Quando quiser, continue a geração para ver o plano de novo.`);
+        stop.code = "PLAN_NOT_APPROVED";
+        throw stop;
+      }
       data = await requestGeneratedWeek(input, index, headers, previousWeeks, button, bridgesBefore(state.flow, index));
     } catch (error) {
       throw annotateFailure(error, index);
@@ -2939,7 +2948,7 @@ async function generate() {
     return;
   }
   if (!resumeGeneration) {
-    state.flow = emptyFlow();
+    state.flow = emptyFlow(); state.lessonPlans = {};
     state.weeks = []; refreshStudioWeekSelect();
     state.teacherGuides = [];
     state.workload = null;
@@ -3309,15 +3318,69 @@ $("#materials-list")?.addEventListener("click", async (event) => {
   scheduleSave();
 });
 
-// Acrescenta ao pedido os trechos dos materiais anexados que combinam com esta semana.
+// Acrescenta ao pedido o plano aprovado da aula e os trechos dos materiais anexados que combinam com ela.
 async function withSources(input, index, week = null) {
+  const plan = state.lessonPlans?.[index] || "";
+  const base = plan ? { ...input, approvedLessonPlan: plan } : input;
   try {
     const excerpts = await sourceExcerptsForWeek(input, index, week);
-    return excerpts.length ? { ...input, sourceExcerpts: excerpts } : input;
+    return excerpts.length ? { ...base, sourceExcerpts: excerpts } : base;
   } catch (error) {
     console.warn("Trechos dos materiais não incluídos:", error);
-    return input;
+    return base;
   }
+}
+
+// ---- Plano prévio da aula (quando há metodologia ativa) ----
+async function requestLessonPlan(input, index, headers, previousPlan = "", instruction = "") {
+  const response = await fetch("/api/lesson-plan", { method: "POST", headers, signal: AbortSignal.timeout(200000), body: JSON.stringify({ action: "plan", input, weekIndex: index, previousPlan, instruction }) });
+  const done = await readApiResponse(response, `Não foi possível montar o plano da aula ${index + 1}.`);
+  return done.text || "";
+}
+
+function openPlanDialog(index, input, headers, initialText, methodLabel) {
+  return new Promise((resolve) => {
+    const modal = $("#plan-modal");
+    const textArea = $("#plan-text"), instruction = $("#plan-instruction"), status = $("#plan-status");
+    $("#plan-modal-eyebrow").textContent = `PLANO DA AULA ${String(index + 1).padStart(2, "0")}${methodLabel ? ` · ${methodLabel.replace(/^Metodologia: /, "").toUpperCase()}` : ""}`;
+    textArea.value = initialText; instruction.value = ""; status.textContent = "";
+    $("#ai-activity")?.classList.add("hidden");
+    modal.classList.remove("hidden"); modal.setAttribute("aria-hidden", "false");
+    const close = (value) => {
+      modal.classList.add("hidden"); modal.setAttribute("aria-hidden", "true");
+      ["#plan-approve", "#plan-cancel", "#plan-cancel-x", "#plan-revise"].forEach((id) => { const el = $(id); el.replaceWith(el.cloneNode(true)); });
+      resolve(value);
+    };
+    $("#plan-approve").addEventListener("click", () => { const value = textArea.value.trim(); if (!value) { status.textContent = "O plano está vazio."; return; } close(value); });
+    $("#plan-cancel").addEventListener("click", () => close(null));
+    $("#plan-cancel-x").addEventListener("click", () => close(null));
+    $("#plan-revise").addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      if (!instruction.value.trim()) { status.textContent = "Escreva o que a IA deve mudar (ou edite o texto do plano diretamente e aprove)."; return; }
+      button.disabled = true; status.textContent = "Refazendo o plano com o seu pedido…";
+      try { textArea.value = await requestLessonPlan(input, index, headers, textArea.value, instruction.value.trim()); instruction.value = ""; status.textContent = "Plano refeito. Confira e aprove, ou peça outro ajuste."; }
+      catch (error) { status.textContent = `Não foi possível refazer: ${error.message}`; }
+      finally { button.disabled = false; }
+    });
+    setTimeout(() => textArea.focus(), 50);
+  });
+}
+
+// Antes de gerar uma aula com metodologia ativa: plano proposto → professor ajusta → aprova.
+async function ensureLessonPlan(input, index, headers, button) {
+  const methodLabel = methodologyForWeekLabel(index, null);
+  if (!methodLabel) return true;
+  if (!state.lessonPlans) state.lessonPlans = {};
+  if (state.lessonPlans[index]) return true;
+  setButtonLabel(button, `Montando o plano da aula ${index + 1}…`);
+  setAiActivity("Plano da aula", `Antes de escrever a aula ${index + 1}, a IA está montando o plano de como aplicar a metodologia, para você ajustar e aprovar…`, { progress: Math.round(((index + 0.1) / (input.weeks + 1)) * 100) });
+  const proposal = await requestLessonPlan(input, index, headers);
+  setAiActivity("Plano da aula", `Plano da aula ${index + 1} pronto: confira, ajuste e aprove para a aula ser gerada.`, { progress: Math.round(((index + 0.15) / (input.weeks + 1)) * 100) });
+  const approved = await openPlanDialog(index, input, headers, proposal, methodLabel);
+  if (!approved) return false;
+  state.lessonPlans[index] = approved;
+  saveDraft("plano-aprovado");
+  return true;
 }
 
 $("#pedagogical-approach")?.addEventListener("change", () => { updateMethodologyHints(); scheduleSave(); });

@@ -660,3 +660,9 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .field .hint,.field > small{margin-top:-2px}
 .bloom-meter{margin-top:10px}
 .material-source-box .field-grid{margin-bottom:14px}
+.plan-dialog{max-width:860px}.plan-body{padding:4px 24px 22px;overflow:auto}
+.plan-intro{color:#435069;margin:6px 0 16px}
+#plan-text{font:14px/1.55 system-ui,sans-serif;min-height:360px}
+.plan-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
+.plan-status{min-height:1.2em;color:#8a5a00;margin:0 0 10px}
+.reader-approved-plan pre{white-space:pre-wrap;font:13px/1.5 system-ui,sans-serif;background:#f6f9fc;border-radius:8px;padding:12px;margin-top:8px}

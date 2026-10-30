@@ -177,3 +177,16 @@ test("material do professor: trechos limpos, no prompt de redação e resumo na 
   assert.deepEqual(plan.sourceUsed.map((item) => item.pages), [["3", "4", "9"]]);
   assert.equal(buildWriterPrompt(baseInput(), 0).includes("MATERIAL DO PROFESSOR"), false);
 });
+
+test("plano da aula: prompt com a metodologia, texto editável e plano aprovado nos prompts", async () => {
+  const { buildLessonPlanPrompt, lessonPlanToText } = await import("../src/lesson-plan.js");
+  const input = baseInput({ methodologyPlan: { default: "sala-invertida" } });
+  assert.match(buildLessonPlanPrompt(input, 0), /Sala de aula invertida/);
+  assert.match(buildLessonPlanPrompt(input, 0, { previousPlan: "PLANO X", instruction: "menos leitura" }), /menos leitura/);
+  const textPlan = lessonPlanToText({ method: "Sala de aula invertida", steps: [{ when: "dias 1-3", what: "estudo prévio", teacher: "abre o quiz", student: "lê" }], activities: [{ title: "Quiz", type: "quiz", purpose: "verificar" }], questions: ["Vale nota?"] });
+  assert.match(textPlan, /PASSO A PASSO:\n1\. dias 1-3: estudo prévio/);
+  const approved = baseInput({ approvedLessonPlan: textPlan });
+  assert.match(buildWriterPrompt(approved, 0), /PLANO DA AULA APROVADO PELO PROFESSOR/);
+  assert.match(derivativesPrompt(approved, 0, { theme: "T", contentSections: [], learningObjectives: [] }, [], "activities"), /PLANO DA AULA APROVADO/);
+  assert.doesNotMatch(buildWriterPrompt(baseInput(), 0), /PLANO DA AULA APROVADO/);
+});

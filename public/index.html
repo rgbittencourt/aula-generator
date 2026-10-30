@@ -204,6 +204,22 @@
       </div>
     </form>
 
+    <section class="lesson-modal hidden" id="plan-modal" aria-hidden="true">
+      <div class="lesson-dialog plan-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-modal-title">
+        <header class="lesson-dialog-header"><div><p class="eyebrow" id="plan-modal-eyebrow">PLANO DA AULA</p><h2 id="plan-modal-title">Como a aula vai aplicar a metodologia</h2></div><button class="close-modal" type="button" id="plan-cancel-x" aria-label="Fechar sem aprovar">×</button></header>
+        <div class="plan-body">
+          <p class="plan-intro">Antes de escrever a aula, a IA mostra como pretende aplicar a metodologia. Leia, <strong>edite o texto à vontade</strong> (responda às perguntas no fim, se houver) ou peça um ajuste. Só depois de aprovar a aula é gerada, seguindo este plano.</p>
+          <label class="field"><span>Plano (editável)</span><textarea id="plan-text" rows="18" spellcheck="true"></textarea></label>
+          <label class="field"><span>Pedir um ajuste à IA (opcional)</span><textarea id="plan-instruction" rows="2" placeholder="Ex.: o estudo prévio precisa ser de no máximo 40 minutos; troque o fórum por um quiz; inclua uma etapa de feedback entre pares."></textarea></label>
+          <p class="plan-status" id="plan-status" aria-live="polite"></p>
+          <div class="plan-actions">
+            <button type="button" class="button button-secondary" id="plan-revise">Refazer o plano com meu pedido</button>
+            <button type="button" class="button button-secondary" id="plan-cancel">Parar aqui</button>
+            <button type="button" class="button button-primary" id="plan-approve">Aprovar e gerar a aula</button>
+          </div>
+        </div>
+      </div>
+    </section>
     <section class="lesson-modal hidden" id="lesson-modal" aria-hidden="true">
       <div class="lesson-dialog" role="dialog" aria-modal="true" aria-labelledby="lesson-modal-title">
         <header class="lesson-dialog-header"><div><p class="eyebrow" id="lesson-modal-eyebrow">PRÉVIA DA SEMANA</p><h2 id="lesson-modal-title">Aula semanal</h2></div><button class="close-modal" type="button" id="close-lesson-modal" aria-label="Fechar prévia">×</button></header>

@@ -588,6 +588,7 @@ export function normalizeLessonPlan(raw = {}, input = {}, index = 0) {
     notes: splitLines(plan.notes),
     pedagogicalApproach: normalizeApproach(input.pedagogicalApproach),
     activeMethodology: normalizeActiveMethodology(plan.activeMethodology, input, index),
+    approvedPlan: text(input.approvedLessonPlan) || text(plan.approvedPlan),
     sourceUsed: Array.isArray(input.sourceExcerpts) && input.sourceExcerpts.length ? sourceUsedSummary(input.sourceExcerpts) : (Array.isArray(plan.sourceUsed) ? plan.sourceUsed : [])
   };
   normalized.alignmentMatrix = buildAlignmentMatrix(normalized);
@@ -640,6 +641,7 @@ export function normalizeCourseInput(raw = {}) {
     pedagogicalApproach: normalizeApproach(raw.pedagogicalApproach),
     methodologyPlan: normalizeMethodologyPlan(raw.methodologyPlan, weeks),
     sourceExcerpts: normalizeSourceExcerpts(raw.sourceExcerpts),
+    approvedLessonPlan: text(raw.approvedLessonPlan).slice(0, 10000),
     startDate: calendarMode === "calendar" && validDate(raw.startDate) ? raw.startDate : null,
     webPractices,
     webPractice: { enabled, moments: legacyMoments.length ? legacyMoments : splitLines(practice.moments || raw.practiceMoments), instructions: legacyInstructions || text(practice.instructions || raw.practiceInstructions), durationMinutes: webPractices.reduce((sum, item) => sum + item.durationMinutes, 0) },

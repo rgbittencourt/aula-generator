@@ -23,6 +23,7 @@ import derivativesHandler from "./derivatives-handler.js";
 import figureHandler from "./figure-handler.js";
 import illustrateHandler from "./illustrate-handler.js";
 import productionHandler from "./production-handler.js";
+import lessonPlanHandler from "./lesson-plan.js";
 import regenerateWeekHandler from "../api/regenerate-week.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -75,6 +76,7 @@ app.post("/api/illustrate", (req, res) => illustrateHandler(req, res));
 app.options("/api/figure", (req, res) => figureHandler(req, res));
 app.post("/api/figure", (req, res) => figureHandler(req, res));
 app.post("/api/production", (req, res) => productionHandler(req, res));
+app.post("/api/lesson-plan", (req, res) => lessonPlanHandler(req, res));
 
 app.post("/api/enrich-week", async (req, res) => {
   if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
