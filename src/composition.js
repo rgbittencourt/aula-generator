@@ -12,7 +12,7 @@ export const COMPOSITION_CATALOG = Object.freeze([
   { key: "atencao", type: "atencao", label: "Atenção / erro comum", group: "Destaques", unit: "bloco", defaultCount: 1, defaultPolicy: "prefer" },
   { key: "reflexao", type: "reflexao", label: "Reflexão", group: "Destaques", unit: "bloco", defaultCount: 1, defaultPolicy: "prefer" },
   { key: "citacao", type: "citacao", label: "Citação", group: "Texto", unit: "bloco", defaultCount: 0, defaultPolicy: "prefer" },
-  { key: "pitaco", type: "pitaco", label: "Comentário / pitaco", group: "Destaques", unit: "bloco", defaultCount: 0, defaultPolicy: "prefer" },
+  { key: "pitaco", type: "pitaco", label: "Dica do professor (pitaco)", group: "Destaques", unit: "bloco", defaultCount: 0, defaultPolicy: "prefer" },
   { key: "imagem", type: "imagem", label: "Imagem com legenda", group: "Mídia", unit: "bloco", defaultCount: 1, defaultPolicy: "prefer" },
   { key: "parallax", type: "parallax", label: "Imagem parallax", group: "Mídia", unit: "bloco", defaultCount: 0, defaultPolicy: "prefer" },
   { key: "textoimagem", type: "textoimagem", label: "Texto + imagem", group: "Mídia", unit: "bloco", defaultCount: 0, defaultPolicy: "prefer" },

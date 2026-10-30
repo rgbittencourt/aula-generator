@@ -7,7 +7,7 @@ import { measureLessonQuality } from "./content-quality.js";
 import { normalizeAcademicProfile } from "./academic.js";
 import { progressionForWeek } from "./curriculum.js";
 import { figureBlock, figuresOf } from "./figures.js";
-import { compositionPlanForWeek, materializeComposition, normalizeCompositionPlan } from "./composition.js";
+import { compositionPlanForWeek, materializeComposition, normalizeCompositionPlan, citationHasSource } from "./composition.js";
 import { referenceItemHtml, GENERATOR_TOOL, GENERATOR_CREDIT, GENERATOR_AI_USE } from "./student-export.js";
 
 export const DEFAULT_LICENSE = "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.pt-br";
@@ -371,8 +371,9 @@ function normalizeSection(value = {}, index = 0) {
     figures: Array.isArray(section.figures) ? section.figures.map((figure, figureIndex) => ({ id: text(figure?.id, `fig-${index + 1}-${figureIndex + 1}`), kind: ["foto", "napkin"].includes(text(figure?.kind)) ? text(figure?.kind) : "diagrama", description: text(figure?.description), prompt: text(figure?.prompt), napkinText: text(figure?.napkinText), caption: text(figure?.caption), sectionNumber: text(figure?.sectionNumber, section.number), src: text(figure?.src), aiGenerated: Boolean(figure?.src) })).filter((figure) => figure.description) : [],
     // Callouts escritos no ponto do texto (modo de prosa): destaque, atenção e reflexão.
     callouts: Array.isArray(section.callouts) ? section.callouts.map((callout) => ({
-      kind: ["destaque", "atencao", "reflexao"].includes(callout?.kind) ? callout.kind : "destaque",
-      title: text(callout?.title), body: text(callout?.body), anchor: text(callout?.anchor)
+      kind: ["destaque", "atencao", "reflexao", "pitaco", "citacao"].includes(callout?.kind) ? callout.kind : "destaque",
+      title: text(callout?.title), body: text(callout?.body), anchor: text(callout?.anchor),
+      ...(callout?.kind === "citacao" ? { quote: text(callout.quote || callout.body), author: text(callout.author), source: text(callout.source) } : {})
     })).filter((callout) => callout.body) : []
   };
 }
@@ -531,7 +532,9 @@ function proseCompositionRequest(request, plan, sections) {
   sections.forEach((section) => (section.callouts || []).forEach((callout) => { provided[callout.kind] = (provided[callout.kind] || 0) + 1; }));
   const rows = {};
   Object.entries(request.rows).forEach(([key, row]) => {
-    rows[key] = { ...row, count: row.policy === "required" ? Math.max(0, row.count - (provided[key] || 0)) : 0 };
+    // Citação e dica do professor só vêm do texto escrito pela IA (com fonte, no caso da citação):
+    // o app não preenche esses blocos com texto genérico.
+    rows[key] = { ...row, count: key === "citacao" || key === "pitaco" ? 0 : row.policy === "required" ? Math.max(0, row.count - (provided[key] || 0)) : 0 };
   });
   return { ...request, rows };
 }
@@ -885,6 +888,12 @@ function fallbackBlocks(input, index, plan = fallbackLessonPlan(input, index)) {
     const id = newId(`c-${callout.kind}-`, week, sectionIndex * 100 + position);
     if (callout.kind === "reflexao") return { id, type: "reflexao", props: { title: callout.title || "Para refletir", question: html(callout.body), body: "", tone: "lavender", icon: "" } };
     if (callout.kind === "atencao") return { id, type: "atencao", props: { title: callout.title || "Atenção", body: richHtml(callout.body), tone: "coral", icon: "" } };
+    // Dica do professor (pitaco): dica, lembrete, detalhe importante ou aviso, na voz de quem assina a aula.
+    if (callout.kind === "pitaco") return { id, type: "pitaco", props: { kicker: callout.title || "Dica", name: text(input.author) || "Professor(a)", role: text(callout.title) ? `${text(callout.title)} do professor` : "Dica do professor", tone: "coral", src: "", slotId: id, body: richHtml(callout.body) } };
+    // Citação direta só com fonte completa (o parser já tirou as que não têm).
+    if (callout.kind === "citacao") return citationHasSource(callout.author, callout.source)
+      ? { id, type: "citacao", props: { quote: html(callout.quote || callout.body), author: html(callout.author), source: html(callout.source), showAttribution: true } }
+      : { id, type: "destaque", props: { title: "Em uma frase", body: richHtml(callout.body), tone: "sage", icon: "" } };
     return { id, type: "destaque", props: { title: callout.title || "Em uma frase", body: richHtml(callout.body), tone: "sage", icon: "" } };
   };
   plan.contentSections.forEach((section, sectionIndex) => {

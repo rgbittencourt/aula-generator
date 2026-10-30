@@ -769,7 +769,7 @@ function renderResourcePlanWeeks(plan = {}) {
 }
 
 const compositionCatalog = [
-  ["destaque", "Destaque conceitual", "Destaques", 1, 1], ["atencao", "Atenção / erro comum", "Destaques", 1, 1], ["reflexao", "Reflexão", "Destaques", 1, 1], ["citacao", "Citação", "Texto", 0, 1], ["pitaco", "Comentário / pitaco", "Destaques", 0, 1],
+  ["destaque", "Destaque conceitual", "Destaques", 1, 1], ["atencao", "Atenção / erro comum", "Destaques", 1, 1], ["reflexao", "Reflexão", "Destaques", 1, 1], ["citacao", "Citação", "Texto", 0, 1], ["pitaco", "Dica do professor (pitaco)", "Destaques", 0, 1],
   ["imagem", "Imagem com legenda", "Mídia", 1, 1], ["parallax", "Imagem parallax", "Mídia", 0, 1], ["textoimagem", "Texto + imagem", "Mídia", 0, 1], ["cases", "Cards de casos", "Mídia", 0, 3], ["feature", "Destaques com ícones", "Mídia", 0, 3], ["tabela", "Tabela comparativa", "Mídia", 0, 3], ["filmstrip", "Filmstrip / carrossel", "Mídia", 0, 3], ["audio", "Áudio / podcast", "Mídia", 0, 1],
   ["accordion", "Acordeão / FAQ", "Interativos", 1, 3], ["flashcards", "Flashcards", "Interativos", 0, 6], ["slider", "Slider / passo a passo", "Interativos", 0, 3], ["linhadotempo", "Linha do tempo", "Interativos", 0, 4], ["columns", "Colunas comparativas", "Interativos", 0, 2], ["quiz", "Quiz formativo", "Interativos", 1, 5], ["externalembed", "Conteúdo externo", "Mídia", 0, 1]
 ];
@@ -3364,13 +3364,16 @@ function localizeUnitNode(node, unit) {
   node.childNodes.forEach((child) => localizeUnitNode(child, unit));
 }
 let unitObserver = null;
+let unitApplied = null;
 function applyUnitToUi() {
   const unit = courseUnit();
+  unitApplied = unit;
   localizeUnitNode(document.body, unit);
   if (!unitObserver) {
     unitObserver = new MutationObserver((mutations) => {
       const current = courseUnit();
-      if (current !== "aula" && !mutations.length) return;
+      // O seletor mudou sem aviso (restauração do navegador, rascunho): refaz a tela inteira.
+      if (current !== unitApplied) { applyUnitToUi(); return; }
       mutations.forEach((mutation) => {
         if (mutation.type === "characterData") localizeUnitNode(mutation.target, current);
         else if (mutation.type === "attributes") localizeUnitNode(mutation.target, current);
@@ -3381,6 +3384,7 @@ function applyUnitToUi() {
   }
 }
 $("#course-unit")?.addEventListener("change", () => { applyUnitToUi(); scheduleSave(); });
+$("#course-unit")?.addEventListener("input", () => applyUnitToUi());
 // O navegador pode restaurar o valor do seletor ao recarregar a página, sem avisar: reaplica.
 window.addEventListener("pageshow", () => applyUnitToUi());
 window.addEventListener("load", () => setTimeout(applyUnitToUi, 0));
@@ -3447,6 +3451,9 @@ async function ensureLessonPlan(input, index, headers, button) {
   if (!approved) return false;
   state.lessonPlans[index] = approved;
   saveDraft("plano-aprovado");
+  // A janela do plano escondeu o painel de progresso: ele volta, para mostrar que a geração seguiu.
+  setButtonLabel(button, `Gerando semana ${index + 1}/${input.weeks}…`);
+  setAiActivity("Gerando material com IA", `Plano aprovado. Escrevendo a semana ${index + 1} de ${input.weeks} seguindo o plano (costuma levar alguns minutos)…`, { progress: Math.round(((index + 0.2) / (input.weeks + 1)) * 100) });
   return true;
 }
 

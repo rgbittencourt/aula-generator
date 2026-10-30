@@ -80,6 +80,8 @@ CALLOUTS (uma linha de citação iniciada por ">", logo depois do parágrafo a q
 - Pergunta para o estudante pensar: > 💭 **Para refletir (não vale nota)**: pergunta aberta, ligada ao dia a dia dele.
 - Ideia-chave que merece destaque: > 💡 **Em uma frase**: a ideia, em uma frase.
 - Cuidado ou erro comum: > ⚠️ **Atenção**: o erro e por que ele acontece.
+- Dica do professor (pitaco): > 📌 **Dica**: (ou **Lembrete**, **Importante**, **Aviso**) de 1 a 3 frases curtas, práticas, na voz do professor: um atalho, um detalhe que costuma passar despercebido, um lembrete de procedimento ou de prazo, um aviso sobre um erro prático. Não é resumo da seção nem opinião genérica.
+- Citação direta em destaque: > 📜 **Citação**: "trecho exato, palavra por palavra, entre aspas" — SOBRENOME, Nome. Título da obra. Ano, p. N. Use SOMENTE quando conhecer a frase exata e a fonte com segurança, ou quando ela estiver, literalmente, nos trechos do material do professor (com a página). Sem autor, obra, ano e página, não use: escreva com suas palavras e cite a fonte no texto. A obra também entra nas referências.
 - Estudo de caso: use "### Caso: título" e conte o caso em prosa, com contexto, dados e uma pergunta final em um callout 💭.
 - Figura: três tipos, conforme o que ajuda mais o estudante. Use de 1 a 3 por semana, no total, só onde a imagem explica melhor que o texto. Não use barra vertical "|" nem aspas duplas dentro dos campos.
   · Diagrama (estrutura, fluxo, comparação, arquitetura, árvore; o desenho é criado depois por IA e precisa ser tecnicamente exato): > 🖼️ **Figura** [diagrama | descrição: "o que o desenho mostra, com os elementos e rótulos exatos: p. ex. árvore de álgebra relacional da consulta X, com π, σ e ⨝ e as relações nas folhas"]: legenda de uma frase.

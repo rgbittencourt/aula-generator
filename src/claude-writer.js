@@ -1,3 +1,4 @@
+import { compositionPlanForWeek } from "./composition.js";
 import { sourceMaterialBlock } from "./source-material.js";
 import { approvedPlanBlock } from "./lesson-plan.js";
 // Modo de escrita em prosa ("como o Claude escreve").
@@ -77,7 +78,14 @@ PEDIDO DO PROFESSOR PARA ESTA REVISÃO:
 "${String(instruction || "").trim()}"
 
 Como revisar: reescreva o documento inteiro já com o pedido incorporado. O que o professor não mencionou deve permanecer praticamente idêntico (mesmas frases, mesma ordem, mesmos casos e callouts), porque ele já leu e aprovou esses trechos. Não encolha o texto, não resuma e mantenha a voz. Se o pedido mudar um fato ou um caso, ajuste também o que dependia dele (síntese, glossário, referências, "Pontos a conferir").` : "";
-  const methodology = [approvedPlanBlock(input), writerMethodologyBlock(input, index), sourceMaterialBlock(input, "writer")].filter(Boolean).join("\n\n");
+  const composition = compositionPlanForWeek(input, index);
+  const askedTips = Number(composition?.rows?.pitaco?.count) || 0;
+  const askedQuotes = Number(composition?.rows?.citacao?.count) || 0;
+  const blocksAsk = [
+    askedTips ? `- O professor pediu ${askedTips} dica(s) do professor (📌) nesta semana, cada uma no ponto do texto em que ajuda.` : "",
+    askedQuotes ? `- O professor pediu até ${askedQuotes} citação(ões) direta(s) (📜), mas SÓ com frase exata e fonte completa (autor, obra, ano e página); se não houver uma citação real e segura, não invente: deixe sem.` : ""
+  ].filter(Boolean).join("\n");
+  const methodology = [blocksAsk ? `BLOCOS PEDIDOS PELO PROFESSOR\n${blocksAsk}` : "", approvedPlanBlock(input), writerMethodologyBlock(input, index), sourceMaterialBlock(input, "writer")].filter(Boolean).join("\n\n");
   return `Escreva a unidade da semana ${weekNumber} do curso "${input.title}". ${intro}
 
 PÚBLICO E NÍVEL: ${input.audience || "estudantes de pós-graduação"} (${input.level || "pós-graduação"}), em ${input.language || "português do Brasil"}.

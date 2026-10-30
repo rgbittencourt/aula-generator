@@ -208,3 +208,22 @@ test("unidade aula: nomes trocados, estrutura igual, calendário real protegido"
   const { parseWeekMarkdown } = await import("../src/writer-markdown.js");
   assert.match(parseWeekMarkdown("# Aula 3 — Junções e custo\n## Boas-vindas\nOi.\n## 1. Seção\nTexto.\n", { weekNumber: 3 }).lessonPlan.theme, /Junções e custo/);
 });
+
+test("citação só com fonte completa; dica do professor vira pitaco com voz do professor", async () => {
+  const { parseWeekMarkdown } = await import("../src/writer-markdown.js");
+  const { normalizeLesson } = await import("../src/aula-schema.js");
+  const md = `# Aula 1 — Teste\n## Boas-vindas\nOi.\n## 1. Seção\nTexto da seção.\n\n> 📜 **Citação**: "A educação é a arma mais poderosa que você pode usar para mudar o mundo." — MANDELA, Nelson. Discurso na Universidade de Witwatersrand. 2003, p. 1.\n\n> 📜 **Citação**: "Toda escola precisa de dados." — Alguém\n\n> 📌 **Lembrete**: salve o arquivo antes de rodar o EXPLAIN.\n## Síntese conceitual\nFim.\n`;
+  const { lessonPlan } = parseWeekMarkdown(md, { weekNumber: 1 });
+  const kinds = lessonPlan.contentSections[0].callouts.map((callout) => callout.kind);
+  assert.deepEqual(kinds, ["citacao", "pitaco"]);
+  assert.ok(lessonPlan.claimEvidence.some((claim) => /sem fonte completa/.test(claim.claim)));
+  const lesson = normalizeLesson({ lessonPlan }, baseInput({ author: "Prof. Rogério" }), 0);
+  const flat = JSON.stringify(lesson.blocks);
+  assert.match(flat, /"type":"citacao"/);
+  assert.match(flat, /MANDELA/);
+  assert.match(flat, /"type":"pitaco"/);
+  assert.match(flat, /Prof. Rogério/);
+  assert.doesNotMatch(flat, /Olhar profissional/);
+  const { writerSystemPrompt } = await import("../src/writer-voice.js");
+  assert.match(writerSystemPrompt("minimal"), /📜 \*\*Citação\*\*/);
+});

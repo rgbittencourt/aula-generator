@@ -1,3 +1,4 @@
+import { citationHasSource } from "./composition.js";
 // Converte o Markdown escrito pelo modo de prosa (writer-voice.js) em lessonPlan.
 //
 // Nada aqui chama IA. O analisador é tolerante: aceita variações de título,
@@ -124,9 +125,9 @@ function resourceKind(label) {
 
 function parseCallout(raw) {
   const source = text(raw);
-  const emoji = (source.match(/^\s*(🔎|💭|💡|⚠️|⚠|📌|🖼️|🖼)/u) || [])[1] || "";
+  const emoji = (source.match(/^\s*(🔎|💭|💡|⚠️|⚠|📌|📜|🖼️|🖼)/u) || [])[1] || "";
   if (!emoji) return null;
-  const rest = source.replace(/^\s*(🔎|💭|💡|⚠️|⚠|📌|🖼️|🖼)\s*/u, "");
+  const rest = source.replace(/^\s*(🔎|💭|💡|⚠️|⚠|📌|📜|🖼️|🖼)\s*/u, "");
   if (emoji === "🖼️" || emoji === "🖼") {
     const match = rest.match(/^(?:\*\*[^*]*\*\*|[^\[:]*)\s*\[([^\]]*)\]\s*:?\s*([\s\S]*)$/);
     const attrs = match ? match[1].split("|").map((part) => part.trim()) : [];
@@ -148,6 +149,17 @@ function parseCallout(raw) {
   const title = (rest.match(/^\*\*([^*]+)\*\*/) || [])[1] || "";
   const body = rest.replace(/^\*\*[^*]+\*\*\s*:?\s*/, "");
   if (emoji === "💭") return { type: "reflection", title: plain(title) || "Para refletir", body: plain(body) };
+  // 📌 Dica do professor: dica, lembrete, detalhe importante ou aviso curto.
+  if (emoji === "📌") return { type: "tip", title: plain(title) || "Dica", body: plain(body) };
+  // 📜 Citação direta: "trecho exato" — AUTOR, Obra, ano, p. N.
+  if (emoji === "📜") {
+    const raw = plain(body);
+    const match = raw.match(/^[“"«]([\s\S]+?)[”"»]\s*[—–-]+\s*([\s\S]+)$/);
+    const quoteText = match ? match[1].trim() : raw.replace(/^[“"«]|[”"»]$/g, "").trim();
+    const attribution = match ? match[2].trim().replace(/\.$/, "") : "";
+    const [author, ...rest] = attribution.split(/\.\s+|,\s+(?=[A-ZÁÉÍÓÚ*])/);
+    return { type: "quote", quote: quoteText, attribution, author: (author || "").trim(), source: rest.join(". ").trim() || attribution };
+  }
   if (emoji === "💡") return { type: "highlight", title: plain(title) || "Em uma frase", body: plain(body) };
   return { type: "attention", title: plain(title) || "Atenção", body: plain(body) };
 }
@@ -288,7 +300,16 @@ export function parseWeekMarkdown(markdown, options = {}) {
           resources[bucket].push(entry);
           section.resources.push(entry);
         } else {
-          const kind = callout.type === "reflection" ? "reflexao" : callout.type === "highlight" ? "destaque" : "atencao";
+          if (callout.type === "quote") {
+            // Citação sem autor, obra e ano não vai para o aluno: vira um ponto a conferir.
+            if (!citationHasSource(callout.author, callout.attribution)) {
+              plan.claimEvidence.push({ id: `quote-${String(plan.claimEvidence.length + 1).padStart(2, "0")}`, claim: `Citação retirada da aula por estar sem fonte completa (autor, obra, ano e página): "${callout.quote.slice(0, 300)}"`, sectionNumber: anchor, sourceIds: [], sourceType: "", supportLevel: "insufficient", requiresVerification: true });
+              continue;
+            }
+            section.callouts.push({ kind: "citacao", title: "Citação", body: callout.quote, quote: callout.quote, author: callout.author, source: callout.attribution, anchor });
+            continue;
+          }
+          const kind = callout.type === "reflection" ? "reflexao" : callout.type === "highlight" ? "destaque" : callout.type === "tip" ? "pitaco" : "atencao";
           section.callouts.push({ kind, title: callout.title, body: callout.body, anchor });
         }
         continue;
@@ -378,8 +399,12 @@ function resourceCallout(resource) {
 
 const figureField = (name, value) => (plain(value) ? ` | ${name}: "${plain(value).replace(/"/g, "'").replace(/\|/g, "/")}"` : "");
 const figureCallout = (figure) => `> 🖼️ **Figura** [${figure.kind || "diagrama"} | descrição: "${plain(figure.description).replace(/"/g, "'")}"${figureField("prompt", figure.prompt)}${figureField("texto", figure.napkinText)}]: ${plain(figure.caption || "")}`;
-const CALLOUT_EMOJI = { reflexao: ["💭", "Para refletir (não vale nota)"], destaque: ["💡", "Em uma frase"], atencao: ["⚠️", "Atenção"] };
-const calloutLine = (callout) => { const [emoji, label] = CALLOUT_EMOJI[callout.kind] || CALLOUT_EMOJI.destaque; return `> ${emoji} **${callout.title || label}**: ${callout.body}`; };
+const CALLOUT_EMOJI = { reflexao: ["💭", "Para refletir (não vale nota)"], destaque: ["💡", "Em uma frase"], atencao: ["⚠️", "Atenção"], pitaco: ["📌", "Dica"] };
+const calloutLine = (callout) => {
+  if (callout.kind === "citacao") return `> 📜 **Citação**: "${plain(callout.quote || callout.body)}" — ${plain(callout.source || callout.author)}`;
+  const [emoji, label] = CALLOUT_EMOJI[callout.kind] || CALLOUT_EMOJI.destaque;
+  return `> ${emoji} **${callout.title || label}**: ${callout.body}`;
+};
 
 export function planToMarkdown(plan = {}) {
   const out = [];
