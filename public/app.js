@@ -3432,9 +3432,10 @@ function openPlanDialog(index, input, headers, initialText, methodLabel) {
     $("#plan-cancel-x").addEventListener("click", () => close(null));
     $("#plan-revise").addEventListener("click", async (event) => {
       const button = event.currentTarget;
-      if (!instruction.value.trim()) { status.textContent = "Escreva o que a IA deve mudar (ou edite o texto do plano diretamente e aprove)."; return; }
-      button.disabled = true; status.textContent = "Refazendo o plano com o seu pedido…";
-      try { textArea.value = await requestLessonPlan(input, index, headers, textArea.value, instruction.value.trim()); instruction.value = ""; status.textContent = "Plano refeito. Confira e aprove, ou peça outro ajuste."; }
+      // Sem pedido escrito: a IA reorganiza o plano incorporando as respostas e edições feitas no próprio texto.
+      const ask = instruction.value.trim() || "Incorpore ao plano as respostas que escrevi às perguntas e as edições que fiz no texto: ajuste os passos, as atividades e a avaliação de acordo com elas e retire as perguntas já respondidas.";
+      button.disabled = true; status.textContent = instruction.value.trim() ? "Refazendo o plano com o seu pedido…" : "Refazendo o plano com as suas respostas…";
+      try { textArea.value = await requestLessonPlan(input, index, headers, textArea.value, ask); instruction.value = ""; status.textContent = "Plano refeito. Confira e aprove, ou peça outro ajuste."; }
       catch (error) { status.textContent = `Não foi possível refazer: ${error.message}`; }
       finally { button.disabled = false; }
     });

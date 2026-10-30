@@ -209,12 +209,12 @@
       <div class="lesson-dialog plan-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-modal-title">
         <header class="lesson-dialog-header"><div><p class="eyebrow" id="plan-modal-eyebrow">PLANO DA AULA</p><h2 id="plan-modal-title">Como a aula vai aplicar a metodologia</h2></div><button class="close-modal" type="button" id="plan-cancel-x" aria-label="Fechar sem aprovar">×</button></header>
         <div class="plan-body">
-          <p class="plan-intro">Antes de escrever a aula, a IA mostra como pretende aplicar a metodologia. Leia, <strong>edite o texto à vontade</strong> (responda às perguntas no fim, se houver) ou peça um ajuste. Só depois de aprovar a aula é gerada, seguindo este plano.</p>
+          <p class="plan-intro">Antes de escrever a aula, a IA mostra como pretende aplicar a metodologia. Leia, <strong>edite o texto à vontade</strong> (responda às perguntas no fim, se houver) ou peça um ajuste. Respondeu às perguntas? Pode <strong>aprovar direto</strong> (as respostas valem como decisão) ou clicar em <strong>Refazer</strong> para ver o plano já reescrito com elas. A aula só é gerada depois de aprovar.</p>
           <label class="field"><span>Plano (editável)</span><textarea id="plan-text" rows="18" spellcheck="true"></textarea></label>
           <label class="field"><span>Pedir um ajuste à IA (opcional)</span><textarea id="plan-instruction" rows="2" placeholder="Ex.: o estudo prévio precisa ser de no máximo 40 minutos; troque o fórum por um quiz; inclua uma etapa de feedback entre pares."></textarea></label>
           <p class="plan-status" id="plan-status" aria-live="polite"></p>
           <div class="plan-actions">
-            <button type="button" class="button button-secondary" id="plan-revise">Refazer o plano com meu pedido</button>
+            <button type="button" class="button button-secondary" id="plan-revise">Refazer o plano com minhas respostas/pedido</button>
             <button type="button" class="button button-secondary" id="plan-cancel">Parar aqui</button>
             <button type="button" class="button button-primary" id="plan-approve">Aprovar e gerar a aula</button>
           </div>
