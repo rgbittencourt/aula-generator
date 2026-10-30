@@ -1,3 +1,4 @@
+import { normalizeUnit } from "./unit.js";
 import { normalizeSourceExcerpts, sourceUsedSummary } from "./source-material.js";
 import { normalizeApproach, normalizeMethodologyPlan, methodForWeek } from "./methodology.js";
 import { normalizeDidacticArc, buildAlignmentMatrix, buildProgression, pedagogicalReview } from "./pedagogy.js";
@@ -96,7 +97,7 @@ function defaultWeeklyObjectives(input = {}, index = 0) {
 
 function specificTheme(value, input, index) {
   const candidate = text(value);
-  if (candidate && !/^conteúdo da semana$|^seção \d+$|^sem título$/iu.test(candidate)) return candidate;
+  if (candidate && !/^conteúdo da (?:semana|aula)$|^seção \d+$|^sem título$/iu.test(candidate)) return candidate;
   return `${text(input.title, "Curso")} — Semana ${index + 1}`;
 }
 
@@ -114,7 +115,7 @@ export function slugify(value, fallback = "aula") {
 // Nome de arquivo de uma semana, no mesmo padrão que o ClassAtelier usa nos seus projetos:
 // Semana01-titulo-da-aula-ClassAtelier.json (título sem acento, no máximo 60 letras, sem palavra solta no fim).
 export function weekFileName(title, number, suffix) {
-  let slug = slugify(title, "aula").replace(/^semana-0*\d+-?/, "");
+  let slug = slugify(title, "aula").replace(/^(?:semana|aula)-0*\d+-?/, "");
   if (slug.length > 60) slug = slug.slice(0, 60).replace(/-[^-]*$/, "") || slug.slice(0, 60);
   slug = slug.replace(/(-(de|da|do|das|dos|em|na|no|nas|nos|e|a|o|as|os|para|com|por|que|um|uma))+$/, "").replace(/-$/, "") || "aula";
   return `Semana${String(number).padStart(2, "0")}-${slug}-${suffix}`;
@@ -639,6 +640,7 @@ export function normalizeCourseInput(raw = {}) {
     weeks, hoursPerWeek, calendarMode,
     didacticMode: text(raw.didacticMode, "auto"),
     pedagogicalApproach: normalizeApproach(raw.pedagogicalApproach),
+    unit: normalizeUnit(raw.unit),
     methodologyPlan: normalizeMethodologyPlan(raw.methodologyPlan, weeks),
     sourceExcerpts: normalizeSourceExcerpts(raw.sourceExcerpts),
     approvedLessonPlan: text(raw.approvedLessonPlan).slice(0, 10000),
@@ -676,7 +678,7 @@ export function practiceScheduledForWeek(practice = {}, input = {}, index = 0) {
   }
   if (directWeek) return true;
   const moments = splitLines(practice.moments || practice.moment);
-  if (moments.some((moment) => new RegExp(`(?:semana|week)\\s*${weekNumber}\\b`, "i").test(moment) || new RegExp(`\\b${weekNumber}\\s*(?:ª|a)?\\s*semana\\b`, "i").test(moment))) return true;
+  if (moments.some((moment) => new RegExp(`(?:semana|aula|week)\\s*${weekNumber}\\b`, "i").test(moment) || new RegExp(`\\b${weekNumber}\\s*(?:ª|a)?\\s*semana\\b`, "i").test(moment))) return true;
   if (moments.some((moment) => validDate(moment))) {
     const calendar = input.calendarMode === "calendar" && input.startDate ? weekCalendar(input, index) : null;
     return Boolean(calendar && moments.some((moment) => moment >= calendar.startDate && moment <= calendar.endDate));

@@ -190,3 +190,21 @@ test("plano da aula: prompt com a metodologia, texto editável e plano aprovado 
   assert.match(derivativesPrompt(approved, 0, { theme: "T", contentSections: [], learningObjectives: [] }, [], "activities"), /PLANO DA AULA APROVADO/);
   assert.doesNotMatch(buildWriterPrompt(baseInput(), 0), /PLANO DA AULA APROVADO/);
 });
+
+test("unidade aula: nomes trocados, estrutura igual, calendário real protegido", async () => {
+  const { localizeUnitText } = await import("../public/unit-text.js");
+  const { deepLocalize, withUnit, currentUnit } = await import("../src/unit.js");
+  assert.equal(localizeUnitText("Semanas planejadas · Gerar a semana 2 · Estudo semanal", "aula"), "Aulas planejadas · Gerar a aula 2 · Estudo por aula");
+  assert.equal(localizeUnitText("Dia da semana e fim de semana", "aula"), "Dia da semana e fim de semana");
+  assert.equal(localizeUnitText("Semana 2", "semana"), "Semana 2");
+  assert.deepEqual(deepLocalize({ weekNumber: 2, theme: "Semana 2", src: "https://x/semana.png" }, "aula"), { weekNumber: 2, theme: "Aula 2", src: "https://x/semana.png" });
+  let seen = null, sent = null;
+  const handler = withUnit(async (request, response) => { seen = { unit: currentUnit(), content: request.body.input.content }; return response.json({ title: "Semana 1 — Fundamentos" }); });
+  await handler({ body: { input: { unit: "aula", content: "Semana 1 – processamento" } } }, { json: (payload) => { sent = payload; return payload; }, setHeader() {} });
+  assert.deepEqual(seen, { unit: "aula", content: "Aula 1 – processamento" });
+  assert.equal(sent.title, "Aula 1 — Fundamentos");
+  assert.equal(baseInput({ unit: "aula" }).unit, "aula");
+  assert.equal(baseInput().unit, "semana");
+  const { parseWeekMarkdown } = await import("../src/writer-markdown.js");
+  assert.match(parseWeekMarkdown("# Aula 3 — Junções e custo\n## Boas-vindas\nOi.\n## 1. Seção\nTexto.\n", { weekNumber: 3 }).lessonPlan.theme, /Junções e custo/);
+});

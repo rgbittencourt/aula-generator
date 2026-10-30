@@ -1,3 +1,4 @@
+import { localizeUnit } from "./unit.js";
 const normalizeProvider = (value) => {
   const provider = String(value || "openai").trim().toLowerCase();
   return provider === "anthropic" || provider === "claude" ? "anthropic" : "openai";
@@ -135,7 +136,9 @@ export function anthropicThinkingConfig(model = getAIModel()) {
   return { thinking: null, effort };
 }
 
-function buildRequest(messages, options, maxTokens) {
+function buildRequest(rawMessages, options, maxTokens) {
+  // Curso organizado em "aulas": todo pedido à IA fala em aula (a estrutura é a mesma).
+  const messages = rawMessages.map((message) => (message && typeof message.content === "string" ? { ...message, content: localizeUnit(message.content) } : message));
   const provider = getAIProvider();
   if (provider !== "anthropic") {
     return {

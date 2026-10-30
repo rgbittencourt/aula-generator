@@ -24,6 +24,7 @@ import figureHandler from "./figure-handler.js";
 import illustrateHandler from "./illustrate-handler.js";
 import productionHandler from "./production-handler.js";
 import lessonPlanHandler from "./lesson-plan.js";
+import { withUnit } from "./unit.js";
 import regenerateWeekHandler from "../api/regenerate-week.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -33,6 +34,8 @@ const port = Number(process.env.PORT || 4310);
 const host = process.env.HOST || "127.0.0.1";
 
 app.use(express.json({ limit: "4mb" }));
+// Unidade do curso ("aula" ou "semana") vale para todas as rotas da API.
+app.use("/api", (req, res, next) => withUnit(() => next())(req, res));
 app.use(express.static(publicDir, { etag: true }));
 
 app.get("/api/health", (_req, res) => {

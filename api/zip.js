@@ -1,3 +1,4 @@
+import { withUnit } from "../src/unit.js";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "../src/calculations.js";
 import { createWeeksZip } from "../src/zip.js";
 import { normalizeCourseInput, normalizeWeeklyOutput, slugify, validateLesson } from "../src/aula-schema.js";
@@ -5,7 +6,7 @@ import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { validateCourse } from "../src/validation.js";
 import { scopeGeneralPlan, scopeMediationMaterial } from "../src/mediation-scope.js";
 
-export default async function handler(request, response) {
+async function handler(request, response) {
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
   try {
     const input = normalizeCourseInput(request.body?.input || {});
@@ -32,3 +33,5 @@ export default async function handler(request, response) {
     return response.status(400).json({ ok: false, error: error.message || "Não foi possível criar o ZIP." });
   }
 }
+
+export default withUnit(handler);

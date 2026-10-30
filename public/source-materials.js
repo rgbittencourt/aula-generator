@@ -104,7 +104,7 @@ export async function importSourceFile(file, materialId, onProgress) {
 export function parseWeekPages(value) {
   const map = {};
   String(value || "").split(/\n|;/).forEach((line) => {
-    const match = line.match(/^\s*(?:semana\s*)?(\d+)\s*[:=\-–]\s*(.+)$/i);
+    const match = line.match(/^\s*(?:semana\s*|aula\s*)?(\d+)\s*[:=\-–]\s*(.+)$/i);
     if (!match) return;
     const pages = new Set();
     match[2].split(",").forEach((part) => {

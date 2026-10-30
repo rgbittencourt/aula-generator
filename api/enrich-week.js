@@ -1,9 +1,10 @@
+import { withUnit } from "../src/unit.js";
 import { accessRequired, hasValidAccess } from "../src/access.js";
 import { normalizeCourseInput, normalizeLesson } from "../src/aula-schema.js";
 import { enrichLessonsWithResources } from "../src/research.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 
-export default async function handler(request, response) {
+async function handler(request, response) {
   response.setHeader("Cache-Control", "no-store");
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
   if (accessRequired() && !hasValidAccess(request)) return response.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
@@ -22,3 +23,5 @@ export default async function handler(request, response) {
     return response.status(status).json({ ok: false, error: error.message || "Não foi possível pesquisar os recursos desta semana.", code: error.code || "RESOURCE_ENRICHMENT_ERROR", retryable: Boolean(error.retryable), retryAfterMs: error.retryAfterMs || 0 });
   }
 }
+
+export default withUnit(handler);

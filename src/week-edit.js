@@ -126,7 +126,7 @@ async function proposeTitle(input, plan, instruction, ctx, ask) {
     { role: "system", content: SYSTEM },
     { role: "user", content: `Curso: ${text(input.title)}\n${titleContext(plan, ctx)}\nPedido do professor:\n${instruction}\n\nProponha SOMENTE o novo título da semana: específico (nomeia o problema, o conceito ou o caso da semana), sem "Semana N", até 90 caracteres.\nDevolva: {"title": "…"}` }
   ], { temperature: 0.6, maxTokens: 1500, retryMaxTokens: 1500, label: "edit:title", cacheSystem: true });
-  return text(result?.title).replace(/^semana\s*\d+\s*[—–:.-]\s*/i, "").slice(0, 120);
+  return text(result?.title).replace(/^(?:semana|aula)\s*\d+\s*[—–:.-]\s*/i, "").slice(0, 120);
 }
 
 async function proposeEdits(input, plan, instruction, ctx, ask) {
@@ -209,7 +209,7 @@ export async function editWeek(input, index, week, instruction, scope = "edit", 
       const section = plan.contentSections.find((candidate) => text(candidate.number) === text(item?.number));
       if (section && text(item.title)) { section.title = text(item.title); applied += 1; }
     });
-    title = text(result.title).replace(/^semana\s*\d+\s*[—–:.-]\s*/i, "").slice(0, 120);
+    title = text(result.title).replace(/^(?:semana|aula)\s*\d+\s*[—–:.-]\s*/i, "").slice(0, 120);
     const objectives = list(result.objectives).map((item) => text(item)).filter(Boolean);
     if (objectives.length >= 2) { plan.learningObjectives = objectives; applied += 1; }
     if (!applied && !title) {

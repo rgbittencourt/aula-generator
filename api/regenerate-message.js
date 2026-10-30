@@ -1,8 +1,9 @@
+import { withUnit } from "../src/unit.js";
 import { normalizeCourseInput } from "../src/aula-schema.js";
 import { regenerateMediationMessageWithAI } from "../src/ai.js";
 import { accessRequired, hasValidAccess } from "../src/access.js";
 
-export default async function handler(request, response) {
+async function handler(request, response) {
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
   if (accessRequired() && !hasValidAccess(request)) return response.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
@@ -29,3 +30,5 @@ export default async function handler(request, response) {
     return response.status(status).json({ ok: false, error: error.message || "Não foi possível refazer a mensagem.", code: error.code || "MESSAGE_REGENERATION_ERROR", retryable: Boolean(error.retryable), retryAfterMs: error.retryAfterMs || 0 });
   }
 }
+
+export default withUnit(handler);

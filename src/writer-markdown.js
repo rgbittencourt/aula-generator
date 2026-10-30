@@ -95,7 +95,7 @@ function classifyH2(title) {
   if (/^boas vindas/.test(key)) return "welcome";
   if (/^objetivos/.test(key)) return "objectives";
   if (/^sintese/.test(key)) return "synthesis";
-  if (/^o que vem|^proxima semana|^na proxima semana|^conexao com a proxima/.test(key)) return "next";
+  if (/^o que vem|^proxima (?:semana|aula)|^na proxima (?:semana|aula)|^conexao com a proxima/.test(key)) return "next";
   if (/^glossario/.test(key)) return "glossary";
   if (/^referencias/.test(key)) return "references";
   if (/^pontos a conferir|^notas de verificacao|^a conferir/.test(key)) return "notes";
@@ -222,7 +222,7 @@ export function parseWeekMarkdown(markdown, options = {}) {
 
   for (const token of tokens) {
     if (token.type === "h" && token.level === 1) {
-      const match = plain(token.text).match(/^semana\s*\d+\s*[—–:.-]\s*(.+)$/i);
+      const match = plain(token.text).match(/^(?:semana|aula)\s*\d+\s*[—–:.-]\s*(.+)$/i);
       plan.theme = match ? match[1].trim() : plain(token.text);
       continue;
     }

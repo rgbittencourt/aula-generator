@@ -1,3 +1,4 @@
+import { localizeUnit } from "./unit.js";
 import {
   AlignmentType,
   Document,
@@ -89,7 +90,8 @@ function practiceMethodology(practice = {}) {
   return label ? { label, rationale: text(source.rationale), howApplied: text(source.howApplied) } : null;
 }
 
-export function practicePackageMarkdown(input, practice, index = 0) {
+export function practicePackageMarkdown(input, practice, index = 0) { return localizeUnit(practicePackageMarkdownRaw(input, practice, index)); }
+function practicePackageMarkdownRaw(input, practice, index = 0) {
   const number = index + 1;
   const blocks = practiceBlocks(practice);
   const blockText = blocks.map((block) => `### ${block.number}. ${block.title}\n\n**Duração:** ${block.minutes || "a definir"} minutos\n\n${block.instructions || "Desenvolver este bloco com a turma."}\n\n**Ação do professor:** ${block.teacherAction || "Medie a execução e faça perguntas de acompanhamento."}\n\n**Ação do estudante:** ${block.studentAction || "Execute a etapa e registre a evidência."}\n\n**Evidência:** ${block.evidence || "A definir."}`).join("\n\n");
@@ -97,6 +99,7 @@ export function practicePackageMarkdown(input, practice, index = 0) {
 }
 
 function paragraph(value, options = {}) {
+  value = localizeUnit(String(value ?? ""));
   const content = text(value);
   if (!content) return new Paragraph({ spacing: { after: 100 } });
   return new Paragraph({

@@ -1,3 +1,4 @@
+import { withUnit } from "../src/unit.js";
 import { accessRequired, hasValidAccess } from "../src/access.js";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "../src/calculations.js";
 import { normalizeCourseInput, normalizeLesson, normalizeWeeklyOutput } from "../src/aula-schema.js";
@@ -14,7 +15,7 @@ import productionHandler from "../src/production-handler.js";
 import weekEditHandler from "../src/week-edit-handler.js";
 import lessonPlanHandler from "../src/lesson-plan.js";
 
-export default async function handler(request, response) {
+async function handler(request, response) {
   // /api/bridge e /api/derivatives são encaminhados para esta função (limite de 12 funções do plano Hobby).
   if (["summary", "adjust"].includes(request.body?.action)) return bridgeHandler(request, response);
   if (request.body?.action === "derivatives") return derivativesHandler(request, response);
@@ -67,3 +68,5 @@ export default async function handler(request, response) {
     return response.status(status).json({ ok: false, error: error.message || "Não foi possível refazer a semana.", code: error.code || "REGENERATION_ERROR", retryable: Boolean(error.retryable), retryAfterMs: error.retryAfterMs || 0 });
   }
 }
+
+export default withUnit(handler);

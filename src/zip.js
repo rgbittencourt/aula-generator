@@ -1,3 +1,4 @@
+import { localizeUnit } from "./unit.js";
 import JSZip from "jszip";
 import { weekFileName } from "./aula-schema.js";
 import { createWebPracticeDocxFiles, createWebPracticeFiles } from "./webpractice.js";
@@ -9,7 +10,10 @@ import { createProductionWorkbook, hasProduction, productionMarkdown } from "./p
 
 export async function createWeeksZip(input, weeks, generalPlan = null, teacherGuides = [], options = {}) {
   const zip = new JSZip();
-  const folder = zip.folder("classatelier");
+  // Unidade "aula": nomes e textos dos arquivos dizem "aula" (a estrutura não muda).
+  const localizeEntry = (target) => { const file = target.file.bind(target); target.file = (name, data, options) => (data === undefined ? file(name) : file(localizeUnit(name), typeof data === "string" ? localizeUnit(data) : data, options)); return target; };
+  localizeEntry(zip);
+  const folder = localizeEntry(zip.folder("classatelier"));
   const allGuides = options.mediationGuides || teacherGuides;
   for (const [index, lesson] of weeks.entries()) {
     const number = String(index + 1).padStart(2, "0");

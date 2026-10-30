@@ -1,3 +1,4 @@
+import { localizeUnit } from "./unit.js";
 // Material de Mediação (PDF do professor).
 //
 // Pensado como um guia de acompanhamento que CRESCE a cada semana gerada: o mesmo arquivo é
@@ -24,7 +25,7 @@ const REPLACEMENTS = [
 const ENCODABLE = /[\n -~¡-ÿ‘“”…€™ŒœŠšŽžŸ]/u;
 
 function clean(value) {
-  let text = String(value ?? "");
+  let text = localizeUnit(String(value ?? ""));
   for (const [pattern, replacement] of REPLACEMENTS) text = text.replace(pattern, replacement);
   // Emojis e símbolos que a fonte do PDF não tem seriam um erro de geração; saem do texto.
   return Array.from(text).filter((char) => ENCODABLE.test(char)).join("").replace(/[ ]{2,}/g, " ").trim();

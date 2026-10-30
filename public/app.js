@@ -3,6 +3,7 @@ import { parseSavedWeek, planPlacement } from "./week-import.js";
 import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
 import { createProductionWorkbook, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
 import { SOURCE_USAGES, deleteSourceDoc, importSourceFile, sourceExcerptsForWeek } from "./source-materials.js";
+import { deepLocalizeUnit, localizeUnitText } from "./unit-text.js";
 import { applyAdjustment, applyRewrite, approveWeek, bridgesBefore, canGenerateNext, dismissIssue, emptyFlow, normalizeFlow, recordGenerated, weekFlowStatus } from "./step-flow.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -242,7 +243,17 @@ function paragraphsMarkup(value) {
   return source.split(/\n\s*\n|\r?\n/).map((part) => readableText(part)).filter(Boolean).map((part) => `<p>${escapeHtml(part)}</p>`).join("");
 }
 function slugify(value) { return String(value || "curso").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "curso"; }
-function downloadBlob(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
+// Unidade "aula": arquivos de texto baixados (JSON, XML, Markdown) e nomes de arquivo dizem "aula".
+function courseUnit() { return $("#course-unit")?.value === "aula" ? "aula" : "semana"; }
+async function downloadBlob(blob, filename) {
+  const unit = courseUnit();
+  if (unit === "aula") {
+    filename = localizeUnitText(filename, unit);
+    if (/^(text\/|application\/(json|xml))/i.test(blob.type || "") || /\.(json|xml|md|txt|html)$/i.test(filename)) blob = new Blob([localizeUnitText(await blob.text(), unit)], { type: blob.type });
+  }
+  return downloadBlobRaw(blob, filename);
+}
+function downloadBlobRaw(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
 function addDays(dateString, days) { const date = new Date(`${dateString}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); }
 
 function formatSavedAt(value) {
@@ -605,6 +616,7 @@ function applyInputToForm(input = {}) {
   if ($("#resource-default-level")) $("#resource-default-level").value = resourceDefaults.requiredReadingLevel || "essential";
   renderResourcePlanWeeks(resourcePlan);
   if ($("#pedagogical-approach")) $("#pedagogical-approach").value = input.pedagogicalApproach === "atual" ? "atual" : "nova";
+  if ($("#course-unit")) { $("#course-unit").value = input.unit === "aula" ? "aula" : "semana"; applyUnitToUi(); }
   if ($("#methodology-default")) $("#methodology-default").value = methodologyOptionExists(input.methodologyPlan?.default) ? input.methodologyPlan.default : "nenhuma";
   renderMethodologyWeeks(input.methodologyPlan || {});
   updateMethodologyHints();
@@ -1095,6 +1107,7 @@ function formInput() {
     content: $("#content").value,
     didacticMode: $("#didactic-mode").value,
     pedagogicalApproach: $("#pedagogical-approach")?.value || "nova",
+    unit: $("#course-unit")?.value || "semana",
     methodologyPlan: collectMethodologyPlan(),
     academicProfile: {
       discipline: $("#course-title").value.trim(),
@@ -3136,7 +3149,7 @@ async function downloadProductionSheet() {
   try {
     if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
     const title = state.input?.title || formInput().title;
-    const blob = await createProductionWorkbook(window.JSZip, state.production, { title }, "blob");
+    const blob = await createProductionWorkbook(window.JSZip, deepLocalizeUnit(state.production, courseUnit()), { title }, "blob");
     downloadBlob(blob, `${slugify(title)}-planilha-de-producao.xlsx`);
   } catch (error) { showError(error.message); }
 }
@@ -3318,6 +3331,55 @@ $("#materials-list")?.addEventListener("click", async (event) => {
   scheduleSave();
 });
 
+// ---- Unidade do curso na tela: "Semana" ou "Aula" (só os nomes mudam) ----
+const unitOriginals = new WeakMap();
+const UNIT_ATTRS = ["placeholder", "title", "aria-label"];
+function unitSkip(node) {
+  const element = node.nodeType === 1 ? node : node.parentElement;
+  return !element || Boolean(element.closest("script,style,textarea,[data-no-unit],[contenteditable='true']"));
+}
+function localizeUnitNode(node, unit) {
+  if (node.nodeType === 3) {
+    if (unitSkip(node)) return;
+    const record = unitOriginals.get(node);
+    const original = record && node.nodeValue === record.set ? record.original : node.nodeValue;
+    const next = localizeUnitText(original, unit);
+    if (next !== original) { unitOriginals.set(node, { original, set: next }); if (node.nodeValue !== next) node.nodeValue = next; }
+    else if (record) { unitOriginals.delete(node); if (node.nodeValue !== original) node.nodeValue = original; }
+    return;
+  }
+  if (node.nodeType !== 1 || unitSkip(node)) return;
+  const saved = unitOriginals.get(node) || {};
+  UNIT_ATTRS.forEach((name) => {
+    if (!node.hasAttribute(name)) return;
+    const current = node.getAttribute(name);
+    const original = saved[name] && current === saved[name].set ? saved[name].original : current;
+    const next = localizeUnitText(original, unit);
+    if (next !== original) { saved[name] = { original, set: next }; if (current !== next) node.setAttribute(name, next); }
+    else if (saved[name]) { delete saved[name]; if (current !== original) node.setAttribute(name, original); }
+  });
+  unitOriginals.set(node, saved);
+  node.childNodes.forEach((child) => localizeUnitNode(child, unit));
+}
+let unitObserver = null;
+function applyUnitToUi() {
+  const unit = courseUnit();
+  localizeUnitNode(document.body, unit);
+  if (!unitObserver) {
+    unitObserver = new MutationObserver((mutations) => {
+      const current = courseUnit();
+      if (current !== "aula" && !mutations.length) return;
+      mutations.forEach((mutation) => {
+        if (mutation.type === "characterData") localizeUnitNode(mutation.target, current);
+        else if (mutation.type === "attributes") localizeUnitNode(mutation.target, current);
+        else mutation.addedNodes.forEach((node) => localizeUnitNode(node, current));
+      });
+    });
+    unitObserver.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: UNIT_ATTRS });
+  }
+}
+$("#course-unit")?.addEventListener("change", () => { applyUnitToUi(); scheduleSave(); });
+
 // Acrescenta ao pedido o plano aprovado da aula e os trechos dos materiais anexados que combinam com ela.
 async function withSources(input, index, week = null) {
   const plan = state.lessonPlans?.[index] || "";
@@ -3403,5 +3465,5 @@ $("#assist-button").dataset.label = "Preencher vazios com IA";
 $("#recalculate-button").dataset.label = "Recalcular qualidade";
 initializeWelcome();
 enhanceLayout();
-renderResourcePlanWeeks(); renderMethodologyWeeks(); updateMethodologyHints(); updateBloomMeter(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
+renderResourcePlanWeeks(); renderMethodologyWeeks(); updateMethodologyHints(); updateBloomMeter(); applyUnitToUi(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
 
