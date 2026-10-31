@@ -609,7 +609,7 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .studio-edit-actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
 .studio-edit .link-button{padding:0;border:0;background:none;color:var(--navy);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer}
 
-/* Abordagem pedagógica e metodologias ativas (cópia de teste) */
+/* Abordagem pedagógica e metodologias ativas */
 .methodology-box{margin:18px 0;padding:16px;border:1px solid #d3b56e;border-radius:12px;background:#fffaf0}
 .methodology-box .profile-heading{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
 .methodology-box .profile-heading small{color:#6b5a2e}
@@ -670,3 +670,4 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .project-folder-bar{border-color:#d7d3ea;background:#f4f2fb;color:#3f3a66}.project-folder-bar .recovery-icon{background:#5b528f}.project-folder-bar.is-connected{border-color:#bfe4df;background:#edf8f6;color:#275d58}.project-folder-bar.is-connected .recovery-icon{background:var(--teal)}.project-folder-bar small{line-height:1.45}
 /* Figuras e imagens do texto, na composição */
 .composition-figures{border:1px solid #d7d3ea;border-radius:12px;overflow:hidden;background:#f8f7fd}.composition-figures>.composition-week-heading{padding:12px 14px 4px;flex-direction:column;align-items:flex-start;gap:4px}.composition-figure-row{grid-template-columns:minmax(220px,1.7fr) 110px;border-top:1px solid #e6e3f2}
+.reader-suggested-image label{display:block;margin:10px 0 4px;font-size:12px;font-weight:700;color:#5e4721}.reader-suggested-image textarea{width:100%;border:1px solid #e3d3a8;border-radius:8px;padding:8px 10px;font:13px/1.45 inherit;background:#fff;color:#252b38;resize:vertical}.reader-suggested-image .copy-suggestion{margin-top:6px;height:32px;padding:0 12px;border:1px solid #d9bf7c;border-radius:8px;background:#fff7e5;color:#76530d;font-weight:700;font-size:12px;cursor:pointer}.reader-suggested-image .copy-suggestion:hover{background:#ffefc7}.reader-suggested-image small{display:block;margin-top:8px}

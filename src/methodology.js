@@ -10,7 +10,7 @@ const text = (value) => String(value ?? "").trim();
 const object = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 
 export const PEDAGOGICAL_APPROACHES = Object.freeze([
-  { id: "atual", label: "Atual (como na versão principal)" },
+  { id: "atual", label: "Atual (como até a versão 1.2.1)" },
   { id: "nova", label: "Nova: planejamento reverso, Bloom e multimídia" }
 ]);
 

@@ -75,7 +75,8 @@ export async function chooseProjectFolder(courseTitle = "", unitLabel = "aulas")
   let reused = false;
   try { await picked.getFileHandle(MARKER); reused = true; } catch { reused = false; }
   if (!reused) {
-    const date = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     projectDir = await picked.getDirectoryHandle(`${slug(courseTitle)}-${date}`, { create: true });
   }
   for (const [name] of SUBFOLDERS) await projectDir.getDirectoryHandle(name, { create: true });

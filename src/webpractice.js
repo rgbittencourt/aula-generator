@@ -83,7 +83,7 @@ function scheduleLabel(practice) {
   return parts.join(" · ") || list(practice.moments).join(", ") || "A definir";
 }
 
-// Metodologia ativa declarada pela IA para a sessão (abordagem/metodologia da cópia de teste).
+// Metodologia ativa declarada pela IA para a sessão (abordagem e metodologia ativa).
 function practiceMethodology(practice = {}) {
   const source = practice?.activeMethodology && typeof practice.activeMethodology === "object" ? practice.activeMethodology : {};
   const label = text(source.label);

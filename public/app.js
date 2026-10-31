@@ -742,10 +742,10 @@ function collectResourcePlan() {
   };
 }
 
-// ---- Abordagem pedagógica e metodologias ativas (cópia de teste) ----
+// ---- Abordagem pedagógica e metodologias ativas ----
 const APPROACH_HINTS = {
   nova: "Planeja de trás para frente (o que o estudante vai produzir vem antes do texto), pede objetivos com verbos observáveis, confere o alinhamento com as atividades e a avaliação e aplica princípios de multimídia no texto, nos slides e nos vídeos.",
-  atual: "Gera exatamente como a versão principal do ClassAuthor. Use para comparar."
+  atual: "Gera como até a versão 1.2.1, sem as regras da abordagem nova."
 };
 
 function methodologyOptions() {
@@ -1597,7 +1597,7 @@ function resourcePreview(resource) {
 
 function compositionPreview(entry = {}) {
   const type = String(entry.type || entry.kind || "bloco").toLowerCase();
-  const labels = { destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", citacao: "Citação", imagem: "Imagem", accordion: "Acordeão", flashcards: "Flashcards", quiz: "Quiz formativo", cases: "Casos", feature: "Pontos-chave", tabela: "Tabela comparativa", slider: "Passo a passo", linhadotempo: "Linha do tempo", columns: "Colunas", externalembed: "Conteúdo externo", pitaco: "Comentário (pitaco)", audio: "Áudio / podcast", parallax: "Imagem parallax", textoimagem: "Texto + imagem", filmstrip: "Carrossel" };
+  const labels = { destaque: "Destaque", atencao: "Atenção", reflexao: "Reflexão", citacao: "Citação", imagem: "Imagem", accordion: "Acordeão", flashcards: "Flashcards", quiz: "Quiz formativo", cases: "Casos", feature: "Pontos-chave", tabela: "Tabela comparativa", slider: "Passo a passo", linhadotempo: "Linha do tempo", columns: "Colunas", externalembed: "Conteúdo externo", pitaco: "Dica do professor", audio: "Áudio / podcast", parallax: "Imagem parallax", textoimagem: "Texto + imagem", filmstrip: "Carrossel" };
   const title = entry.title || entry.label || labels[type] || "Bloco do ClassAtelier";
   const body = entry.body || entry.question || entry.intro || entry.description || entry.quote || "";
   const collection = entry.items || entry.cards || entry.steps || entry.questions || entry.features || entry.eras || entry.columns || entry.rows;
@@ -1855,7 +1855,7 @@ function methodologyPreviewMarkup(plan, guide, index, lesson) {
   const mg = guide?.methodologyGuide;
   const head = `<h3>Metodologia ativa: ${escapeHtml(label.replace(/^Metodologia: /, ""))}</h3>${declared.rationale ? `<p><strong>Por que esta metodologia:</strong> ${escapeHtml(declared.rationale)}</p>` : ""}${declared.howApplied ? `<p><strong>Como as atividades a aplicam:</strong> ${escapeHtml(declared.howApplied)}</p>` : ""}${declared.modalityNote ? `<p><small>${escapeHtml(declared.modalityNote)}</small></p>` : ""}`;
   if (!mg) return `<section class="reader-methodology">${head}<div class="reader-warning"><p>O <strong>guia de aplicação</strong> (passo a passo, como acompanhar e como avaliar se está funcionando) ainda não foi gerado para esta semana. Ele também entra no Material de Mediação (PDF).</p><button type="button" class="secondary" id="methodology-guide-button">Gerar o guia de aplicação da metodologia</button></div></section>`;
-  const phases = (mg.phases || []).map((phase, position) => `<li><strong>${position + 1}. ${escapeHtml(phase.name || "Etapa")}</strong>${phase.when ? ` <em>(${escapeHtml(phase.when)})</em>` : ""}${phase.goal ? `<br>${escapeHtml(phase.goal)}` : ""}${(phase.teacherActions || []).length ? `<br><small><strong>Professor:</strong> ${escapeHtml(phase.teacherActions.join(" · "))}</small>` : ""}${(phase.studentActions || []).length ? `<br><small><strong>Estudante:</strong> ${escapeHtml(phase.studentActions.join(" · "))}</small>` : ""}</li>`).join("");
+  const phases = (mg.phases || []).map((phase, position) => `<li><strong>${escapeHtml(phase.name || "Etapa")}</strong>${phase.when ? ` <em>(${escapeHtml(phase.when)})</em>` : ""}${phase.goal ? `<br>${escapeHtml(phase.goal)}` : ""}${(phase.teacherActions || []).length ? `<br><small><strong>Professor:</strong> ${escapeHtml(phase.teacherActions.join(" · "))}</small>` : ""}${(phase.studentActions || []).length ? `<br><small><strong>Estudante:</strong> ${escapeHtml(phase.studentActions.join(" · "))}</small>` : ""}</li>`).join("");
   const monitoring = (mg.monitoring || []).map((item) => `<li><strong>${escapeHtml(item.indicator || "")}</strong>${item.howToCheck ? ` — ${escapeHtml(item.howToCheck)}` : ""}${item.when ? ` <em>(${escapeHtml(item.when)})</em>` : ""}${item.ifLow ? `<br><small>Se estiver baixo: ${escapeHtml(item.ifLow)}</small>` : ""}</li>`).join("");
   const warnings = (mg.warningSignals || []).map((item) => `<li><strong>${escapeHtml(item.signal || "")}</strong>${item.action ? ` → ${escapeHtml(item.action)}` : ""}</li>`).join("");
   const assess = mg.assessment || {};
