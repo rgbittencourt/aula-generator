@@ -8,13 +8,30 @@ Segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) (MAIOR.MENOR.
 
 A versão aparece no rodapé do aplicativo, em `GET /api/health` (campo `version`), em `package.json` e em `src/version.js`. O teste `tests/version.test.mjs` garante que os quatro lugares dizem o mesmo número.
 
-## 1.3.0 · em teste (ramo `metodologia`) · abordagem pedagógica e metodologias ativas
+## 1.3.0 · 30/10/2026 · metodologia, plano da aula e pasta do projeto
 
-- Novo bloco no briefing (seção 05): **Abordagem pedagógica** (atual ou nova) e **Metodologia ativa**, com padrão do curso e escolha por semana.
-- Abordagem nova: planejamento reverso, objetivos com verbos observáveis (Bloom revisada), alinhamento construtivo nas atividades e na avaliação, e princípios de aprendizagem multimídia no texto, nos slides e nos vídeos.
-- Metodologias ativas: sala de aula invertida, estudo de caso, ABP/PBL, projetos, instrução por pares, gamificação, júri simulado/debate, rotação por estações e design thinking, ou "a IA escolhe e justifica". A metodologia molda o texto, as atividades e a mediação, e aparece no cartão e na prévia da semana.
-- Novas conferências: verbos dos objetivos, nível dos objetivos e aplicação da metodologia.
-- Compatível com os backups da 1.2.1 nos dois sentidos; sem os campos novos, a geração é idêntica à 1.2.1.
+Aprovada na cópia de teste (ramo `metodologia`). Compatível com os backups e rascunhos da 1.2.1: planejamentos antigos continuam em "Semana" e, sem metodologia escolhida, a geração segue como antes.
+
+### Novo
+- **Abordagem pedagógica** (atual ou nova: planejamento reverso, Bloom revisada, alinhamento construtivo, princípios de Mayer) e **metodologia ativa** por aula: sala de aula invertida, estudo de caso, ABP/PBL, projetos, instrução por pares, gamificação, júri simulado/debate, rotação por estações, design thinking ou "a IA escolhe e justifica". Também por prática.
+- **Plano da aula antes de gerar**: a IA mostra como pensa montar a aula com a metodologia; o professor responde, pede "Refazer o plano" ou aprova e gera.
+- **Como aplicar a metodologia**: guia na prévia e no Material de Mediação (antes da aula, fases, o que o professor e o estudante fazem, como acompanhar, sinais de sucesso e de alerta, avaliação, armadilhas e adaptações).
+- **Medidor de Bloom** dos objetivos e regras de Bloom em "Preencher vazios com IA".
+- **Voz humana**: regras de escrita e conferência de clichês de IA.
+- **Figuras de três tipos**: diagrama (desenhado pela IA), foto (pedido pronto para gerar fora) e Napkin (texto para colar no napkin.ai). Na aba 4, a quantidade de cada tipo por aula (vazio = a IA decide). Diagrama que não sair traz pedido pronto para o ChatGPT e texto para o Napkin; botão "Criar figuras pendentes".
+- **Apostila ou livro como fonte** (PDF ou DOCX) nos Materiais de apoio, com uso (base, complementar, exercícios) e páginas por aula; materiais de apoio passam a dizer de onde vêm (autor, obra, onde encontrar).
+- **Práticas/Laboratório** (antes "Webpráticas síncronas"), com modalidade: webprática síncrona, laboratório prático ou aula síncrona.
+- **Organizar o curso por Aula ou Semana** (só os nomes mudam, nos rótulos, nos arquivos e nos documentos).
+- **Pasta do projeto** (Chrome e Edge no computador): tudo o que o ClassAuthor salva vai para uma pasta do curso, com as subpastas backup, classatelier, classauthor, moodle, professor, praticas, producao, pacotes, fontes e textos. O rascunho é gravado em backup/rascunho-atual.json a cada alteração; "Abrir pasta de projeto" retoma o planejamento em outro navegador ou computador.
+
+### Mudou
+- Aba **Produção audiovisual** depois de "Aulas planejadas"; as duas visões de carga reunidas em "Carga por atividade".
+- **Citação** só com fonte completa (autor, obra, ano e página); sem fonte, vai para "Pontos a conferir". O **pitaco** passa a ser "Dica do professor": dica, lembrete, aviso ou detalhe importante, escrito pela IA no ponto certo do texto.
+- Espaçamento do formulário refeito.
+
+### Corrigido
+- Resposta vazia do Claude 5.x por limite de saída (raciocínio prévio desligado e nova tentativa com mais espaço).
+- Barra de progresso some depois de aprovar o plano; "Refazer o plano" exigia instrução.
 
 ## 1.2.1 · 29/10/2026 · marca com fundo claro
 
