@@ -1,3 +1,4 @@
+import { localizeUnit } from "./unit.js";
 const normalizeProvider = (value) => {
   const provider = String(value || "openai").trim().toLowerCase();
   return provider === "anthropic" || provider === "claude" ? "anthropic" : "openai";
@@ -113,7 +114,31 @@ function providerMessages(messages = []) {
   }));
 }
 
-function buildRequest(messages, options, maxTokens) {
+// Raciocínio ("thinking") dos modelos Claude recentes. Nos modelos 5.x ele vem LIGADO por padrão e
+// conta dentro de max_tokens: numa tarefa mais exigente, o modelo pode gastar todo o limite pensando
+// e devolver resposta sem texto (stop_reason "max_tokens"). Como cada chamada do ClassAuthor já é uma
+// tarefa bem especificada, o padrão aqui é desligar o raciocínio prévio onde a API permite.
+// ANTHROPIC_THINKING=default|adaptive|disabled|between_tools e ANTHROPIC_EFFORT=low|medium|high mudam isso.
+let thinkingUnsupported = false;
+export function anthropicThinkingConfig(model = getAIModel()) {
+  const configured = String(process.env.ANTHROPIC_THINKING || "").trim().toLowerCase();
+  const effortEnv = String(process.env.ANTHROPIC_EFFORT || "").trim().toLowerCase();
+  const effort = ["low", "medium", "high", "xhigh", "max"].includes(effortEnv) ? effortEnv : "";
+  if (configured === "default" || thinkingUnsupported) return { thinking: null, effort };
+  if (["adaptive", "disabled", "between_tools"].includes(configured)) return { thinking: { type: configured }, effort };
+  const id = String(model || "").toLowerCase();
+  // Sonnet 5.5: "disabled" é recusado; "between_tools" desliga o raciocínio antes da resposta.
+  if (/sonnet-5-5/.test(id)) return { thinking: { type: "between_tools" }, effort };
+  // Sonnet 5, Haiku 5.5 e Opus 5 aceitam "disabled" (com esforço até "high").
+  if (/sonnet-5(?!-\d)|haiku-5-5|opus-5(?!-\d)/.test(id)) return { thinking: { type: "disabled" }, effort: effort && ["xhigh", "max"].includes(effort) ? "high" : effort };
+  // Opus 5.5, Fable e Mythos: raciocínio sempre ligado; reduz o esforço para sobrar espaço ao texto.
+  if (/opus-5-5|fable|mythos/.test(id)) return { thinking: null, effort: effort || "low" };
+  return { thinking: null, effort };
+}
+
+function buildRequest(rawMessages, options, maxTokens) {
+  // Curso organizado em "aulas": todo pedido à IA fala em aula (a estrutura é a mesma).
+  const messages = rawMessages.map((message) => (message && typeof message.content === "string" ? { ...message, content: localizeUnit(message.content) } : message));
   const provider = getAIProvider();
   if (provider !== "anthropic") {
     return {
@@ -145,6 +170,9 @@ function buildRequest(messages, options, maxTokens) {
   if (process.env.ANTHROPIC_STRUCTURED_OUTPUTS === "true") {
     body.output_config = { format: { type: "json_schema", schema: { type: "object", additionalProperties: true } } };
   }
+  const reasoning = anthropicThinkingConfig(body.model);
+  if (reasoning.thinking) body.thinking = reasoning.thinking;
+  if (reasoning.effort) body.output_config = { ...(body.output_config || {}), effort: reasoning.effort };
   return {
     url: endpointUrl(),
     headers: { "Content-Type": "application/json", "x-api-key": providerKey(), "anthropic-version": process.env.ANTHROPIC_VERSION || "2023-06-01" },
@@ -157,6 +185,15 @@ function responseText(payload) {
   return Array.isArray(payload?.content)
     ? payload.content.filter((block) => block?.type === "text").map((block) => block.text).join("\n")
     : "";
+}
+
+// Motivo de parada quando a resposta vem sem texto (ajuda a diagnosticar: limite de saída, recusa, filtro).
+function emptyReason(payload) {
+  const stop = getAIProvider() === "anthropic" ? payload?.stop_reason : payload?.choices?.[0]?.finish_reason;
+  const refusal = getAIProvider() === "anthropic" ? "" : payload?.choices?.[0]?.message?.refusal;
+  const labels = { max_tokens: "limite de saída atingido", length: "limite de saída atingido", refusal: "o modelo recusou a resposta", content_filter: "filtro de conteúdo do provedor", end_turn: "o modelo encerrou sem texto", stop: "o modelo encerrou sem texto" };
+  const blocks = Array.isArray(payload?.content) ? [...new Set(payload.content.map((block) => block?.type).filter(Boolean))] : [];
+  return [stop ? `${labels[stop] || stop} [${stop}]` : "", blocks.length && !blocks.includes("text") ? `blocos sem texto: ${blocks.join(", ")}` : "", refusal ? `recusa: ${String(refusal).slice(0, 160)}` : ""].filter(Boolean).join("; ");
 }
 
 function responseFinishedByLength(payload) {
@@ -271,13 +308,14 @@ export async function callJson(messages, options = {}) {
   }
   const maxAttempts = Math.max(1, getAITokenSettings().maxRetries);
   let formatRetry = false;
+  let raisedMaxTokens = 0;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const retryingFormat = formatRetry;
     const requestMessages = formatRetry
       ? [...messages, { role: "user", content: options.formatRetryInstruction || "A resposta anterior veio em formato JSON inválido ou foi truncada. Gere novamente uma versão compacta e completa do mesmo objeto, sem markdown, comentários ou texto fora do JSON; use aspas duplas em todas as propriedades e não deixe vírgula antes de } ou ]." }]
       : messages;
     const requestedMaxTokens = configuredMaxTokens(options, retryingFormat);
-    const maxTokens = boundedOutputTokens(requestMessages, requestedMaxTokens);
+    const maxTokens = Math.max(boundedOutputTokens(requestMessages, requestedMaxTokens), raisedMaxTokens);
     const request = buildRequest(requestMessages, options, maxTokens);
     const response = await fetch(request.url, {
       method: "POST",
@@ -287,6 +325,13 @@ export async function callJson(messages, options = {}) {
     const payload = await response.json().catch(() => ({}));
     const providerError = providerErrorMessage(payload, response);
     if (!response.ok || providerError && !payload?.choices && !payload?.content) {
+      // Configuração de raciocínio recusada por este modelo: volta ao padrão da API e tenta de novo.
+      if (response.status === 400 && getAIProvider() === "anthropic" && !thinkingUnsupported && /thinking|effort|output_config/i.test(String(providerError))) {
+        console.error("thinking config rejected; falling back to API default", { model: request.body?.model, error: String(providerError).slice(0, 300) });
+        thinkingUnsupported = true;
+        attempt -= 1;
+        continue;
+      }
       const classification = classifyProviderError(providerError, response.status);
       const retryAfterMs = retryDelay(response, attempt);
       if (classification.retryable && attempt < maxAttempts - 1 && retryAfterMs <= 30000) {
@@ -297,10 +342,15 @@ export async function callJson(messages, options = {}) {
     }
     const content = responseText(payload);
     if (!content) {
-      const emptyError = new Error("A API de IA retornou uma resposta vazia.");
+      const reason = emptyReason(payload);
+      console.error("empty AI response", { label: options.label || "", maxTokens, reason, usage: payload?.usage || null, model: payload?.model || "" });
+      const emptyError = new Error(`A API de IA retornou uma resposta vazia${reason ? ` (motivo informado pela API: ${reason})` : ""}.`);
       emptyError.code = "AI_EMPTY_RESPONSE";
       emptyError.retryable = true;
       emptyError.provider = getAIProvider();
+      // Resposta vazia por limite de saída: o modelo gastou o espaço antes de escrever (por
+      // exemplo, raciocinando). A próxima tentativa vai com o dobro de espaço, até 32 mil tokens.
+      if (responseFinishedByLength(payload)) raisedMaxTokens = Math.min(32000, Math.max(maxTokens * 2, 8000));
       if (attempt < maxAttempts - 1) { await wait(250); continue; }
       throw emptyError;
     }
@@ -351,16 +401,24 @@ export async function callText(messages, options = {}) {
     throw error;
   }
   const maxAttempts = Math.max(1, getAITokenSettings().maxRetries);
+  let raisedMaxTokens = 0;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     // Na Anthropic a redação leva um guia longo (em cache) e não deve ter a saída cortada
     // pela "margem local" de tokens, pensada para o limite por minuto da OpenAI.
     const requested = configuredMaxTokens(options);
-    const maxTokens = options.ignoreRequestBudget && getAIProvider() === "anthropic" ? requested : boundedOutputTokens(messages, requested);
+    const maxTokens = Math.max(options.ignoreRequestBudget && getAIProvider() === "anthropic" ? requested : boundedOutputTokens(messages, requested), raisedMaxTokens);
     const request = buildRequest(messages, { ...options, plainText: true }, maxTokens);
     const response = await fetch(request.url, { method: "POST", headers: request.headers, body: JSON.stringify(request.body) });
     const payload = await response.json().catch(() => ({}));
     const providerError = providerErrorMessage(payload, response);
     if (!response.ok || providerError && !payload?.choices && !payload?.content) {
+      // Configuração de raciocínio recusada por este modelo: volta ao padrão da API e tenta de novo.
+      if (response.status === 400 && getAIProvider() === "anthropic" && !thinkingUnsupported && /thinking|effort|output_config/i.test(String(providerError))) {
+        console.error("thinking config rejected; falling back to API default", { model: request.body?.model, error: String(providerError).slice(0, 300) });
+        thinkingUnsupported = true;
+        attempt -= 1;
+        continue;
+      }
       const classification = classifyProviderError(providerError, response.status);
       const retryAfterMs = retryDelay(response, attempt);
       if (classification.retryable && attempt < maxAttempts - 1 && retryAfterMs <= 30000) {
@@ -371,10 +429,15 @@ export async function callText(messages, options = {}) {
     }
     const content = responseText(payload);
     if (!content) {
-      const emptyError = new Error("A API de IA retornou uma resposta vazia.");
+      const reason = emptyReason(payload);
+      console.error("empty AI response", { label: options.label || "", maxTokens, reason, usage: payload?.usage || null, model: payload?.model || "" });
+      const emptyError = new Error(`A API de IA retornou uma resposta vazia${reason ? ` (motivo informado pela API: ${reason})` : ""}.`);
       emptyError.code = "AI_EMPTY_RESPONSE";
       emptyError.retryable = true;
       emptyError.provider = getAIProvider();
+      // Resposta vazia por limite de saída: o modelo gastou o espaço antes de escrever (por
+      // exemplo, raciocinando). A próxima tentativa vai com o dobro de espaço, até 32 mil tokens.
+      if (responseFinishedByLength(payload)) raisedMaxTokens = Math.min(32000, Math.max(maxTokens * 2, 8000));
       if (attempt < maxAttempts - 1) { await wait(250); continue; }
       throw emptyError;
     }

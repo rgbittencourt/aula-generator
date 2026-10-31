@@ -124,3 +124,31 @@ test("cliente distingue excesso real de contexto de TPM", async () => {
     restoreEnv(snapshot);
   }
 });
+
+test("Anthropic: resposta vazia por limite de saída repete com o dobro de espaço e informa o motivo", async () => {
+  const { callText } = await import("../src/ai-client.js");
+  const previousFetch = global.fetch;
+  const snapshot = snapshotEnv();
+  process.env.AI_PROVIDER = "anthropic";
+  process.env.ANTHROPIC_API_KEY = "anthropic-test-key";
+  process.env.ANTHROPIC_BASE_URL = "https://anthropic.test";
+  process.env.ANTHROPIC_MAX_RETRIES = "3";
+  const sent = [];
+  global.fetch = async (url, options) => {
+    const body = JSON.parse(options.body);
+    sent.push(body.max_tokens);
+    if (sent.length === 1) return jsonResponse({ content: [{ type: "thinking", thinking: "..." }], stop_reason: "max_tokens" });
+    return jsonResponse({ content: [{ type: "text", text: "pronto" }], stop_reason: "end_turn" });
+  };
+  try {
+    const result = await callText([{ role: "user", content: "oi" }], { maxTokens: 3000, ignoreRequestBudget: true });
+    assert.equal(result.text, "pronto");
+    assert.deepEqual(sent, [3000, 8000]);
+    sent.length = 0;
+    global.fetch = async () => jsonResponse({ content: [{ type: "thinking", thinking: "..." }], stop_reason: "max_tokens" });
+    await assert.rejects(callText([{ role: "user", content: "oi" }], { maxTokens: 3000, ignoreRequestBudget: true }), /limite de saída atingido \[max_tokens\]; blocos sem texto: thinking/);
+  } finally {
+    global.fetch = previousFetch;
+    restoreEnv(snapshot);
+  }
+});

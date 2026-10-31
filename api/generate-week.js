@@ -1,3 +1,4 @@
+import { withUnit } from "../src/unit.js";
 import { accessRequired, hasValidAccess } from "../src/access.js";
 import { normalizeCourseInput, normalizeLesson } from "../src/aula-schema.js";
 import { generateOneWeek } from "../src/ai.js";
@@ -6,7 +7,7 @@ import { buildCourseProgression } from "../src/curriculum.js";
 import { getAIModel, getAIProvider } from "../src/ai-client.js";
 import { sanitizeBridges } from "../src/bridge.js";
 
-export default async function handler(request, response) {
+async function handler(request, response) {
   response.setHeader("Cache-Control", "no-store");
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
   if (accessRequired() && !hasValidAccess(request)) return response.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
@@ -46,3 +47,5 @@ export default async function handler(request, response) {
     return response.status(status).json({ ok: false, error: error.message || "Não foi possível gerar esta semana.", code: error.code || "GENERATION_ERROR", retryable: Boolean(error.retryable) });
   }
 }
+
+export default withUnit(handler);

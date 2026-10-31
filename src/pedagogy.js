@@ -1,3 +1,4 @@
+import { aiClicheReport, bloomProfile, isNewApproach, methodForWeek } from "./methodology.js";
 const text = (value) => String(value ?? "").trim();
 // Itens que chegam como objeto (ex.: verbetes do glossário) viram o seu rótulo, e não "[object Object]".
 const itemText = (item) => item && typeof item === "object" ? text(item.term || item.title || item.label || item.name || item.text || item.description) : text(item);
@@ -123,7 +124,7 @@ export function assessmentIssues(questions = []) {
   return list.flatMap((question, position) => questionIssues(question).map((issue) => `Questão ${position + 1}: ${issue}`));
 }
 
-export function pedagogicalReview(plan = {}) {
+export function pedagogicalReview(plan = {}, context = {}) {
   const objectives = list(plan.learningObjectives || plan.objectives);
   const sections = Array.isArray(plan.contentSections) ? plan.contentSections : [];
   const resources = Object.values(plan.resources || {}).flatMap((items) => Array.isArray(items) ? items : []);
@@ -146,6 +147,22 @@ export function pedagogicalReview(plan = {}) {
     { id: "differentiation", label: "Há trilhas essencial, padrão e aprofundamento.", pass: Boolean(plan.differentiation?.support?.length && plan.differentiation?.standard?.length && plan.differentiation?.extension?.length) },
     { id: "self-assessment", label: "O estudante recebe autoavaliação ou reflexão final.", pass: Boolean(plan.selfAssessment?.questions?.length || plan.selfAssessment?.prompts?.length || plan.reflection) }
   ];
+  const input = context.input || null;
+  if (input && isNewApproach(input)) {
+    const bloom = bloomProfile(objectives);
+    checks.push(
+      { id: "bloom-verbs", label: "Os objetivos usam verbos observáveis (sem compreender, conhecer, entender, saber…).", pass: objectives.length > 0 && bloom.vague.length === 0, detail: bloom.vague.map((item) => item.objective) },
+      { id: "human-voice", label: "O texto evita marcas de texto de IA (\"além disso\", \"vale ressaltar\", \"é fundamental\"…).", ...(() => { const body = sections.map((section) => `${text(section.body)} ${(section.subsections || []).map((sub) => text(sub.body)).join(" ")}`).join(" ").replace(/<[^>]+>/g, " "); const report = aiClicheReport(`${text(plan.welcome)} ${body}`); return { pass: report.total <= 4 && report.perThousand <= 1.5, detail: report.hits.slice(0, 8).map((hit) => `${hit.term} (${hit.count}×)`) }; })() },
+      { id: "bloom-balance", label: "Pelo menos um objetivo está em nível de aplicação ou acima (aplicar, analisar, avaliar ou criar).", pass: bloom.higher.length > 0, levels: bloom.items.map((item) => ({ objective: item.objective, verb: item.verb, level: item.level })) }
+    );
+  }
+  if (input) {
+    const chosen = methodForWeek(input, Number(context.index) || 0);
+    if (chosen.id !== "nenhuma") {
+      const declared = plan.activeMethodology && typeof plan.activeMethodology === "object" ? plan.activeMethodology : {};
+      checks.push({ id: "methodology-applied", label: `As atividades aplicam a metodologia ativa${chosen.method ? ` escolhida (${chosen.method.label})` : " escolhida pela IA"}, com justificativa.`, pass: activities.length > 0 && Boolean(text(declared.label) && text(declared.howApplied)) });
+    }
+  }
   const passed = checks.filter((check) => check.pass).length;
   return { status: passed === checks.length ? "ready" : passed >= checks.length - 3 ? "review" : "incomplete", score: passed, total: checks.length, checks, alignmentMatrix: alignment };
 }

@@ -1,3 +1,4 @@
+import { withUnit } from "../src/unit.js";
 import { accessRequired, hasValidAccess } from "../src/access.js";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "../src/calculations.js";
 import { buildFallbackLesson, normalizeCourseInput, normalizeWeeklyOutput, slugify } from "../src/aula-schema.js";
@@ -7,7 +8,7 @@ import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { validateCourse } from "../src/validation.js";
 import { getAIModel, getAIProvider } from "../src/ai-client.js";
 
-export default async function handler(request, response) {
+async function handler(request, response) {
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
   if (accessRequired() && !hasValidAccess(request)) return response.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
@@ -28,3 +29,5 @@ export default async function handler(request, response) {
     return response.status(status).json({ ok: false, error: error.message || "Não foi possível gerar o curso.", code: error.code || "GENERATION_ERROR", retryable: Boolean(error.retryable), retryAfterMs: error.retryAfterMs || 0 });
   }
 }
+
+export default withUnit(handler);

@@ -1,8 +1,9 @@
+import { withUnit } from "../src/unit.js";
 import { accessRequired, hasValidAccess } from "../src/access.js";
 import { normalizeCourseInput } from "../src/aula-schema.js";
 import { assistBriefing } from "../src/ai.js";
 
-export default async function handler(request, response) {
+async function handler(request, response) {
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
   if (accessRequired() && !hasValidAccess(request)) return response.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });
   try {
@@ -21,3 +22,5 @@ export default async function handler(request, response) {
     return response.status(status).json({ ok: false, error: message, code: error.code || "BRIEFING_ASSIST_ERROR", retryable: Boolean(error.retryable) });
   }
 }
+
+export default withUnit(handler);

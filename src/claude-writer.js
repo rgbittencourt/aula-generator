@@ -1,3 +1,6 @@
+import { compositionPlanForWeek, figureCountsAsked } from "./composition.js";
+import { sourceMaterialBlock } from "./source-material.js";
+import { approvedPlanBlock } from "./lesson-plan.js";
 // Modo de escrita em prosa ("como o Claude escreve").
 //
 // Em vez de pedir à IA um JSON de ~40 campos (o que a faz escrever "para preencher
@@ -14,6 +17,7 @@
 // restante do sistema (blocos do ClassAtelier, qualidade, ponte entre semanas,
 // pesquisa de recursos) segue igual. AULA_WRITER=json volta ao modo antigo.
 
+import { writerMethodologyBlock, derivativesMethodologyBlock, webPracticeMethodologyBlock, METHODOLOGY_GUIDE_SPEC, methodologyGuideRules } from "./methodology.js";
 import { callJson, callText, getAIModel } from "./ai-client.js";
 import { normalizeAcademicPlan } from "./academic.js";
 import { buildCourseProgression, progressionForWeek } from "./curriculum.js";
@@ -74,6 +78,15 @@ PEDIDO DO PROFESSOR PARA ESTA REVISÃO:
 "${String(instruction || "").trim()}"
 
 Como revisar: reescreva o documento inteiro já com o pedido incorporado. O que o professor não mencionou deve permanecer praticamente idêntico (mesmas frases, mesma ordem, mesmos casos e callouts), porque ele já leu e aprovou esses trechos. Não encolha o texto, não resuma e mantenha a voz. Se o pedido mudar um fato ou um caso, ajuste também o que dependia dele (síntese, glossário, referências, "Pontos a conferir").` : "";
+  const composition = compositionPlanForWeek(input, index);
+  const askedTips = Number(composition?.rows?.pitaco?.count) || 0;
+  const askedQuotes = Number(composition?.rows?.citacao?.count) || 0;
+  const blocksAsk = [
+    askedTips ? `- O professor pediu ${askedTips} dica(s) do professor (📌) nesta semana, cada uma no ponto do texto em que ajuda.` : "",
+    askedQuotes ? `- O professor pediu até ${askedQuotes} citação(ões) direta(s) (📜), mas SÓ com frase exata e fonte completa (autor, obra, ano e página); se não houver uma citação real e segura, não invente: deixe sem.` : "",
+    figureAsk(composition.figures)
+  ].filter(Boolean).join("\n");
+  const methodology = [blocksAsk ? `BLOCOS PEDIDOS PELO PROFESSOR\n${blocksAsk}` : "", approvedPlanBlock(input), writerMethodologyBlock(input, index), sourceMaterialBlock(input, "writer")].filter(Boolean).join("\n\n");
   return `Escreva a unidade da semana ${weekNumber} do curso "${input.title}". ${intro}
 
 PÚBLICO E NÍVEL: ${input.audience || "estudantes de pós-graduação"} (${input.level || "pós-graduação"}), em ${input.language || "português do Brasil"}.
@@ -96,7 +109,7 @@ TAMANHO: pelo menos ${targets.requiredSectionCount} seções numeradas, cada uma
 RECURSOS: ${resourcePlan.videosPerWeek} vídeo(s) e ${resourcePlan.articlesPerWeek} artigo(s) nesta semana (${resourcePlan.requiredReadingsPerWeek} de leitura obrigatória, nível ${resourcePlan.requiredReadingLevel}). Cada um é um callout 🔎 colocado no parágrafo exato em que ajuda, com "busca" específica. ${provided.length ? `Links fornecidos pelo professor (únicos que podem aparecer em "url:"): ${provided.join(" ")}` : "O professor não forneceu links: use somente \"busca\"."}
 ${bridge ? `\n${bridge}\n` : ""}
 ${closingRequirement()} Esse texto vai na seção "O que vem por aí", em um único parágrafo.
-${previousWeeksBlock(previousWeeks)}
+${methodology ? `\n${methodology}\n` : ""}${previousWeeksBlock(previousWeeks)}
 ${revision}
 
 BRIEFING DO CURSO:
@@ -171,8 +184,21 @@ ${outline}
 SUA TAREFA AGORA: a semana será escrita em ${total} partes simultâneas, unidas depois na ordem. Você escreve somente a PARTE ${part} de ${total}: ela ${scope}.
 - Use os cabeçalhos "## n. Título" exatamente como estão no roteiro; subseções "### n.1 …" quando o conceito pedir.
 - Não escreva nada das outras partes e não repita o caso ou o dado que o roteiro atribui a outra seção. Nada de introdução ou conclusão própria da parte: comece direto no Markdown e, ${closing ? "ao chegar à síntese, retome os casos do roteiro, o contraponto e os conceitos novos" : "na última seção desta parte, deixe uma tensão que a seção seguinte do roteiro resolve"}.
-- Cada seção com cerca de ${targets.sectionTargetWords} palavras (mínimo ${targets.sectionMinimumWords}); inclua em cada seção desta parte TODOS os callouts 🔎 (vídeo, artigo) e as figuras 🖼️ (no formato do guia: > 🖼️ **Figura** [diagrama | descrição: "…"]: legenda) que o roteiro lhe atribui, no parágrafo exato em que ajudam, mais os 💭, 💡 e ⚠️ conforme o roteiro. Sem esses 🔎 a semana fica sem recursos.
+- Cada seção com cerca de ${targets.sectionTargetWords} palavras (mínimo ${targets.sectionMinimumWords}); inclua em cada seção desta parte TODOS os callouts 🔎 (vídeo, artigo) e as figuras 🖼️ (no formato do guia, conforme o tipo marcado no roteiro: > 🖼️ **Figura** [diagrama | descrição: "…"]: legenda; [napkin | descrição: "…" | texto: "…"]; [foto | descrição: "…" | prompt: "…"]) que o roteiro lhe atribui, no parágrafo exato em que ajudam, mais os 💭, 💡 e ⚠️ conforme o roteiro. Sem esses 🔎 a semana fica sem recursos.
 - Esta instrução vale mais do que qualquer outra que peça o documento inteiro.`;
+}
+
+// Quantas figuras de cada tipo o professor pediu na aba de composição (vazio = a IA decide).
+export function figureAsk(figures) {
+  if (!figureCountsAsked(figures)) return "";
+  const part = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+  const asked = [];
+  const n = (kind) => Number(figures?.[kind]) || 0;
+  if (figures.diagrama !== null && figures.diagrama !== undefined) asked.push(part(n("diagrama"), "diagrama", "diagramas"));
+  if (figures.napkin !== null && figures.napkin !== undefined) asked.push(part(n("napkin"), "figura napkin (texto para o Napkin AI)", "figuras napkin (textos para o Napkin AI)"));
+  if (figures.foto !== null && figures.foto !== undefined) asked.push(part(n("foto"), "foto (com o pedido para o gerador de imagens)", "fotos (com o pedido para o gerador de imagens)"));
+  const free = ["diagrama", "napkin", "foto"].filter((kind) => figures?.[kind] === null || figures?.[kind] === undefined);
+  return `- Figuras 🖼️: o professor pediu EXATAMENTE ${asked.join(", ")} nesta semana, cada uma na seção em que explica melhor que o texto, no formato do guia (diagrama, napkin ou foto). Isso substitui a faixa "de 1 a 3 figuras".${free.length ? ` Para ${free.join(" e ")}, use só se fizer falta.` : " Não acrescente figuras de outro tipo."}`;
 }
 
 async function writeWeekMarkdown(input, index, { progression, previousWeeks, bridges, current, instruction, temperature, targets }) {
@@ -189,7 +215,7 @@ ANTES DE ESCREVER, faça o ROTEIRO da semana. Responda somente com ele, neste fo
 # Semana ${weekNumber} — Título da semana
 1. Título da seção | cobre: o que a seção explica | caso ou dado concreto: instituição, ano, número, norma ou autor reais (marque "conferir" se não tiver certeza) | callouts: 🔎/💭/💡/⚠️/🖼️ que entram
 2. …
-Uma linha por seção numerada, no mínimo ${targets.requiredSectionCount} seções, na ordem didática (problema, conceito, caso, lição, limite; contraponto crítico perto do fim). Casos e dados não podem se repetir entre seções. Distribua pelas seções, na coluna callouts, EXATAMENTE ${resources.videosPerWeek} callout(s) 🔎 de vídeo e ${resources.articlesPerWeek} de artigo, cada um na seção em que realmente ajuda, e diga o que o recurso mostra. Marque também 1 ou 2 seções com 🖼️ (figura: diagrama que explica melhor que o texto) e escreva ao lado, em "figura:", o que o desenho mostra. Subseções e demais partes (boas-vindas, síntese, glossário) não entram no roteiro.`;
+Uma linha por seção numerada, no mínimo ${targets.requiredSectionCount} seções, na ordem didática (problema, conceito, caso, lição, limite; contraponto crítico perto do fim). Casos e dados não podem se repetir entre seções. Distribua pelas seções, na coluna callouts, EXATAMENTE ${resources.videosPerWeek} callout(s) 🔎 de vídeo e ${resources.articlesPerWeek} de artigo, cada um na seção em que realmente ajuda, e diga o que o recurso mostra. ${figureCountsAsked(compositionPlanForWeek(input, index).figures) ? `Marque com 🖼️ as seções que recebem as figuras pedidas pelo professor (em BLOCOS PEDIDOS) e escreva ao lado, em "figura:", o tipo (diagrama, napkin ou foto) e o que ela mostra.` : `Marque também 1 ou 2 seções com 🖼️ (figura: diagrama que explica melhor que o texto) e escreva ao lado, em "figura:", o que o desenho mostra.`} Subseções e demais partes (boas-vindas, síntese, glossário) não entram no roteiro.`;
   const askOutline = (text) => callText([system, { role: "user", content: text }], { temperature, maxTokens: 3000, ignoreRequestBudget: true, cacheSystem: true });
   let outline = String((await askOutline(outlineAsk)).text || "").trim();
   let { sections } = parseOutline(outline);
@@ -237,7 +263,9 @@ export function derivativesPrompt(input, index, plan, scheduledPractices, part =
     activities: ["all", "guide", "activities"].includes(part),
     mediation: ["all", "guide", "mediation"].includes(part),
     explain: ["all", "guide", "explain"].includes(part),
-    webpractice: ["all", "guide", "webpractice"].includes(part) && scheduledPractices.length > 0
+    webpractice: ["all", "guide", "webpractice"].includes(part) && scheduledPractices.length > 0,
+    // O guia da metodologia sai numa chamada própria, depois das atividades (precisa delas).
+    methodology: part === "methodology"
   };
   // Com webprática, o projeto completo sai numa chamada própria (é a parte mais longa do guia).
   const separateWebpractice = part === "mediation" || part === "webpractice";
@@ -273,7 +301,7 @@ export function derivativesPrompt(input, index, plan, scheduledPractices, part =
   const webpracticeSpec = `  "teacherGuide": {
     "webPracticeProjects": [ { "title": "...", "problem": "...", "context": "...", "studentRole": "...", "challenge": "...", "deliverable": "...", "steps": [ { "minutes": 10, "instructions": "...", "evidence": "..." } ], "criteria": ["..."], "fallbackPlan": "..." } ]
   }`;
-  const specs = [wants.assessment && assessmentSpec, wants.activities && activitiesSpec, wants.mediation && mediationSpec, wants.explain && explainSpec, part === "webpractice" && wants.webpractice && webpracticeSpec].filter(Boolean);
+  const specs = [wants.methodology && METHODOLOGY_GUIDE_SPEC, wants.assessment && assessmentSpec, wants.activities && activitiesSpec, wants.mediation && mediationSpec, wants.explain && explainSpec, part === "webpractice" && wants.webpractice && webpracticeSpec].filter(Boolean);
   const rules = [
     wants.assessment && `REGRAS DA AVALIAÇÃO
 - Exatamente 6 questões, todas de múltipla escolha com EXATAMENTE 5 alternativas e uma única correta, cobrindo todos os objetivos. Não use verdadeiro/falso. "answer" é o índice (começando em 0, de 0 a 4) da alternativa correta; varie a posição da correta entre as questões.
@@ -294,6 +322,20 @@ ${scheduledPractices.length && !separateWebpractice ? `- Há webprática agendad
     part === "webpractice" && wants.webpractice && `REGRAS DA WEBPRÁTICA
 - Desenvolva o projeto completo de cada webprática agendada para esta semana, só em teacherGuide.webPracticeProjects (nunca no texto do aluno), ligado ao que o texto ensinou. Briefing da prática: ${JSON.stringify(scheduledPractices.map((practice, practiceIndex) => compactBriefingPractice(practice, practiceIndex)))}`
   ].filter(Boolean);
+  const methodology = wants.methodology ? methodologyGuideRules(input, index, plan) : derivativesMethodologyBlock(input, index, wants);
+  if (methodology) rules.push(methodology);
+  // As webpráticas saem junto com a mediação ou numa chamada própria; a metodologia vai com elas.
+  const practiceMethodology = scheduledPractices.length && ((wants.mediation && !separateWebpractice) || (part === "webpractice" && wants.webpractice)) ? webPracticeMethodologyBlock(input, index, scheduledPractices) : "";
+  if (practiceMethodology) rules.push(practiceMethodology);
+  const practiceInThisCall = scheduledPractices.length && ((wants.mediation && !separateWebpractice) || (part === "webpractice" && wants.webpractice));
+  const sourceBlock = wants.activities || wants.methodology || wants.explain ? sourceMaterialBlock(input, "derivatives") : practiceInThisCall ? sourceMaterialBlock(input, "practice") : "";
+  if (sourceBlock) rules.push(sourceBlock);
+  const planBlock = approvedPlanBlock(input);
+  if (planBlock && (wants.activities || wants.methodology || wants.explain || wants.mediation || wants.webpractice)) rules.unshift(planBlock);
+  if (scheduledPractices.length && ((wants.mediation && !separateWebpractice) || (part === "webpractice" && wants.webpractice))) rules.push(`MODALIDADE DE CADA SESSÃO PRÁTICA (respeite o campo "modality")
+- Webprática síncrona: encontro online ao vivo, com ferramenta digital; preveja plano B para falha de conexão e de ferramenta.
+- Laboratório prático: presencial, no laboratório; liste equipamentos, insumos e materiais físicos, organização dos grupos e bancadas, cuidados de segurança e de descarte quando couber, e o que fazer se um equipamento falhar.
+- Aula síncrona: encontro ao vivo (online ou presencial) dialogado, com momentos de participação da turma; não transforme em palestra.`);
   return `Texto da semana ${weekNumber} ("${plan.theme}") do curso "${input.title}":
 
 ${text}
@@ -315,7 +357,7 @@ ${rules.join("\n\n")}${rules.length ? "\n\n" : ""}Responda somente JSON válido.
 // (o erro é da etapa inteira e a repetição refaz as duas).
 async function buildDerivatives(input, index, plan, only = null) {
   const scheduled = (input.webPractices || []).filter((practice) => practiceScheduledForWeek(practice, input, index));
-  const names = { assessment: "assessment", activities: "diagnostic, formativeChecks, activities, selfAssessment", mediation: "teacherGuide", explain: "teacherGuide (weekSummary, keyIdeas, studentFAQ, ...)", webpractice: "teacherGuide.webPracticeProjects" };
+  const names = { methodology: "teacherGuide.methodologyGuide", assessment: "assessment", activities: "diagnostic, formativeChecks, activities, selfAssessment", mediation: "teacherGuide", explain: "teacherGuide (weekSummary, keyIdeas, studentFAQ, ...)", webpractice: "teacherGuide.webPracticeProjects" };
   const call = (part, maxTokens, extra = "") => callJson([
     { role: "system", content: DERIVATIVES_SYSTEM },
     { role: "user", content: `${derivativesPrompt(input, index, plan, scheduled, part)}${extra}` }
@@ -332,7 +374,7 @@ async function buildDerivatives(input, index, plan, only = null) {
     // `only` limita a regeneração a partes (ex.: ["assessment"]) quando o professor quer
     // consertar um item específico sem refazer o que já conferiu.
     const wanted = (part) => !Array.isArray(only) || only.includes(part);
-    const plannedParts = [["assessment", 12000], ["activities", 9000], ["mediation", 12000], ["explain", 12000], ...(scheduled.length ? [["webpractice", 12000]] : [])].filter(([part]) => wanted(part));
+    const plannedParts = [["assessment", 12000], ["activities", 9000], ["mediation", 12000], ["explain", 12000], ...(scheduled.length ? [["webpractice", 12000]] : []), ...(Array.isArray(only) && only.includes("methodology") ? [["methodology", 12000]] : [])].filter(([part]) => wanted(part));
     // As questões precisam ter 5 alternativas e feedback em todas; se vier fora do padrão, a IA
     // refaz as questões uma vez, com a lista exata do que faltou.
     const callChecked = async (part, tokens) => {
@@ -348,9 +390,9 @@ async function buildDerivatives(input, index, plan, only = null) {
     const failed = results.find((result) => result.status === "rejected");
     if (failed) throw failed.reason;
     const byPart = Object.fromEntries(plannedParts.map(([part], position) => [part, results[position].value]));
-    const { assessment, activities, mediation, explain, webpractice } = byPart;
+    const { assessment, activities, mediation, explain, webpractice, methodology } = byPart;
     const object = (value) => (value && typeof value === "object" ? value : {});
-    const teacherGuide = { ...object(object(mediation).teacherGuide), ...object(object(explain).teacherGuide), ...(object(object(webpractice).teacherGuide).webPracticeProjects ? { webPracticeProjects: webpractice.teacherGuide.webPracticeProjects } : {}) };
+    const teacherGuide = { ...object(object(mediation).teacherGuide), ...object(object(explain).teacherGuide), ...(object(object(methodology).teacherGuide).methodologyGuide ? { methodologyGuide: methodology.teacherGuide.methodologyGuide } : {}), ...(object(object(webpractice).teacherGuide).webPracticeProjects ? { webPracticeProjects: webpractice.teacherGuide.webPracticeProjects } : {}) };
     const data = { ...object(activities), ...(Object.keys(teacherGuide).length ? { teacherGuide } : {}), ...(object(assessment).assessment ? { assessment: assessment.assessment } : {}) };
     return { data, error: "" };
   } catch (error) {
@@ -360,7 +402,7 @@ async function buildDerivatives(input, index, plan, only = null) {
 
 function mergeDerivatives(plan, derivatives) {
   const pick = (key) => derivatives[key] && (Array.isArray(derivatives[key]) ? derivatives[key].length : Object.keys(derivatives[key]).length) ? { [key]: derivatives[key] } : {};
-  return { ...plan, ...pick("assessment"), ...pick("diagnostic"), ...pick("formativeChecks"), ...pick("activities"), ...pick("selfAssessment") };
+  return { ...plan, ...pick("assessment"), ...pick("diagnostic"), ...pick("formativeChecks"), ...pick("activities"), ...pick("selfAssessment"), ...pick("activeMethodology") };
 }
 
 async function composeWeek(input, index, markdown, options = {}) {
@@ -448,7 +490,7 @@ export async function regenerateWeekProse(input, index, currentWeek, instruction
 // Segunda etapa do modo de prosa: avaliação, atividades e Material de Mediação a
 // partir do texto que o professor já tem. Recebe a semana normalizada (lessonPlan)
 // e devolve a semana reconstruída, o guia do professor e o novo estado de geração.
-export const DERIVATIVE_PARTS = ["assessment", "activities", "mediation", "explain", "webpractice"];
+export const DERIVATIVE_PARTS = ["assessment", "activities", "mediation", "explain", "webpractice", "methodology"];
 
 export async function completeWeekDerivatives(input, index, week, teacherGuide = {}, options = {}) {
   const plan = week?.lessonPlan || {};

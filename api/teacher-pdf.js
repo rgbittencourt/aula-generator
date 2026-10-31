@@ -1,10 +1,11 @@
+import { withUnit } from "../src/unit.js";
 import { attachWorkloadToLessons, buildGeneralPlan, calculateCourseWorkload } from "../src/calculations.js";
 import { normalizeCourseInput, normalizeLesson, slugify } from "../src/aula-schema.js";
 import { buildTeacherGuides } from "../src/teacher-guide.js";
 import { createMediationMaterialPdf } from "../src/pdf.js";
 import { scopeMediationMaterial } from "../src/mediation-scope.js";
 
-export default async function handler(request, response) {
+async function handler(request, response) {
   if (request.method !== "POST") return response.status(405).json({ ok: false, error: "Método não permitido." });
   try {
     const input = normalizeCourseInput(request.body?.input || {});
@@ -29,3 +30,5 @@ export default async function handler(request, response) {
     return response.status(400).json({ ok: false, error: error.message || "Não foi possível criar o Material de Mediação em PDF." });
   }
 }
+
+export default withUnit(handler);

@@ -65,7 +65,8 @@ export function insertFigureBlocks(blocks, figures) {
 export async function illustrateWeek(input, week, { ask = callText, limit = 3 } = {}) {
   const plan = week?.lessonPlan || {};
   const sections = Array.isArray(plan.contentSections) ? plan.contentSections : [];
-  const todo = allFigures(plan).filter((figure) => !text(figure.src)).slice(0, limit);
+  // Só diagramas são desenhados aqui; foto e Napkin são sugestões para o professor criar fora.
+  const todo = allFigures(plan).filter((figure) => !text(figure.src) && (!figure.kind || figure.kind === "diagrama")).slice(0, limit);
   if (!todo.length) return { week, drawn: 0, failed: 0, total: allFigures(plan).length };
   const settled = await Promise.allSettled(todo.map((figure) => drawFigure(input, plan, sections.find((section) => text(section.number) === text(figure.sectionNumber)), figure, ask)));
   const done = new Map();
@@ -73,7 +74,8 @@ export async function illustrateWeek(input, week, { ask = callText, limit = 3 } 
   const nextSections = sections.map((section) => ({ ...section, figures: (section.figures || []).map((figure) => done.has(figure.id) ? { ...figure, src: svgDataUri(done.get(figure.id)), aiGenerated: true } : figure) }));
   const figures = nextSections.flatMap((section) => (section.figures || []).map((figure) => ({ ...figure, sectionNumber: text(figure.sectionNumber || section.number) })));
   const next = { ...week, lessonPlan: { ...plan, contentSections: nextSections }, blocks: insertFigureBlocks(week.blocks, figures) };
-  return { week: next, drawn: done.size, failed: todo.length - done.size, total: allFigures(plan).length };
+  const reasons = settled.map((result) => result.status === "rejected" ? text(result.reason?.message) : (result.value ? "" : "o SVG devolvido foi recusado duas vezes")).filter(Boolean);
+  return { week: next, drawn: done.size, failed: todo.length - done.size, total: allFigures(plan).length, reasons: [...new Set(reasons)].slice(0, 3) };
 }
 
 /**

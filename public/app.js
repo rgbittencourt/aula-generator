@@ -2,6 +2,9 @@ import { toStudentLesson, toGeneratorWeek } from "./student-export.js";
 import { parseSavedWeek, planPlacement } from "./week-import.js";
 import { createMoodleXml, quizQuestions } from "./moodle-xml.js";
 import { createProductionWorkbook, hasProduction, productionMarkdown, productionVideos, formatDuration } from "./production-xlsx.js";
+import { SOURCE_USAGES, deleteSourceDoc, importSourceFile, sourceExcerptsForWeek } from "./source-materials.js";
+import { deepLocalizeUnit, localizeUnitText } from "./unit-text.js";
+import { DRAFT_FILE, chooseProjectFolder, folderPermission, folderSupported, forgetProjectFolder, loadProjectFolder, openExistingProjectFolder, projectFolder, saveToProjectFolder, SUBFOLDERS } from "./project-folder.js";
 import { applyAdjustment, applyRewrite, approveWeek, bridgesBefore, canGenerateNext, dismissIssue, emptyFlow, normalizeFlow, recordGenerated, weekFlowStatus } from "./step-flow.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -143,7 +146,7 @@ function enhanceLayout() {
   navigation.className = "sidebar-navigation";
   navigation.id = "project-navigation";
   navigation.setAttribute("aria-label", "Navegação do planejamento");
-  navigation.innerHTML = '<p class="sidebar-label">NAVEGAR PELO PROJETO</p>' + navItems.map((item) => `<a href="#${item.id}" data-scroll-to="${item.id}">${escapeHtml(item.title)}<span>→</span></a>`).join("") + '<a href="#results-load" data-scroll-to="results-load">Carga por atividade<span>→</span></a><a href="#results-breakdown" data-scroll-to="results-breakdown">Carga aberta por atividade<span>→</span></a><a href="#results-review" data-scroll-to="results-review">Checklists<span>→</span></a><a href="#results-weeks" data-scroll-to="results-weeks">Semanas planejadas<span>→</span></a>';
+  navigation.innerHTML = '<p class="sidebar-label">NAVEGAR PELO PROJETO</p>' + navItems.map((item) => `<a href="#${item.id}" data-scroll-to="${item.id}">${escapeHtml(item.title)}<span>→</span></a>`).join("") + '<a href="#results-load" data-scroll-to="results-load">Carga por atividade<span>→</span></a><a href="#results-review" data-scroll-to="results-review">Checklists<span>→</span></a><a href="#results-weeks" data-scroll-to="results-weeks">Semanas planejadas<span>→</span></a><a href="#results-production" data-scroll-to="results-production">Produção audiovisual<span>→</span></a>';
   const navigationColumn = document.createElement("aside");
   navigationColumn.className = "navigation-column";
   navigationColumn.setAttribute("aria-label", "Navegação do planejamento");
@@ -182,13 +185,28 @@ function enhanceLayout() {
     weeksSector.className = "results-sector weeks-sector";
     weeksSector.id = "results-weeks";
     weeksSector.open = false;
-    weeksSector.innerHTML = '<summary class="results-sector-summary"><div class="results-sector-copy"><strong>Semanas planejadas</strong><small id="weeks-sector-note">As semanas aparecerão aqui depois da geração.</small></div><span class="sector-chevron results-sector-chevron" aria-hidden="true">⌄</span></summary>';
+    weeksSector.innerHTML = '<summary class="results-sector-summary"><div class="results-sector-copy"><strong id="weeks-sector-title">Semanas planejadas</strong><small id="weeks-sector-note">As semanas aparecerão aqui depois da geração.</small></div><span class="sector-chevron results-sector-chevron" aria-hidden="true">⌄</span></summary>';
     const body = document.createElement("div");
     body.className = "results-sector-body";
     weekGrid.remove();
     body.appendChild(weekGrid);
     weeksSector.appendChild(body);
     parent.appendChild(weeksSector);
+    // Produção audiovisual: aba própria, depois das semanas (só faz sentido com as semanas planejadas e liberadas).
+    const productionCard = $("#production-uc-card");
+    if (productionCard && !$("#results-production")) {
+      const productionSector = document.createElement("details");
+      productionSector.className = "results-sector production-sector hidden";
+      productionSector.id = "results-production";
+      productionSector.open = false;
+      productionSector.innerHTML = '<summary class="results-sector-summary"><div class="results-sector-copy"><strong>Produção audiovisual</strong><small id="production-sector-note">Vídeos da UC (abertura, aviso no WhatsApp e encerramento) e planilha de produção, depois que todas as semanas forem liberadas.</small></div><span class="sector-chevron results-sector-chevron" aria-hidden="true">⌄</span></summary>';
+      const productionBody = document.createElement("div");
+      productionBody.className = "results-sector-body";
+      productionCard.remove();
+      productionBody.appendChild(productionCard);
+      productionSector.appendChild(productionBody);
+      weeksSector.after(productionSector);
+    }
   }
   resetWorkspaceScroll();
 }
@@ -226,7 +244,102 @@ function paragraphsMarkup(value) {
   return source.split(/\n\s*\n|\r?\n/).map((part) => readableText(part)).filter(Boolean).map((part) => `<p>${escapeHtml(part)}</p>`).join("");
 }
 function slugify(value) { return String(value || "curso").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "curso"; }
-function downloadBlob(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
+// Unidade "aula": arquivos de texto baixados (JSON, XML, Markdown) e nomes de arquivo dizem "aula".
+function courseUnit() { return $("#course-unit")?.value === "aula" ? "aula" : "semana"; }
+async function downloadBlob(blob, filename) {
+  const unit = courseUnit();
+  if (unit === "aula") {
+    filename = localizeUnitText(filename, unit);
+    if (/^(text\/|application\/(json|xml))/i.test(blob.type || "") || /\.(json|xml|md|txt|html)$/i.test(filename)) blob = new Blob([localizeUnitText(await blob.text(), unit)], { type: blob.type });
+  }
+  if (projectFolder()) {
+    try {
+      const path = await saveToProjectFolder(blob, filename, { interactive: true });
+      if (path) { showAssistantMessage(`Salvo na pasta do projeto: ${path}`); renderProjectFolder(); return; }
+    } catch { /* sem permissão ou pasta movida: cai no download normal */ }
+    renderProjectFolder();
+  }
+  return downloadBlobRaw(blob, filename);
+}
+
+// ── Pasta do projeto ──────────────────────────────────────────────
+// O rascunho vai junto para a pasta (backup/rascunho-atual.json) a cada salvamento automático,
+// e um histórico (backup/historico/) a cada 20 minutos, no máximo. Assim o planejamento abre
+// em outro navegador ou computador com "Abrir pasta de projeto".
+let folderState = "none";
+let lastHistoryAt = 0;
+async function renderProjectFolder() {
+  const box = $("#project-folder-bar");
+  if (!box) return;
+  if (!folderSupported()) {
+    box.querySelector("#project-folder-status").innerHTML = "<strong>Pasta do projeto</strong><small>Este navegador não deixa o site gravar numa pasta do computador. No Chrome ou no Edge (computador), tudo o que for salvo vai para uma pasta só do projeto, separada em subpastas. Aqui, os arquivos continuam indo para Downloads.</small>";
+    box.querySelectorAll("button").forEach((button) => button.classList.add("hidden"));
+    return;
+  }
+  const folder = projectFolder();
+  folderState = folder ? await folderPermission(false).catch(() => "none") : "none";
+  const status = box.querySelector("#project-folder-status");
+  const subfolders = SUBFOLDERS.map(([name]) => name).join(", ");
+  if (!folder) status.innerHTML = `<strong>Pasta do projeto: ainda não escolhida</strong><small>Escolha onde criar a pasta deste planejamento. Backups, rascunho, Material de Mediação, arquivos do ClassAtelier, XML do Moodle, práticas, produção e pacotes passam a ser salvos nela, cada um na sua subpasta (${subfolders}).</small>`;
+  else if (folderState === "granted") status.innerHTML = `<strong>Pasta do projeto: ${escapeHtml(folder.name)}</strong><small>Tudo o que você salvar vai para cá, separado em subpastas. O rascunho é gravado em backup/${DRAFT_FILE} a cada alteração. Em outro navegador ou computador, use “Abrir pasta de projeto”.</small>`;
+  else status.innerHTML = `<strong>Pasta do projeto: ${escapeHtml(folder.name)} (aguardando permissão)</strong><small>O navegador pede sua autorização de novo depois que a página é recarregada. Clique em “Reconectar pasta”. Enquanto isso, os arquivos vão para Downloads.</small>`;
+  $("#project-folder-choose").classList.remove("hidden");
+  $("#project-folder-open").classList.remove("hidden");
+  $("#project-folder-choose").textContent = folder ? "Trocar pasta" : "Criar pasta do projeto";
+  $("#project-folder-choose").classList.toggle("button-primary", !folder);
+  $("#project-folder-choose").classList.toggle("button-secondary", Boolean(folder));
+  $("#project-folder-reconnect").classList.toggle("hidden", !folder || folderState === "granted");
+  $("#project-folder-forget").classList.toggle("hidden", !folder);
+  box.classList.toggle("is-connected", folderState === "granted");
+}
+async function writeDraftToFolder(snapshot) {
+  if (!projectFolder() || folderState !== "granted" || !snapshot) return;
+  try {
+    const text = JSON.stringify(snapshot, null, 2);
+    await saveToProjectFolder(new Blob([text], { type: "application/json" }), DRAFT_FILE, { interactive: false, subfolder: "backup" });
+    if (Date.now() - lastHistoryAt > 20 * 60000) {
+      lastHistoryAt = Date.now();
+      const now = new Date(); const pad = (n) => String(n).padStart(2, "0");
+      const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}h${pad(now.getMinutes())}`;
+      await saveToProjectFolder(new Blob([text], { type: "application/json" }), `rascunho-${stamp}.json`, { interactive: false, subfolder: "backup/historico" });
+    }
+  } catch { folderState = "none"; renderProjectFolder(); }
+}
+async function handleChooseFolder() {
+  try {
+    const snapshot = currentSnapshot();
+    const folder = await chooseProjectFolder($("#course-title")?.value.trim() || "planejamento", courseUnit() === "aula" ? "aulas" : "semanas");
+    folderState = "granted";
+    lastHistoryAt = 0;
+    if (snapshot) { snapshot.projectFolder = folder.name; await writeDraftToFolder(snapshot); }
+    renderProjectFolder();
+    showAssistantMessage(folder.reused ? `Pasta de projeto reaproveitada: ${folder.name}.` : `Pasta do projeto criada: ${folder.name}, com as subpastas ${SUBFOLDERS.map(([name]) => name).join(", ")}.`);
+  } catch (error) {
+    if (error?.name !== "AbortError") showAssistantMessage(`Não foi possível criar a pasta: ${error.message || error}`, true);
+  }
+}
+async function handleOpenFolder() {
+  try {
+    const { name, draft } = await openExistingProjectFolder();
+    folderState = "granted";
+    renderProjectFolder();
+    if (!draft) { showAssistantMessage(`Pasta ${name} conectada, mas não encontrei rascunho nem backup dentro de backup/.`, true); return; }
+    if (draft?.version !== 2 || !isOwnApp(draft?.app)) throw new Error("O rascunho desta pasta não é um backup válido do ClassAuthor.");
+    if (currentSnapshot() && !window.confirm(`Abrir o planejamento da pasta ${name}? O que está aberto agora será substituído (ele continua salvo na pasta dele, se tiver uma).`)) return;
+    safeStorageSet(JSON.stringify(draft));
+    restoreSnapshot(draft);
+    enterWorkspace();
+    showAssistantMessage(`Planejamento aberto da pasta ${name}.`);
+  } catch (error) {
+    if (error?.name !== "AbortError") showAssistantMessage(error.message || "Não foi possível abrir a pasta.", true);
+  }
+}
+async function handleReconnectFolder() {
+  try { folderState = await folderPermission(true); } catch { folderState = "none"; }
+  renderProjectFolder();
+  if (folderState === "granted") { saveDraft("pasta"); showAssistantMessage(`Pasta ${projectFolder()?.name} reconectada.`); }
+}
+function downloadBlobRaw(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
 function addDays(dateString, days) { const date = new Date(`${dateString}T12:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); }
 
 function formatSavedAt(value) {
@@ -365,6 +478,10 @@ function resetDisciplineForm(preserveSession = true) {
   addPractice();
   addMaterial();
   renderResourcePlanWeeks();
+  renderMethodologyWeeks();
+  updateMethodologyHints();
+  updateBloomMeter();
+  applyUnitToUi();
   renderCompositionPlanWeeks();
   toggleCalendar();
   togglePractice();
@@ -388,7 +505,7 @@ function resetDisciplineForm(preserveSession = true) {
   state.weekApprovals = {};
   state.studioEdits = {};
   state.production = emptyProduction();
-  state.flow = emptyFlow();
+  state.flow = emptyFlow(); state.lessonPlans = {};
   state.activeReviewGuidance = null;
   state.generation = null;
   state.previewIndex = null;
@@ -417,6 +534,7 @@ function startNewProject(event) {
   clearTimeout(saveTimer);
   saveTimer = null;
   resetDisciplineForm(true);
+  forgetProjectFolder().then(renderProjectFolder);
   document.body.classList.remove("welcome-active");
   document.body.classList.add("workspace-active");
   document.documentElement.classList.add("workspace-active");
@@ -476,6 +594,7 @@ function currentSnapshot() {
       studioEdits: state.studioEdits,
       production: state.production,
       stepFlow: state.flow,
+      lessonPlans: state.lessonPlans || {},
       generation: state.generation,
       weeks: state.weeks
     } : null
@@ -491,6 +610,7 @@ function saveDraft(reason = "") {
       return;
     }
     if (document.body.classList.contains("workspace-active")) updateDraftRecoveryCard(snapshot);
+    writeDraftToFolder(snapshot);
     const resultText = snapshot.results ? ` · ${snapshot.results.weeks.length} semana(s) preservada(s)` : "";
     setSaveStatus("Salvamento local ativo", `Último salvamento: ${formatSavedAt(snapshot.savedAt)}${resultText}`, "success");
   } catch {
@@ -585,6 +705,12 @@ function applyInputToForm(input = {}) {
   if ($("#resource-default-required")) $("#resource-default-required").value = Number.isFinite(Number(resourceDefaults.requiredReadingsPerWeek)) ? resourceDefaults.requiredReadingsPerWeek : 1;
   if ($("#resource-default-level")) $("#resource-default-level").value = resourceDefaults.requiredReadingLevel || "essential";
   renderResourcePlanWeeks(resourcePlan);
+  if ($("#pedagogical-approach")) $("#pedagogical-approach").value = input.pedagogicalApproach === "atual" ? "atual" : "nova";
+  if ($("#course-unit")) { $("#course-unit").value = input.unit === "aula" ? "aula" : "semana"; applyUnitToUi(); }
+  if ($("#methodology-default")) $("#methodology-default").value = methodologyOptionExists(input.methodologyPlan?.default) ? input.methodologyPlan.default : "nenhuma";
+  renderMethodologyWeeks(input.methodologyPlan || {});
+  updateMethodologyHints();
+  updateBloomMeter();
   renderCompositionPlanWeeks(input.compositionPlan || {});
   updateAcademicInheritance();
   updateSummary();
@@ -616,6 +742,99 @@ function collectResourcePlan() {
   };
 }
 
+// ---- Abordagem pedagógica e metodologias ativas (cópia de teste) ----
+const APPROACH_HINTS = {
+  nova: "Planeja de trás para frente (o que o estudante vai produzir vem antes do texto), pede objetivos com verbos observáveis, confere o alinhamento com as atividades e a avaliação e aplica princípios de multimídia no texto, nos slides e nos vídeos.",
+  atual: "Gera exatamente como a versão principal do ClassAuthor. Use para comparar."
+};
+
+function methodologyOptions() {
+  return [...($("#methodology-default")?.options || [])].map((option) => ({ value: option.value, label: option.textContent, hint: option.dataset.hint || "" }));
+}
+
+function methodologyOptionExists(value) {
+  return methodologyOptions().some((option) => option.value === value);
+}
+
+function methodologyLabel(value) {
+  return methodologyOptions().find((option) => option.value === value)?.label || "";
+}
+
+function collectMethodologyPlan() {
+  const weeks = [...document.querySelectorAll("[data-methodology-week]")]
+    .map((row) => ({ weekNumber: Number(row.dataset.methodologyWeek), method: row.querySelector("select")?.value || "" }))
+    .filter((entry) => entry.method);
+  return { default: $("#methodology-default")?.value || "nenhuma", weeks };
+}
+
+function renderMethodologyWeeks(plan = {}) {
+  const container = $("#methodology-weeks");
+  if (!container) return;
+  const weeks = Math.min(52, Math.max(1, Number($("#weeks")?.value) || 1));
+  const byWeek = new Map((Array.isArray(plan.weeks) ? plan.weeks : []).map((entry) => [Number(entry.weekNumber || entry.week), entry.method]));
+  const defaultLabel = methodologyLabel($("#methodology-default")?.value || "nenhuma");
+  const options = methodologyOptions();
+  container.innerHTML = Array.from({ length: weeks }, (_, index) => {
+    const weekNumber = index + 1;
+    const chosen = byWeek.get(weekNumber) || "";
+    const choices = [`<option value="">Padrão (${escapeHtml(defaultLabel)})</option>`, ...options.map((option) => `<option value="${escapeHtml(option.value)}" title="${escapeHtml(option.hint)}" ${option.value === chosen ? "selected" : ""}>${escapeHtml(option.label)}</option>`)].join("");
+    return `<label class="methodology-week ${chosen ? "is-override" : ""}" data-methodology-week="${weekNumber}"><span>Semana ${weekNumber}</span><select aria-label="Metodologia ativa da semana ${weekNumber}">${choices}</select></label>`;
+  }).join("");
+}
+
+function updateMethodologyHints() {
+  const approach = $("#pedagogical-approach")?.value || "nova";
+  if ($("#pedagogical-approach-hint")) $("#pedagogical-approach-hint").textContent = APPROACH_HINTS[approach] || "";
+  const selected = $("#methodology-default")?.selectedOptions?.[0];
+  if ($("#methodology-default-hint")) $("#methodology-default-hint").textContent = selected?.dataset.hint || "";
+}
+
+// Taxonomia de Bloom revisada: leitura dos verbos dos objetivos (mesma lista de src/methodology.js).
+const BLOOM_CLIENT = {
+  lembrar: "listar nomear identificar reconhecer definir citar recordar enumerar localizar indicar apontar memorizar",
+  entender: "explicar descrever resumir interpretar classificar exemplificar parafrasear ilustrar caracterizar situar conceituar discutir inferir traduzir",
+  aplicar: "aplicar executar usar utilizar implementar calcular resolver demonstrar empregar operar simular realizar praticar mapear preencher configurar",
+  analisar: "analisar comparar diferenciar distinguir organizar examinar investigar relacionar contrastar categorizar problematizar diagnosticar decompor correlacionar testar",
+  avaliar: "avaliar julgar criticar justificar argumentar defender verificar priorizar decidir recomendar validar selecionar posicionar-se ponderar monitorar",
+  criar: "criar elaborar planejar propor projetar construir desenvolver produzir formular compor redigir conceber prototipar desenhar estruturar gerar sistematizar"
+};
+const BLOOM_VAGUE = "compreender conhecer entender saber aprender apreciar perceber familiarizar-se familiarizar conscientizar-se conscientizar refletir estudar ver".split(" ");
+const BLOOM_ORDER = ["lembrar", "entender", "aplicar", "analisar", "avaliar", "criar"];
+const BLOOM_VERB_LEVEL = new Map(Object.entries(BLOOM_CLIENT).flatMap(([level, verbs]) => verbs.split(" ").map((verb) => [verb, level])));
+
+function bloomOf(objective) {
+  const cleaned = String(objective || "").trim().toLowerCase().replace(/^[-•*\d.)\s]+/, "").replace(/^(ao final[^,:]*[,:]\s*)?((o|a) (estudante|aluno|aluna|participante|cursista)\s+)?(ser[áa] capaz de|poder[áa]|deve(r[áa])?)\s+/, "").replace(/^ser capaz de\s+/, "");
+  const verb = (cleaned.match(/^[a-zà-ú]+(-se)?/) || [""])[0];
+  if (!verb) return null;
+  if (BLOOM_VAGUE.includes(verb)) return { verb, level: "vago" };
+  return { verb, level: BLOOM_VERB_LEVEL.get(verb) || BLOOM_VERB_LEVEL.get(verb.replace(/-se$/, "")) || "?" };
+}
+
+function updateBloomMeter() {
+  const meter = $("#bloom-meter");
+  if (!meter) return;
+  const items = splitLines($("#objectives")?.value || "").map(bloomOf).filter(Boolean);
+  if (!items.length) { meter.innerHTML = ""; return; }
+  const counts = {};
+  items.forEach((item) => { counts[item.level] = (counts[item.level] || 0) + 1; });
+  const chips = [...BLOOM_ORDER, "?", "vago"].filter((level) => counts[level]).map((level) => `<span class="bloom-chip bloom-${level === "?" ? "unknown" : level}">${level === "?" ? "verbo não reconhecido" : level === "vago" ? "verbo vago" : level} · ${counts[level]}</span>`).join("");
+  const vague = items.filter((item) => item.level === "vago").map((item) => item.verb);
+  const higher = items.some((item) => ["aplicar", "analisar", "avaliar", "criar"].includes(item.level));
+  const notes = [vague.length ? `Troque “${[...new Set(vague)].join("”, “")}” por um verbo observável.` : "", !higher ? "Nenhum objetivo chega a aplicar, analisar, avaliar ou criar." : ""].filter(Boolean).join(" ");
+  meter.innerHTML = `<strong>Taxonomia de Bloom:</strong> ${chips}${notes ? `<small>${escapeHtml(notes)}</small>` : ""}`;
+}
+
+// Metodologia em vigor numa semana, para mostrar nos cartões e na prévia.
+function methodologyForWeekLabel(index, lesson) {
+  const declared = lesson?.lessonPlan?.activeMethodology;
+  if (declared?.label) return declared.label;
+  const plan = state.input?.methodologyPlan || collectMethodologyPlan();
+  const specific = (plan.weeks || []).find((entry) => Number(entry.weekNumber) === index + 1)?.method;
+  const id = specific || plan.default || "nenhuma";
+  if (id === "nenhuma") return "";
+  return id === "auto" ? "Metodologia: a IA escolhe" : methodologyLabel(id);
+}
+
 function renderResourcePlanWeeks(plan = {}) {
   const container = $("#resource-plan-weeks");
   if (!container) return;
@@ -638,9 +857,16 @@ function renderResourcePlanWeeks(plan = {}) {
 }
 
 const compositionCatalog = [
-  ["destaque", "Destaque conceitual", "Destaques", 1, 1], ["atencao", "Atenção / erro comum", "Destaques", 1, 1], ["reflexao", "Reflexão", "Destaques", 1, 1], ["citacao", "Citação", "Texto", 0, 1], ["pitaco", "Comentário / pitaco", "Destaques", 0, 1],
+  ["destaque", "Destaque conceitual", "Destaques", 1, 1], ["atencao", "Atenção / erro comum", "Destaques", 1, 1], ["reflexao", "Reflexão", "Destaques", 1, 1], ["citacao", "Citação", "Texto", 0, 1], ["pitaco", "Dica do professor (pitaco)", "Destaques", 0, 1],
   ["imagem", "Imagem com legenda", "Mídia", 1, 1], ["parallax", "Imagem parallax", "Mídia", 0, 1], ["textoimagem", "Texto + imagem", "Mídia", 0, 1], ["cases", "Cards de casos", "Mídia", 0, 3], ["feature", "Destaques com ícones", "Mídia", 0, 3], ["tabela", "Tabela comparativa", "Mídia", 0, 3], ["filmstrip", "Filmstrip / carrossel", "Mídia", 0, 3], ["audio", "Áudio / podcast", "Mídia", 0, 1],
   ["accordion", "Acordeão / FAQ", "Interativos", 1, 3], ["flashcards", "Flashcards", "Interativos", 0, 6], ["slider", "Slider / passo a passo", "Interativos", 0, 3], ["linhadotempo", "Linha do tempo", "Interativos", 0, 4], ["columns", "Colunas comparativas", "Interativos", 0, 2], ["quiz", "Quiz formativo", "Interativos", 1, 5], ["externalembed", "Conteúdo externo", "Mídia", 0, 1]
+];
+
+// Figuras escritas no texto pela IA: diagrama (desenhado depois), texto para o Napkin e foto (pedido para gerar fora).
+const FIGURE_KINDS = [
+  ["diagrama", "Diagramas", "desenhados pela IA do ClassAuthor"],
+  ["napkin", "Textos para o Napkin", "você cola no napkin.ai e escolhe o visual"],
+  ["foto", "Fotos / imagens", "pedido pronto para gerar fora (ChatGPT etc.)"]
 ];
 
 function compositionDefaultRows() {
@@ -665,7 +891,9 @@ function collectCompositionPlan() {
       return [key, { count: count === "" ? "" : Math.min(12, Math.max(0, Number(count) || 0)), policy, itemsPerBlock: itemsPerBlock > 1 ? (Number(row.querySelector(`[data-composition-week-items="${key}"]`)?.value) || itemsPerBlock) : 1 }];
     }))
   }));
-  return { preset: "balanced", default: { rows }, weeks };
+  const figuresFrom = (root, attr) => Object.fromEntries(FIGURE_KINDS.map(([kind]) => { const value = root.querySelector(`[${attr}="${kind}"]`)?.value ?? ""; return [kind, value === "" ? null : Math.min(6, Math.max(0, Number(value) || 0))]; }));
+  weeks.forEach((entry) => { const row = document.querySelector(`[data-composition-week="${entry.weekNumber}"]`); if (row) entry.figures = figuresFrom(row, "data-figure-week"); });
+  return { preset: "balanced", default: { rows, figures: figuresFrom(document, "data-figure-default") }, weeks };
 }
 
 function renderCompositionPlanWeeks(plan = {}) {
@@ -682,9 +910,12 @@ function renderCompositionPlanWeeks(plan = {}) {
   const weekMarkup = Array.from({ length: weeks }, (_, index) => {
     const weekNumber = index + 1;
     const rowPlan = byWeek.get(weekNumber) || {};
-    return `<details class="composition-week" data-composition-week="${weekNumber}"><summary>Semana ${weekNumber}<small>Deixe vazio para herdar o padrão</small></summary><div class="composition-week-grid">${compositionCatalog.map(([key, label, group, defaultCount, itemsPerBlock]) => { const row = rowPlan[key] || {}; return `<label class="composition-week-cell"><span>${escapeHtml(label)}</span><input data-composition-week-count="${key}" type="number" min="0" max="12" step="1" value="${row.count ?? ""}" placeholder="padrão" />${itemsPerBlock > 1 ? `<input data-composition-week-items="${key}" type="number" min="1" max="12" value="${row.itemsPerBlock || ""}" placeholder="${itemsPerBlock} itens" />` : ""}<select data-composition-week-policy="${key}"><option value="">padrão</option><option value="prefer" ${row.policy === "prefer" ? "selected" : ""}>preferir</option><option value="required" ${row.policy === "required" ? "selected" : ""}>obrigatório</option><option value="none" ${row.policy === "none" ? "selected" : ""}>não usar</option></select></label>`; }).join("")}</div></details>`;
+    const weekFigures = entries.find((entry) => Number(entry.weekNumber || entry.week) === weekNumber)?.figures || {};
+    return `<details class="composition-week" data-composition-week="${weekNumber}"><summary>Semana ${weekNumber}<small>Deixe vazio para herdar o padrão</small></summary><div class="composition-week-grid">${FIGURE_KINDS.map(([kind, label]) => `<label class="composition-week-cell"><span>🖼️ ${escapeHtml(label)}</span><input data-figure-week="${kind}" type="number" min="0" max="6" step="1" value="${weekFigures[kind] ?? ""}" placeholder="padrão" /></label>`).join("")}${compositionCatalog.map(([key, label, group, defaultCount, itemsPerBlock]) => { const row = rowPlan[key] || {}; return `<label class="composition-week-cell"><span>${escapeHtml(label)}</span><input data-composition-week-count="${key}" type="number" min="0" max="12" step="1" value="${row.count ?? ""}" placeholder="padrão" />${itemsPerBlock > 1 ? `<input data-composition-week-items="${key}" type="number" min="1" max="12" value="${row.itemsPerBlock || ""}" placeholder="${itemsPerBlock} itens" />` : ""}<select data-composition-week-policy="${key}"><option value="">padrão</option><option value="prefer" ${row.policy === "prefer" ? "selected" : ""}>preferir</option><option value="required" ${row.policy === "required" ? "selected" : ""}>obrigatório</option><option value="none" ${row.policy === "none" ? "selected" : ""}>não usar</option></select></label>`; }).join("")}</div></details>`;
   }).join("");
-  container.innerHTML = `<div class="composition-defaults"><div class="composition-table-head"><strong>Bloco do ClassAtelier</strong><span>Qtd. padrão</span><span>Política</span><span>Itens/bloco</span></div>${defaultRows}</div><div class="composition-week-heading"><strong>Exceções por semana</strong><small>Use apenas quando uma semana precisar de composição diferente.</small></div><div class="composition-week-list">${weekMarkup}</div>`;
+  const defaultFigures = plan.default?.figures || {};
+  const figureRows = FIGURE_KINDS.map(([kind, label, hint]) => `<div class="composition-row composition-figure-row"><span class="composition-label"><strong>${escapeHtml(label)}</strong><small>${escapeHtml(hint)}</small></span><input data-figure-default="${kind}" type="number" min="0" max="6" step="1" value="${defaultFigures[kind] ?? ""}" placeholder="IA decide" aria-label="Quantidade de ${escapeHtml(label.toLowerCase())} por semana" /></div>`).join("");
+  container.innerHTML = `<div class="composition-figures"><div class="composition-week-heading"><strong>Figuras e imagens do texto</strong><small>Quantas a IA deve preparar em cada semana. Vazio: a IA decide (de 1 a 3, só onde a imagem explica melhor que o texto). 0: nenhuma daquele tipo.</small></div>${figureRows}</div><div class="composition-defaults"><div class="composition-table-head"><strong>Bloco do ClassAtelier</strong><span>Qtd. padrão</span><span>Política</span><span>Itens/bloco</span></div>${defaultRows}</div><div class="composition-week-heading"><strong>Exceções por semana</strong><small>Use apenas quando uma semana precisar de composição diferente.</small></div><div class="composition-week-list">${weekMarkup}</div>`;
 }
 
 function restoreSnapshot(snapshot) {
@@ -696,6 +927,7 @@ function restoreSnapshot(snapshot) {
   state.studioEdits = snapshot.results?.studioEdits || {};
   state.production = normalizeProductionState(snapshot.results?.production);
   state.flow = normalizeFlow(snapshot.results?.stepFlow);
+  state.lessonPlans = snapshot.results?.lessonPlans && typeof snapshot.results.lessonPlans === "object" ? snapshot.results.lessonPlans : {};
   state.generation = snapshot.results?.generation || snapshot.generation || null;
   if (["running", "consolidating"].includes(state.generation?.status)) state.generation = { ...state.generation, status: "partial" };
   if (state.generation?.status === "partial") {
@@ -785,14 +1017,30 @@ let practiceSequence = 0;
 let materialSequence = 0;
 const selectOption = (value, option) => value === option ? "selected" : "";
 
+// Modalidades das sessões práticas. O valor antigo "Aula síncrona / laboratório prático" vira "Webprática síncrona".
+const PRACTICE_MODALITIES = ["Webprática síncrona", "Laboratório prático", "Aula síncrona"];
+function practiceModality(value) {
+  const raw = String(value || "").trim();
+  if (PRACTICE_MODALITIES.includes(raw)) return raw;
+  if (/laborat/i.test(raw) && !/síncrona \//i.test(raw)) return "Laboratório prático";
+  if (/^aula síncrona$/i.test(raw)) return "Aula síncrona";
+  return "Webprática síncrona";
+}
+
+function practiceMethodologyOptions(selected = "semana") {
+  const current = selected || "semana";
+  return [`<option value="semana" ${current === "semana" ? "selected" : ""}>Mesma da semana</option>`, ...methodologyOptions().map((option) => `<option value="${escapeHtml(option.value)}" title="${escapeHtml(option.hint)}" ${option.value === current ? "selected" : ""}>${escapeHtml(option.label)}</option>`)].join("");
+}
+
 function practiceCard(data = {}) {
   practiceSequence += 1;
   const id = data.id || `webpractice-${practiceSequence}`;
   return `<article class="item-card practice-card" data-id="${escapeHtml(id)}">
-    <div class="item-card-heading"><strong>Sessão prática <span class="item-index">${practiceSequence}</span></strong><button class="remove-item" type="button" data-remove-practice aria-label="Remover webprática">×</button></div>
+    <div class="item-card-heading"><strong>Sessão prática <span class="item-index">${practiceSequence}</span></strong><button class="remove-item" type="button" data-remove-practice aria-label="Remover prática">×</button></div>
     <div class="field-grid two">
       <label class="field"><span>Título da sessão</span><input class="practice-title" value="${escapeHtml(data.title || data.sessionTitle || "")}" placeholder="Ex.: Laboratório de prototipagem com IA" /></label>
-      <label class="field"><span>Modalidade</span><select class="practice-modality"><option ${selectOption(data.modality, "Aula síncrona / laboratório prático")}>Aula síncrona / laboratório prático</option><option ${selectOption(data.modality, "Aula síncrona")}>Aula síncrona</option><option ${selectOption(data.modality, "Laboratório prático")}>Laboratório prático</option></select></label>
+      <label class="field practice-methodology-field"><span>Metodologia ativa da sessão</span><select class="practice-methodology">${practiceMethodologyOptions(data.methodology)}</select><small class="hint">“Mesma da semana” herda a metodologia escolhida para a semana em que a sessão acontece.</small></label>
+      <label class="field"><span>Modalidade</span><select class="practice-modality">${(() => { const current = practiceModality(data.modality); return PRACTICE_MODALITIES.map((value) => `<option ${current === value ? "selected" : ""}>${value}</option>`).join(""); })()}</select></label>
     </div>
     <div class="field-grid three">
       <label class="field"><span>Semana de ocorrência <b>*</b></span><input class="practice-week" type="number" min="1" max="52" value="${Number(data.weekNumber || data.week) || ""}" placeholder="Ex.: 2" /></label>
@@ -819,15 +1067,45 @@ function practiceCard(data = {}) {
   </article>`;
 }
 
+// Conteúdo do material (PDF/DOCX): o texto fica neste navegador; só trechos de cada semana vão para a IA.
+function materialSourceStatus(file) {
+  if (!file) return `<span class="material-source-empty">Nenhum arquivo anexado. Anexe a apostila, o livro ou o roteiro de laboratório para a IA usar o conteúdo dele.</span>`;
+  const unit = file.unit === "parte" ? "partes" : "páginas";
+  return `<strong>📎 ${escapeHtml(file.name || "arquivo")}</strong> · ${Number(file.pageCount) || 0} ${unit} com texto extraído${file.warning ? `<br><span class="material-source-warning">⚠ ${escapeHtml(file.warning)}</span>` : ""} <button type="button" class="link-button material-source-remove">Remover arquivo</button>`;
+}
+
+function materialSourceBox(data = {}) {
+  const usage = data.sourceUsage || "";
+  return `<div class="material-source-box">
+      <div class="material-source-head"><strong>Usar o conteúdo deste material na geração</strong><small>O arquivo é lido no seu navegador e fica guardado nele; para cada semana, só os trechos ligados ao tema vão para a IA, com a página.</small></div>
+      <div class="field-grid two">
+        <label class="field"><span>Arquivo (PDF ou DOCX)</span><input class="material-file" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" /></label>
+        <label class="field"><span>Como a IA deve usar</span><select class="material-usage">${SOURCE_USAGES.map((option) => `<option value="${option.id}" ${option.id === usage ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select></label>
+      </div>
+      <p class="material-source-status">${materialSourceStatus(data.sourceFile)}</p>
+      <label class="field"><span>Páginas por semana (opcional)</span><textarea class="material-week-pages" rows="2" placeholder="Uma linha por semana. Ex.: 1: 1-30
+2: 31-45, 50">${escapeHtml(data.sourceWeekPages || "")}</textarea><small class="hint">Em branco, o app escolhe sozinho os trechos que combinam com o tema de cada semana. “Roteiro de prática” só entra nas semanas com sessão prática.</small></label>
+    </div>`;
+}
+
 function materialCard(data = {}) {
   materialSequence += 1;
   const id = data.id || `material-${materialSequence}`;
-  return `<article class="item-card material-card" data-id="${escapeHtml(id)}">
+  return `<article class="item-card material-card" data-id="${escapeHtml(id)}" data-notes="${escapeHtml(data.notes || "")}" data-source="${escapeHtml(data.sourceFile ? JSON.stringify(data.sourceFile) : "")}">
     <div class="item-card-heading"><strong>Material <span class="item-index">${materialSequence}</span></strong><button class="remove-item" type="button" data-remove-material aria-label="Remover material">×</button></div>
     <div class="field-grid two">
       <label class="field"><span>Título do material</span><input class="material-title" value="${escapeHtml(data.title || "")}" placeholder="Ex.: Texto-base sobre mobilidade urbana" /></label>
       <label class="field"><span>Tipo</span><select class="material-type"><option ${selectOption(data.type, "Texto-base")}>Texto-base</option><option ${selectOption(data.type, "Artigo científico")}>Artigo científico</option><option ${selectOption(data.type, "Livro ou capítulo")}>Livro ou capítulo</option><option ${selectOption(data.type, "Vídeo")}>Vídeo</option><option ${selectOption(data.type, "Relatório ou dados")}>Relatório ou dados</option><option ${selectOption(data.type, "Infográfico")}>Infográfico</option><option ${selectOption(data.type, "Exercício")}>Exercício</option></select></label>
     </div>
+    <div class="field-grid two">
+      <label class="field"><span>Autor ou instituição</span><input class="material-author" value="${escapeHtml(data.author || "")}" placeholder="Ex.: ELMASRI, R.; NAVATHE, S. ou Ministério da Educação" /></label>
+      <label class="field"><span>Referência (ABNT)</span><input class="material-source" value="${escapeHtml(data.source || "")}" placeholder="AUTOR. Título. Edição. Local: Editora, ano." /></label>
+    </div>
+    <div class="field-grid two">
+      <label class="field"><span>Onde encontrar</span><input class="material-where" value="${escapeHtml(data.whereToFind || "")}" placeholder="Ex.: biblioteca virtual do IFSC; site oficial; SciELO" /></label>
+      <label class="field"><span>Termos de busca</span><input class="material-search" value="${escapeHtml(data.search || "")}" placeholder="Para localizar a obra certa" /></label>
+    </div>
+    ${data.notes ? `<p class="hint material-notes">⚠ ${escapeHtml(data.notes)}</p>` : ""}${!data.link && (data.source || data.title) && data.verificationStatus === "suggested-no-url" ? `<p class="hint material-notes">Sugestão da IA: confira se a obra existe e cole o link real antes de usar.</p>` : ""}
     <div class="field-grid two">
       <label class="field"><span>Momento de uso</span><input class="material-moment" value="${escapeHtml(data.moment || "")}" placeholder="Ex.: antes da semana 1; revisão da semana 3" /></label>
       <label class="field"><span>Link real (opcional)</span><input class="material-link" type="url" value="${escapeHtml(data.link || "")}" placeholder="Cole somente um link conferido" /></label>
@@ -837,6 +1115,7 @@ function materialCard(data = {}) {
       <label class="field"><span>Duração (min)</span><input class="material-duration" type="number" min="0" step="1" value="${Number(data.durationMinutes) || ""}" placeholder="Para vídeo/áudio" /></label>
       <label class="field checkbox-field"><span>Leitura obrigatória</span><input class="material-required" type="checkbox" ${data.required ? "checked" : ""} /></label>
     </div>
+    ${materialSourceBox(data)}
     <label class="field"><span>Objetivo do material</span><input class="material-objective" value="${escapeHtml(data.objective || "")}" placeholder="Por que o estudante precisa deste material?" /></label>
     <label class="field"><span>Alinhamento com o conteúdo</span><textarea class="material-alignment" rows="2" placeholder="Que conceito, objetivo ou webprática ele sustenta?">${escapeHtml(data.alignment || "")}</textarea></label>
     <label class="field"><span>Como o estudante vai usar</span><textarea class="material-use" rows="2" placeholder="Ler, comparar, assistir com roteiro, extrair dados…">${escapeHtml(data.use || "")}</textarea></label>
@@ -859,7 +1138,7 @@ function applyPracticeCount() {
   const current = document.querySelectorAll("#practice-list .practice-card").length;
   while (document.querySelectorAll("#practice-list .practice-card").length < requested) addPractice();
   syncPracticeCount();
-  if (current > requested) showAssistantMessage(`Já existem ${current} webprática(s) preenchidas. A redução não remove dados automaticamente; use × nos cartões que deseja retirar.`);
+  if (current > requested) showAssistantMessage(`Já existem ${current} prática(s) preenchidas. A redução não remove dados automaticamente; use × nos cartões que deseja retirar.`);
   updateSummary(); updateProgress(); scheduleSave();
 }
 
@@ -884,7 +1163,8 @@ function collectPractices() {
     materials: splitLines(card.querySelector(".practice-materials").value),
     product: card.querySelector(".practice-product").value.trim(),
     fallbackPlan: card.querySelector(".practice-fallback").value.trim(),
-    durationMinutes: Number(card.querySelector(".practice-duration").value) || 90
+    durationMinutes: Number(card.querySelector(".practice-duration").value) || 90,
+    methodology: card.querySelector(".practice-methodology")?.value || "semana"
   }));
 }
 
@@ -901,7 +1181,14 @@ function collectMaterials() {
     objective: card.querySelector(".material-objective").value.trim(),
     alignment: card.querySelector(".material-alignment").value.trim(),
     use: card.querySelector(".material-use").value.trim(),
-    notes: ""
+    author: card.querySelector(".material-author")?.value.trim() || "",
+    source: card.querySelector(".material-source")?.value.trim() || "",
+    whereToFind: card.querySelector(".material-where")?.value.trim() || "",
+    search: card.querySelector(".material-search")?.value.trim() || "",
+    sourceFile: (() => { try { return card.dataset.source ? JSON.parse(card.dataset.source) : null; } catch { return null; } })(),
+    sourceUsage: card.querySelector(".material-usage")?.value || "",
+    sourceWeekPages: card.querySelector(".material-week-pages")?.value.trim() || "",
+    notes: card.dataset.notes || ""
   }));
 }
 
@@ -921,6 +1208,9 @@ function formInput() {
     objectives: splitLines($("#objectives").value),
     content: $("#content").value,
     didacticMode: $("#didactic-mode").value,
+    pedagogicalApproach: $("#pedagogical-approach")?.value || "nova",
+    unit: $("#course-unit")?.value || "semana",
+    methodologyPlan: collectMethodologyPlan(),
     academicProfile: {
       discipline: $("#course-title").value.trim(),
       level: $("#level").value,
@@ -1249,15 +1539,15 @@ async function assistBriefing() {
     if (accessCode) headers["x-aula-access-code"] = accessCode;
     const response = await fetch("/api/assist-briefing", { method: "POST", headers, body: JSON.stringify({ input, missingFields }) });
     const data = await readApiResponse(response, "Não foi possível preencher o briefing.");
-    setAiActivity("Aplicando sugestões da IA", "Organizando objetivos, materiais e campos de webpráticas…", { progress: 82 });
+    setAiActivity("Aplicando sugestões da IA", "Organizando objetivos, materiais e campos das práticas…", { progress: 82 });
     const briefing = data.briefing || {};
     const filled = [];
     if (!$("#audience").value.trim() && briefing.audience) { $("#audience").value = briefing.audience; filled.push("público"); }
-    if (!$("#objectives").value.trim() && Array.isArray(briefing.objectives) && briefing.objectives.length) { $("#objectives").value = briefing.objectives.join("\n"); filled.push("objetivos"); }
+    if (!$("#objectives").value.trim() && Array.isArray(briefing.objectives) && briefing.objectives.length) { $("#objectives").value = briefing.objectives.join("\n"); filled.push("objetivos"); updateBloomMeter(); }
     if (!$("#content").value.trim() && briefing.content) { $("#content").value = briefing.content; filled.push("conteúdos"); }
     if ($("#practice-enabled").checked && Array.isArray(briefing.webPractices) && briefing.webPractices.length) {
       const practiceFieldsFilled = mergeBriefingPractices(briefing.webPractices);
-      if (practiceFieldsFilled) filled.push(`${briefing.webPractices.length} webprática(s) analisadas (${practiceFieldsFilled} campo(s) completado(s))`);
+      if (practiceFieldsFilled) filled.push(`${briefing.webPractices.length} prática(s) analisadas (${practiceFieldsFilled} campo(s) completado(s))`);
     }
     if (Array.isArray(briefing.materials) && briefing.materials.length && !collectMaterials().some((material) => material.title || material.objective || material.alignment || material.link)) {
       $("#materials-list").innerHTML = "";
@@ -1446,7 +1736,7 @@ function renderLessonPreview(lesson, index) {
     const reflection = section.reflection?.question ? `<div class="reader-callout"><strong>Para refletir</strong><p>${escapeHtml(section.reflection.question)}</p>${paragraphsMarkup(section.reflection.body || "")}</div>` : "";
     const composition = (plan.composition?.entries || []).filter((entry) => Number(entry.sectionNumber) === Number(section.number) || (!entry.sectionNumber && section.number === "1")).map(compositionPreview).join("");
     const resources = [...(section.resources || [])].map(resourcePreview).join("");
-    const figures = (section.figures || []).map((figure) => figure.src ? `<figure class="reader-figure"><img src="${escapeHtml(figure.src)}" alt="${escapeHtml(figure.description || figure.caption || "Figura")}" loading="lazy" /><figcaption>${escapeHtml((figure.caption || figure.description || "").replace(/[.\s]+$/, ""))}. <em>Ilustração criada por IA · revisar antes de publicar.</em></figcaption></figure>` : `<p class="reader-resource-pending">Figura prevista (ainda sem ilustração): ${escapeHtml(figure.description)}</p>`).join("");
+    const figures = (section.figures || []).map((figure) => figure.src ? `<figure class="reader-figure"><img src="${escapeHtml(figure.src)}" alt="${escapeHtml(figure.description || figure.caption || "Figura")}" loading="lazy" /><figcaption>${escapeHtml((figure.caption || figure.description || "").replace(/[.\s]+$/, ""))}. <em>Ilustração criada por IA · revisar antes de publicar.</em></figcaption></figure>` : suggestedImageMarkup(figure, { lesson: plan.theme || lesson?.meta?.title || "", section: section.title || "" })).join("");
     return `<section><h3>${escapeHtml(`${section.number || ""} ${section.title || "Seção"}`.trim())}</h3>${paragraphsMarkup(section.body)}${figures}${composition}${resources}${subs}${caseMarkup}${reflection}</section>`;
   }).join("");
   const globalResources = Object.values(allResources).flat().filter((resource) => resource && !sections.some((section) => (section.resources || []).some((item) => item.id && item.id === resource.id))).slice(0, 12).map(resourcePreview).join("");
@@ -1477,14 +1767,27 @@ function renderLessonPreview(lesson, index) {
   const timeItems = (plan.timePlan?.items || []).filter((item) => Number(item.minutes || item.learnerMinutes) > 0).map((item) => `<li><strong>${escapeHtml(workloadItemLabel(item))}</strong>: ${escapeHtml(item.title || "")} — ${formatLoad(item.minutes || item.learnerMinutes)}${item.required === false ? " · complementar" : " · obrigatório"}</li>`).join("");
   const timeBreakdown = Object.entries(plan.timePlan?.breakdown || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<li><strong>${escapeHtml(breakdownLabels[key] || key)}</strong>: ${formatLoad(value)}</li>`).join("");
   const timeMarkup = timeItems || timeBreakdown ? `<section class="time-breakdown reader-time-breakdown"><h3>Tempo desta semana</h3><p>O cálculo está separado por texto-base, leituras, mídias e atividades. “Obrigatório” indica o que entra na trilha essencial; “complementar” não é obrigatório.</p><ul>${timeItems || timeBreakdown}</ul></section>` : "";
+  const pendingFigures = weekHasPendingFigures(lesson) ? `<section class="reader-warning"><h3>Figuras pendentes</h3><p>Esta semana tem diagramas planejados que ainda não foram desenhados pela IA. O texto não é alterado. Se algum continuar sem sair, cada diagrama pendente, no ponto do texto em que aparece, traz um pedido pronto para o ChatGPT (ou outro gerador de imagens) e um texto para o Napkin.</p><button type="button" class="secondary" id="retry-figures-button">Criar figuras pendentes</button></section>` : "";
+  const methodology = methodologyPreviewMarkup(plan, guide, index, lesson);
+  const approvedPlanText = plan.approvedPlan || state.lessonPlans?.[index] || "";
+  const approvedPlanMarkup = approvedPlanText ? `<section class="reader-approved-plan"><details><summary><strong>Plano da aula aprovado por você</strong> <small>(a aula foi gerada seguindo este plano)</small></summary><pre>${escapeHtml(approvedPlanText)}</pre></details></section>` : "";
+  const usageLabel = { base: "base do conteúdo", apoio: "referência de apoio", pratica: "roteiro de prática" };
+  const sourceUsed = (plan.sourceUsed || []).length ? `<section class="reader-source-used"><h3>Material do professor usado nesta semana</h3><ul>${plan.sourceUsed.map((item) => `<li><strong>${escapeHtml(item.title || "Material")}</strong> (${escapeHtml(usageLabel[item.usage] || item.usage || "")}) · ${item.unit === "parte" ? "partes" : "páginas"} ${escapeHtml((item.pages || []).join(", "))}${item.chosenByTeacher ? " · escolhidas por você" : " · escolhidas pelo app"}</li>`).join("")}</ul><small>Estes foram os trechos enviados à IA. Se não forem os certos, indique as páginas da semana no cartão do material e refaça a semana.</small></section>` : "";
   const alignment = (plan.alignmentMatrix || []).length ? `<section><h3>Alinhamento pedagógico</h3><ul>${plan.alignmentMatrix.map((row) => `<li><strong>${escapeHtml(row.objective || "Objetivo")}</strong>: ${escapeHtml(row.evidence || "evidência a definir")} · avaliação: ${escapeHtml((row.assessmentQuestions || []).join(", ") || "a definir")}</li>`).join("")}</ul></section>` : "";
   const mediation = mediationMessagesMarkup(guide.mediationMessages, plan.theme || lesson?.meta?.title || `a semana ${index + 1}`, index + 1)
     + (guide.weekSummary && guide.studentFAQ?.length ? "" : `<section class="reader-warning"><h3>Explicações para o professor</h3><p>Esta semana ainda não tem o resumo, as perguntas prováveis dos alunos, os equívocos comuns e os sinais de alerta que entram no Material de Mediação. O texto da semana não é alterado.</p><button type="button" class="secondary" id="retry-explain-button">Completar explicações do Material de Mediação</button></section>`);
   $("#lesson-modal-eyebrow").textContent = `PRÉVIA · SEMANA ${String(index + 1).padStart(2, "0")}`;
   $("#lesson-modal-title").textContent = plan.theme || lesson?.meta?.title || `Semana ${index + 1}`;
-  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${sectionsMarkup}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
+  $("#lesson-reader").innerHTML = `${validationIssue}${issue}${academicIssue}<div class="reader-callout"><strong>Arco desta semana:</strong> ${escapeHtml(arc.label || "Arco variável")} · ${escapeHtml(phaseSummary || "progressão definida pelo conteúdo")}</div><div class="reader-welcome">${paragraphsMarkup(plan.welcome || "Abertura da semana ainda não foi preenchida.")}</div><section class="reader-objectives"><h3>Objetivos de aprendizagem</h3><ul>${objectives.map((objective) => `<li>${escapeHtml(objective)}</li>`).join("")}</ul></section>${diagnostic}${pendingFigures}${approvedPlanMarkup}${sourceUsed}${sectionsMarkup}${methodology}${activities}${formative}${globalResources ? `<section><h3>Recursos gerais</h3>${globalResources}</section>` : ""}${plan.synthesis ? `<section><h3>Síntese</h3>${paragraphsMarkup(plan.synthesis)}</section>` : ""}${plan.nextWeekConnection ? `<section><h3>Conexão com a próxima semana</h3>${paragraphsMarkup(plan.nextWeekConnection)}</section>` : ""}${differentiation}${selfAssessment}${glossary}${references}${assessment}${alignment}${timeMarkup}${workload}${mediation}${productionMarkup(index, weekReleased(index) || manuallyApproved || ["ready", "complete"].includes(automaticStatus))}`;
   renderFlowPanel(index);
   $("#retry-derivatives-button")?.addEventListener("click", () => retryDerivatives(index));
+  $("#retry-figures-button")?.addEventListener("click", () => retryFigures(index));
+  $("#methodology-guide-button")?.addEventListener("click", async (event) => { await retryDerivatives(index, { parts: ["methodology"], button: event.currentTarget }); openLessonPreview(index); });
+  document.querySelectorAll("#lesson-reader .copy-suggestion").forEach((button) => button.addEventListener("click", async () => {
+    const value = button.previousElementSibling?.value || "";
+    try { await navigator.clipboard.writeText(value); } catch { button.previousElementSibling?.select(); document.execCommand?.("copy"); }
+    const label = button.textContent; button.textContent = "Copiado!"; setTimeout(() => { button.textContent = label; }, 1600);
+  }));
   $("#retry-explain-button")?.addEventListener("click", (event) => retryDerivatives(index, { parts: ["explain"], button: event.currentTarget }));
   $("#production-week-button")?.addEventListener("click", () => generateProductionWeek(index));
   $("#production-sheet-button-card")?.addEventListener("click", downloadProductionSheet);
@@ -1543,6 +1846,85 @@ function refreshChecklistFromWeek(index) {
 }
 
 // Gera só a avaliação, as atividades e a mediação de uma semana cujo texto já está salvo.
+// Metodologia ativa na prévia: por que, como as atividades a aplicam e o guia de aplicação para o professor.
+function methodologyPreviewMarkup(plan, guide, index, lesson) {
+  const declared = plan.activeMethodology || {};
+  const label = declared.label || methodologyForWeekLabel(index, lesson);
+  if (!label) return "";
+  const list = (items) => (Array.isArray(items) && items.length ? `<ul>${items.map((item) => `<li>${escapeHtml(typeof item === "object" ? Object.values(item).filter(Boolean).join(" — ") : item)}</li>`).join("")}</ul>` : "");
+  const mg = guide?.methodologyGuide;
+  const head = `<h3>Metodologia ativa: ${escapeHtml(label.replace(/^Metodologia: /, ""))}</h3>${declared.rationale ? `<p><strong>Por que esta metodologia:</strong> ${escapeHtml(declared.rationale)}</p>` : ""}${declared.howApplied ? `<p><strong>Como as atividades a aplicam:</strong> ${escapeHtml(declared.howApplied)}</p>` : ""}${declared.modalityNote ? `<p><small>${escapeHtml(declared.modalityNote)}</small></p>` : ""}`;
+  if (!mg) return `<section class="reader-methodology">${head}<div class="reader-warning"><p>O <strong>guia de aplicação</strong> (passo a passo, como acompanhar e como avaliar se está funcionando) ainda não foi gerado para esta semana. Ele também entra no Material de Mediação (PDF).</p><button type="button" class="secondary" id="methodology-guide-button">Gerar o guia de aplicação da metodologia</button></div></section>`;
+  const phases = (mg.phases || []).map((phase, position) => `<li><strong>${position + 1}. ${escapeHtml(phase.name || "Etapa")}</strong>${phase.when ? ` <em>(${escapeHtml(phase.when)})</em>` : ""}${phase.goal ? `<br>${escapeHtml(phase.goal)}` : ""}${(phase.teacherActions || []).length ? `<br><small><strong>Professor:</strong> ${escapeHtml(phase.teacherActions.join(" · "))}</small>` : ""}${(phase.studentActions || []).length ? `<br><small><strong>Estudante:</strong> ${escapeHtml(phase.studentActions.join(" · "))}</small>` : ""}</li>`).join("");
+  const monitoring = (mg.monitoring || []).map((item) => `<li><strong>${escapeHtml(item.indicator || "")}</strong>${item.howToCheck ? ` — ${escapeHtml(item.howToCheck)}` : ""}${item.when ? ` <em>(${escapeHtml(item.when)})</em>` : ""}${item.ifLow ? `<br><small>Se estiver baixo: ${escapeHtml(item.ifLow)}</small>` : ""}</li>`).join("");
+  const warnings = (mg.warningSignals || []).map((item) => `<li><strong>${escapeHtml(item.signal || "")}</strong>${item.action ? ` → ${escapeHtml(item.action)}` : ""}</li>`).join("");
+  const assess = mg.assessment || {};
+  return `<section class="reader-methodology">${head}<details open><summary><strong>Guia de aplicação para o professor</strong></summary>
+    ${mg.whatItIs ? `<p><strong>O que é:</strong> ${escapeHtml(mg.whatItIs)}</p>` : ""}${mg.whyHere ? `<p><strong>Por que nesta semana:</strong> ${escapeHtml(mg.whyHere)}</p>` : ""}
+    ${(mg.beforeTheWeek || []).length ? `<h4>Antes de abrir a semana</h4>${list(mg.beforeTheWeek)}` : ""}
+    ${phases ? `<h4>Passo a passo</h4><ol class="methodology-phases">${phases}</ol>` : ""}
+    ${mg.studentInstructions ? `<h4>Texto para o aluno (Moodle)</h4><p class="methodology-student-text">${escapeHtml(mg.studentInstructions)}</p>` : ""}
+    ${monitoring ? `<h4>Como acompanhar se está funcionando</h4><ul>${monitoring}</ul>` : ""}
+    ${(mg.successSignals || []).length ? `<h4>Sinais de que deu certo</h4>${list(mg.successSignals)}` : ""}
+    ${warnings ? `<h4>Sinais de alerta e o que fazer</h4><ul>${warnings}</ul>` : ""}
+    ${assess.howToAssess || (assess.criteria || []).length ? `<h4>Como avaliar a aprendizagem</h4>${assess.howToAssess ? `<p>${escapeHtml(assess.howToAssess)}</p>` : ""}${list((assess.criteria || []).map((item) => `${item.criterion || ""}${item.evidence ? ` — evidência: ${item.evidence}` : ""}`))}` : ""}
+    ${(mg.pitfalls || []).length ? `<h4>Erros comuns</h4>${list(mg.pitfalls)}` : ""}
+    ${mg.adaptations ? `<h4>Adaptações</h4>${list([mg.adaptations.ead ? `100% a distância: ${mg.adaptations.ead}` : "", mg.adaptations.synchronous ? `Encontro ao vivo / prática: ${mg.adaptations.synchronous}` : "", mg.adaptations.largeClass ? `Turma grande: ${mg.adaptations.largeClass}` : ""].filter(Boolean))}` : ""}
+    <button type="button" class="secondary" id="methodology-guide-button">Gerar o guia de novo</button></details></section>`;
+}
+
+// Imagem sugerida (foto para gerar fora, ou visual para o Napkin): o professor cria e insere no ClassAtelier.
+function suggestedImageMarkup(figure, context = {}) {
+  if (figure.kind === "foto") {
+    return `<div class="reader-suggested-image"><strong>📷 Foto sugerida</strong> <span>(crie fora, por exemplo no ChatGPT, e insira no ClassAtelier com “Inserir imagem no cursor”)</span><p>${escapeHtml(figure.description)}</p>${figure.prompt ? `<label>Pedido para o gerador de imagens</label><textarea readonly rows="3">${escapeHtml(figure.prompt)}</textarea><button type="button" class="secondary copy-suggestion">Copiar pedido</button>` : ""}${figure.caption ? `<small>Legenda sugerida: ${escapeHtml(figure.caption)}</small>` : ""}</div>`;
+  }
+  if (figure.kind === "napkin") {
+    return `<div class="reader-suggested-image"><strong>🧩 Visual sugerido para o Napkin</strong> <span>(cole o texto em <a href="https://www.napkin.ai" target="_blank" rel="noopener">napkin.ai</a>, escolha o visual e insira no ClassAtelier)</span><p>${escapeHtml(figure.description)}</p>${figure.napkinText ? `<label>Texto para colar no Napkin</label><textarea readonly rows="4">${escapeHtml(figure.napkinText)}</textarea><button type="button" class="secondary copy-suggestion">Copiar texto</button>` : ""}${figure.caption ? `<small>Legenda sugerida: ${escapeHtml(figure.caption)}</small>` : ""}</div>`;
+  }
+  const prompt = externalDiagramPrompt(figure, context);
+  const napkin = [figure.description, figure.caption].filter(Boolean).map((part) => String(part).replace(/[.\s]+$/, "")).join(". ") + ".";
+  return `<div class="reader-suggested-image is-pending"><strong>📐 Diagrama ainda não desenhado</strong> <span>(use “Criar figuras pendentes” acima ou crie fora: cole o pedido no ChatGPT ou em outro gerador de imagens, ou o texto no <a href="https://www.napkin.ai" target="_blank" rel="noopener">napkin.ai</a>, e insira no ClassAtelier com “Inserir imagem no cursor”)</span><p>${escapeHtml(figure.description)}</p><label>Pedido para o ChatGPT ou outro gerador de imagens</label><textarea readonly rows="6">${escapeHtml(prompt)}</textarea><button type="button" class="secondary copy-suggestion">Copiar pedido</button><label>Texto para colar no Napkin</label><textarea readonly rows="3">${escapeHtml(napkin)}</textarea><button type="button" class="secondary copy-suggestion">Copiar texto</button>${figure.caption ? `<small>Legenda sugerida: ${escapeHtml(figure.caption)}</small>` : ""}</div>`;
+}
+
+// Pedido pronto para gerar fora o diagrama que a IA do ClassAuthor não desenhou.
+function externalDiagramPrompt(figure, context = {}) {
+  const course = $("#course-title")?.value.trim() || "";
+  const audience = $("#audience")?.value.trim() || "";
+  return [
+    `Crie um diagrama didático para uma aula${course ? ` do curso "${course}"` : ""}${context.lesson ? `, tema "${context.lesson}"` : ""}${context.section ? `, seção "${context.section}"` : ""}.`,
+    `O que o diagrama precisa mostrar: ${String(figure.description || "").replace(/[.\s]+$/, "")}.`,
+    figure.caption ? `Ele vai acompanhar a legenda: "${String(figure.caption).replace(/[.\s]+$/, "")}".` : "",
+    audience ? `Público: ${audience}.` : "",
+    "Requisitos: tecnicamente exato; todos os rótulos em português do Brasil, escritos exatamente com os termos acima e sem erros de ortografia; estilo vetorial plano e limpo, fundo branco, poucas cores com bom contraste (legível também em preto e branco), setas e conectores claros, hierarquia visual evidente; formato horizontal 16:9; sem pessoas, sem logotipos, sem marcas d'água e sem texto decorativo além dos rótulos.",
+    "Se algum termo técnico for ambíguo, pergunte antes de desenhar."
+  ].filter(Boolean).join("\n");
+}
+
+async function retryFigures(index) {
+  if (aiActionBusy) return;
+  const button = $("#retry-figures-button");
+  if (!beginAiAction(button)) return;
+  setBusy(button, true, "Desenhando…");
+  try {
+    const input = formInput();
+    const accessCode = input.accessCode || $("#access-code")?.value || "";
+    delete input.accessCode;
+    const headers = { "Content-Type": "application/json" };
+    if (accessCode) headers["x-aula-access-code"] = accessCode;
+    const result = await illustrateGeneratedWeek({ week: state.weeks[index], teacherGuide: state.teacherGuides[index] }, input, index, headers, button);
+    if (result.week) { state.weeks[index] = result.week; if (state.studioEdits) delete state.studioEdits[index]; }
+    saveDraft("figuras-geradas");
+    openLessonPreview(index);
+    if (result.figuresError) finishAiActivity("Figuras não criadas", result.figuresError, "error");
+    else if (!result.figuresFailed) finishAiActivity("Figuras criadas", `Os diagramas da semana ${index + 1} foram desenhados. Confira na prévia.`);
+  } catch (error) {
+    finishAiActivity("Figuras não criadas", error.message, "error");
+  } finally {
+    setBusy(button, false, "");
+    endAiAction();
+  }
+}
+
 async function retryDerivatives(index, options = {}) {
   if (aiActionBusy) return;
   const parts = Array.isArray(options.parts) && options.parts.length ? options.parts : null;
@@ -1557,7 +1939,7 @@ async function retryDerivatives(index, options = {}) {
     delete input.accessCode;
     const headers = { "Content-Type": "application/json" };
     if (accessCode) headers["x-aula-access-code"] = accessCode;
-    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input, weekIndex: index, week: state.weeks[index], teacherGuide: state.teacherGuides[index], ...(parts ? { parts } : {}) }) });
+    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input: await withSources(input, index, state.weeks[index]), weekIndex: index, week: state.weeks[index], teacherGuide: state.teacherGuides[index], ...(parts ? { parts } : {}) }) });
     const done = await readApiResponse(response, `Não foi possível gerar ${partsText} da semana ${index + 1}.`);
     state.weeks[index] = done.week; if (state.studioEdits) delete state.studioEdits[index];
     state.teacherGuides[index] = done.teacherGuide || state.teacherGuides[index];
@@ -1633,12 +2015,12 @@ async function regenerateSelectedWeek() {
     state.input = input;
     const headers = { "Content-Type": "application/json" };
     if (accessCode) headers["x-aula-access-code"] = accessCode;
-    const response = await fetch("/api/regenerate-week", { method: "POST", headers, body: JSON.stringify({ input, weekIndex: index, instruction, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
+    const response = await fetch("/api/regenerate-week", { method: "POST", headers, body: JSON.stringify({ input: await withSources(input, index, state.weeks[index]), weekIndex: index, instruction, weeks: state.weeks, teacherGuides: state.teacherGuides }) });
     const data = await readApiResponse(response, "Não foi possível refazer a semana.");
     state.weeks = data.weeks || state.weeks;
     state.teacherGuides = data.teacherGuides || state.teacherGuides;
     saveDraft("semana-refeita");
-    const completed = await completeDerivativesStep({ ...data, week: data.weeks?.[index], teacherGuide: data.teacherGuides?.[index], resourcesDeferred: true }, input, index, headers, button);
+    const completed = await completeMethodologyStep(await completeDerivativesStep({ ...data, week: data.weeks?.[index], teacherGuide: data.teacherGuides?.[index], resourcesDeferred: true }, input, index, headers, button), input, index, headers, button);
     const enriched = await illustrateGeneratedWeek(await enrichGeneratedWeek(completed, input, index, headers, button), input, index, headers, button);
     if (enriched.week) data.weeks[index] = enriched.week;
     if (enriched.teacherGuide) data.teacherGuides[index] = enriched.teacherGuide;
@@ -1745,7 +2127,7 @@ function workloadItemLabel(item = {}) {
   if (item.category === "video") return item.required ? "Vídeo obrigatório" : "Vídeo complementar";
   if (item.category === "assessment") return "Quiz/avaliação";
   if (item.category === "forum") return "Fórum/discussão";
-  if (item.category === "practice") return "Webprática síncrona";
+  if (item.category === "practice") return "Prática (webprática, laboratório ou aula síncrona)";
   if (item.category === "review") return "Síntese e revisão";
   if (item.category === "image") return "Imagem/diagrama";
   if (item.category === "audio") return "Áudio/podcast";
@@ -1765,7 +2147,7 @@ const breakdownLabels = {
   interactiveMinutes: "Interativos ClassAtelier",
   quizMinutes: "Quiz/avaliação",
   forumMinutes: "Fórum/discussão",
-  practiceMinutes: "Webprática",
+  practiceMinutes: "Prática",
   reviewMinutes: "Síntese/revisão",
   projectMinutes: "Projeto/produção",
   otherMinutes: "Outras atividades"
@@ -1789,7 +2171,7 @@ function reviewCheckChecked(item = {}, reviewMarks = state.reviewMarks || create
 //   scope "full"            -> reescrita da semana (só quando o próprio item exige texto novo em grande parte)
 //   scope "manual"          -> conferência humana; não há o que a IA refazer sozinha
 const REVIEW_LIMITS_EDIT = "Altere SOMENTE o que este item exige. Preserve todo o resto da semana: título, objetivos, seções, recursos, figuras, questões e atividades que não estejam envolvidos. Não reordene nem reescreva por estilo. Não invente autores, dados, referências, DOI ou URLs; onde faltar base, marque como “a conferir”.";
-const PARTS_LABEL = { explain: "as explicações para o professor", assessment: "as questões", activities: "o diagnóstico, as paradas e as atividades", mediation: "o Material de Mediação", webpractice: "a webprática" };
+const PARTS_LABEL = { methodology: "o guia de aplicação da metodologia", explain: "as explicações para o professor", assessment: "as questões", activities: "o diagnóstico, as paradas e as atividades", mediation: "o Material de Mediação", webpractice: "a prática" };
 
 function reviewActionFor(kind, item, lesson) {
   const id = String(item.id || "");
@@ -1801,11 +2183,15 @@ function reviewActionFor(kind, item, lesson) {
     "objective-present": { scope: "edit", title: "Como verificar os objetivos", checks: ["Há de 4 a 6 objetivos, cada um com verbo observável (comparar, aplicar, justificar…).", "Cada objetivo é coberto por pelo menos uma seção do texto."], ask: "Reescreva SOMENTE a lista de objetivos de aprendizagem: de 4 a 6 objetivos observáveis (verbo mensurável + objeto + contexto), cada um coberto por uma seção do texto atual. Não altere o texto das seções.", accept: "Lista de objetivos observáveis, coerente com as seções existentes." },
     "content-present": { scope: sections.length < 5 ? "full" : "edit", title: "Como verificar o desenvolvimento do conteúdo", checks: ["Há pelo menos 5 seções e quatro delas com desenvolvimento real (conceito, exemplo, aplicação).", "Nenhuma seção é só uma introdução de duas linhas."], ask: sections.length < 5 ? "O texto tem menos de 5 seções. Acrescente as seções que faltam para cobrir os objetivos, mantendo as existentes exatamente como estão." : "Desenvolva SOMENTE as seções curtas (menos de 120 caracteres de corpo), inserindo parágrafos de aprofundamento: o conceito, um exemplo concreto e, se couber, um contraponto. Não mexa nas seções que já estão desenvolvidas.", accept: "Todas as seções com desenvolvimento real; as já boas permanecem iguais." },
     "alignment-complete": { scope: "derivatives", parts: ["assessment", "activities"], title: "Como verificar o alinhamento", checks: ["Cada objetivo aparece no texto, em uma atividade com evidência e em pelo menos uma questão."], ask: "Gerar de novo apenas as questões e as atividades, de modo que cada objetivo tenha conteúdo, atividade, evidência e questão relacionados.", accept: "Matriz de alinhamento completa; o texto da semana não é tocado." },
+    "bloom-verbs": { scope: "edit", title: "Como verificar os verbos dos objetivos", checks: ["Nenhum objetivo começa com compreender, conhecer, entender, saber, aprender, perceber ou refletir.", "Cada verbo descreve algo que se pode observar na produção do estudante."], ask: "Reescreva SOMENTE a lista de objetivos de aprendizagem, trocando verbos vagos (compreender, conhecer, entender, saber, aprender, perceber, refletir) por verbos observáveis equivalentes (explicar, comparar, aplicar, analisar, avaliar, propor…), sem mudar a intenção de cada objetivo. Não altere o texto das seções.", accept: "Todos os objetivos com verbos observáveis, mesma intenção." },
+    "human-voice": { scope: "edit", title: "Como verificar a voz do texto", checks: ["Procure as expressões listadas no item (\"além disso\", \"vale ressaltar\", \"é fundamental\", \"nesse contexto\"…).", "Leia em voz alta um trecho: deve soar como você falando com a turma."], ask: "Reescreva o texto da semana para soar como um professor conversando com a turma: elimine expressões típicas de texto de IA (além disso, nesse sentido, dessa forma, vale ressaltar, é fundamental, é crucial, em suma, neste contexto, no cenário atual, cada vez mais, desempenha um papel, não se trata apenas, jornada, mergulhar), varie o ritmo das frases e abra cada seção com algo concreto. Mantenha os fatos, casos, seções, callouts e referências exatamente como estão.", accept: "Mesmo conteúdo, sem as marcas de texto de IA, com ritmo natural." },
+    "bloom-balance": { scope: "edit", title: "Como verificar o nível dos objetivos", checks: ["Pelo menos um objetivo pede aplicar, analisar, avaliar ou criar.", "O texto da semana prepara o estudante para esse nível (exemplo aplicado, caso ou exercício)."], ask: "Reescreva SOMENTE a lista de objetivos de aprendizagem para que pelo menos um deles esteja em nível de aplicação ou acima (aplicar, analisar, avaliar ou criar), coerente com o que as seções já desenvolvem. Não altere o texto das seções.", accept: "Ao menos um objetivo em nível de aplicação ou acima." },
+    "methodology-applied": { scope: "derivatives", parts: ["activities"], title: "Como verificar a metodologia ativa", checks: ["As atividades seguem a estrutura da metodologia escolhida para a semana.", "Há uma justificativa de por que ela serve aos objetivos e de como foi aplicada."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação, seguindo a metodologia ativa da semana.", accept: "Atividades estruturadas pela metodologia, com justificativa." },
     "activity-present": { scope: "derivatives", parts: ["activities"], title: "Como verificar as atividades", checks: ["Existe ao menos uma atividade ativa ou produto observável, com critérios."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "Pelo menos uma atividade com evidência e critérios." },
     "diagnostic-present": { scope: "derivatives", parts: ["activities"], title: "Como verificar o diagnóstico", checks: ["Há uma pergunta de entrada ligada ao dia a dia do estudante, ou a ausência está justificada."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "Diagnóstico de entrada presente." },
     "formative-present": { scope: "derivatives", parts: ["activities"], title: "Como verificar as paradas formativas", checks: ["Há de 2 a 4 checagens ao longo das seções, cada uma com o que fazer se o estudante errar."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "De 2 a 4 paradas formativas com ação de correção." },
     "summative-alignment": { scope: "derivatives", parts: ["assessment"], title: "Como verificar a avaliação final", checks: ["As 6 questões cobrem todos os objetivos, têm 5 alternativas e feedback em todas.", "A explicação da correta cita o texto da semana."], ask: "Gerar de novo apenas as questões da atividade avaliativa (6 questões, 5 alternativas, feedback em todas).", accept: "Questões alinhadas aos objetivos, com feedback por alternativa." },
-    "practice-complete": { scope: "derivatives", parts: [scheduledPractice ? "webpractice" : "mediation"], title: "Como verificar a webprática", checks: ["A webprática tem produto, etapas, critérios e plano B."], ask: scheduledPractice ? "Gerar de novo apenas o projeto da webprática (produto, etapas, critérios e plano B)." : "Gerar de novo apenas o Material de Mediação.", accept: "Webprática com produto, etapas, critérios e plano B." },
+    "practice-complete": { scope: "derivatives", parts: [scheduledPractice ? "webpractice" : "mediation"], title: "Como verificar a prática", checks: ["A prática tem produto, etapas, critérios e plano B."], ask: scheduledPractice ? "Gerar de novo apenas o projeto da prática (produto, etapas, critérios e plano B)." : "Gerar de novo apenas o Material de Mediação.", accept: "Prática com produto, etapas, critérios e plano B." },
     "self-assessment": { scope: "derivatives", parts: ["activities"], title: "Como verificar a autoavaliação", checks: ["O estudante recebe perguntas de autoavaliação com escala, ou uma reflexão final."], ask: "Gerar de novo apenas o diagnóstico, as paradas formativas, as atividades e a autoavaliação.", accept: "Autoavaliação presente." },
     "resource-context": { scope: "edit", title: "Como verificar a função dos recursos", checks: ["Em cada recurso “Veja mais aqui”, o parágrafo diz o que observar e por que vale abrir.", "A função pedagógica cabe em uma frase e aponta o objetivo atendido."], ask: "Para os recursos que estão sem parágrafo de ligação ou sem função pedagógica, escreva a ligação (o que observar e por que vale abrir, em duas ou três frases, no ponto do texto em que o recurso aparece) e a função pedagógica (uma frase). Mude somente esses dois campos, só nos recursos que estiverem vazios ou genéricos; não troque links nem mexa no texto das seções.", accept: "Todo recurso com ligação e função pedagógica específicas; links e texto inalterados." },
     accessibility: { scope: "edit", title: "Como verificar a acessibilidade", checks: ["Imagens e figuras têm texto alternativo que descreve o que importa, em uma frase.", "Vídeos e áudios: legenda ou transcrição é conferência humana na fonte; a IA não consegue garantir isso."], ask: "Escreva o texto alternativo (uma frase descritiva, sem “imagem de”) SOMENTE das imagens, figuras e recursos visuais que estão sem ele. Não altere links, títulos nem o texto das seções. Para vídeos e áudios, não invente informação sobre legenda ou transcrição.", accept: "Todo recurso visual com texto alternativo; o restante inalterado." },
@@ -1960,8 +2346,7 @@ function organizeResultSectors(container, previousOpenStates = null) {
     return sector;
   };
   container.replaceChildren(
-    makeSector("results-load", "Carga por atividade", "Resumo da meta, carga calculada, categorias e arco didático do curso.", overview),
-    makeSector("results-breakdown", "Carga aberta por atividade", "Tempo separado por texto-base, leituras, vídeos, interativos, avaliação e demais atividades.", breakdown),
+    makeSector("results-load", "Carga por atividade", "Resumo da meta e da carga calculada e, logo abaixo, o tempo aberto por texto-base, leituras, vídeos, interativos, avaliação e demais atividades.", (() => { const both = document.createElement("div"); both.className = "results-load-combined"; if (overview) both.appendChild(overview); if (breakdown) both.appendChild(breakdown); return both; })()),
     makeSector("results-review", "Checklists", "Conferências pedagógicas, acadêmicas, de recursos, qualidade e liberação manual.", checklists)
   );
 }
@@ -1972,7 +2357,7 @@ function renderGeneralPlan(plan) {
   const resultOpenStates = new Map([...container.querySelectorAll(":scope > .results-sector")].map((sector) => [sector.id, sector.open]));
   const reviewOpenStates = new Map([...container.querySelectorAll(".review-panel")].flatMap((panel) => { const kind = [...panel.classList].find((name) => name.startsWith("checklist-"))?.replace("checklist-", ""); return kind ? [[kind, panel.open]] : []; }));
   const totals = plan.totals;
-  const labels = { contentMinutes: "Conteúdo", resourcesMinutes: "Materiais e mídia", practiceMinutes: "Webpráticas", assessmentMinutes: "Avaliação", reviewMinutes: "Revisão", communicationMinutes: "Comunicação", projectMinutes: "Projetos", otherMinutes: "Outros" };
+  const labels = { contentMinutes: "Conteúdo", resourcesMinutes: "Materiais e mídia", practiceMinutes: "Práticas/Laboratório", assessmentMinutes: "Avaliação", reviewMinutes: "Revisão", communicationMinutes: "Comunicação", projectMinutes: "Projetos", otherMinutes: "Outros" };
   const categoryMarkup = Object.entries(plan.categoryTotals || {}).filter(([, value]) => Number(value) > 0).map(([key, value]) => `<span>${escapeHtml(labels[key] || key)}: ${formatMinutes(value)}</span>`).join("");
   const unresolved = Array.isArray(plan.unresolvedResources) ? plan.unresolvedResources : [];
   const arcs = (plan.didacticArcs || []).filter((arc) => arc.label).map((arc) => `<span class="arc-chip">${escapeHtml(arc.label)}</span>`).join("");
@@ -1983,7 +2368,7 @@ function renderGeneralPlan(plan) {
   const checklistMarkup = reviewPanelMarkup("checks", "Checklist pedagógico", checklist, `${passed}/${checklist.length} itens atendidos automaticamente; ${checkedChecks}/${checklist.length} atualmente marcados. Desmarque qualquer item que queira refazer ou revisar novamente.`, "Nenhum item pedagógico foi retornado.", reviewOpenStates.get("checks") ?? true);
   const progressionMarkup = Array.isArray(plan.progression) && plan.progression.length ? `<div class="general-warning"><strong>Progressão curricular</strong><ul>${plan.progression.map((item) => `<li>Semana ${item.weekNumber}: ${escapeHtml(item.theme || "")} ${item.projectMilestone ? `— ${escapeHtml(item.projectMilestone)}` : ""}</li>`).join("")}</ul></div>` : "";
   const practices = Array.isArray(plan.webPracticeSchedule) ? plan.webPracticeSchedule : [];
-  const practiceMarkup = practices.length ? `<section class="webpractice-schedule"><div class="schedule-heading"><div><p class="eyebrow">SESSÕES PRÁTICAS INDEPENDENTES</p><h3>Webpráticas programadas</h3><p>Estas sessões não entram no texto-base nem no JSON do aluno. Cada uma é exportada como roteiro DOCX para o professor.</p></div></div><div class="schedule-list">${practices.map((practice, index) => `<article class="schedule-item"><div><strong>${escapeHtml(practice.title || `Webprática ${index + 1}`)}</strong><span>${escapeHtml([practice.weekNumber ? `Semana ${practice.weekNumber}` : "", practice.date ? formatDate(practice.date) : "", practice.dayOfWeek, [practice.startTime, practice.endTime].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "Agenda a confirmar")}</span><small>${escapeHtml([practice.modality, practice.tool, practice.platform].filter(Boolean).join(" · ") || "Sessão síncrona / laboratório prático")}</small></div><button class="button button-secondary webpractice-download" data-practice-id="${escapeHtml(practice.id || practice.title || "")}" type="button">Baixar DOCX <span>↓</span></button></article>`).join("")}</div></section>` : "";
+  const practiceMarkup = practices.length ? `<section class="webpractice-schedule"><div class="schedule-heading"><div><p class="eyebrow">SESSÕES PRÁTICAS INDEPENDENTES</p><h3>Práticas/Laboratório</h3><p>Estas sessões não entram no texto-base nem no JSON do aluno. Cada uma é exportada como roteiro DOCX para o professor.</p></div></div><div class="schedule-list">${practices.map((practice, index) => `<article class="schedule-item"><div><strong>${escapeHtml(practice.title || `Prática ${index + 1}`)}</strong><span>${escapeHtml([practice.weekNumber ? `Semana ${practice.weekNumber}` : "", practice.date ? formatDate(practice.date) : "", practice.dayOfWeek, [practice.startTime, practice.endTime].filter(Boolean).join("–")].filter(Boolean).join(" · ") || "Agenda a confirmar")}</span><small>${escapeHtml([practice.modality, practice.tool, practice.platform].filter(Boolean).join(" · ") || "Sessão síncrona / laboratório prático")}</small></div><button class="button button-secondary webpractice-download" data-practice-id="${escapeHtml(practice.id || practice.title || "")}" type="button">Baixar DOCX <span>↓</span></button></article>`).join("")}</div></section>` : "";
   const resourceItems = unresolved.length ? unresolved.map((item, index) => ({ ...item, id: item.id || `resource-${item.weekNumber || 0}-${index + 1}`, label: item.title || "Recurso sem título", pass: false, detail: item.status || "Conferência pendente" })) : [{ id: "resources-ok", weekNumber: 0, label: "Recursos sem pendências automáticas", pass: true, detail: "Ainda assim, confirme coerência, duração/páginas, acessibilidade e licença antes de exportar." }];
   const reviewedResources = resourceItems.filter((item) => reviewMarkChecked("resources", item, reviewMarks)).length;
   const resourcesMarkup = reviewPanelMarkup("resources", "Checklist de recursos e acessibilidade", resourceItems, `${reviewedResources}/${resourceItems.length} itens atualmente marcados. Os recursos devem ser abertos e conferidos antes da publicação.`, "Nenhum recurso foi localizado para conferência.", reviewOpenStates.get("resources") ?? true);
@@ -2014,7 +2399,7 @@ function renderGeneralPlan(plan) {
     const itemMarkup = items.map((item) => `<li><strong>${escapeHtml(workloadItemLabel(item))}</strong><span>${escapeHtml(item.title || "")}</span><em>${formatLoad(item.minutes || item.learnerMinutes)}</em></li>`).join("");
     return `<details class="load-week"><summary><strong>Semana ${escapeHtml(week.weekNumber)}</strong><span>${formatLoad(week.calculatedMinutes)} calculados · ${formatLoad(week.targetMinutes)} de meta</span></summary><ul>${itemMarkup || "<li>Sem itens calculáveis ainda.</li>"}</ul></details>`;
   }).join("");
-  const timeBreakdownMarkup = `<section class="time-breakdown"><p class="eyebrow">CARGA ABERTA POR ATIVIDADE</p><h3>De onde vem o tempo calculado?</h3><p>O texto-base é contado separadamente das leituras, vídeos, quiz, fórum, revisão e webpráticas. Artigos/leitura aparecem como obrigatórios ou complementares conforme a marcação do recurso.</p><div class="breakdown-summary">${breakdownSummary || "<span>A carga será calculada depois da redação.</span>"}</div><div class="load-weeks">${weeklyLoads}</div></section>`;
+  const timeBreakdownMarkup = `<section class="time-breakdown"><p class="eyebrow">CARGA ABERTA POR ATIVIDADE</p><h3>De onde vem o tempo calculado?</h3><p>O texto-base é contado separadamente das leituras, vídeos, quiz, fórum, revisão e práticas. Artigos/leitura aparecem como obrigatórios ou complementares conforme a marcação do recurso.</p><div class="breakdown-summary">${breakdownSummary || "<span>A carga será calculada depois da redação.</span>"}</div><div class="load-weeks">${weeklyLoads}</div></section>`;
   const overviewMarkup = `<div class="plan-overview"><p class="eyebrow">PLANEJAMENTO GERAL</p><h3>${escapeHtml(plan.title || "Curso")}</h3><p>O total considera todas as semanas depois da redação do conteúdo, dos recursos e das atividades. A experiência do aluno e o Material de Mediação são entregues separadamente.</p><div class="general-plan-grid"><div class="general-metric"><strong>${formatMinutes(totals.targetLearnerMinutes)}</strong><small>meta de estudo do aluno</small></div><div class="general-metric"><strong>${formatMinutes(totals.calculatedLearnerMinutes)}</strong><small>carga calculada</small></div><div class="general-metric"><strong>${formatMinutes(totals.requiredMinutes)}</strong><small>itens obrigatórios</small></div><div class="general-metric"><strong>${formatMinutes(totals.instructionalMinutes)}</strong><small>atividade instrucional eq.</small></div></div><div class="general-category-list">${categoryMarkup || "<span>Itens serão dimensionados após a geração</span>"}</div><div class="arc-list">${arcs}</div></div>`;
   const checklistsMarkup = `<div class="results-checklists">${resourcesMarkup}${checklistMarkup}${academicMarkup}${qualityMarkup}${progressionMarkup}${practiceMarkup}</div>`;
   container.innerHTML = `${overviewMarkup}${timeBreakdownMarkup}${checklistsMarkup}`;
@@ -2081,9 +2466,11 @@ function renderWeeks(data, { scrollToResults = true } = {}) {
     const qualityLabel = manuallyApproved ? "conferida e liberada por você" : ({ ready: "conteúdo pronto", complete: "conteúdo completo", blocked: "bloqueada: pendência crítica", review: "revisão recomendada", "needs-review": "revisão recomendada", insufficient: "conteúdo insuficiente" }[automaticStatus] || "qualidade não medida");
     const approvalButton = automaticStatus !== "ready" && automaticStatus !== "complete" ? `<button class="week-approve ${manuallyApproved ? "is-approved" : ""}" data-index="${index}" type="button">${manuallyApproved ? "Desfazer liberação" : "Liberar após conferência"}</button>` : "";
     const statusDetail = reasons.length ? `<small class="week-status-detail">${escapeHtml(manuallyApproved ? `Diagnóstico automático: ${reasons.join(" · ")}` : reasons.join(" · "))}</small>` : "";
-    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no ClassAtelier (sem o quiz)">JSON ClassAtelier <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do ClassAuthor, com quiz, feedbacks e guia do professor">JSON ClassAuthor <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button><button class="button button-secondary week-open-studio" data-index="${index}" type="button" title="Abre o ClassAtelier em outra aba já com esta semana carregada">Abrir esta semana no <strong class="wordmark"><b>Class</b><i>Atelier</i></strong> <span>↗</span></button>${approvalButton}</div>${studioEditMarkup(index)}</article>`;
+    return `<article class="week-card"><div class="week-card-top"><span class="week-number">${String(index + 1).padStart(2, "0")}</span><span class="week-date">${escapeHtml(date || `Semana ${index + 1}`)}</span></div><div class="week-arc">${escapeHtml(arc)}</div>${methodologyForWeekLabel(index, lesson) ? `<span class="week-method">${escapeHtml(methodologyForWeekLabel(index, lesson))}</span>` : ""}${flowBadge(index)}<h3>${escapeHtml(lesson.lessonPlan?.theme || meta.title || `Semana ${index + 1}`)}</h3><p class="week-objective">${escapeHtml((lesson.blocks?.find((b) => b.type === "hero")?.props?.lead) || lesson.lessonPlan?.welcome || "Conteúdo semanal pronto para revisão.")}</p><div class="week-metrics"><span><strong>${calculated}</strong> calculado</span><span>${target} meta</span><span>${quality.wordCount ? `${quality.wordCount.toLocaleString("pt-BR")} palavras` : `${lesson.blocks?.length || 0} blocos`}</span></div><div class="tag-row">${types.map((type) => `<span>${escapeHtml(type)}</span>`).join("")}</div>${compositionSummary ? `<small class="week-composition-summary"><strong>Composição materializada:</strong> ${escapeHtml(compositionSummary)}</small>` : ""}${resourceCoverage ? `<small class="week-resource-coverage"><strong>Cobertura:</strong> ${escapeHtml(resourceCoverage)}</small>` : pendingResources ? `<small class="week-resource-coverage is-pending"><strong>Cobertura:</strong> ${escapeHtml(pendingResources)}</small>` : ""}${pendingGeneration ? `<small class="week-generation-pending">${escapeHtml(pendingGeneration)}</small>` : ""}<span class="quality-badge ${manuallyApproved ? "complete" : escapeHtml(automaticStatus)}">${escapeHtml(qualityLabel)}</span>${statusDetail}<div class="week-actions"><button class="button button-secondary week-preview" data-index="${index}" type="button">Ver aula <span>↗</span></button><button class="button button-secondary week-download" data-index="${index}" type="button" title="Arquivo para abrir no ClassAtelier (sem o quiz)">JSON ClassAtelier <span>↓</span></button><button class="button button-secondary week-download-full" data-index="${index}" type="button" title="Semana completa do ClassAuthor, com quiz, feedbacks e guia do professor">JSON ClassAuthor <span>↓</span></button><button class="button button-secondary week-download-quiz" data-index="${index}" type="button" ${quizQuestions(lesson).length ? "" : "disabled"} title="Quiz da semana em Moodle XML, com feedback em todas as alternativas">Quiz XML <span>↓</span></button><button class="button button-secondary week-open-studio" data-index="${index}" type="button" title="Abre o ClassAtelier em outra aba já com esta semana carregada">Abrir esta semana no <strong class="wordmark"><b>Class</b><i>Atelier</i></strong> <span>↗</span></button>${approvalButton}</div>${studioEditMarkup(index)}</article>`;
   }).join("");
   $("#week-grid").innerHTML = cards;
+  const weeksTitle = $("#weeks-sector-title");
+  if (weeksTitle) weeksTitle.textContent = courseUnit() === "aula" ? "Aulas planejadas" : "Semanas planejadas";
   const weeksNote = $("#weeks-sector-note");
   if (weeksNote) weeksNote.textContent = partial ? `${data.weeks.length} de ${totalWeeks} semana(s) preservada(s); a geração pode ser retomada pela próxima semana.` : `${data.weeks.length} semana(s) gerada(s); abra cada cartão para revisar o conteúdo do aluno.`;
   $("#week-grid").querySelectorAll(".week-preview").forEach((button) => button.addEventListener("click", () => openLessonPreview(Number(button.dataset.index))));
@@ -2211,6 +2598,10 @@ window.addEventListener("message", (event) => {
   state.studioEdits[index] = { project: { meta: lesson.meta || {}, blocks: lesson.blocks }, text: String(text || ""), fileName: fileName || "", at: new Date().toISOString() };
   refreshStudioEditNote(index);
   saveDraft("semana devolvida pelo ClassAtelier");
+  if (projectFolder() && folderState === "granted") {
+    const name = localizeUnitText(fileName || weekFileName(state.weeks[index], index, "ClassAtelier.json"), courseUnit());
+    saveToProjectFolder(new Blob([JSON.stringify({ meta: lesson.meta || {}, blocks: lesson.blocks }, null, 2)], { type: "application/json" }), name, { interactive: false, subfolder: "classatelier" }).catch(() => {});
+  }
   showStudioToast(`A semana ${index + 1} voltou editada do ClassAtelier. Ela agora é a versão usada ao abrir e ao baixar o JSON ClassAtelier.`);
   reply({ type: "classauthor:received", week: index + 1, title: state.weeks[index]?.meta?.title || "" });
 });
@@ -2257,12 +2648,12 @@ function apiHeaders() {
 
 async function downloadWebPractice(practiceId) {
   if (!practiceId || !state.weeks.length) return;
-  if (isGitHubPages) { showError("O DOCX das webpráticas é gerado na versão Vercel com backend."); return; }
+  if (isGitHubPages) { showError("O DOCX das práticas é gerado na versão Vercel com backend."); return; }
   const button = document.querySelector(`.webpractice-download[data-practice-id="${CSS.escape(practiceId)}"]`);
   if (button) { button.disabled = true; button.classList.add("is-loading"); }
   try {
     const response = await fetch("/api/webpractice-docx", { method: "POST", headers: apiHeaders(), body: JSON.stringify({ input: state.input, weeks: state.weeks, teacherGuides: state.teacherGuides, practiceId }) });
-    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível criar o DOCX da webprática."); }
+    if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Não foi possível criar o DOCX da prática."); }
     const disposition = response.headers.get("Content-Disposition") || "";
     const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `${slugify(practiceId)}-roteiro.docx`;
     downloadBlob(await response.blob(), filename);
@@ -2300,7 +2691,7 @@ async function requestGeneratedWeek(input, index, headers, previousWeeks, button
       const response = await fetch("/api/generate-week", {
         method: "POST",
         headers,
-        body: JSON.stringify({ input, weekIndex: index, previousWeeks, bridges })
+        body: JSON.stringify({ input: await withSources(input, index), weekIndex: index, previousWeeks, bridges })
       });
       const data = await readApiResponse(response, `Não foi possível gerar a semana ${index + 1}.`);
       if (!data.week) {
@@ -2330,7 +2721,7 @@ async function completeDerivativesStep(data, input, index, headers, button) {
   setButtonLabel(button, `Gerando avaliação e mediação da semana ${index + 1}…`);
   setAiActivity("Avaliação e mediação", `O texto da semana ${index + 1} já está salvo. Escrevendo as questões (com feedback por alternativa), as atividades e as mensagens de acompanhamento a partir dele…`, { progress: Math.round(((index + 0.6) / (input.weeks + 1)) * 100) });
   try {
-    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input, weekIndex: index, week: data.week, teacherGuide: data.teacherGuide }) });
+    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input: await withSources(input, index, data.week), weekIndex: index, week: data.week, teacherGuide: data.teacherGuide }) });
     const done = await readApiResponse(response, `Não foi possível gerar a avaliação da semana ${index + 1}.`);
     return { ...data, week: done.week, teacherGuide: done.teacherGuide, generation: done.generation };
   } catch (error) {
@@ -2340,9 +2731,30 @@ async function completeDerivativesStep(data, input, index, headers, button) {
   }
 }
 
+// Guia de aplicação da metodologia ativa (Material de Mediação): etapa própria, depois das atividades.
+function weekNeedsMethodologyGuide(index, week, guide) {
+  if (guide?.methodologyGuide) return false;
+  if (week?.lessonPlan?.activeMethodology?.label) return true;
+  return Boolean(methodologyForWeekLabel(index, week));
+}
+
+async function completeMethodologyStep(data, input, index, headers, button) {
+  if (!data?.week || data?.week?.generationMeta?.derivativesPending || !weekNeedsMethodologyGuide(index, data.week, data.teacherGuide)) return data;
+  setButtonLabel(button, `Escrevendo o guia da metodologia da semana ${index + 1}…`);
+  setAiActivity("Guia da metodologia", `Montando o passo a passo de como aplicar a metodologia da semana ${index + 1}, como acompanhar e como avaliar…`, { progress: Math.round(((index + 0.6) / (input.weeks + 1)) * 100) });
+  try {
+    const response = await fetch("/api/derivatives", { method: "POST", headers, body: JSON.stringify({ action: "derivatives", input: await withSources(input, index, data.week), weekIndex: index, week: data.week, teacherGuide: data.teacherGuide, parts: ["methodology"] }) });
+    const done = await readApiResponse(response, `Não foi possível escrever o guia da metodologia da semana ${index + 1}.`);
+    return { ...data, week: done.week, teacherGuide: done.teacherGuide };
+  } catch (error) {
+    console.warn(`Guia da metodologia da semana ${index + 1} adiado:`, error);
+    return { ...data, methodologyError: error.message || "O guia da metodologia não foi concluído." };
+  }
+}
+
 // Figuras (diagramas SVG) criadas por IA: etapa própria, depois do texto e dos recursos.
 function weekHasPendingFigures(week) {
-  return (week?.lessonPlan?.contentSections || []).some((section) => (section.figures || []).some((figure) => !figure.src));
+  return (week?.lessonPlan?.contentSections || []).some((section) => (section.figures || []).some((figure) => !figure.src && (!figure.kind || figure.kind === "diagrama")));
 }
 
 async function illustrateGeneratedWeek(data, input, index, headers, button) {
@@ -2354,9 +2766,14 @@ async function illustrateGeneratedWeek(data, input, index, headers, button) {
   try {
     const response = await fetch("/api/illustrate", { method: "POST", headers, signal: controller.signal, body: JSON.stringify({ action: "illustrate", input, weekIndex: index, week: data.week }) });
     const done = await readApiResponse(response, `Não foi possível criar as figuras da semana ${index + 1}.`);
+    if (done.failed) {
+      const why = (done.reasons || []).join(" · ");
+      setAiActivity("Figuras incompletas", `${done.drawn || 0} de ${(done.drawn || 0) + done.failed} figura(s) da semana ${index + 1} foram criadas.${why ? ` Motivo: ${why}.` : ""} O texto foi preservado; use “Criar figuras pendentes” na prévia da semana para tentar de novo.`, { progress: 100, tone: "error" });
+    }
     return { ...data, week: done.week, figuresFailed: done.failed || 0 };
   } catch (error) {
     console.warn(`Figuras da semana ${index + 1} adiadas:`, error);
+    setAiActivity("Figuras não criadas", `As figuras da semana ${index + 1} não foram concluídas (${error.message || "falha na IA"}). O texto foi preservado; use “Criar figuras pendentes” na prévia da semana para tentar de novo.`, { progress: 100, tone: "error" });
     return { ...data, figuresError: error.message || "As figuras não foram concluídas." };
   } finally {
     clearTimeout(timer);
@@ -2577,6 +2994,11 @@ async function generateDistributed(input, accessCode, button, options = {}) {
     }));
     let data;
     try {
+      if (!(await ensureLessonPlan(input, index, headers, button))) {
+        const stop = new Error(`Geração pausada antes da aula ${index + 1}: o plano não foi aprovado. Quando quiser, continue a geração para ver o plano de novo.`);
+        stop.code = "PLAN_NOT_APPROVED";
+        throw stop;
+      }
       data = await requestGeneratedWeek(input, index, headers, previousWeeks, button, bridgesBefore(state.flow, index));
     } catch (error) {
       throw annotateFailure(error, index);
@@ -2590,6 +3012,7 @@ async function generateDistributed(input, accessCode, button, options = {}) {
     saveDraft("semana-gerada");
     renderWeeks({ ok: true, partial: true, provider: "ai-distributed-partial", model: data.model, input, weeks: state.weeks, teacherGuides: state.teacherGuides, generation: state.generation }, { scrollToResults: false });
     data = await completeDerivativesStep(data, input, index, headers, button);
+    data = await completeMethodologyStep(data, input, index, headers, button);
     data = await enrichGeneratedWeek(data, input, index, headers, button);
     data = await illustrateGeneratedWeek(data, input, index, headers, button);
     weeks[index] = data.week;
@@ -2640,7 +3063,7 @@ async function generate() {
   if (!input.objectives.length && !input.content.trim()) { showError("Informe ao menos um objetivo ou conteúdo-base para orientar a geração."); $("#objectives").focus(); return; }
   if (input.webPractice.enabled) {
     const incomplete = input.webPractices.find((practice) => !practice.title || (!practice.weekNumber && !practice.date));
-    if (incomplete) { showError("Cada webprática precisa de um título e de uma semana ou data de ocorrência. Ela não será alocada automaticamente."); return; }
+    if (incomplete) { showError("Cada prática precisa de um título e de uma semana ou data de ocorrência. Ela não será alocada automaticamente."); return; }
   }
   const generation = state.generation;
   const continuable = generation?.status === "partial"
@@ -2662,7 +3085,7 @@ async function generate() {
     return;
   }
   if (!resumeGeneration) {
-    state.flow = emptyFlow();
+    state.flow = emptyFlow(); state.lessonPlans = {};
     state.weeks = []; refreshStudioWeekSelect();
     state.teacherGuides = [];
     state.workload = null;
@@ -2801,8 +3224,11 @@ function productionCourseGate() {
 function renderProductionUcCard() {
   const card = $("#production-uc-card");
   if (!card) return;
-  if (!state.weeks.length) { card.classList.add("hidden"); card.innerHTML = ""; return; }
+  const sector = $("#results-production");
+  if (!state.weeks.length) { card.classList.add("hidden"); card.innerHTML = ""; sector?.classList.add("hidden"); return; }
+  sector?.classList.remove("hidden");
   const gate = productionCourseGate();
+  if ($("#production-sector-note")) $("#production-sector-note").textContent = gate.ready ? "Todas as semanas liberadas: os vídeos da UC e a planilha de produção já podem ser gerados." : gate.missing ? `Disponível depois que todas as semanas forem planejadas e liberadas (faltam ${gate.missing}).` : `Disponível depois que todas as semanas forem liberadas (falta liberar: ${gate.pending.join(", ")}).`;
   const course = state.production?.course;
   const status = gate.ready ? "Todas as semanas estão liberadas: já dá para gerar." : gate.missing ? `Ainda faltam ${gate.missing} semana(s) para serem geradas.` : `Falta liberar a(s) semana(s) ${gate.pending.join(", ")}.`;
   const videos = course?.videos?.length ? `<ul>${course.videos.map((video) => `<li><strong>${escapeHtml(video.title || "")}</strong> · ${escapeHtml(video.platform || "")} — ${formatDuration(video.durationSeconds)}</li>`).join("")}</ul>` : "";
@@ -2847,7 +3273,7 @@ async function downloadProductionSheet() {
   try {
     if (!window.JSZip) throw new Error("O componente de ZIP ainda não carregou. Recarregue a página e tente novamente.");
     const title = state.input?.title || formInput().title;
-    const blob = await createProductionWorkbook(window.JSZip, state.production, { title }, "blob");
+    const blob = await createProductionWorkbook(window.JSZip, deepLocalizeUnit(state.production, courseUnit()), { title }, "blob");
     downloadBlob(blob, `${slugify(title)}-planilha-de-producao.xlsx`);
   } catch (error) { showError(error.message); }
 }
@@ -2988,6 +3414,11 @@ $("#course-form").addEventListener("submit", (event) => { event.preventDefault()
 initStepMode();
 $("#assist-button").addEventListener("click", assistBriefing);
 $("#zip-button").addEventListener("click", downloadZip);
+$("#project-folder-choose")?.addEventListener("click", handleChooseFolder);
+$("#project-folder-open")?.addEventListener("click", handleOpenFolder);
+$("#project-folder-reconnect")?.addEventListener("click", handleReconnectFolder);
+$("#project-folder-forget")?.addEventListener("click", async () => { if (!window.confirm("Desligar a pasta do projeto? Nada é apagado dela; os próximos arquivos voltam a ir para Downloads.")) return; await forgetProjectFolder(); renderProjectFolder(); });
+loadProjectFolder().then(renderProjectFolder);
 $("#production-sheet-button")?.addEventListener("click", downloadProductionSheet);
 $("#teacher-pdf-button").addEventListener("click", downloadTeacherPdf);
 $("#recalculate-button").addEventListener("click", recalculateQuality);
@@ -3000,9 +3431,171 @@ document.addEventListener("keydown", (event) => { if (event.key === "Escape" && 
 window.addEventListener("resize", syncRecoveryLayout);
 window.addEventListener("scroll", keepWorkspaceAtTop, { passive: true });
 $("#calendar-mode").addEventListener("change", () => { toggleCalendar(); scheduleSave(); });
-$("#weeks").addEventListener("input", () => { const resourcePlan = collectResourcePlan(); const compositionPlan = collectCompositionPlan(); renderResourcePlanWeeks(resourcePlan); renderCompositionPlanWeeks(compositionPlan); updateSummary(); updateProgress(); scheduleSave(); });
+// Anexar / remover o arquivo de um material.
+$("#materials-list")?.addEventListener("change", async (event) => {
+  const input = event.target.closest(".material-file");
+  if (!input || !input.files?.length) return;
+  const card = input.closest(".material-card");
+  const status = card.querySelector(".material-source-status");
+  status.textContent = "Lendo o arquivo…";
+  try {
+    const original = input.files[0];
+    const file = await importSourceFile(original, card.dataset.id, (done, total) => { status.textContent = `Lendo o arquivo… página ${done} de ${total}`; });
+    if (projectFolder()) saveToProjectFolder(original, original.name, { interactive: true, subfolder: "fontes" }).catch(() => {});
+    card.dataset.source = JSON.stringify(file);
+    status.innerHTML = materialSourceStatus(file);
+    const usage = card.querySelector(".material-usage");
+    if (usage && !usage.value) usage.value = "base";
+    if (!card.querySelector(".material-title").value.trim()) card.querySelector(".material-title").value = file.name.replace(/\.(pdf|docx)$/i, "");
+    scheduleSave();
+  } catch (error) {
+    status.innerHTML = `<span class="material-source-warning">Não foi possível ler o arquivo: ${escapeHtml(error.message || "erro")}</span>`;
+  } finally { input.value = ""; }
+});
+$("#materials-list")?.addEventListener("click", async (event) => {
+  const button = event.target.closest(".material-source-remove");
+  if (!button) return;
+  const card = button.closest(".material-card");
+  try { const file = JSON.parse(card.dataset.source || "null"); if (file?.id) await deleteSourceDoc(file.id); } catch { /* sem arquivo */ }
+  card.dataset.source = "";
+  card.querySelector(".material-source-status").innerHTML = materialSourceStatus(null);
+  scheduleSave();
+});
+
+// ---- Unidade do curso na tela: "Semana" ou "Aula" (só os nomes mudam) ----
+const unitOriginals = new WeakMap();
+const UNIT_ATTRS = ["placeholder", "title", "aria-label"];
+function unitSkip(node) {
+  const element = node.nodeType === 1 ? node : node.parentElement;
+  return !element || Boolean(element.closest("script,style,textarea,[data-no-unit],[contenteditable='true']"));
+}
+function localizeUnitNode(node, unit) {
+  if (node.nodeType === 3) {
+    if (unitSkip(node)) return;
+    const record = unitOriginals.get(node);
+    const original = record && node.nodeValue === record.set ? record.original : node.nodeValue;
+    const next = localizeUnitText(original, unit);
+    if (next !== original) { unitOriginals.set(node, { original, set: next }); if (node.nodeValue !== next) node.nodeValue = next; }
+    else if (record) { unitOriginals.delete(node); if (node.nodeValue !== original) node.nodeValue = original; }
+    return;
+  }
+  if (node.nodeType !== 1 || unitSkip(node)) return;
+  const saved = unitOriginals.get(node) || {};
+  UNIT_ATTRS.forEach((name) => {
+    if (!node.hasAttribute(name)) return;
+    const current = node.getAttribute(name);
+    const original = saved[name] && current === saved[name].set ? saved[name].original : current;
+    const next = localizeUnitText(original, unit);
+    if (next !== original) { saved[name] = { original, set: next }; if (current !== next) node.setAttribute(name, next); }
+    else if (saved[name]) { delete saved[name]; if (current !== original) node.setAttribute(name, original); }
+  });
+  unitOriginals.set(node, saved);
+  node.childNodes.forEach((child) => localizeUnitNode(child, unit));
+}
+let unitObserver = null;
+let unitApplied = null;
+function applyUnitToUi() {
+  const unit = courseUnit();
+  unitApplied = unit;
+  localizeUnitNode(document.body, unit);
+  // Títulos fixos das abas, definidos de forma explícita (não dependem da troca automática).
+  const weeksTitle = document.getElementById("weeks-sector-title");
+  if (weeksTitle) weeksTitle.textContent = unit === "aula" ? "Aulas planejadas" : "Semanas planejadas";
+  if (!unitObserver) {
+    unitObserver = new MutationObserver((mutations) => {
+      const current = courseUnit();
+      // O seletor mudou sem aviso (restauração do navegador, rascunho): refaz a tela inteira.
+      if (current !== unitApplied) { applyUnitToUi(); return; }
+      mutations.forEach((mutation) => {
+        if (mutation.type === "characterData") localizeUnitNode(mutation.target, current);
+        else if (mutation.type === "attributes") localizeUnitNode(mutation.target, current);
+        else mutation.addedNodes.forEach((node) => localizeUnitNode(node, current));
+      });
+    });
+    unitObserver.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: UNIT_ATTRS });
+  }
+}
+$("#course-unit")?.addEventListener("change", () => { applyUnitToUi(); scheduleSave(); });
+$("#course-unit")?.addEventListener("input", () => applyUnitToUi());
+// O navegador pode restaurar o valor do seletor ao recarregar a página, sem avisar: reaplica.
+window.addEventListener("pageshow", () => applyUnitToUi());
+window.addEventListener("load", () => setTimeout(applyUnitToUi, 0));
+
+// Acrescenta ao pedido o plano aprovado da aula e os trechos dos materiais anexados que combinam com ela.
+async function withSources(input, index, week = null) {
+  const plan = state.lessonPlans?.[index] || "";
+  const base = plan ? { ...input, approvedLessonPlan: plan } : input;
+  try {
+    const excerpts = await sourceExcerptsForWeek(input, index, week);
+    return excerpts.length ? { ...base, sourceExcerpts: excerpts } : base;
+  } catch (error) {
+    console.warn("Trechos dos materiais não incluídos:", error);
+    return base;
+  }
+}
+
+// ---- Plano prévio da aula (quando há metodologia ativa) ----
+async function requestLessonPlan(input, index, headers, previousPlan = "", instruction = "") {
+  const response = await fetch("/api/lesson-plan", { method: "POST", headers, signal: AbortSignal.timeout(200000), body: JSON.stringify({ action: "plan", input, weekIndex: index, previousPlan, instruction }) });
+  const done = await readApiResponse(response, `Não foi possível montar o plano da aula ${index + 1}.`);
+  return done.text || "";
+}
+
+function openPlanDialog(index, input, headers, initialText, methodLabel) {
+  return new Promise((resolve) => {
+    const modal = $("#plan-modal");
+    const textArea = $("#plan-text"), instruction = $("#plan-instruction"), status = $("#plan-status");
+    $("#plan-modal-eyebrow").textContent = `PLANO DA AULA ${String(index + 1).padStart(2, "0")}${methodLabel ? ` · ${methodLabel.replace(/^Metodologia: /, "").toUpperCase()}` : ""}`;
+    textArea.value = initialText; instruction.value = ""; status.textContent = "";
+    $("#ai-activity")?.classList.add("hidden");
+    modal.classList.remove("hidden"); modal.setAttribute("aria-hidden", "false");
+    const close = (value) => {
+      modal.classList.add("hidden"); modal.setAttribute("aria-hidden", "true");
+      ["#plan-approve", "#plan-cancel", "#plan-cancel-x", "#plan-revise"].forEach((id) => { const el = $(id); el.replaceWith(el.cloneNode(true)); });
+      resolve(value);
+    };
+    $("#plan-approve").addEventListener("click", () => { const value = textArea.value.trim(); if (!value) { status.textContent = "O plano está vazio."; return; } close(value); });
+    $("#plan-cancel").addEventListener("click", () => close(null));
+    $("#plan-cancel-x").addEventListener("click", () => close(null));
+    $("#plan-revise").addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      // Sem pedido escrito: a IA reorganiza o plano incorporando as respostas e edições feitas no próprio texto.
+      const ask = instruction.value.trim() || "Incorpore ao plano as respostas que escrevi às perguntas e as edições que fiz no texto: ajuste os passos, as atividades e a avaliação de acordo com elas e retire as perguntas já respondidas.";
+      button.disabled = true; status.textContent = instruction.value.trim() ? "Refazendo o plano com o seu pedido…" : "Refazendo o plano com as suas respostas…";
+      try { textArea.value = await requestLessonPlan(input, index, headers, textArea.value, ask); instruction.value = ""; status.textContent = "Plano refeito. Confira e aprove, ou peça outro ajuste."; }
+      catch (error) { status.textContent = `Não foi possível refazer: ${error.message}`; }
+      finally { button.disabled = false; }
+    });
+    setTimeout(() => textArea.focus(), 50);
+  });
+}
+
+// Antes de gerar uma aula com metodologia ativa: plano proposto → professor ajusta → aprova.
+async function ensureLessonPlan(input, index, headers, button) {
+  const methodLabel = methodologyForWeekLabel(index, null);
+  if (!methodLabel) return true;
+  if (!state.lessonPlans) state.lessonPlans = {};
+  if (state.lessonPlans[index]) return true;
+  setButtonLabel(button, `Montando o plano da aula ${index + 1}…`);
+  setAiActivity("Plano da aula", `Antes de escrever a aula ${index + 1}, a IA está montando o plano de como aplicar a metodologia, para você ajustar e aprovar…`, { progress: Math.round(((index + 0.1) / (input.weeks + 1)) * 100) });
+  const proposal = await requestLessonPlan(input, index, headers);
+  setAiActivity("Plano da aula", `Plano da aula ${index + 1} pronto: confira, ajuste e aprove para a aula ser gerada.`, { progress: Math.round(((index + 0.15) / (input.weeks + 1)) * 100) });
+  const approved = await openPlanDialog(index, input, headers, proposal, methodLabel);
+  if (!approved) return false;
+  state.lessonPlans[index] = approved;
+  saveDraft("plano-aprovado");
+  // A janela do plano escondeu o painel de progresso: ele volta, para mostrar que a geração seguiu.
+  setButtonLabel(button, `Gerando semana ${index + 1}/${input.weeks}…`);
+  setAiActivity("Gerando material com IA", `Plano aprovado. Escrevendo a semana ${index + 1} de ${input.weeks} seguindo o plano (costuma levar alguns minutos)…`, { progress: Math.round(((index + 0.2) / (input.weeks + 1)) * 100) });
+  return true;
+}
+
+$("#pedagogical-approach")?.addEventListener("change", () => { updateMethodologyHints(); scheduleSave(); });
+$("#methodology-default")?.addEventListener("change", () => { updateMethodologyHints(); renderMethodologyWeeks(collectMethodologyPlan()); scheduleSave(); });
+$("#methodology-weeks")?.addEventListener("change", (event) => { const row = event.target.closest("[data-methodology-week]"); if (row) row.classList.toggle("is-override", Boolean(event.target.value)); scheduleSave(); });
+$("#weeks").addEventListener("input", () => { const resourcePlan = collectResourcePlan(); const compositionPlan = collectCompositionPlan(); renderResourcePlanWeeks(resourcePlan); renderMethodologyWeeks(collectMethodologyPlan()); renderCompositionPlanWeeks(compositionPlan); updateSummary(); updateProgress(); scheduleSave(); });
 $("#practice-enabled").addEventListener("change", () => { togglePractice(); scheduleSave(); });
-$("#course-form").addEventListener("input", () => { updateAcademicInheritance(); updateSummary(); updateProgress(); scheduleSave(); });
+$("#course-form").addEventListener("input", () => { updateBloomMeter(); updateAcademicInheritance(); updateSummary(); updateProgress(); scheduleSave(); });
 $("#save-backup-button").addEventListener("click", downloadBackup);
 $("#restore-backup-button").addEventListener("click", () => $("#backup-file-input").click());
 $("#backup-file-input").addEventListener("change", (event) => { restoreBackupFile(event.target.files?.[0]); event.target.value = ""; });
@@ -3017,4 +3610,5 @@ $("#assist-button").dataset.label = "Preencher vazios com IA";
 $("#recalculate-button").dataset.label = "Recalcular qualidade";
 initializeWelcome();
 enhanceLayout();
-renderResourcePlanWeeks(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
+renderResourcePlanWeeks(); renderMethodologyWeeks(); updateMethodologyHints(); updateBloomMeter(); applyUnitToUi(); renderCompositionPlanWeeks(); toggleCalendar(); togglePractice(); updateAcademicInheritance(); updateSummary(); updateProgress(); offerDraftRecovery(); loadHealth();
+

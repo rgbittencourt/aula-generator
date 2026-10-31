@@ -1,3 +1,4 @@
+import { localizeUnit } from "./unit.js";
 // Material de Mediação (PDF do professor).
 //
 // Pensado como um guia de acompanhamento que CRESCE a cada semana gerada: o mesmo arquivo é
@@ -24,7 +25,7 @@ const REPLACEMENTS = [
 const ENCODABLE = /[\n -~¡-ÿ‘“”…€™ŒœŠšŽžŸ]/u;
 
 function clean(value) {
-  let text = String(value ?? "");
+  let text = localizeUnit(String(value ?? ""));
   for (const [pattern, replacement] of REPLACEMENTS) text = text.replace(pattern, replacement);
   // Emojis e símbolos que a fonte do PDF não tem seriam um erro de geração; saem do texto.
   return Array.from(text).filter((char) => ENCODABLE.test(char)).join("").replace(/[ ]{2,}/g, " ").trim();
@@ -410,6 +411,45 @@ export async function createMediationMaterialPdf(input, teacherGuides = [], gene
     if (!guide.weekSummary) callout("Resumo para o professor ainda não gerado", "Na prévia da semana, use “Completar explicações do Material de Mediação” para gerar o resumo, as perguntas dos alunos, os equívocos comuns e os sinais de alerta desta semana.", { background: paleCoral, border: coral, size: 8.8 });
     if (guide.objectives?.length) { paragraph("O estudante, ao fim da semana, deve ser capaz de:", { font: bold, size: 9.2, after: 2 }); bullets(guide.objectives); }
     if (guide.keyIdeas?.length) { heading("Ideias-chave para levar", 3); bullets(guide.keyIdeas); }
+
+    // 1b. Como aplicar a metodologia ativa da semana.
+    const mg = object(guide.methodologyGuide);
+    if (Object.keys(mg).length) {
+      heading(`Como aplicar a metodologia: ${display(mg.method) || "metodologia ativa"}`, 2);
+      if (mg.whatItIs) labelled([["O que é", mg.whatItIs], ["Por que nesta semana", mg.whyHere]], { background: paleGreen });
+      if (list(mg.beforeTheWeek).length) { paragraph("Antes de abrir a semana", { font: bold, size: 9.4, color: navy, after: 2 }); bullets(mg.beforeTheWeek); }
+      if (list(mg.phases).length) {
+        paragraph("Passo a passo", { font: bold, size: 9.4, color: navy, after: 2 });
+        list(mg.phases).forEach((phase, position) => labelled([
+          ["Etapa", `${position + 1}. ${display(phase.name)}${phase.when ? ` · ${display(phase.when)}` : ""}`],
+          ["Para quê", phase.goal],
+          ["Professor", entries(phase.teacherActions).join(" · ")],
+          ["Estudante", entries(phase.studentActions).join(" · ")],
+          ["Usa", entries(phase.materials).join(" · ")]
+        ], { background: white, max: 1400 }));
+      }
+      if (mg.studentInstructions) labelled([["Texto para o aluno (Moodle)", mg.studentInstructions]], { background: paleGold, max: 1600 });
+      if (list(mg.monitoring).length) {
+        paragraph("Como acompanhar se está funcionando", { font: bold, size: 9.4, color: navy, after: 2 });
+        list(mg.monitoring).forEach((item) => labelled([["Indicador", item.indicator], ["Onde ver", item.howToCheck], ["Quando", item.when], ["Se estiver baixo", item.ifLow]], { background: white }));
+      }
+      if (list(mg.successSignals).length) { paragraph("Sinais de que deu certo", { font: bold, size: 9.4, color: navy, after: 2 }); bullets(mg.successSignals); }
+      if (list(mg.warningSignals).length) {
+        paragraph("Sinais de alerta e o que fazer", { font: bold, size: 9.4, color: navy, after: 2 });
+        list(mg.warningSignals).forEach((item) => labelled([["Sinal", item.signal], ["O que fazer", item.action]], { background: paleCoral, border: rgb(0.93, 0.78, 0.72), labelColor: coral }));
+      }
+      const assess = object(mg.assessment);
+      if (assess.howToAssess || list(assess.criteria).length) {
+        paragraph("Como avaliar a aprendizagem com esta metodologia", { font: bold, size: 9.4, color: navy, after: 2 });
+        if (assess.howToAssess) paragraph(assess.howToAssess);
+        list(assess.criteria).forEach((item) => labelled([["Critério", item.criterion], ["Evidência", item.evidence]], { background: white }));
+      }
+      if (list(mg.pitfalls).length) { paragraph("Erros comuns de quem aplica pela primeira vez", { font: bold, size: 9.4, color: navy, after: 2 }); bullets(mg.pitfalls); }
+      const adapt = object(mg.adaptations);
+      if (adapt.ead || adapt.synchronous || adapt.largeClass) labelled([["100% a distância", adapt.ead], ["Encontro ao vivo / webprática", adapt.synchronous], ["Turma grande ou pouco participativa", adapt.largeClass]], { background: white });
+    } else if (guide.activeMethodology?.label || guide.methodologyRequested) {
+      callout("Guia da metodologia ainda não gerado", "Na prévia da semana, use “Gerar o guia de aplicação da metodologia” para receber o passo a passo, como acompanhar e como avaliar.", { background: paleGold, border: rgb(0.9, 0.78, 0.45), size: 8.8 });
+    }
 
     // 2. Roteiro de acompanhamento.
     heading("Roteiro de acompanhamento: antes, durante e depois", 2);

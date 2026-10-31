@@ -23,6 +23,8 @@ import derivativesHandler from "./derivatives-handler.js";
 import figureHandler from "./figure-handler.js";
 import illustrateHandler from "./illustrate-handler.js";
 import productionHandler from "./production-handler.js";
+import lessonPlanHandler from "./lesson-plan.js";
+import { withUnit } from "./unit.js";
 import regenerateWeekHandler from "../api/regenerate-week.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -32,6 +34,8 @@ const port = Number(process.env.PORT || 4310);
 const host = process.env.HOST || "127.0.0.1";
 
 app.use(express.json({ limit: "4mb" }));
+// Unidade do curso ("aula" ou "semana") vale para todas as rotas da API.
+app.use("/api", (req, res, next) => withUnit(() => next())(req, res));
 app.use(express.static(publicDir, { etag: true }));
 
 app.get("/api/health", (_req, res) => {
@@ -75,6 +79,7 @@ app.post("/api/illustrate", (req, res) => illustrateHandler(req, res));
 app.options("/api/figure", (req, res) => figureHandler(req, res));
 app.post("/api/figure", (req, res) => figureHandler(req, res));
 app.post("/api/production", (req, res) => productionHandler(req, res));
+app.post("/api/lesson-plan", (req, res) => lessonPlanHandler(req, res));
 
 app.post("/api/enrich-week", async (req, res) => {
   if (accessRequired() && !hasValidAccess(req)) return res.status(401).json({ ok: false, error: "Informe o código de acesso configurado para esta aplicação." });

@@ -79,7 +79,7 @@ export function measureLessonQuality(lesson = {}, input = {}, context = {}) {
   const words = wordCount(instructionalText);
   const metadataWordCount = wordCount(metadataText);
   const title = text(plan.theme || lesson?.meta?.title);
-  const hasSpecificTitle = Boolean(title) && !genericTitles.has(title.toLowerCase()) && !/^semana\s*\d+$/iu.test(title);
+  const hasSpecificTitle = Boolean(title) && !genericTitles.has(title.toLowerCase()) && !/^(?:semana|aula)\s*\d+$/iu.test(title);
   const hasObjectives = objectives.length >= 1;
   const hasDetailedObjectives = objectives.length >= qualityTargets(input).minimumObjectives;
   const hasSections = sections.length >= qualityTargets(input).requiredSectionCount;

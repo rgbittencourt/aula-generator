@@ -14,7 +14,7 @@ export default async function illustrateHandler(request, response) {
     const index = Math.max(0, Math.min(input.weeks - 1, Number.parseInt(request.body?.weekIndex, 10) || 0));
     const week = normalizeLesson(request.body?.week || {}, input, index);
     const result = await illustrateWeek(input, week);
-    return response.status(200).json({ ok: true, provider: "ai-illustrate", aiProvider: getAIProvider(), model: getAIModel(), weekIndex: index, week: result.week, drawn: result.drawn, failed: result.failed, total: result.total });
+    return response.status(200).json({ ok: true, provider: "ai-illustrate", aiProvider: getAIProvider(), model: getAIModel(), weekIndex: index, week: result.week, drawn: result.drawn, failed: result.failed, total: result.total, reasons: result.reasons || [] });
   } catch (error) {
     console.error("illustrate failed", error);
     const status = error.code === "AI_KEY_MISSING" ? 503 : error.code === "AI_TPM_LIMIT" ? 429 : error.code === "AI_PROVIDER_ERROR" ? 502 : 400;

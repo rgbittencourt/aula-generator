@@ -33,8 +33,8 @@ export function weekNumberOf(week = {}, fileName = "") {
   const candidates = [
     week.lessonPlan?.weekNumber,
     week.meta?.weekNumber,
-    String(week.meta?.title || "").match(/semana\s*0*(\d{1,2})/i)?.[1],
-    String(fileName || "").match(/semana\s*0*(\d{1,2})/i)?.[1]
+    String(week.meta?.title || "").match(/(?:semana|aula)\s*0*(\d{1,2})/i)?.[1],
+    String(fileName || "").match(/(?:semana|aula)\s*0*(\d{1,2})/i)?.[1]
   ];
   for (const value of candidates) {
     const n = Number(value);

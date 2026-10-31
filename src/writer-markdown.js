@@ -1,3 +1,4 @@
+import { citationHasSource } from "./composition.js";
 // Converte o Markdown escrito pelo modo de prosa (writer-voice.js) em lessonPlan.
 //
 // Nada aqui chama IA. O analisador é tolerante: aceita variações de título,
@@ -95,7 +96,7 @@ function classifyH2(title) {
   if (/^boas vindas/.test(key)) return "welcome";
   if (/^objetivos/.test(key)) return "objectives";
   if (/^sintese/.test(key)) return "synthesis";
-  if (/^o que vem|^proxima semana|^na proxima semana|^conexao com a proxima/.test(key)) return "next";
+  if (/^o que vem|^proxima (?:semana|aula)|^na proxima (?:semana|aula)|^conexao com a proxima/.test(key)) return "next";
   if (/^glossario/.test(key)) return "glossary";
   if (/^referencias/.test(key)) return "references";
   if (/^pontos a conferir|^notas de verificacao|^a conferir/.test(key)) return "notes";
@@ -124,14 +125,17 @@ function resourceKind(label) {
 
 function parseCallout(raw) {
   const source = text(raw);
-  const emoji = (source.match(/^\s*(🔎|💭|💡|⚠️|⚠|📌|🖼️|🖼)/u) || [])[1] || "";
+  const emoji = (source.match(/^\s*(🔎|💭|💡|⚠️|⚠|📌|📜|🖼️|🖼)/u) || [])[1] || "";
   if (!emoji) return null;
-  const rest = source.replace(/^\s*(🔎|💭|💡|⚠️|⚠|📌|🖼️|🖼)\s*/u, "");
+  const rest = source.replace(/^\s*(🔎|💭|💡|⚠️|⚠|📌|📜|🖼️|🖼)\s*/u, "");
   if (emoji === "🖼️" || emoji === "🖼") {
     const match = rest.match(/^(?:\*\*[^*]*\*\*|[^\[:]*)\s*\[([^\]]*)\]\s*:?\s*([\s\S]*)$/);
     const attrs = match ? match[1].split("|").map((part) => part.trim()) : [];
-    const description = (attrs.find((part) => /^descri[cç][aã]o\s*:/i.test(part)) || "").replace(/^descri[cç][aã]o\s*:\s*/i, "").replace(/^["“”']|["“”']$/g, "").trim();
-    return { type: "figure", description, body: plain(match ? match[2] : rest.replace(/^\*\*[^*]*\*\*\s*:?\s*/, "")) };
+    const field = (name) => (attrs.find((part) => new RegExp(`^${name}\\s*:`, "i").test(part)) || "").replace(new RegExp(`^${name}\\s*:\\s*`, "i"), "").replace(/^["“”']|["“”']$/g, "").trim();
+    const description = field("descri[cç][aã]o");
+    const rawKind = (attrs[0] || "").toLowerCase();
+    const kind = /foto|imagem|fotografia/.test(rawKind) ? "foto" : /napkin/.test(rawKind) ? "napkin" : "diagrama";
+    return { type: "figure", kind, description, prompt: field("prompt"), napkinText: field("texto"), body: plain(match ? match[2] : rest.replace(/^\*\*[^*]*\*\*\s*:?\s*/, "")) };
   }
   if (emoji === "🔎") {
     const match = rest.match(/^(?:\*\*[^*]*\*\*|[^\[:]*)\s*\[([^\]]*)\]\s*:?\s*([\s\S]*)$/);
@@ -145,6 +149,17 @@ function parseCallout(raw) {
   const title = (rest.match(/^\*\*([^*]+)\*\*/) || [])[1] || "";
   const body = rest.replace(/^\*\*[^*]+\*\*\s*:?\s*/, "");
   if (emoji === "💭") return { type: "reflection", title: plain(title) || "Para refletir", body: plain(body) };
+  // 📌 Dica do professor: dica, lembrete, detalhe importante ou aviso curto.
+  if (emoji === "📌") return { type: "tip", title: plain(title) || "Dica", body: plain(body) };
+  // 📜 Citação direta: "trecho exato" — AUTOR, Obra, ano, p. N.
+  if (emoji === "📜") {
+    const raw = plain(body);
+    const match = raw.match(/^[“"«]([\s\S]+?)[”"»]\s*[—–-]+\s*([\s\S]+)$/);
+    const quoteText = match ? match[1].trim() : raw.replace(/^[“"«]|[”"»]$/g, "").trim();
+    const attribution = match ? match[2].trim().replace(/\.$/, "") : "";
+    const [author, ...rest] = attribution.split(/\.\s+|,\s+(?=[A-ZÁÉÍÓÚ*])/);
+    return { type: "quote", quote: quoteText, attribution, author: (author || "").trim(), source: rest.join(". ").trim() || attribution };
+  }
   if (emoji === "💡") return { type: "highlight", title: plain(title) || "Em uma frase", body: plain(body) };
   return { type: "attention", title: plain(title) || "Atenção", body: plain(body) };
 }
@@ -219,7 +234,7 @@ export function parseWeekMarkdown(markdown, options = {}) {
 
   for (const token of tokens) {
     if (token.type === "h" && token.level === 1) {
-      const match = plain(token.text).match(/^semana\s*\d+\s*[—–:.-]\s*(.+)$/i);
+      const match = plain(token.text).match(/^(?:semana|aula)\s*\d+\s*[—–:.-]\s*(.+)$/i);
       plan.theme = match ? match[1].trim() : plain(token.text);
       continue;
     }
@@ -258,7 +273,7 @@ export function parseWeekMarkdown(markdown, options = {}) {
         const anchor = sub ? sub.number : section.number;
         if (callout.type === "figure") {
           figureCounter += 1;
-          if (callout.description) section.figures.push({ id: `w${weekNumber}-f${figureCounter}`, kind: "diagrama", description: callout.description, caption: callout.body, sectionNumber: anchor });
+          if (callout.description) section.figures.push({ id: `w${weekNumber}-f${figureCounter}`, kind: callout.kind || "diagrama", description: callout.description, prompt: callout.prompt || "", napkinText: callout.napkinText || "", caption: callout.body, sectionNumber: anchor });
           continue;
         }
         if (callout.type === "resource") {
@@ -285,7 +300,16 @@ export function parseWeekMarkdown(markdown, options = {}) {
           resources[bucket].push(entry);
           section.resources.push(entry);
         } else {
-          const kind = callout.type === "reflection" ? "reflexao" : callout.type === "highlight" ? "destaque" : "atencao";
+          if (callout.type === "quote") {
+            // Citação sem autor, obra e ano não vai para o aluno: vira um ponto a conferir.
+            if (!citationHasSource(callout.author, callout.attribution)) {
+              plan.claimEvidence.push({ id: `quote-${String(plan.claimEvidence.length + 1).padStart(2, "0")}`, claim: `Citação retirada da aula por estar sem fonte completa (autor, obra, ano e página): "${callout.quote.slice(0, 300)}"`, sectionNumber: anchor, sourceIds: [], sourceType: "", supportLevel: "insufficient", requiresVerification: true });
+              continue;
+            }
+            section.callouts.push({ kind: "citacao", title: "Citação", body: callout.quote, quote: callout.quote, author: callout.author, source: callout.attribution, anchor });
+            continue;
+          }
+          const kind = callout.type === "reflection" ? "reflexao" : callout.type === "highlight" ? "destaque" : callout.type === "tip" ? "pitaco" : "atencao";
           section.callouts.push({ kind, title: callout.title, body: callout.body, anchor });
         }
         continue;
@@ -373,9 +397,14 @@ function resourceCallout(resource) {
   return `> 🔎 **Veja mais aqui** [${attrs.join(" | ")}]${note}: ${plain(resource.bridgeParagraph || resource.pedagogicalUse || resource.objective || "")}`;
 }
 
-const figureCallout = (figure) => `> 🖼️ **Figura** [${figure.kind || "diagrama"} | descrição: "${plain(figure.description).replace(/"/g, "'")}"]: ${plain(figure.caption || "")}`;
-const CALLOUT_EMOJI = { reflexao: ["💭", "Para refletir (não vale nota)"], destaque: ["💡", "Em uma frase"], atencao: ["⚠️", "Atenção"] };
-const calloutLine = (callout) => { const [emoji, label] = CALLOUT_EMOJI[callout.kind] || CALLOUT_EMOJI.destaque; return `> ${emoji} **${callout.title || label}**: ${callout.body}`; };
+const figureField = (name, value) => (plain(value) ? ` | ${name}: "${plain(value).replace(/"/g, "'").replace(/\|/g, "/")}"` : "");
+const figureCallout = (figure) => `> 🖼️ **Figura** [${figure.kind || "diagrama"} | descrição: "${plain(figure.description).replace(/"/g, "'")}"${figureField("prompt", figure.prompt)}${figureField("texto", figure.napkinText)}]: ${plain(figure.caption || "")}`;
+const CALLOUT_EMOJI = { reflexao: ["💭", "Para refletir (não vale nota)"], destaque: ["💡", "Em uma frase"], atencao: ["⚠️", "Atenção"], pitaco: ["📌", "Dica"] };
+const calloutLine = (callout) => {
+  if (callout.kind === "citacao") return `> 📜 **Citação**: "${plain(callout.quote || callout.body)}" — ${plain(callout.source || callout.author)}`;
+  const [emoji, label] = CALLOUT_EMOJI[callout.kind] || CALLOUT_EMOJI.destaque;
+  return `> ${emoji} **${callout.title || label}**: ${callout.body}`;
+};
 
 export function planToMarkdown(plan = {}) {
   const out = [];

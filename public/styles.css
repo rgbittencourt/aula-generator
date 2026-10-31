@@ -608,3 +608,65 @@ button.studio-top-link img{width:24px;height:24px;border-radius:7px}
 .studio-edit small{display:block;margin-top:4px;color:var(--muted);font-size:11px}
 .studio-edit-actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
 .studio-edit .link-button{padding:0;border:0;background:none;color:var(--navy);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer}
+
+/* Abordagem pedagógica e metodologias ativas (cópia de teste) */
+.methodology-box{margin:18px 0;padding:16px;border:1px solid #d3b56e;border-radius:12px;background:#fffaf0}
+.methodology-box .profile-heading{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
+.methodology-box .profile-heading small{color:#6b5a2e}
+.methodology-weeks{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-top:8px}
+.methodology-week{display:grid;grid-template-columns:78px minmax(0,1fr);gap:8px;align-items:center;padding:8px 10px;border:1px solid #e8dcc0;border-radius:10px;background:#fff}
+.methodology-week span{font-size:12px;font-weight:700;color:#6b5a2e}
+.methodology-week select{min-height:34px;padding:6px 8px;font-size:12px;width:100%}
+.methodology-week.is-override{border-color:#b8902f;background:#fff6dd}
+.week-method{display:inline-block;margin:2px 0 4px;padding:2px 8px;border-radius:999px;background:#fbefd0;color:#6b4a00;font-size:11px;font-weight:600}
+.reader-methodology{border-left:3px solid #d3b56e;padding-left:12px}
+.methodology-box .resource-plan-heading{margin-top:14px}
+.methodology-box .resource-plan-heading strong{font-size:14px;font-family:inherit}
+.methodology-weeks{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.practice-methodology-field{grid-column:1/-1}
+.bloom-meter{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:12px}
+.bloom-meter small{flex-basis:100%;color:#8a5a00}
+.bloom-chip{padding:2px 8px;border-radius:999px;background:#eef2f5;color:#33434f;font-weight:600}
+.bloom-lembrar,.bloom-entender{background:#e8eef6;color:#2c4a6e}
+.bloom-aplicar,.bloom-analisar{background:#e3f1e8;color:#1f6b45}
+.bloom-avaliar,.bloom-criar{background:#f4ecd3;color:#7a5a10}
+.bloom-vago,.bloom-unknown{background:#fbe4dc;color:#9a3b1b}
+
+.reader-suggested-image{margin:14px 0;padding:12px 14px;border:1px dashed #b8902f;border-radius:10px;background:#fffaf0}
+.reader-suggested-image span{font-size:12px;color:#6b5a2e}
+.reader-suggested-image p{margin:6px 0}
+.reader-suggested-image label{display:block;font-size:12px;font-weight:700;margin-top:6px}
+.reader-suggested-image textarea{width:100%;margin:4px 0;font:13px/1.45 system-ui,sans-serif;padding:8px;border:1px solid #e1d6b8;border-radius:8px;background:#fff;resize:vertical}
+.reader-suggested-image small{display:block;color:#6b5a2e;margin-top:4px}
+
+.production-sector .production-uc{margin:0;border:0;border-radius:0;background:transparent;padding:4px 2px 2px}
+.results-sector.hidden{display:none}
+.reader-methodology details{margin-top:8px}.reader-methodology h4{margin:12px 0 4px}.methodology-phases li{margin-bottom:8px}
+.methodology-student-text{padding:10px 12px;border-radius:8px;background:#fff6dd;white-space:pre-wrap}
+.results-load-combined > * + *{margin-top:18px}
+.material-notes{color:#8a5a00;margin:-4px 0 10px}
+.material-source-box{margin:12px 0;padding:12px 14px;border:1px dashed #9fb3c8;border-radius:10px;background:#f6f9fc}
+.material-source-head{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}.material-source-head small{color:#5b6b7f}
+.material-source-status{margin:4px 0 8px;font-size:13px}.material-source-empty{color:#6b7690}.material-source-warning{color:#9a3b1b}
+.link-button{background:none;border:0;padding:0 0 0 8px;color:#bf4c34;text-decoration:underline;cursor:pointer;font:inherit}
+.reader-source-used{border-left:3px solid #9fb3c8;padding-left:12px}
+/* Ritmo vertical dos formulários: cada campo (rótulo + caixa) fica separado do próximo,
+   para o rótulo ficar claramente ligado à caixa logo ABAIXO dele. */
+.field-grid + .field-grid,.academic-profile-box .field-grid + .field-grid{margin-top:0}
+.field-grid{margin-bottom:22px;row-gap:22px}
+.field{margin-bottom:22px}
+.field-grid > .field,.resource-plan-week .field,.practice-count-controls .field,.methodology-week,.composition-week .field{margin-bottom:0}
+.field > span:first-child{margin-bottom:1px}
+.field .hint,.field > small{margin-top:-2px}
+.bloom-meter{margin-top:10px}
+.material-source-box .field-grid{margin-bottom:14px}
+.plan-dialog{max-width:860px}.plan-body{padding:4px 24px 22px;overflow:auto}
+.plan-intro{color:#435069;margin:6px 0 16px}
+#plan-text{font:14px/1.55 system-ui,sans-serif;min-height:360px}
+.plan-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
+.plan-status{min-height:1.2em;color:#8a5a00;margin:0 0 10px}
+.reader-approved-plan pre{white-space:pre-wrap;font:13px/1.5 system-ui,sans-serif;background:#f6f9fc;border-radius:8px;padding:12px;margin-top:8px}
+/* Pasta do projeto */
+.project-folder-bar{border-color:#d7d3ea;background:#f4f2fb;color:#3f3a66}.project-folder-bar .recovery-icon{background:#5b528f}.project-folder-bar.is-connected{border-color:#bfe4df;background:#edf8f6;color:#275d58}.project-folder-bar.is-connected .recovery-icon{background:var(--teal)}.project-folder-bar small{line-height:1.45}
+/* Figuras e imagens do texto, na composição */
+.composition-figures{border:1px solid #d7d3ea;border-radius:12px;overflow:hidden;background:#f8f7fd}.composition-figures>.composition-week-heading{padding:12px 14px 4px;flex-direction:column;align-items:flex-start;gap:4px}.composition-figure-row{grid-template-columns:minmax(220px,1.7fr) 110px;border-top:1px solid #e6e3f2}

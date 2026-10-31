@@ -193,6 +193,7 @@ export function toStudentLesson(lesson = {}) {
       title: text(meta.title),
       courseTitle: text(meta.courseTitle),
       weekNumber: Number(meta.weekNumber || 0) || 0,
+      unit: text(meta.unit) === "aula" || /^aula\b/i.test(text(meta.weekLabel)) ? "aula" : "semana",
       weekLabel: text(meta.weekLabel),
       calendarStartDate: text(meta.calendarStartDate),
       calendarEndDate: text(meta.calendarEndDate),
